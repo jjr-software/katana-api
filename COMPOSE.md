@@ -14,6 +14,7 @@ docker compose -f compose.yml up -d --build
 ## Notes
 
 - `katana.ryzen.jjrsoftware.co.uk` is used as the default host rule for both web and API routes.
+- Traefik routers are configured on `websecure` with `tls=true` and cert resolver `le-dns`.
 - API expects host PipeWire socket at `/run/user/1000/pipewire-0`.
 - API mounts `/dev/snd` for MIDI/audio access.
 - Startup checks fail hard if PipeWire socket, MIDI path, DB, or `amidi` are unavailable.

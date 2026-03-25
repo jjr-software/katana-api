@@ -1,4 +1,4 @@
-FROM node:20-bookworm
+FROM node:20-bookworm AS build
 
 WORKDIR /app
 
@@ -6,5 +6,9 @@ COPY package.json ./package.json
 RUN npm install
 
 COPY . .
+RUN npm run build
 
-CMD ["npm", "run", "start", "--", "--host", "0.0.0.0", "--port", "4200"]
+FROM caddy:2.10
+
+COPY Caddyfile /etc/caddy/Caddyfile
+COPY --from=build /app/dist/katana-web/browser /usr/share/caddy

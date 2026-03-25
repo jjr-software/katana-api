@@ -32,10 +32,12 @@ services:
       - /run/user/1000/pipewire-0:/run/user/1000/pipewire-0
       - /dev/snd:/dev/snd
     labels:
+      - com.dockerips.access.traefik-traefik-1=1
       - traefik.enable=true
-      - traefik.docker.network=dockerips
       - traefik.http.routers.katana-api.rule=Host(`katana.ryzen.jjrsoftware.co.uk`) && PathPrefix(`/api`)
-      - traefik.http.routers.katana-api.entrypoints=web
+      - traefik.http.routers.katana-api.entrypoints=websecure
+      - traefik.http.routers.katana-api.tls=true
+      - traefik.http.routers.katana-api.tls.certresolver=le-dns
       - traefik.http.services.katana-api.loadbalancer.server.port=8000
     networks:
       - app_internal
@@ -46,12 +48,14 @@ services:
       context: ./apps/web
     user: "1000:1000"
     labels:
+      - com.dockerips.access.traefik-traefik-1=1
       - traefik.enable=true
-      - traefik.docker.network=dockerips
       - traefik.http.routers.katana-web.rule=Host(`katana.ryzen.jjrsoftware.co.uk`)
-      - traefik.http.routers.katana-web.entrypoints=web
+      - traefik.http.routers.katana-web.entrypoints=websecure
+      - traefik.http.routers.katana-web.tls=true
+      - traefik.http.routers.katana-web.tls.certresolver=le-dns
       - traefik.http.routers.katana-web.priority=1
-      - traefik.http.services.katana-web.loadbalancer.server.port=4200
+      - traefik.http.services.katana-web.loadbalancer.server.port=80
     networks:
       - dockerips
 
