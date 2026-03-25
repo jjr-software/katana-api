@@ -23,6 +23,7 @@ services:
       DATABASE_URL: postgresql+psycopg://katana:katana@db:5432/katana
       PIPEWIRE_SOCKET: /run/user/1000/pipewire-0
       MIDI_DEVICE_DIR: /dev/snd
+      KATANA_MIDI_PORT: hw:1,0,0
       XDG_RUNTIME_DIR: /run/user/1000
     depends_on:
       db:
