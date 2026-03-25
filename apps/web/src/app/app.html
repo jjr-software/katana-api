@@ -1,0 +1,9 @@
+<main class="shell">
+  <h1>Katana Gen 3 Patch Manager</h1>
+  <p>Smoke test real amp communication from the web UI.</p>
+  <button type="button" (click)="testAmpConnection()" [disabled]="isLoading()">
+    {{ isLoading() ? 'Testing...' : 'Test Amp Connection' }}
+  </button>
+  <p class="status">{{ status() }}</p>
+  <pre>{{ responseJson() }}</pre>
+</main>
