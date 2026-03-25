@@ -1,0 +1,64 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: katana
+      POSTGRES_USER: katana
+      POSTGRES_PASSWORD: katana
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U katana -d katana"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - app_internal
+
+  api:
+    build:
+      context: ../../apps/api
+    user: "1000:1000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://katana:katana@db:5432/katana
+      PIPEWIRE_SOCKET: /run/user/1000/pipewire-0
+      MIDI_DEVICE_DIR: /dev/snd
+      XDG_RUNTIME_DIR: /run/user/1000
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - /run/user/1000/pipewire-0:/run/user/1000/pipewire-0
+      - /dev/snd:/dev/snd
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=dockerips
+      - traefik.http.routers.katana-api.rule=Host(`katana.local`) && PathPrefix(`/api`)
+      - traefik.http.routers.katana-api.entrypoints=web
+      - traefik.http.services.katana-api.loadbalancer.server.port=8000
+    networks:
+      - app_internal
+      - dockerips
+
+  web:
+    build:
+      context: ../../apps/web
+    user: "1000:1000"
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=dockerips
+      - traefik.http.routers.katana-web.rule=Host(`katana.local`)
+      - traefik.http.routers.katana-web.entrypoints=web
+      - traefik.http.routers.katana-web.priority=1
+      - traefik.http.services.katana-web.loadbalancer.server.port=4200
+    networks:
+      - dockerips
+
+volumes:
+  db_data:
+
+networks:
+  app_internal:
+    driver: bridge
+  dockerips:
+    external: true

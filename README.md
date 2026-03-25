@@ -1,6 +1,28 @@
-# BOSS TONE STUDIO for Linux 🎸🐧
+# Katana Gen 3 Patch Manager
 
-An unofficial port of BOSS TONE STUDIO to Linux.
+This repository is evolving into a full-stack web app for managing a BOSS/Roland Katana Gen 3 amp.
+
+Runtime target:
+- FastAPI + SQLAlchemy + Alembic + PostgreSQL backend,
+- Angular frontend (strict TypeScript),
+- Docker Compose deployment behind Traefik on `dockerips` (no host app port exposure).
+
+The `tauri/` folder is retained as a reverse-engineering source/reference for extracted JS assets, not as the primary runtime UI.
+
+Primary planning doc:
+- `docs/webapp-implementation-plan.md`
+
+Phase 1 scaffold paths:
+- `apps/api`
+- `apps/web`
+- `libs/katana-core`
+- `infra/compose/compose.yml`
+
+---
+
+# Legacy Notes: BOSS TONE STUDIO for Linux
+
+An earlier goal of this repository was an unofficial port of BOSS TONE STUDIO to Linux.
 
 ## Installing
 

@@ -1,0 +1,16 @@
+:root {
+  --bg: #0f1419;
+  --fg: #f7fafc;
+  --card: #1a202c;
+  --accent: #2b6cb0;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  font-family: "Segoe UI", "Noto Sans", sans-serif;
+  background: radial-gradient(circle at top, #1f2937, var(--bg));
+  color: var(--fg);
+}

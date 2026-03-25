@@ -1,0 +1,1 @@
+"""katana-core package scaffold."""
