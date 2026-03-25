@@ -53,4 +53,41 @@ export class App {
       this.isLoading.set(false);
     }
   }
+
+  async readCurrentPatch(): Promise<void> {
+    this.isLoading.set(true);
+    this.status.set('Reading current patch from amp...');
+    this.responseJson.set('');
+
+    try {
+      const response = await fetch('/api/v1/amp/current-patch', {
+        method: 'GET',
+        cache: 'no-store',
+      });
+
+      const payload = (await response.json()) as Record<string, unknown>;
+      if (!response.ok) {
+        this.status.set('Read current patch failed');
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+
+      this.status.set('Read current patch succeeded');
+      this.responseJson.set(JSON.stringify(payload, null, 2));
+    } catch (error: unknown) {
+      this.status.set('Read current patch failed');
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Browser request failed',
+            error: String(error),
+          },
+          null,
+          2,
+        ),
+      );
+    } finally {
+      this.isLoading.set(false);
+    }
+  }
 }
