@@ -34,7 +34,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=dockerips
-      - traefik.http.routers.katana-api.rule=Host(`katana.local`) && PathPrefix(`/api`)
+      - traefik.http.routers.katana-api.rule=Host(`katana.ryzen.jjrsoftware.co.uk`) && PathPrefix(`/api`)
       - traefik.http.routers.katana-api.entrypoints=web
       - traefik.http.services.katana-api.loadbalancer.server.port=8000
     networks:
@@ -48,7 +48,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=dockerips
-      - traefik.http.routers.katana-web.rule=Host(`katana.local`)
+      - traefik.http.routers.katana-web.rule=Host(`katana.ryzen.jjrsoftware.co.uk`)
       - traefik.http.routers.katana-web.entrypoints=web
       - traefik.http.routers.katana-web.priority=1
       - traefik.http.services.katana-web.loadbalancer.server.port=4200

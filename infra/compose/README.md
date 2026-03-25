@@ -13,7 +13,7 @@ docker compose -f infra/compose/compose.yml up -d --build
 
 ## Notes
 
-- `katana.local` is used as the default host rule for both web and API routes.
+- `katana.ryzen.jjrsoftware.co.uk` is used as the default host rule for both web and API routes.
 - API expects host PipeWire socket at `/run/user/1000/pipewire-0`.
 - API mounts `/dev/snd` for MIDI/audio access.
 - Startup checks fail hard if PipeWire socket, MIDI path, DB, or `amidi` are unavailable.
@@ -24,6 +24,6 @@ docker compose -f infra/compose/compose.yml up -d --build
 ```bash
 docker compose -f infra/compose/compose.yml up -d --build
 ```
-2. Open `http://katana.local`.
+2. Open `https://katana.ryzen.jjrsoftware.co.uk`.
 3. Click `Test Amp Connection`.
 4. Confirm the response JSON includes a SysEx identity reply (`response_hex` begins with `F0` and ends with `F7`).
