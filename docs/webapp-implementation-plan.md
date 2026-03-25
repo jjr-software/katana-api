@@ -33,7 +33,7 @@ Core workflows:
 - `apps/api`: FastAPI service exposing amp + patch APIs.
 - `apps/web`: Angular SPA.
 - `libs/katana-core`: shared Python library for MIDI SysEx, patch I/O, pipeline decode, leveling/matching.
-- `infra/compose`: compose and container config, Traefik labels, dockerips attachment.
+- `compose.yml` + `COMPOSE.md`: compose and runtime contract, Traefik labels, dockerips attachment.
 - `db` service: PostgreSQL internal-only on compose network.
 
 Tauri remains non-runtime and is retained only for extracted JS/resources used in protocol decoding research.
@@ -107,7 +107,7 @@ UX requirements:
 
 ## Delivery Phases
 ### Phase 1: Foundation
-- Monorepo structure (`apps/`, `libs/`, `infra/compose/`).
+- Monorepo structure (`apps/`, `libs/`) plus root `compose.yml`.
 - Container build skeleton for API + Web.
 - Compose stack with Traefik/dockerips labels (no host ports).
 - Postgres service + Alembic wiring.

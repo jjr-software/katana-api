@@ -8,7 +8,7 @@ This stack is Traefik/dockerips-first:
 ## Start
 
 ```bash
-docker compose -f infra/compose/compose.yml up -d --build
+docker compose -f compose.yml up -d --build
 ```
 
 ## Notes
@@ -22,7 +22,7 @@ docker compose -f infra/compose/compose.yml up -d --build
 
 1. Start the stack:
 ```bash
-docker compose -f infra/compose/compose.yml up -d --build
+docker compose -f compose.yml up -d --build
 ```
 2. Open `https://katana.ryzen.jjrsoftware.co.uk`.
 3. Click `Test Amp Connection`.

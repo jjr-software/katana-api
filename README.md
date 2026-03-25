@@ -16,7 +16,8 @@ Phase 1 scaffold paths:
 - `apps/api`
 - `apps/web`
 - `libs/katana-core`
-- `infra/compose/compose.yml`
+- `compose.yml`
+- `COMPOSE.md`
 
 ---
 
