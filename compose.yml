@@ -19,11 +19,17 @@ services:
     build:
       context: ./apps/api
     user: "1000:1000"
+    group_add:
+      - "29"
+    device_cgroup_rules:
+      - "c 116:* rmw"
+    security_opt:
+      - systempaths=unconfined
     environment:
       DATABASE_URL: postgresql+psycopg://katana:katana@db:5432/katana
       PIPEWIRE_SOCKET: /run/user/1000/pipewire-0
       MIDI_DEVICE_DIR: /dev/snd
-      KATANA_MIDI_PORT: hw:1,0,0
+      KATANA_MIDI_PORT: ${KATANA_MIDI_PORT:?Set KATANA_MIDI_PORT via scripts/resolve_katana_midi.py}
       XDG_RUNTIME_DIR: /run/user/1000
     depends_on:
       db:
