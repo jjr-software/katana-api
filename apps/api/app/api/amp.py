@@ -18,12 +18,7 @@ class AmpConnectionTestResponse(BaseModel):
 
 class CurrentPatchResponse(BaseModel):
     created_at: str
-    amp: list[int]
-    booster: list[int]
-    ge10_raw: list[int]
-    ge10_db: list[int]
-    ns: list[int]
-    metadata: dict
+    patch: dict
 
 
 @router.get("/test-connection", response_model=AmpConnectionTestResponse)
@@ -64,10 +59,5 @@ async def current_patch(client: AmpClient = Depends(get_amp_client)) -> CurrentP
 
     return CurrentPatchResponse(
         created_at=datetime.now().isoformat(timespec="seconds"),
-        amp=snapshot.amp,
-        booster=snapshot.booster,
-        ge10_raw=snapshot.ge10_raw,
-        ge10_db=[value - 24 for value in snapshot.ge10_raw],
-        ns=snapshot.ns,
-        metadata={"eq_switch": snapshot.eq_switch},
+        patch=snapshot.payload,
     )
