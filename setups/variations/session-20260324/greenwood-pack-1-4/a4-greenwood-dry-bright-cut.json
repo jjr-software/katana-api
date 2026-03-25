@@ -1,0 +1,10 @@
+{
+  "created_at": "2026-03-24T16:30:00",
+  "method": "base-variant",
+  "intent": "Johnny Greenwood dry with tighter high cut",
+  "amp": [44, 72, 45, 63, 44, 48, 1, 1, 0, 0],
+  "booster": [13, 95, 47, 46, 0, 50, 50, 0],
+  "ge10_raw": [22, 23, 24, 25, 26, 27, 26, 23, 20, 17, 24],
+  "ns": [0, 50, 50],
+  "dry_default": true
+}

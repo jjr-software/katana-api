@@ -1,0 +1,55 @@
+{
+  "created_at": "2026-03-23T18:20:02",
+  "slug": "rat",
+  "pedal_type": 14,
+  "intent": "Radiohead-adjacent grainy aggression; upper-mid snarl with fizz trim.",
+  "amp": [
+    30,
+    78,
+    38,
+    72,
+    52,
+    30,
+    0,
+    1,
+    1,
+    0
+  ],
+  "amp_type_name": "clean",
+  "booster": [
+    14,
+    76,
+    40,
+    58,
+    0,
+    50,
+    68,
+    0
+  ],
+  "ge10_raw": [
+    17,
+    19,
+    21,
+    23,
+    28,
+    31,
+    30,
+    24,
+    17,
+    14,
+    24
+  ],
+  "ge10_db": [
+    -7,
+    -5,
+    -3,
+    -1,
+    4,
+    7,
+    6,
+    0,
+    -7,
+    -10,
+    0
+  ]
+}

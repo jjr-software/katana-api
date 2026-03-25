@@ -1,0 +1,54 @@
+{
+  "created_at": "2026-03-23T18:08:40",
+  "pedal_type": 1,
+  "pedal_slug": "clean-boost",
+  "amp": [
+    32,
+    81,
+    46,
+    75,
+    47,
+    24,
+    0,
+    1,
+    1,
+    0
+  ],
+  "booster": [
+    1,
+    63,
+    44,
+    46,
+    0,
+    50,
+    60,
+    0
+  ],
+  "ge10_raw": [
+    20,
+    18,
+    18,
+    22,
+    27,
+    24,
+    28,
+    23,
+    23,
+    18,
+    24
+  ],
+  "ge10_db": [
+    -4,
+    -6,
+    -6,
+    -2,
+    3,
+    0,
+    4,
+    -1,
+    -1,
+    -6,
+    0
+  ],
+  "notes": "Randomized clean+box variation with dry default recall."
+}

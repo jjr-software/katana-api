@@ -1,0 +1,55 @@
+{
+  "created_at": "2026-03-23T18:25:12",
+  "method": "manual-hand-tuned",
+  "intent": "Graham Coxon-inspired 90s Brit scratch: lean lows, sharp upper-mids, dry",
+  "amp": [
+    28,
+    78,
+    32,
+    76,
+    52,
+    30,
+    0,
+    1,
+    1,
+    0
+  ],
+  "amp_type_name": "clean",
+  "booster": [
+    13,
+    74,
+    36,
+    62,
+    0,
+    50,
+    70,
+    0
+  ],
+  "booster_name": "distortion",
+  "ge10_raw": [
+    17,
+    19,
+    21,
+    23,
+    28,
+    31,
+    31,
+    26,
+    21,
+    17,
+    24
+  ],
+  "ge10_db": [
+    -7,
+    -5,
+    -3,
+    -1,
+    4,
+    7,
+    7,
+    2,
+    -3,
+    -7,
+    0
+  ]
+}

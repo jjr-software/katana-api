@@ -1,0 +1,449 @@
+# Agent Session Notes
+
+## Scope
+- Date: 2026-03-22
+- Device under test: BOSS/Roland KATANA Gen 3 over USB MIDI
+- Goal: verify manual SysEx control/readback and identify working command flow
+
+## What Was Confirmed
+- Katana is visible to host:
+  - `lsusb`: `0582:02f0 Roland Corp. KATANA3`
+  - `amidi -l`: `hw:1,0,0  KATANA3 MIDI 1`
+- Raw read/write SysEx works through `amidi`.
+- `EDITOR_COMMUNICATION_MODE` must be `1` for reliable live control.
+  - Before enabling it, many commands appeared to have no audible effect.
+  - After enabling it, patch switching became audible and reliable.
+
+## Key Readback Examples
+- Identity request works:
+  - Sent: `F0 7E 7F 06 01 F7`
+  - Reply: `F0 7E 10 06 02 41 07 05 00 00 06 00 00 00 F7`
+- Editor communication mode readback:
+  - RQ1: `F0 41 10 01 05 07 11 7F 00 00 01 00 00 00 01 7F F7`
+  - DT1 reply value observed: `00` (off), then `01` (on) after write
+- GA-FC connected and detected:
+  - RQ1: `F0 41 10 01 05 07 11 7F 01 02 02 00 00 00 01 7B F7`
+  - Reply observed: `... 7F 01 02 02 03 ...`
+
+## Commands Used Successfully
+- Turn editor mode ON:
+  - `F0 41 10 01 05 07 12 7F 00 00 01 01 7F F7`
+- Patch select (worked audibly after editor mode ON):
+  - A:CH1: `F0 41 10 01 05 07 12 7F 00 01 00 00 01 7F F7`
+  - A:CH2: `F0 41 10 01 05 07 12 7F 00 01 00 00 02 7E F7`
+  - A:CH3: `F0 41 10 01 05 07 12 7F 00 01 00 00 03 7D F7`
+
+## LINE OUT Investigation
+- Parameters were read/written successfully:
+  - `LINEOUT_COM%0` at `0x10001800`
+  - `LINEOUT_COM%1` (AIR FEEL mode) at `0x10001801`
+  - `LINEOUT_COM%2` at `0x10001802`
+  - `LINEOUT(1)%4` ambience at `0x10001A04`
+  - `LINEOUT(2)%4` ambience at `0x10001C04`
+- AIR FEEL options in extracted resources: `REC, LIVE, BLEND`.
+- Writes and readbacks were consistent, but audible impact depended on active mode/path.
+
+## Extracted Source Location (for protocol map)
+- `manual-extract/installer_extracted/localappdata/Roland/BOSS TONE STUDIO for KATANA Gen 3/html/js/config/address_map.js`
+- `manual-extract/installer_extracted/localappdata/Roland/BOSS TONE STUDIO for KATANA Gen 3/html/js/businesslogic/bts/address_const.js`
+- `manual-extract/installer_extracted/localappdata/Roland/BOSS TONE STUDIO for KATANA Gen 3/html/js/common/midi_controller.js`
+- `manual-extract/installer_extracted/localappdata/Roland/BOSS TONE STUDIO for KATANA Gen 3/html/js/config/product_setting.js`
+
+## Practical Note
+- For manual host testing, this pattern worked well:
+  - `amidi -p hw:1,0,0 -S "<SYSEX_HEX>"`
+  - `amidi -p hw:1,0,0 -d -t 2 -S "<RQ1_SYSEX_HEX>"`
+
+## Session Signposting
+- Keep this file updated at the end of meaningful work sessions.
+- Add one dated entry per session with:
+  - what was discovered/changed,
+  - where key files/commands live,
+  - current status and next recommended step.
+
+## Session Update - 2026-03-24
+- Confirmed patch tool exists and is active at:
+  - `python/katana_patch_tool.py`
+- Current CLI surface:
+  - `save` (read amp state to snapshot JSON),
+  - `pull` (alias of `save`),
+  - `apply` (apply snapshot JSON to amp),
+  - `level` (auto-level patch snapshots),
+  - `sample` (USB level sampling to console/JSONL).
+- Command docs are in:
+  - `python/README.md`
+- Suggested next session starting point:
+  - run one end-to-end smoke command (for example `pull` or `apply`) before deeper changes.
+- `save` command run confirmed on host MIDI:
+  - `python3 python/katana_patch_tool.py --port hw:1,0,0 save --out setups/backups/current-patch-backup-YYYYMMDD-HHMMSS.json`
+  - Snapshot written: `setups/backups/current-patch-backup-20260324-131043.json`
+- Bugfix recorded:
+  - File: `python/katana/sysex.py`
+  - `build_rq1()` size encoding corrected from 3-byte to Roland 4-byte size field (`00 00 00 NN` style).
+  - Symptom before fix: `No DT1 response` during `pull/save` despite manual `amidi` reads working.
+
+## Session Update - 2026-03-24 (Live FFT Check While Playing)
+- Current live patch was backed up before capture:
+  - `setups/backups/current-patch-backup-20260324-131352.json`
+- Core patch values at capture time:
+  - `amp`: `[44,75,45,65,45,50,1,1,0,0]`
+  - `booster`: `[13,100,49,48,0,50,50,0]`
+  - `ge10_raw`: `[24,24,24,24,24,24,24,24,24,24,24]`
+  - `ns`: `[0,50,50]`
+  - `dry_default`: `true`
+- Matching against `setups/variations/**/snapshot.json`:
+  - Exact matches: `0` (current state appears to be a distinct live state).
+- Amp block manual readback succeeded during this session:
+  - RQ1: `F0 41 10 01 05 07 11 20 00 06 00 00 00 00 0A 50 F7`
+  - DT1: `F0 41 10 01 05 07 12 20 00 06 00 2C 4B 2D 41 2D 32 01 01 00 00 14 F7`
+- FFT capture performed while user played:
+  - WAV: `setups/recordings/katana_take_20260324-131457_active.wav`
+  - TXT: `setups/analysis/fft_20260324-131457_active.txt`
+  - JSON: `setups/analysis/fft_20260324-131457_active.json`
+  - Active RMS: `-21.385 dBFS`
+  - Active Peak: `-11.34 dBFS`
+  - Crest Factor: `10.045 dB`
+  - Spectral Centroid: `216.852 Hz`
+  - 95% Rolloff: `249.023 Hz`
+  - Band power %:
+    - `bass_40_250`: `95.568%`
+    - `low_mid_250_500`: `1.428%`
+    - `mid_500_2k`: `1.458%`
+    - `high_mid_2k_6k`: `1.546%`
+    - `presence_6k_12k`: `0.001%`
+    - `air_12k_20k`: `0.0%`
+
+## Session Update - 2026-03-24 (Patch Load)
+- Applied Coxon keeper baseline patch to amp:
+  - `setups/variations/by-pedal/coxon-keeper/base-manual-90s-graham-coxon-20260323-182512/snapshot.json`
+- Command used:
+  - `python3 python/katana_patch_tool.py --port hw:1,0,0 apply --patch <snapshot>`
+
+## Session Update - 2026-03-24 (Coxon vs Original Consistency Check)
+- Capture on Coxon keeper (while playing):
+  - WAV: `setups/recordings/katana_take_20260324-131856_active.wav`
+  - JSON: `setups/analysis/fft_20260324-131856_active.json`
+  - RMS/Peak: `-24.891 / -14.238 dBFS`
+  - Centroid/Roll95: `881.150 / 3708.984 Hz`
+  - Bands: bass `56.436%`, low-mid `15.892%`, mid `9.114%`, high-mid `18.520%`
+- Re-applied original patch backup:
+  - `setups/backups/current-patch-backup-20260324-131352.json`
+- Capture on reloaded original (while playing):
+  - WAV: `setups/recordings/katana_take_20260324-131925_active.wav`
+  - JSON: `setups/analysis/fft_20260324-131925_active.json`
+  - RMS/Peak: `-21.884 / -11.328 dBFS`
+  - Centroid/Roll95: `332.376 / 981.445 Hz`
+  - Bands: bass `68.130%`, low-mid `25.386%`, mid `2.822%`, high-mid `3.645%`
+- Original-vs-original consistency against earlier run (`fft_20260324-131457_active.json`):
+  - Level is close (`RMS delta -0.499 dB`, `Peak delta +0.012 dB`).
+  - Spectral shape changed significantly (earlier was much more sub/bass heavy: `95.568%` in `40-250 Hz`; rerun is `68.130%`).
+  - Implication: playing variation/pick attack/string choice has a large effect; for tighter patch profiling, capture a fixed riff with near-identical articulation across takes.
+
+## Session Update - 2026-03-24 (New Patch Idea: Mild Comp Clean v01)
+- Goal from user: mild compression feel for cleaner RHCP/chilli-style tone.
+- Constraint: current patch toolkit does not expose an explicit compressor pedal type index; used a `clean-boost` based approximation.
+- Created snapshot:
+  - `setups/variations/mixed/mild-comp-clean-v01-20260324-132202/snapshot.json`
+- Applied snapshot to amp.
+- Key settings:
+  - `amp`: `[22,75,42,62,58,54,1,1,0,0]`
+  - `booster` (`clean-boost`): `[1,18,50,45,0,50,58,0]`
+  - `dry_default`: `true`
+
+## Session Update - 2026-03-24 (Quick Level-Match Attempts)
+- User requested keeping patch loudness consistent across ideas.
+- Method used:
+  - baseline meter pass on original patch with `katana_patch_tool.py sample` (6 x 1s windows),
+  - then `katana_patch_tool.py level` targeting baseline RMS.
+- Baseline pass (original patch) measured near `-21.9 dBFS` RMS on PipeWire source `alsa_input.usb-Roland_KATANA3-01.analog-surround-40`.
+- Two leveler runs on `mild-comp-clean-v01` measured very low RMS (`~ -39 dBFS`) and pushed `amp_volume` to `100` in generated level-matched snapshots:
+  - `setups/variations/level-matched/mild-comp-clean-v01-20260324-132202-lvl-20260324-132326/snapshot.json`
+  - `setups/variations/level-matched/mild-comp-clean-v01-20260324-132202-lvl-20260324-132504/snapshot.json`
+- Safety/reset:
+  - Re-applied base `mild-comp-clean-v01` snapshot (`amp_volume=75`) after each run to avoid leaving the amp at max output.
+
+## Session Update - 2026-03-24 (Clean Loudness Rule)
+- Critical finding from user testing:
+  - In clean modes with low amp gain, usable loudness is hard to achieve.
+  - Working rule: keep clean patch gain around `50` as a floor for practical output level.
+- Created and applied variant:
+  - `setups/variations/mixed/mild-comp-clean-v02-gain50-20260324-132649/snapshot.json`
+- v02 key change:
+  - `amp` moved to `[50,68,42,62,58,54,1,1,0,0]` (gain raised to `50`, amp volume re-centered).
+
+## Session Update - 2026-03-24 (Locked Good Patch + New Reference dB)
+- User requested this current state be tracked as a "good patch" and used to set a new dB reference.
+- Saved good patch snapshot:
+  - `setups/variations/good/solid-clean-20260324-134019/snapshot.json`
+- Readable state at save time:
+  - `amp`: `[46,82,50,50,51,54,1,1,0,0]`
+  - `booster`: `[1,18,50,45,0,50,58,0]` (`clean-boost`)
+  - `ge10_raw`: `[24,24,24,24,24,24,24,24,24,24,24]`
+  - `ns`: `[0,50,50]` (off)
+- New reference capture (while playing, `--set-reference`):
+  - WAV: `setups/recordings/katana_take_20260324-134037_active.wav`
+  - JSON: `setups/analysis/fft_20260324-134037_active.json`
+  - Reference file updated: `setups/analysis/db_reference.json`
+  - New target values:
+    - `target_rms_dbfs`: `-27.98`
+    - `target_peak_dbfs`: `-17.825`
+  - Label: `solid-clean-20260324-134019`
+
+## Session Update - 2026-03-24 (Coxon Volume-Right, Character-Safe)
+- User requirement: for character patches (example: Coxon), avoid changing gain to preserve tone character; treat loudness with volume controls.
+- Procedure run:
+  - Loaded base Coxon keeper patch:
+    - `setups/variations/by-pedal/coxon-keeper/base-manual-90s-graham-coxon-20260323-182512/snapshot.json`
+  - Level-matched to current reference target (`-27.98 dBFS`) in two passes.
+- Final applied snapshot:
+  - `setups/variations/level-matched/base-manual-90s-graham-coxon-20260323-182512-lvl-20260324-134432-lvl-20260324-134453/snapshot.json`
+- Final convergence record:
+  - `mean_rms_dbfs: -27.383`, `error_db: -0.597`, status `within_tolerance`.
+- Final key params:
+  - `amp`: `[28,59,32,76,52,30,0,1,1,0]`
+  - `booster`: `[13,74,36,62,0,50,70,0]`
+
+## Session Update - 2026-03-24 (PipeWire A/B Swap RMS Utility)
+- Added utility:
+  - `setups/analysis/ab_swap_rms.py`
+- Purpose:
+  - alternate two patches repeatedly,
+  - measure RMS per patch using PipeWire stream windows,
+  - report per-cycle and mean `delta(B-A)` in dB.
+- Example:
+  - `python3 setups/analysis/ab_swap_rms.py --patch-a <patchA.json> --patch-b <patchB.json> --cycles 4 --windows-per-patch 4 --window-sec 1.0 --settle-sec 1.0 --source alsa_input.usb-Roland_KATANA3-01.analog-surround-40 --report-json setups/analysis/ab_swap_report.json`
+
+## Session Update - 2026-03-24 (A/B Level Iteration: Clean vs Coxon)
+- A/B measurement run (PipeWire swap utility):
+  - A: `setups/variations/good/solid-clean-20260324-134019/snapshot.json`
+  - B: `setups/variations/level-matched/coxon-character-safe-quieter-v01-20260324-134611/snapshot.json`
+  - Report: `setups/analysis/ab_swap_report_clean_vs_coxon_v01.json`
+  - Mean delta (`B - A`): `+0.232 dB` (Coxon slightly louder).
+- Fine trim created:
+  - `setups/variations/level-matched/coxon-character-safe-quieter-v02-20260324-135740/snapshot.json`
+  - Change: `amp_volume -1` (character-safe trim).
+- Quick verify run:
+  - Report: `setups/analysis/ab_swap_report_clean_vs_coxon_v02.json`
+  - One cycle showed low/quiet clean playing (outlier); stable cycle indicates Coxon still about `+0.5 dB` louder.
+- Current applied working patch: `coxon-character-safe-quieter-v02`.
+- Re-run with controlled playing:
+  - Report: `setups/analysis/ab_swap_report_clean_vs_coxon_v02_rerun.json`
+  - Mean delta (`B - A`): `-0.031 dB` (effectively matched).
+
+## Session Update - 2026-03-24 (Session Folder + Slot Write Limitation)
+- Created session folder for today:
+  - `setups/variations/session-20260324/`
+- Added files:
+  - `slot1-before-fix-snapshot.json` (backup before attempted correction)
+  - `slot1-gain50-clean-snapshot.json` (intended gain-50 clean target)
+- Critical behavior observed:
+  - `katana_patch_tool.py apply --slot N` updates the current edit buffer, but did not persist to GA-FC channel memory in this test.
+  - Verification after apply+reselect on slot 1 still read old patch values (`gain=80`, `volume=85`).
+
+## Session Update - 2026-03-24 (Write/Read/Verify Bug Found + Fixed)
+- Hard gate test established:
+  - write -> read verify on live buffer (pass),
+  - store to slot -> reselect -> read verify (initially flaky in CLI, then fixed).
+- Root cause:
+  - Toolchain lacked the BTS `PATCH_WRITE` commit command (`0x7F000104`), so slot memory was not being committed.
+  - After adding commit, immediate verify could race the device write completion.
+- Fixes implemented:
+  - `python/katana/midi.py`: added `PATCH_WRITE_ADDR` and `write_patch(slot)`.
+  - `python/katana/patch_ops.py`: `apply_patch(..., store=True)` now commits slot memory and adds short settle delay.
+  - `python/katana_patch_tool.py`: `apply` gained `--store` and `--verify`.
+- Verified command (pass):
+  - `python3 python/katana_patch_tool.py --port hw:1,0,0 apply --slot 1 --store --verify --patch setups/variations/session-20260324/slot1-gain50-clean-snapshot.json`
+  - Output: `Verify OK: amp/booster/ge10/ns readback matches snapshot`
+
+## Session Update - 2026-03-24 (Speed-Up for Multi-Slot Programming)
+- Added fast batch command:
+  - `katana_patch_tool.py apply-batch --slot-patch SLOT=PATH ...`
+- Purpose:
+  - write/store multiple slots in one run without expensive per-slot verify overhead.
+- Optional end-check:
+  - add `--verify-end` to verify all programmed slots after batch write.
+
+## Session Update - 2026-03-24 (Five-Slot Workflow Verbs)
+- Added two new CLI verbs in `python/katana_patch_tool.py`:
+  - `setup-5`: programs exactly five consecutive slots from five `--patch` snapshot paths, stores each slot, optional `--verify-end`, and writes a manifest JSON.
+  - `cycle-5`: cycles across five consecutive slots for auditioning (`--dwell-sec`, `--cycles`).
+- Kept CLI on `argparse` with `asyncio` coroutine handlers.
+  - Reason: Typer was considered, but this host currently has no Typer runtime dependency installed and the existing async-first flow remains simpler/reliable with zero extra package requirement.
+- Docs updated:
+  - `python/README.md` now includes `setup-5` and `cycle-5` examples and the CLI framework note.
+
+## Session Update - 2026-03-24 (Special Active Mode: Cycle Loudness Match)
+- Extended `cycle-5` with an active loudness-match mode:
+  - flag: `--active-match`
+  - behavior: uses the first slot in the cycle as reference, then adjusts `AMP VOLUME` on the other 4 slots until each is within tolerance of reference RMS.
+- Key options added:
+  - `--measure-seconds`, `--match-tol-db`, `--max-match-iters`, `--match-step-scale`, `--match-max-step`,
+  - `--active-floor-dbfs`, `--source`, `--rate`, `--channels`, `--window-sec`, `--settle-sec`,
+  - `--store` to persist matched values to slot memory,
+  - `--report-json` for run report output.
+- Docs updated:
+  - `python/README.md` includes a concrete `cycle-5 --active-match` command example.
+
+## Session Update - 2026-03-24 (Dedicated Match Verb)
+- Per workflow simplification request, matching logic now has its own dedicated verb:
+  - `match-5`
+- `cycle-5` is now audition-only again (no matching flags/behavior).
+- `match-5` defaults:
+  - reference is slot 1 of the selected 5-slot block (`--start-slot`, default `1`),
+  - uses active RMS matching and adjusts AMP VOLUME on slots 2..5,
+  - stores matched values by default (disable with `--no-store`),
+  - writes a timestamped report under `setups/analysis/match5_report_*.json`.
+
+## Session Update - 2026-03-24 (Manual Target Input for Match Verb)
+- `match-5` now prompts at runtime for target RMS:
+  - user can enter a numeric dBFS value to use as manual target, or
+  - press Enter to fall back to slot-1 reference sampling.
+- This keeps the one-verb workflow while allowing manual target entry without extra CLI flags.
+
+## Session Update - 2026-03-24 (Match-5 Speed + Live Measured Output)
+- Updated `match-5` progress output to include measured/target/error on every iteration.
+- Updated slot labels in active matching logs to `A:1..A:5` for the five-slot set.
+- Improved speed defaults:
+  - measure window reduced (`2.0s` total using `0.5s` windows),
+  - settle delay reduced to `0.25s`,
+  - more iterations allowed (`8`) for faster but still convergent behavior.
+- Matching now applies live edits per iteration and only stores once at final per slot (when store is enabled), reducing write latency and avoiding repeated commit overhead.
+
+## Session Update - 2026-03-24 (Greenwood Pack on A:1..A:4)
+- Loaded four Greenwood-focused snapshots to slots `A:1..A:4` from:
+  - `setups/variations/session-20260324/greenwood-pack-1-4/a1-greenwood-dry-base.json`
+  - `setups/variations/session-20260324/greenwood-pack-1-4/a2-greenwood-eq-shaped.json`
+  - `setups/variations/session-20260324/greenwood-pack-1-4/a3-guvds-manual-90s-greenwoodish.json`
+  - `setups/variations/session-20260324/greenwood-pack-1-4/a4-greenwood-dry-bright-cut.json`
+- Note:
+  - `apply-batch --verify-end` reported a verify mismatch immediately after write,
+  - direct slot audit afterwards confirmed stored values on slots 1..4 match expected patch payloads.
+
+## Session Update - 2026-03-24 (Pipeline Utilities Foundation)
+- Added dedicated pipeline library:
+  - `python/katana/pipeline.py`
+- New capabilities:
+  - reads patch routing and stage blocks using BTS address map layout,
+  - reports on/off and key values for amp, booster, mod, fx, delay, delay2, reverb, eq1/eq2, ns, send/return, solo, pedalfx,
+  - includes selected color/type context and raw block values.
+- Added CLI verb:
+  - `python3 python/katana_patch_tool.py pipeline`
+  - optional: `--slot N` and `--json`.
+- `match-5` now captures this pipeline report per slot and prints stage details before matching that slot.
+
+## Session Update - 2026-03-24 (Fast Connection Sanity Verb)
+- Added dedicated connectivity verb:
+  - `python3 python/katana_patch_tool.py test-connection`
+- Purpose:
+  - fast Katana USB MIDI sanity check without the heavier `pipeline` read sweep,
+  - checks identity reply, forces editor mode on, verifies editor mode readback (`0x7F000001`),
+  - optional slot probe with `--slot N` to validate patch select + amp-block read.
+- Files changed:
+  - `python/katana_patch_tool.py`
+  - `python/README.md`
+- Practical usage:
+  - quick check: `python3 python/katana_patch_tool.py --port hw:1,0,0 test-connection`
+  - with slot probe JSON: `python3 python/katana_patch_tool.py --port hw:1,0,0 test-connection --slot 1 --json`
+
+## Session Update - 2026-03-24 (Pipeline Output Decode + Colour)
+- Enhanced pipeline text output to be fully decoded for inspected blocks:
+  - includes named per-byte fields for amp, booster, mod, fx, delay, delay2, reverb, eq1/eq2, ns, send/return, solo, pedalfx.
+  - GE10 now includes centered step view (`value-24`) for quick reading.
+- Added pipeline colour control:
+  - `--color auto|always|never` (default `auto`).
+  - useful on hosts where stdout is not detected as TTY (`--color always`).
+- Files changed:
+  - `python/katana/pipeline.py`
+  - `python/katana_patch_tool.py`
+  - `python/README.md`
+
+## Session Update - 2026-03-24 (Python Toolkit Moved To Repo Root)
+- Relocated toolkit directory:
+  - from `setups/python/` to `python/` at repository root.
+- Canonical CLI path is now:
+  - `python3 python/katana_patch_tool.py ...`
+- Updated path references in docs/session notes accordingly.
+
+## Session Update - 2026-03-24 (Pipeline Spinner + Full Channel Fetch)
+- Added npm-style live status spinner for pipeline fetch progress:
+  - uses `\r` animation and updates messages as each block is read.
+- Added progress hooks in pipeline reader:
+  - reports what is being fetched (routing, colors, amp, variants, EQ, NS, etc.).
+- Added full channel fetch mode:
+  - `pipeline` now defaults to downloading and printing all channels `A:1..B:4` when `--slot` is omitted.
+  - single-slot scoped read remains available with `--slot N`.
+- Files changed:
+  - `python/katana/pipeline.py`
+  - `python/katana_patch_tool.py`
+  - `python/katana/__init__.py`
+  - `python/README.md`
+
+## Session Update - 2026-03-24 (Pipeline Type Name Decode + Local Cache)
+- Added decoded type-name rendering in pipeline text output:
+  - example fields now render as `type=RAT(14)`, `type=CHORUS(23)`, `type=DIGITAL(0)`, etc.
+  - applied to amp type, booster type, mod/fx type, delay type, reverb type/layer mode, EQ type, send/return mode+position, pedal-fx type, and chain pattern.
+- Added BTS resource parser + local cache:
+  - new module: `python/katana/decode.py`
+  - source table: `manual-extract/.../html/js/config/resource.js`
+  - cache file: `python/.cache/decode_tables.json`
+  - cache invalidates automatically when the source file size/mtime changes.
+
+## Session Update - 2026-03-24 (Pipeline OFF Filtering Switch)
+- Pipeline text output now hides OFF blocks by default for cleaner reading.
+- Added CLI switch to include them when needed:
+  - `python3 python/katana_patch_tool.py pipeline --show-off`
+- JSON output behavior is unchanged (full payload still available with `--json`).
+
+## Session Update - 2026-03-24 (Full Amp-State Download Command)
+- Added new CLI verb for full download + dated cache:
+  - `python3 python/katana_patch_tool.py dump-amp-state`
+- Behavior:
+  - fetches full pipeline payload for all slots/channels `A:1..B:4`,
+  - writes timestamped JSON by default to:
+    - `setups/backups/amp-state-YYYYMMDD-HHMMSS.json`
+  - supports custom output path via `--out`.
+
+## Session Update - 2026-03-24 (Leveling Rule: Stomp Bypass Then Restore)
+- `level` workflow now applies a staging rule aligned with physical pedal-chain gain logic:
+  - core loudness match runs with stomp-style blocks bypassed,
+  - then previously-active blocks are restored progressively one-by-one,
+  - AMP volume is trimmed during restore so final level remains controlled.
+- New level flags:
+  - `--no-bypass-stomps` to keep full chain active throughout,
+  - `--no-progressive-restore` to restore all blocks in one step.
+- Core files updated:
+  - `python/katana/patch_ops.py` (stage-state read/write/bypass helpers)
+  - `python/katana/leveling.py` (staged leveling algorithm)
+  - `python/katana_patch_tool.py` (CLI flags wiring)
+
+## Session Update - 2026-03-24 (Pipeline Reads From Dump File)
+- Added offline source option for pipeline rendering:
+  - `python3 python/katana_patch_tool.py pipeline --dump-file <amp-state.json>`
+- Behavior:
+  - renders the same decoded pipeline output from a saved `dump-amp-state` JSON file,
+  - supports `--slot`, `--json`, `--show-off`, `--color` in dump-file mode,
+  - avoids live MIDI reads when you want to inspect cached snapshots.
+
+## Session Update - 2026-03-25 (Flattened `by-pedal` Structure)
+- Removed pedal-type category nesting under:
+  - `setups/variations/by-pedal/<pedal-type>/<variation>/...`
+- New canonical layout is flat:
+  - `setups/variations/by-pedal/<variation>/...`
+- Existing variation folders were moved up one level (no name collisions found).
+- Updated path references in docs/scripts/state JSON and level-matched metadata where old nested paths were embedded.
+- Updated generators so new runs stay flat:
+  - `setups/variations/by-pedal/random_pedal_pick.py`
+  - `setups/variations/by-pedal/intentional_pedal_cycle.py`
+- Updated `setups/variations/by-pedal/README.md` to document flat naming convention and metadata-in-JSON rule.
+
+## Session Update - 2026-03-25 (.gitignore Expansion for Python Workflow)
+- Expanded repository root `.gitignore` from minimal entries to a fuller Python-oriented baseline.
+- Added ignores for:
+  - Python caches/bytecode, virtualenvs, packaging/build artifacts, test/coverage outputs, editor/OS clutter.
+  - Repo-local generated outputs from current workflow:
+    - `python/.cache/`
+    - `setups/backups/`
+    - `setups/recordings/`
+    - `setups/analysis/*.json`
+    - `setups/analysis/*.txt`
+- Kept patch/snapshot sources under `setups/variations/**` unaffected.

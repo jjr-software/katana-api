@@ -1,0 +1,10 @@
+{
+  "created_at": "2026-03-24T16:30:00",
+  "method": "reuse-existing-guv-ds-manual-90s",
+  "intent": "Greenwood-ish guv-ds 90s voicing",
+  "amp": [30, 78, 36, 74, 50, 28, 0, 1, 1, 0],
+  "booster": [15, 80, 40, 56, 0, 50, 70, 0],
+  "ge10_raw": [19, 21, 23, 25, 27, 29, 28, 24, 21, 18, 24],
+  "ns": [1, 50, 40],
+  "dry_default": true
+}

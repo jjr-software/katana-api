@@ -1,0 +1,59 @@
+{
+  "created_at": "2026-03-23T19:31:28",
+  "source_snapshot": "/home/will/dev/BOSS-TONE-STUDIO-for-Linux/setups/variations/by-pedal/intentional-20260323-181211/snapshot.json",
+  "target_rms_dbfs": -29.0,
+  "amp": [
+    24,
+    96,
+    42,
+    70,
+    50,
+    28,
+    0,
+    1,
+    1,
+    0
+  ],
+  "booster": [
+    9,
+    64,
+    46,
+    50,
+    0,
+    50,
+    86,
+    0
+  ],
+  "ge10_raw": [
+    19,
+    21,
+    22,
+    24,
+    26,
+    28,
+    27,
+    23,
+    19,
+    16,
+    24
+  ],
+  "ns": [
+    1,
+    18,
+    40
+  ],
+  "history": [
+    {
+      "iter": 1,
+      "samples": 2,
+      "mean_rms_dbfs": -36.185,
+      "error_db": 7.185
+    },
+    {
+      "iter": 2,
+      "samples": 2,
+      "mean_rms_dbfs": -36.403,
+      "error_db": 7.403
+    }
+  ]
+}

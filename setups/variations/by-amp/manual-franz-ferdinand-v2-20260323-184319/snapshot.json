@@ -1,0 +1,47 @@
+{
+  "created_at": "2026-03-23T18:43:19",
+  "method": "manual-hand-tuned",
+  "intent": "Franz Ferdinand variant 2: thicker body, slightly less bite, amp-driven",
+  "amp": [
+    52,
+    82,
+    34,
+    70,
+    58,
+    34,
+    0,
+    5,
+    1,
+    0
+  ],
+  "amp_type_index": 5,
+  "distortion_pedal_used": false,
+  "non_dist_pedals_allowed": true,
+  "ge10_raw": [
+    18,
+    20,
+    22,
+    24,
+    27,
+    29,
+    29,
+    25,
+    20,
+    17,
+    24
+  ],
+  "ge10_db": [
+    -6,
+    -4,
+    -2,
+    0,
+    3,
+    5,
+    5,
+    1,
+    -4,
+    -7,
+    0
+  ],
+  "dry_default": true
+}

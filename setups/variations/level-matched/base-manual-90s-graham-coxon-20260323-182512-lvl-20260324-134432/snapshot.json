@@ -1,0 +1,106 @@
+{
+  "created_at": "2026-03-23T18:25:12",
+  "method": "manual-hand-tuned",
+  "intent": "Graham Coxon-inspired 90s Brit scratch: lean lows, sharp upper-mids, dry",
+  "amp_type_name": "clean",
+  "booster_name": "distortion",
+  "ge10_db": [
+    -7,
+    -5,
+    -3,
+    -1,
+    4,
+    7,
+    7,
+    2,
+    -3,
+    -7,
+    0
+  ],
+  "amp": [
+    28,
+    61,
+    32,
+    76,
+    52,
+    30,
+    0,
+    1,
+    1,
+    0
+  ],
+  "booster": [
+    13,
+    74,
+    36,
+    62,
+    0,
+    50,
+    70,
+    0
+  ],
+  "ge10_raw": [
+    17,
+    19,
+    21,
+    23,
+    28,
+    31,
+    31,
+    26,
+    21,
+    17,
+    24
+  ],
+  "ns": [
+    1,
+    50,
+    40
+  ],
+  "dry_default": true,
+  "updated_at": "2026-03-24T13:44:32",
+  "source_snapshot": "/home/will/dev/BOSS-TONE-STUDIO-for-Linux/setups/variations/by-pedal/coxon-keeper/base-manual-90s-graham-coxon-20260323-182512/snapshot.json",
+  "target_rms_dbfs": -27.98,
+  "history": [
+    {
+      "iter": 1,
+      "samples": 6,
+      "mean_rms_dbfs": -25.056,
+      "error_db": -2.924,
+      "amp_volume": 78,
+      "status": "adjusted",
+      "adjust_step": -6,
+      "new_amp_volume": 72
+    },
+    {
+      "iter": 2,
+      "samples": 6,
+      "mean_rms_dbfs": -25.507,
+      "error_db": -2.473,
+      "amp_volume": 72,
+      "status": "adjusted",
+      "adjust_step": -5,
+      "new_amp_volume": 67
+    },
+    {
+      "iter": 3,
+      "samples": 6,
+      "mean_rms_dbfs": -26.522,
+      "error_db": -1.458,
+      "amp_volume": 67,
+      "status": "adjusted",
+      "adjust_step": -3,
+      "new_amp_volume": 64
+    },
+    {
+      "iter": 4,
+      "samples": 6,
+      "mean_rms_dbfs": -26.429,
+      "error_db": -1.551,
+      "amp_volume": 64,
+      "status": "adjusted",
+      "adjust_step": -3,
+      "new_amp_volume": 61
+    }
+  ]
+}

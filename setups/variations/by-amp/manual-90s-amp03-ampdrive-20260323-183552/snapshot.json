@@ -1,0 +1,47 @@
+{
+  "created_at": "2026-03-23T18:35:52",
+  "method": "manual-hand-tuned",
+  "intent": "Amp-driven 90s indie crunch; no distortion pedal, EQ mandatory, dry default",
+  "amp": [
+    66,
+    78,
+    34,
+    74,
+    52,
+    30,
+    0,
+    4,
+    1,
+    0
+  ],
+  "amp_type_index": 4,
+  "distortion_pedal_used": false,
+  "non_dist_pedals_allowed": true,
+  "ge10_raw": [
+    18,
+    20,
+    22,
+    24,
+    27,
+    30,
+    29,
+    24,
+    20,
+    17,
+    24
+  ],
+  "ge10_db": [
+    -6,
+    -4,
+    -2,
+    0,
+    3,
+    6,
+    5,
+    0,
+    -4,
+    -7,
+    0
+  ],
+  "dry_default": true
+}

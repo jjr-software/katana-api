@@ -1,0 +1,55 @@
+{
+  "created_at": "2026-03-23T18:24:18",
+  "method": "manual-hand-tuned",
+  "intent": "90s alt/Radiohead RAT lane: tight lows, biting mids, controlled fizz",
+  "amp": [
+    30,
+    78,
+    34,
+    75,
+    49,
+    27,
+    0,
+    1,
+    1,
+    0
+  ],
+  "amp_type_name": "clean",
+  "booster": [
+    14,
+    76,
+    38,
+    60,
+    0,
+    50,
+    69,
+    0
+  ],
+  "booster_name": "rat",
+  "ge10_raw": [
+    18,
+    20,
+    22,
+    24,
+    28,
+    31,
+    30,
+    24,
+    19,
+    15,
+    24
+  ],
+  "ge10_db": [
+    -6,
+    -4,
+    -2,
+    0,
+    4,
+    7,
+    6,
+    0,
+    -5,
+    -9,
+    0
+  ]
+}

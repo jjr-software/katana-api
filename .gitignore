@@ -1,2 +1,68 @@
+# Build/extract outputs
 out/
 installer_extracted/
+manual-extract/installer_extracted/
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.py,cover
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.hypothesis/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python packaging/build artifacts
+build/
+dist/
+site/
+.eggs/
+*.egg
+*.egg-info/
+pip-wheel-metadata/
+
+# Test and coverage
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+
+# Local environment/config
+.env
+.env.*
+*.local
+.python-version
+
+# IDE/editor state
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Project-local generated artifacts
+python/.cache/
+setups/backups/
+setups/recordings/
+setups/analysis/*.json
+setups/analysis/*.txt
+setups/analysis/.last_*
+setups/analysis/level_log*.csv
+setups/analysis/level_log*.jsonl
+setups/analysis/**/level_log*.jsonl
