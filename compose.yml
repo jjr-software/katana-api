@@ -17,7 +17,7 @@ services:
 
   api:
     build:
-      context: ../../apps/api
+      context: ./apps/api
     user: "1000:1000"
     environment:
       DATABASE_URL: postgresql+psycopg://katana:katana@db:5432/katana
@@ -43,7 +43,7 @@ services:
 
   web:
     build:
-      context: ../../apps/web
+      context: ./apps/web
     user: "1000:1000"
     labels:
       - traefik.enable=true
