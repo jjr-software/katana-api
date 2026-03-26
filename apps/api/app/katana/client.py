@@ -64,6 +64,23 @@ class SlotPatchSummary:
 
 
 @dataclass(frozen=True)
+class SlotDump:
+    slot: int
+    slot_label: str
+    payload: dict[str, Any]
+    synced_at: str
+    slot_sync_ms: int
+
+
+@dataclass(frozen=True)
+class FullAmpDumpSnapshot:
+    synced_at: str
+    amp_state_hash_sha256: str
+    total_sync_ms: int
+    slots: list[SlotDump]
+
+
+@dataclass(frozen=True)
 class SlotsStateSnapshot:
     synced_at: str
     amp_state_hash_sha256: str
@@ -101,9 +118,29 @@ class AmpClient:
         return CurrentPatchSnapshot(payload=await self._read_selected_patch_payload())
 
     async def read_slots_state(self, synced_at: str) -> SlotsStateSnapshot:
+        dump = await self.full_amp_dump(synced_at=synced_at)
+        slots: list[SlotPatchSummary] = [
+            SlotPatchSummary(
+                slot=item.slot,
+                slot_label=item.slot_label,
+                patch_name=str(item.payload.get("patch_name", "")),
+                config_hash_sha256=str(item.payload["config_hash_sha256"]),
+                synced_at=item.synced_at,
+                slot_sync_ms=item.slot_sync_ms,
+            )
+            for item in dump.slots
+        ]
+        return SlotsStateSnapshot(
+            synced_at=dump.synced_at,
+            amp_state_hash_sha256=dump.amp_state_hash_sha256,
+            total_sync_ms=dump.total_sync_ms,
+            slots=slots,
+        )
+
+    async def full_amp_dump(self, synced_at: str) -> FullAmpDumpSnapshot:
         started = time.perf_counter()
         await self._send_only(EDITOR_MODE_ON)
-        slots: list[SlotPatchSummary] = []
+        slots: list[SlotDump] = []
         slot_hash_parts: list[str] = []
         for slot in range(1, 9):
             slot_started = time.perf_counter()
@@ -112,17 +149,16 @@ class AmpClient:
             slot_hash = str(payload["config_hash_sha256"])
             slot_hash_parts.append(f"{slot}:{slot_hash}")
             slots.append(
-                SlotPatchSummary(
+                SlotDump(
                     slot=slot,
                     slot_label=slot_label(slot),
-                    patch_name=str(payload.get("patch_name", "")),
-                    config_hash_sha256=slot_hash,
+                    payload=payload,
                     synced_at=synced_at,
                     slot_sync_ms=int(round((time.perf_counter() - slot_started) * 1000)),
                 )
             )
         amp_state_hash = sha256("|".join(slot_hash_parts).encode("utf-8")).hexdigest()
-        return SlotsStateSnapshot(
+        return FullAmpDumpSnapshot(
             synced_at=synced_at,
             amp_state_hash_sha256=amp_state_hash,
             total_sync_ms=int(round((time.perf_counter() - started) * 1000)),

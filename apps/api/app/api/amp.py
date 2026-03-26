@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.deps import get_amp_client
-from app.katana import AmpClient, AmpClientError, SlotPatchSummary
+from app.katana import AmpClient, AmpClientError, SlotDump, SlotPatchSummary
 
 router = APIRouter(prefix="/api/v1/amp", tags=["amp"])
 
@@ -35,6 +35,21 @@ class SlotsStateResponse(BaseModel):
     amp_state_hash_sha256: str
     total_sync_ms: int
     slots: list[SlotPatchSummaryResponse]
+
+
+class FullDumpSlotResponse(BaseModel):
+    slot: int
+    slot_label: str
+    synced_at: str
+    slot_sync_ms: int
+    patch: dict
+
+
+class FullAmpDumpResponse(BaseModel):
+    synced_at: str
+    amp_state_hash_sha256: str
+    total_sync_ms: int
+    slots: list[FullDumpSlotResponse]
 
 
 @router.get("/test-connection", response_model=AmpConnectionTestResponse)
@@ -110,4 +125,36 @@ def _slot_to_dict(slot: SlotPatchSummary) -> dict:
         "config_hash_sha256": slot.config_hash_sha256,
         "synced_at": slot.synced_at,
         "slot_sync_ms": slot.slot_sync_ms,
+    }
+
+
+@router.get("/full-dump", response_model=FullAmpDumpResponse)
+async def full_amp_dump(client: AmpClient = Depends(get_amp_client)) -> FullAmpDumpResponse:
+    synced_at = datetime.now().isoformat(timespec="seconds")
+    try:
+        dump = await client.full_amp_dump(synced_at=synced_at)
+    except AmpClientError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "Failed to read full amp dump",
+                "error": str(exc),
+                "midi_port": client.midi_port,
+            },
+        ) from exc
+    return FullAmpDumpResponse(
+        synced_at=dump.synced_at,
+        amp_state_hash_sha256=dump.amp_state_hash_sha256,
+        total_sync_ms=dump.total_sync_ms,
+        slots=[FullDumpSlotResponse(**_slot_dump_to_dict(item)) for item in dump.slots],
+    )
+
+
+def _slot_dump_to_dict(slot: SlotDump) -> dict:
+    return {
+        "slot": slot.slot,
+        "slot_label": slot.slot_label,
+        "synced_at": slot.synced_at,
+        "slot_sync_ms": slot.slot_sync_ms,
+        "patch": slot.payload,
     }

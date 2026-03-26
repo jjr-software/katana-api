@@ -3,6 +3,8 @@ from app.katana.client import (
     AmpClientError,
     AmpConnectionResult,
     CurrentPatchSnapshot,
+    FullAmpDumpSnapshot,
+    SlotDump,
     SlotPatchSummary,
     SlotsStateSnapshot,
 )
@@ -12,6 +14,8 @@ __all__ = [
     "AmpClientError",
     "AmpConnectionResult",
     "CurrentPatchSnapshot",
+    "FullAmpDumpSnapshot",
+    "SlotDump",
     "SlotPatchSummary",
     "SlotsStateSnapshot",
 ]
