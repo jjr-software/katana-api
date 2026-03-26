@@ -2,13 +2,13 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.amp_queue import amp_job_queue
 from app.deps import get_amp_client, get_db
-from app.katana import AmpClient, AmpClientError, SlotDump, SlotPatchSummary
-from app.models import PatchSet, PatchSetMember
+from app.katana import AmpClient, AmpClientError, QuickSlotName, SlotDump, SlotPatchSummary
+from app.models import PatchConfig, PatchSet, PatchSetMember
 
 router = APIRouter(prefix="/api/v1/amp", tags=["amp"])
 
@@ -40,6 +40,23 @@ class SlotsStateResponse(BaseModel):
     amp_state_hash_sha256: str
     total_sync_ms: int
     slots: list[SlotPatchSummaryResponse]
+
+
+class QuickSlotSummaryResponse(BaseModel):
+    slot: int
+    slot_label: str
+    patch_name: str
+    inferred_hash_sha256: str | None = None
+    candidate_hashes_sha256: list[str]
+    match_count: int
+    synced_at: str
+    slot_sync_ms: int
+
+
+class QuickSlotsStateResponse(BaseModel):
+    synced_at: str
+    total_sync_ms: int
+    slots: list[QuickSlotSummaryResponse]
 
 
 class FullDumpSlotResponse(BaseModel):
@@ -175,6 +192,35 @@ async def enqueue_slots_sync() -> SlotsSyncEnqueueResponse:
     )
 
 
+@router.get("/slots/quick", response_model=QuickSlotsStateResponse)
+async def quick_slots_state(
+    client: AmpClient = Depends(get_amp_client),
+    db: Session = Depends(get_db),
+) -> QuickSlotsStateResponse:
+    synced_at = datetime.now().isoformat(timespec="seconds")
+    try:
+        quick = await client.read_slots_names_quick(synced_at=synced_at)
+    except AmpClientError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "Failed to read quick amp slot names",
+                "error": str(exc),
+                "midi_port": client.midi_port,
+            },
+        ) from exc
+    candidates_by_name = _load_hash_candidates_by_patch_name(db, [slot.patch_name for slot in quick.slots])
+    slots = [
+        QuickSlotSummaryResponse(**_quick_slot_to_dict(slot, candidates_by_name))
+        for slot in quick.slots
+    ]
+    return QuickSlotsStateResponse(
+        synced_at=quick.synced_at,
+        total_sync_ms=quick.total_sync_ms,
+        slots=slots,
+    )
+
+
 @router.get("/slots/sync/{job_id}", response_model=SlotsSyncJobResponse)
 async def get_slots_sync_job(job_id: str, db: Session = Depends(get_db)) -> SlotsSyncJobResponse:
     job = await amp_job_queue.get_job(job_id)
@@ -206,6 +252,22 @@ async def get_slots_sync_job(job_id: str, db: Session = Depends(get_db)) -> Slot
         error=job.error,
         result=result,
     )
+
+
+def _quick_slot_to_dict(slot: QuickSlotName, candidates_by_name: dict[str, list[str]]) -> dict:
+    normalized = _normalize_patch_name(slot.patch_name)
+    candidates = candidates_by_name.get(normalized, [])
+    inferred_hash = candidates[0] if len(candidates) == 1 else None
+    return {
+        "slot": slot.slot,
+        "slot_label": slot.slot_label,
+        "patch_name": slot.patch_name,
+        "inferred_hash_sha256": inferred_hash,
+        "candidate_hashes_sha256": candidates,
+        "match_count": len(candidates),
+        "synced_at": slot.synced_at,
+        "slot_sync_ms": slot.slot_sync_ms,
+    }
 
 
 def _slot_to_dict(slot: SlotPatchSummary, curated_by_hash: dict[str, list[dict]]) -> dict:
@@ -288,3 +350,26 @@ def _load_curation_by_hash(db: Session, hash_ids: list[str]) -> dict[str, list[d
             }
         )
     return out
+
+
+def _load_hash_candidates_by_patch_name(db: Session, patch_names: list[str]) -> dict[str, list[str]]:
+    normalized = {_normalize_patch_name(name) for name in patch_names if _normalize_patch_name(name)}
+    if not normalized:
+        return {}
+    patch_name_expr = func.lower(PatchConfig.snapshot["patch_name"].astext)
+    rows = db.execute(
+        select(PatchConfig.hash_id, patch_name_expr)
+        .where(patch_name_expr.in_(normalized))
+        .order_by(PatchConfig.hash_id.asc())
+    ).all()
+    out: dict[str, list[str]] = {}
+    for hash_id, name in rows:
+        key = str(name or "").strip().lower()
+        if not key:
+            continue
+        out.setdefault(key, []).append(hash_id)
+    return out
+
+
+def _normalize_patch_name(value: str) -> str:
+    return str(value or "").strip().lower()

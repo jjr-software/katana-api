@@ -13,6 +13,9 @@
     <button type="button" (click)="testAmpConnection()" [disabled]="isLoading()">
       {{ isLoading() ? 'Working...' : 'Test Amp Connection' }}
     </button>
+    <button type="button" (click)="quickSyncAmpSlots()" [disabled]="isLoading()">
+      {{ isLoading() ? 'Working...' : 'Quick Sync Names' }}
+    </button>
     <button type="button" (click)="syncAmpSlots()" [disabled]="isLoading()">
       {{ isLoading() ? 'Working...' : 'Sync Slots A:1..B:4' }}
     </button>
@@ -30,10 +33,11 @@
       @for (slot of slotsForBank('A'); track slot.slot) {
         <article class="card">
           <p class="slot">{{ slot.slot_label }}</p>
-          <h3>{{ slot.patch_name || 'Unnamed Patch' }}</h3>
-          <p>Hash: <code>{{ shortHash(slot.config_hash_sha256) }}</code></p>
-          <p>Last Sync: <code>{{ slot.synced_at }}</code></p>
+          <h3>{{ displayPatchName(slot) }}</h3>
+          <p>Hash: <code>{{ displayHash(slot) }}</code></p>
+          <p>Last Sync: <code>{{ slot.synced_at || 'n/a' }}</code></p>
           <p>Slot Read: <code>{{ formatMs(slot.slot_sync_ms) }}</code></p>
+          <p>Match: <code>{{ slot.inferred ? 'inferred' : (slot.match_count > 1 ? 'ambiguous' : 'unknown') }}</code></p>
         </article>
       }
     </div>
@@ -45,10 +49,11 @@
       @for (slot of slotsForBank('B'); track slot.slot) {
         <article class="card">
           <p class="slot">{{ slot.slot_label }}</p>
-          <h3>{{ slot.patch_name || 'Unnamed Patch' }}</h3>
-          <p>Hash: <code>{{ shortHash(slot.config_hash_sha256) }}</code></p>
-          <p>Last Sync: <code>{{ slot.synced_at }}</code></p>
+          <h3>{{ displayPatchName(slot) }}</h3>
+          <p>Hash: <code>{{ displayHash(slot) }}</code></p>
+          <p>Last Sync: <code>{{ slot.synced_at || 'n/a' }}</code></p>
           <p>Slot Read: <code>{{ formatMs(slot.slot_sync_ms) }}</code></p>
+          <p>Match: <code>{{ slot.inferred ? 'inferred' : (slot.match_count > 1 ? 'ambiguous' : 'unknown') }}</code></p>
         </article>
       }
     </div>

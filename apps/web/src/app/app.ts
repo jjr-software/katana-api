@@ -16,11 +16,28 @@ interface SlotPatchSummary {
   slot_sync_ms: number;
 }
 
+interface QuickSlotSummary {
+  slot: number;
+  slot_label: string;
+  patch_name: string;
+  inferred_hash_sha256: string | null;
+  candidate_hashes_sha256: string[];
+  match_count: number;
+  synced_at: string;
+  slot_sync_ms: number;
+}
+
 interface SlotsStateResponse {
   synced_at: string;
   amp_state_hash_sha256: string;
   total_sync_ms: number;
   slots: SlotPatchSummary[];
+}
+
+interface QuickSlotsStateResponse {
+  synced_at: string;
+  total_sync_ms: number;
+  slots: QuickSlotSummary[];
 }
 
 interface SlotsSyncEnqueueResponse {
@@ -48,6 +65,35 @@ interface DeviceStatusResponse {
   checked_at: string;
 }
 
+interface SlotCard {
+  slot: number;
+  slot_label: string;
+  patch_name: string;
+  config_hash_sha256: string;
+  synced_at: string;
+  slot_sync_ms: number;
+  inferred: boolean;
+  match_count: number;
+}
+
+function defaultSlotCards(): SlotCard[] {
+  return Array.from({ length: 8 }, (_, idx) => {
+    const slot = idx + 1;
+    const bank = slot <= 4 ? 'A' : 'B';
+    const channel = slot <= 4 ? slot : slot - 4;
+    return {
+      slot,
+      slot_label: `${bank}:${channel}`,
+      patch_name: '',
+      config_hash_sha256: '',
+      synced_at: '',
+      slot_sync_ms: 0,
+      inferred: false,
+      match_count: 0,
+    };
+  });
+}
+
 @Component({
   selector: 'app-root',
   imports: [],
@@ -60,7 +106,7 @@ export class App implements OnInit, OnDestroy {
   isLoading = signal(false);
   status = signal('Idle');
   responseJson = signal('');
-  slots = signal<SlotPatchSummary[]>([]);
+  slots = signal<SlotCard[]>(defaultSlotCards());
   ampStateHash = signal('');
   lastSyncedAt = signal('');
   totalSyncMs = signal(0);
@@ -140,7 +186,6 @@ export class App implements OnInit, OnDestroy {
       const enqueuePayload = (await enqueueResponse.json()) as SlotsSyncEnqueueResponse | { detail: unknown };
       if (!enqueueResponse.ok) {
         this.status.set('Amp sync failed');
-        this.slots.set([]);
         this.ampStateHash.set('');
         this.lastSyncedAt.set('');
         this.totalSyncMs.set(0);
@@ -155,7 +200,6 @@ export class App implements OnInit, OnDestroy {
       const job = await this.waitForSyncJob(queued.job_id);
       if (job.status !== 'succeeded' || job.result === null) {
         this.status.set('Amp sync failed');
-        this.slots.set([]);
         this.ampStateHash.set('');
         this.lastSyncedAt.set('');
         this.totalSyncMs.set(0);
@@ -177,7 +221,7 @@ export class App implements OnInit, OnDestroy {
 
       const state = job.result;
       this.status.set('Amp sync succeeded');
-      this.slots.set(state.slots);
+      this.slots.set(this.mergeFullState(state));
       this.ampStateHash.set(state.amp_state_hash_sha256);
       this.lastSyncedAt.set(state.synced_at);
       this.totalSyncMs.set(state.total_sync_ms);
@@ -185,10 +229,54 @@ export class App implements OnInit, OnDestroy {
       await this.refreshDeviceStatus();
     } catch (error: unknown) {
       this.status.set('Amp sync failed');
-      this.slots.set([]);
       this.ampStateHash.set('');
       this.lastSyncedAt.set('');
       this.totalSyncMs.set(0);
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Browser request failed',
+            error: String(error),
+          },
+          null,
+          2,
+        ),
+      );
+      await this.refreshDeviceStatus();
+    } finally {
+      this.isLoading.set(false);
+    }
+  }
+
+  async quickSyncAmpSlots(): Promise<void> {
+    this.isLoading.set(true);
+    this.status.set('Quick sync: reading slot names...');
+    this.responseJson.set('');
+
+    try {
+      const response = await fetch('/api/v1/amp/slots/quick', {
+        method: 'GET',
+        cache: 'no-store',
+      });
+
+      const payload = (await response.json()) as QuickSlotsStateResponse | { detail: unknown };
+      if (!response.ok) {
+        this.status.set('Quick sync failed');
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        this.updateBusyFromPayload(payload);
+        await this.refreshDeviceStatus();
+        return;
+      }
+
+      const quick = payload as QuickSlotsStateResponse;
+      this.slots.set(this.mergeQuickState(quick));
+      this.ampStateHash.set('');
+      this.lastSyncedAt.set(quick.synced_at);
+      this.totalSyncMs.set(quick.total_sync_ms);
+      this.status.set('Quick sync succeeded');
+      await this.refreshDeviceStatus();
+    } catch (error: unknown) {
+      this.status.set('Quick sync failed');
       this.responseJson.set(
         JSON.stringify(
           {
@@ -272,12 +360,63 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  slotsForBank(bank: 'A' | 'B'): SlotPatchSummary[] {
+  slotsForBank(bank: 'A' | 'B'): SlotCard[] {
     return this.slots().filter((slot) => slot.slot_label.startsWith(`${bank}:`));
   }
 
   shortHash(hash: string): string {
     return hash.slice(0, 12);
+  }
+
+  displayHash(slot: SlotCard): string {
+    return slot.config_hash_sha256 ? this.shortHash(slot.config_hash_sha256) : 'n/a';
+  }
+
+  displayPatchName(slot: SlotCard): string {
+    if (slot.patch_name) {
+      return slot.patch_name;
+    }
+    return 'Unsynced';
+  }
+
+  private mergeFullState(state: SlotsStateResponse): SlotCard[] {
+    const bySlot = new Map<number, SlotPatchSummary>(state.slots.map((slot) => [slot.slot, slot]));
+    return defaultSlotCards().map((base) => {
+      const full = bySlot.get(base.slot);
+      if (!full) {
+        return base;
+      }
+      return {
+        slot: full.slot,
+        slot_label: full.slot_label,
+        patch_name: full.patch_name,
+        config_hash_sha256: full.config_hash_sha256,
+        synced_at: full.synced_at,
+        slot_sync_ms: full.slot_sync_ms,
+        inferred: false,
+        match_count: 1,
+      };
+    });
+  }
+
+  private mergeQuickState(state: QuickSlotsStateResponse): SlotCard[] {
+    const bySlot = new Map<number, QuickSlotSummary>(state.slots.map((slot) => [slot.slot, slot]));
+    return defaultSlotCards().map((base) => {
+      const quick = bySlot.get(base.slot);
+      if (!quick) {
+        return base;
+      }
+      return {
+        slot: quick.slot,
+        slot_label: quick.slot_label,
+        patch_name: quick.patch_name,
+        config_hash_sha256: quick.inferred_hash_sha256 ?? '',
+        synced_at: quick.synced_at,
+        slot_sync_ms: quick.slot_sync_ms,
+        inferred: quick.inferred_hash_sha256 !== null,
+        match_count: quick.match_count,
+      };
+    });
   }
 
   formatMs(value: number): string {

@@ -89,6 +89,22 @@ class SlotsStateSnapshot:
 
 
 @dataclass(frozen=True)
+class QuickSlotName:
+    slot: int
+    slot_label: str
+    patch_name: str
+    synced_at: str
+    slot_sync_ms: int
+
+
+@dataclass(frozen=True)
+class QuickSlotsSnapshot:
+    synced_at: str
+    total_sync_ms: int
+    slots: list[QuickSlotName]
+
+
+@dataclass(frozen=True)
 class AmpDeviceStatus:
     midi_port: str
     busy: bool
@@ -175,6 +191,30 @@ class AmpClient:
             return FullAmpDumpSnapshot(
                 synced_at=synced_at,
                 amp_state_hash_sha256=amp_state_hash,
+                total_sync_ms=int(round((time.perf_counter() - started) * 1000)),
+                slots=slots,
+            )
+
+    async def read_slots_names_quick(self, synced_at: str) -> QuickSlotsSnapshot:
+        async with self._port_lock():
+            started = time.perf_counter()
+            await self._send_only(EDITOR_MODE_ON)
+            slots: list[QuickSlotName] = []
+            for slot in range(1, 9):
+                slot_started = time.perf_counter()
+                await self._select_patch(slot)
+                patch_com = await self._read_rq1(ADDR_PATCH_COM, 16)
+                slots.append(
+                    QuickSlotName(
+                        slot=slot,
+                        slot_label=slot_label(slot),
+                        patch_name=self._decode_patch_name(patch_com),
+                        synced_at=synced_at,
+                        slot_sync_ms=int(round((time.perf_counter() - slot_started) * 1000)),
+                    )
+                )
+            return QuickSlotsSnapshot(
+                synced_at=synced_at,
                 total_sync_ms=int(round((time.perf_counter() - started) * 1000)),
                 slots=slots,
             )
