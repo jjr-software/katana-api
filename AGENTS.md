@@ -1450,3 +1450,15 @@
   - `apps/web/src/app/app.html`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Editor Stage/Live-Apply Without Follow-Up Current-Patch Read)
+- Removed follow-up `Current Patch` refresh calls after:
+  - card-level `Stage to AMP`, and
+  - editor live-apply operations.
+- New behavior:
+  - stage/apply updates local amp hash/state directly,
+  - commit state is set to `uncommitted` locally without enqueueing an immediate `Current Patch` read job.
+- Files changed:
+  - `apps/web/src/app/app.ts`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

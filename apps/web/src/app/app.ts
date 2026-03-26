@@ -538,7 +538,7 @@ export class App implements OnInit, OnDestroy {
             : card,
         ),
       );
-      await this.refreshCurrentCommitState();
+      this.currentAmpCommitState.set('uncommitted');
       this.status.set(`Staged ${slot.slot_label} to active amp patch`);
       this.responseJson.set(
         JSON.stringify(
@@ -2459,9 +2459,7 @@ export class App implements OnInit, OnDestroy {
         }),
       );
       this.currentAmpPatchHash.set(hash);
-      if (this.selectedAmpSlot() !== null) {
-        await this.refreshCurrentCommitState();
-      }
+      this.currentAmpCommitState.set('uncommitted');
     } catch (error: unknown) {
       this.editorLiveApplyError.set(String(error));
     } finally {
