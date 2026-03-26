@@ -428,6 +428,74 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  async loadSlotToAmp(slot: SlotCard): Promise<void> {
+    if (!slot.patch) {
+      this.status.set(`No full patch payload loaded for ${slot.slot_label}. Read this slot first.`);
+      return;
+    }
+    this.status.set(`Loading ${slot.slot_label} to amp...`);
+    this.responseJson.set('');
+    try {
+      const response = await fetch('/api/v1/amp/current-patch/live-apply', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patch: slot.patch }),
+      });
+      const payload = (await response.json()) as ApplyCurrentPatchResponse | { detail?: unknown };
+      if (!response.ok) {
+        this.status.set(`Failed loading ${slot.slot_label} to amp`);
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      const applied = payload as ApplyCurrentPatchResponse;
+      const appliedPatch = this.clonePatch(applied.patch);
+      const appliedHash = this.readString(appliedPatch, 'config_hash_sha256') ?? slot.config_hash_sha256;
+      const appliedName = this.readString(appliedPatch, 'patch_name') ?? slot.patch_name;
+      this.slots.update((current) =>
+        current.map((card) => {
+          if (card.slot !== slot.slot) {
+            return card;
+          }
+          return {
+            ...card,
+            patch_name: appliedName || card.patch_name,
+            patch: this.clonePatch(appliedPatch),
+            config_hash_sha256: appliedHash,
+            in_sync: true,
+            out_synced: true,
+            is_saved: card.is_saved && appliedHash === card.config_hash_sha256,
+          };
+        }),
+      );
+      this.status.set(`Loaded ${slot.slot_label} to amp`);
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Patch loaded to amp',
+            slot: slot.slot_label,
+            applied_at: applied.applied_at,
+            hash_id: appliedHash || null,
+          },
+          null,
+          2,
+        ),
+      );
+    } catch (error: unknown) {
+      this.status.set(`Failed loading ${slot.slot_label} to amp`);
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Browser request failed',
+            error: String(error),
+          },
+          null,
+          2,
+        ),
+      );
+    }
+  }
+
   async saveSlotPatch(slot: SlotCard): Promise<void> {
     if (!slot.patch || !slot.config_hash_sha256) {
       this.status.set(`No full patch payload loaded for ${slot.slot_label}. Read this slot first.`);
@@ -881,6 +949,10 @@ export class App implements OnInit, OnDestroy {
 
   canReadSlot(slot: SlotCard): boolean {
     return !(slot.in_sync && slot.is_saved);
+  }
+
+  canLoadSlot(slot: SlotCard): boolean {
+    return this.hasFullPatch(slot);
   }
 
   canSyncSlot(slot: SlotCard): boolean {

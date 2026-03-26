@@ -1169,3 +1169,18 @@
   - `apps/web/src/app/app.html`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Per-Card Patch Loader)
+- Added a per-slot `Load` action button on cards.
+- `Load` pushes the card's full patch payload to the amp live patch using:
+  - `POST /api/v1/amp/current-patch/live-apply`
+- After successful load, the slot card is updated with amp readback patch/hash and sync flags:
+  - `in_sync = true`
+  - `out_synced = true`
+- Added UI gate helper:
+  - `canLoadSlot(...)` (requires full patch payload present).
+- Files changed:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

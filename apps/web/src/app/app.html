@@ -107,6 +107,7 @@
                   </p>
                   <div class="d-flex flex-wrap gap-2 mb-2">
                     <button type="button" class="btn btn-sm btn-primary" (click)="syncAmpSlot(slot.slot)" [disabled]="!canReadSlot(slot)">Read</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" (click)="loadSlotToAmp(slot)" [disabled]="!canLoadSlot(slot)">Load</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="saveSlotPatch(slot)" [disabled]="!canWriteSlot(slot)">Write</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openEditor(slot)" [disabled]="!canOpenEditor(slot)">Editor</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="showRaw(slot)" [disabled]="!canUseSlotActions(slot)">Raw</button>
@@ -154,6 +155,7 @@
                   </p>
                   <div class="d-flex flex-wrap gap-2 mb-2">
                     <button type="button" class="btn btn-sm btn-primary" (click)="syncAmpSlot(slot.slot)" [disabled]="!canReadSlot(slot)">Read</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" (click)="loadSlotToAmp(slot)" [disabled]="!canLoadSlot(slot)">Load</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="saveSlotPatch(slot)" [disabled]="!canWriteSlot(slot)">Write</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openEditor(slot)" [disabled]="!canOpenEditor(slot)">Editor</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="showRaw(slot)" [disabled]="!canUseSlotActions(slot)">Raw</button>
