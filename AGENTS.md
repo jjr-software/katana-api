@@ -481,3 +481,15 @@
   - `apps/web/src/app/app.html`
 - Containerized verification run:
   - `docker compose build web` succeeded.
+
+## Session Update - 2026-03-26 (Refresh/Sync Parity + Quick Sync Route Fix)
+- Per-slot `Refresh` now uses the exact same full sync flow as per-slot `Sync` in the web UI.
+- Removed the added per-slot quick endpoint and helper:
+  - removed `POST /api/v1/amp/slots/{slot}/quick`
+  - removed `AmpClient.read_slot_name_quick(...)`
+- Reason:
+  - the dynamic route `POST /api/v1/amp/slots/{slot}/sync` could capture `POST /api/v1/amp/slots/quick/sync`, breaking `Quick Sync Names`.
+- Verified route table no longer includes the per-slot quick route and still includes:
+  - `POST /api/v1/amp/slots/quick/sync`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

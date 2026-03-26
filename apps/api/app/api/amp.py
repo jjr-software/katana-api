@@ -64,11 +64,6 @@ class QuickSlotsStateResponse(BaseModel):
     slots: list[QuickSlotSummaryResponse]
 
 
-class QuickSlotSyncResponse(BaseModel):
-    synced_at: str
-    slot: QuickSlotSummaryResponse
-
-
 class FullDumpSlotResponse(BaseModel):
     slot: int
     slot_label: str
@@ -313,38 +308,6 @@ async def quick_slots_state(
         synced_at=quick.synced_at,
         total_sync_ms=quick.total_sync_ms,
         slots=slots,
-    )
-
-
-@router.post("/slots/{slot}/quick", response_model=QuickSlotSyncResponse)
-async def quick_sync_single_slot(
-    slot: int,
-    client: AmpClient = Depends(get_amp_client),
-    db: Session = Depends(get_db),
-) -> QuickSlotSyncResponse:
-    if slot < 1 or slot > 8:
-        raise HTTPException(
-            status_code=400,
-            detail={"message": "slot must be in range 1..8", "slot": slot},
-        )
-
-    synced_at = datetime.now().isoformat(timespec="seconds")
-    try:
-        item = await client.read_slot_name_quick(slot=slot, synced_at=synced_at)
-    except AmpClientError as exc:
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "message": "Failed to quick sync slot name from amp",
-                "error": str(exc),
-                "midi_port": client.midi_port,
-                "slot": slot,
-            },
-        ) from exc
-    candidates_by_name = _load_hash_candidates_by_patch_name(db, [item.patch_name])
-    return QuickSlotSyncResponse(
-        synced_at=synced_at,
-        slot=QuickSlotSummaryResponse(**_quick_slot_to_dict(item, candidates_by_name)),
     )
 
 
