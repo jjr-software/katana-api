@@ -716,6 +716,16 @@
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
 
+## Session Update - 2026-03-26 (Live RMS Graph Uses Fixed Rolling Window)
+- Adjusted bar-chart time axis behavior so it is a fixed rolling window, not a compressing timeline.
+- Implementation:
+  - fixed bin count (`96`) and fixed x-step spacing,
+  - newest samples scroll through the window while oldest drop off.
+- File changed:
+  - `apps/web/src/app/app.ts`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
+
 ## Session Update - 2026-03-26 (Queued Backup Feature + Nested Repo Flatten)
 - Added queued amp backup API endpoints:
   - `POST /api/v1/amp/backup` (enqueue full amp-state dump)

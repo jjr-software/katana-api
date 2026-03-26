@@ -71,6 +71,7 @@ const DELAY_TYPE_NAMES = [
   'Roland SDE-3000 Delay',
 ];
 const REVERB_TYPE_NAMES = ['Plate Reverb', 'Room Reverb', 'Hall Reverb', 'Spring Reverb', 'Modulate Reverb'];
+const LIVE_RMS_WINDOW_POINTS = 96;
 
 interface AmpConnectionTestResponse {
   ok: boolean;
@@ -648,20 +649,20 @@ export class App implements OnInit, OnDestroy {
   }
 
   rmsGraphBars(): Array<{ x: number; y: number; width: number; height: number }> {
-    const allValues = this.liveRmsHistory();
-    if (allValues.length === 0) {
+    const values = this.liveRmsHistory();
+    if (values.length === 0) {
       return [];
     }
-    const values = allValues.slice(-96);
     const graphWidth = 1000;
     const graphHeight = 64;
     const minDb = -90;
     const maxDb = 0;
-    const step = graphWidth / values.length;
+    const step = graphWidth / LIVE_RMS_WINDOW_POINTS;
     const barWidth = Math.max(1, step * 0.7);
+    const startIndex = Math.max(0, LIVE_RMS_WINDOW_POINTS - values.length);
     return values.map((value, idx) => {
       const y = this.rmsToGraphY(value, minDb, maxDb, graphHeight);
-      const x = (idx * step) + ((step - barWidth) / 2);
+      const x = ((startIndex + idx) * step) + ((step - barWidth) / 2);
       const height = Math.max(1, graphHeight - y);
       return {
         x,
@@ -675,8 +676,8 @@ export class App implements OnInit, OnDestroy {
   private pushLiveRmsPoint(value: number): void {
     this.liveRmsHistory.update((current) => {
       const next = [...current, value];
-      if (next.length > 120) {
-        return next.slice(next.length - 120);
+      if (next.length > LIVE_RMS_WINDOW_POINTS) {
+        return next.slice(next.length - LIVE_RMS_WINDOW_POINTS);
       }
       return next;
     });
