@@ -86,18 +86,58 @@ class AmpDeviceStatusResponse(BaseModel):
 
 class SlotsSyncEnqueueResponse(BaseModel):
     job_id: str
+    operation: str
     status: str
     created_at: str
 
 
 class SlotsSyncJobResponse(BaseModel):
     job_id: str
+    operation: str
     status: str
     created_at: str
     started_at: str | None = None
     finished_at: str | None = None
+    elapsed_ms: int
     error: str | None = None
     result: SlotsStateResponse | None = None
+
+
+class QuickSyncEnqueueResponse(BaseModel):
+    job_id: str
+    operation: str
+    status: str
+    created_at: str
+
+
+class QuickSyncJobResponse(BaseModel):
+    job_id: str
+    operation: str
+    status: str
+    created_at: str
+    started_at: str | None = None
+    finished_at: str | None = None
+    elapsed_ms: int
+    error: str | None = None
+    result: QuickSlotsStateResponse | None = None
+
+
+class QueueJobSummaryResponse(BaseModel):
+    job_id: str
+    operation: str
+    status: str
+    created_at: str
+    started_at: str | None = None
+    finished_at: str | None = None
+    elapsed_ms: int
+    error: str | None = None
+
+
+class QueueStateResponse(BaseModel):
+    generated_at: str
+    queued_count: int
+    running_job_id: str | None = None
+    jobs: list[QueueJobSummaryResponse]
 
 
 @router.get("/test-connection", response_model=AmpConnectionTestResponse)
@@ -187,6 +227,18 @@ async def enqueue_slots_sync() -> SlotsSyncEnqueueResponse:
     job = await amp_job_queue.enqueue_slots_sync()
     return SlotsSyncEnqueueResponse(
         job_id=job.job_id,
+        operation=job.operation,
+        status=job.status,
+        created_at=job.created_at,
+    )
+
+
+@router.post("/slots/quick/sync", response_model=QuickSyncEnqueueResponse)
+async def enqueue_quick_sync() -> QuickSyncEnqueueResponse:
+    job = await amp_job_queue.enqueue_quick_sync()
+    return QuickSyncEnqueueResponse(
+        job_id=job.job_id,
+        operation=job.operation,
         status=job.status,
         created_at=job.created_at,
     )
@@ -221,6 +273,19 @@ async def quick_slots_state(
     )
 
 
+@router.get("/queue", response_model=QueueStateResponse)
+async def queue_state() -> QueueStateResponse:
+    jobs = await amp_job_queue.list_jobs(limit=50)
+    running_job_id = await amp_job_queue.get_running_job_id()
+    queued_count = len([job for job in jobs if job.status == "queued"])
+    return QueueStateResponse(
+        generated_at=datetime.now().isoformat(timespec="seconds"),
+        queued_count=queued_count,
+        running_job_id=running_job_id,
+        jobs=[QueueJobSummaryResponse(**_queue_job_summary(job)) for job in jobs],
+    )
+
+
 @router.get("/slots/sync/{job_id}", response_model=SlotsSyncJobResponse)
 async def get_slots_sync_job(job_id: str, db: Session = Depends(get_db)) -> SlotsSyncJobResponse:
     job = await amp_job_queue.get_job(job_id)
@@ -231,24 +296,60 @@ async def get_slots_sync_job(job_id: str, db: Session = Depends(get_db)) -> Slot
         )
 
     result: SlotsStateResponse | None = None
-    if job.result is not None:
+    if job.result_slots is not None:
         curated_by_hash = _load_curation_by_hash(
             db,
-            [slot.config_hash_sha256 for slot in job.result.slots],
+            [slot.config_hash_sha256 for slot in job.result_slots.slots],
         )
         result = SlotsStateResponse(
-            synced_at=job.result.synced_at,
-            amp_state_hash_sha256=job.result.amp_state_hash_sha256,
-            total_sync_ms=job.result.total_sync_ms,
-            slots=[SlotPatchSummaryResponse(**_slot_to_dict(slot, curated_by_hash)) for slot in job.result.slots],
+            synced_at=job.result_slots.synced_at,
+            amp_state_hash_sha256=job.result_slots.amp_state_hash_sha256,
+            total_sync_ms=job.result_slots.total_sync_ms,
+            slots=[SlotPatchSummaryResponse(**_slot_to_dict(slot, curated_by_hash)) for slot in job.result_slots.slots],
         )
 
     return SlotsSyncJobResponse(
         job_id=job.job_id,
+        operation=job.operation,
         status=job.status,
         created_at=job.created_at,
         started_at=job.started_at,
         finished_at=job.finished_at,
+        elapsed_ms=_job_elapsed_ms(job),
+        error=job.error,
+        result=result,
+    )
+
+
+@router.get("/slots/quick/sync/{job_id}", response_model=QuickSyncJobResponse)
+async def get_quick_sync_job(job_id: str, db: Session = Depends(get_db)) -> QuickSyncJobResponse:
+    job = await amp_job_queue.get_job(job_id)
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"message": "Quick sync job not found", "job_id": job_id},
+        )
+
+    result: QuickSlotsStateResponse | None = None
+    if job.result_quick is not None:
+        candidates_by_name = _load_hash_candidates_by_patch_name(
+            db,
+            [slot.patch_name for slot in job.result_quick.slots],
+        )
+        result = QuickSlotsStateResponse(
+            synced_at=job.result_quick.synced_at,
+            total_sync_ms=job.result_quick.total_sync_ms,
+            slots=[QuickSlotSummaryResponse(**_quick_slot_to_dict(slot, candidates_by_name)) for slot in job.result_quick.slots],
+        )
+
+    return QuickSyncJobResponse(
+        job_id=job.job_id,
+        operation=job.operation,
+        status=job.status,
+        created_at=job.created_at,
+        started_at=job.started_at,
+        finished_at=job.finished_at,
+        elapsed_ms=_job_elapsed_ms(job),
         error=job.error,
         result=result,
     )
@@ -279,6 +380,32 @@ def _slot_to_dict(slot: SlotPatchSummary, curated_by_hash: dict[str, list[dict]]
         "synced_at": slot.synced_at,
         "slot_sync_ms": slot.slot_sync_ms,
         "curated": curated_by_hash.get(slot.config_hash_sha256, []),
+    }
+
+
+def _job_elapsed_ms(job: object) -> int:
+    started = getattr(job, "started_at", None)
+    finished = getattr(job, "finished_at", None)
+    if not started:
+        return 0
+    try:
+        start_dt = datetime.fromisoformat(started)
+        end_dt = datetime.fromisoformat(finished) if finished else datetime.now()
+    except ValueError:
+        return 0
+    return max(0, int(round((end_dt - start_dt).total_seconds() * 1000)))
+
+
+def _queue_job_summary(job: object) -> dict:
+    return {
+        "job_id": getattr(job, "job_id"),
+        "operation": getattr(job, "operation"),
+        "status": getattr(job, "status"),
+        "created_at": getattr(job, "created_at"),
+        "started_at": getattr(job, "started_at", None),
+        "finished_at": getattr(job, "finished_at", None),
+        "elapsed_ms": _job_elapsed_ms(job),
+        "error": getattr(job, "error", None),
     }
 
 

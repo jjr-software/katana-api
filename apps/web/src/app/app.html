@@ -25,6 +25,26 @@
     <span>Last Sync: <code>{{ lastSyncedAt() || 'n/a' }}</code></span>
     <span>Total Sync Time: <code>{{ formatMs(totalSyncMs()) }}</code></span>
   </div>
+  <section class="queue-panel">
+    <p class="queue-title">
+      Queue Monitor
+      <span class="queue-updated">updated: <code>{{ queueGeneratedAt() || 'n/a' }}</code></span>
+    </p>
+    <div class="queue-list">
+      @for (job of queueJobs(); track job.job_id) {
+        <article class="queue-item">
+          <p><strong>{{ operationLabel(job.operation) }}</strong> · <code>{{ job.status }}</code></p>
+          <p>
+            elapsed: <code>{{ formatMs(job.elapsed_ms) }}</code> |
+            created: <code>{{ job.created_at }}</code>
+          </p>
+        </article>
+      }
+      @if (queueJobs().length === 0) {
+        <p class="queue-empty">No queue jobs yet.</p>
+      }
+    </div>
+  </section>
   <p class="status">{{ status() }}</p>
 
   <section class="bank">
@@ -36,7 +56,6 @@
           <h3>{{ displayPatchName(slot) }}</h3>
           <p>Hash: <code>{{ displayHash(slot) }}</code></p>
           <p>Last Sync: <code>{{ slot.synced_at || 'n/a' }}</code></p>
-          <p>Slot Read: <code>{{ formatMs(slot.slot_sync_ms) }}</code></p>
           <p>Match: <code>{{ slot.inferred ? 'inferred' : (slot.match_count > 1 ? 'ambiguous' : 'unknown') }}</code></p>
         </article>
       }
@@ -52,7 +71,6 @@
           <h3>{{ displayPatchName(slot) }}</h3>
           <p>Hash: <code>{{ displayHash(slot) }}</code></p>
           <p>Last Sync: <code>{{ slot.synced_at || 'n/a' }}</code></p>
-          <p>Slot Read: <code>{{ formatMs(slot.slot_sync_ms) }}</code></p>
           <p>Match: <code>{{ slot.inferred ? 'inferred' : (slot.match_count > 1 ? 'ambiguous' : 'unknown') }}</code></p>
         </article>
       }

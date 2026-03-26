@@ -42,18 +42,40 @@ interface QuickSlotsStateResponse {
 
 interface SlotsSyncEnqueueResponse {
   job_id: string;
+  operation: string;
   status: string;
   created_at: string;
 }
 
 interface SlotsSyncJobResponse {
   job_id: string;
+  operation: string;
   status: 'queued' | 'running' | 'succeeded' | 'failed';
   created_at: string;
   started_at: string | null;
   finished_at: string | null;
+  elapsed_ms: number;
   error: string | null;
   result: SlotsStateResponse | null;
+}
+
+interface QuickSyncEnqueueResponse {
+  job_id: string;
+  operation: string;
+  status: string;
+  created_at: string;
+}
+
+interface QuickSyncJobResponse {
+  job_id: string;
+  operation: string;
+  status: 'queued' | 'running' | 'succeeded' | 'failed';
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  elapsed_ms: number;
+  error: string | null;
+  result: QuickSlotsStateResponse | null;
 }
 
 interface DeviceStatusResponse {
@@ -63,6 +85,24 @@ interface DeviceStatusResponse {
   concurrency_supported: boolean;
   detail: string;
   checked_at: string;
+}
+
+interface QueueJobSummary {
+  job_id: string;
+  operation: string;
+  status: 'queued' | 'running' | 'succeeded' | 'failed';
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  elapsed_ms: number;
+  error: string | null;
+}
+
+interface QueueStateResponse {
+  generated_at: string;
+  queued_count: number;
+  running_job_id: string | null;
+  jobs: QueueJobSummary[];
 }
 
 interface SlotCard {
@@ -115,21 +155,32 @@ export class App implements OnInit, OnDestroy {
   deviceStatusText = signal('Checking amp device...');
   deviceStatusCheckedAt = signal('');
   deviceMidiPort = signal('');
+  queueJobs = signal<QueueJobSummary[]>([]);
+  queueGeneratedAt = signal('');
+  queuePollHandle: ReturnType<typeof setInterval> | null = null;
 
   ngOnInit(): void {
     void this.refreshDeviceStatus();
+    void this.refreshQueueState();
     this.pollHandle = setInterval(() => {
       if (this.isLoading()) {
         return;
       }
       void this.refreshDeviceStatus();
     }, 4000);
+    this.queuePollHandle = setInterval(() => {
+      void this.refreshQueueState();
+    }, 1000);
   }
 
   ngOnDestroy(): void {
     if (this.pollHandle !== null) {
       clearInterval(this.pollHandle);
       this.pollHandle = null;
+    }
+    if (this.queuePollHandle !== null) {
+      clearInterval(this.queuePollHandle);
+      this.queuePollHandle = null;
     }
   }
 
@@ -250,25 +301,45 @@ export class App implements OnInit, OnDestroy {
 
   async quickSyncAmpSlots(): Promise<void> {
     this.isLoading.set(true);
-    this.status.set('Quick sync: reading slot names...');
+    this.status.set('Quick sync queued...');
     this.responseJson.set('');
 
     try {
-      const response = await fetch('/api/v1/amp/slots/quick', {
-        method: 'GET',
+      const enqueueResponse = await fetch('/api/v1/amp/slots/quick/sync', {
+        method: 'POST',
         cache: 'no-store',
       });
 
-      const payload = (await response.json()) as QuickSlotsStateResponse | { detail: unknown };
-      if (!response.ok) {
+      const enqueuePayload = (await enqueueResponse.json()) as QuickSyncEnqueueResponse | { detail: unknown };
+      if (!enqueueResponse.ok) {
         this.status.set('Quick sync failed');
-        this.responseJson.set(JSON.stringify(payload, null, 2));
-        this.updateBusyFromPayload(payload);
+        this.responseJson.set(JSON.stringify(enqueuePayload, null, 2));
+        this.updateBusyFromPayload(enqueuePayload);
         await this.refreshDeviceStatus();
         return;
       }
 
-      const quick = payload as QuickSlotsStateResponse;
+      const queued = enqueuePayload as QuickSyncEnqueueResponse;
+      const job = await this.waitForQuickSyncJob(queued.job_id);
+      if (job.status !== 'succeeded' || job.result === null) {
+        this.status.set('Quick sync failed');
+        this.responseJson.set(
+          JSON.stringify(
+            {
+              message: 'Queued quick sync job failed',
+              job_id: job.job_id,
+              status: job.status,
+              error: job.error,
+            },
+            null,
+            2,
+          ),
+        );
+        await this.refreshDeviceStatus();
+        return;
+      }
+
+      const quick = job.result;
       this.slots.set(this.mergeQuickState(quick));
       this.ampStateHash.set('');
       this.lastSyncedAt.set(quick.synced_at);
@@ -316,6 +387,29 @@ export class App implements OnInit, OnDestroy {
     throw new Error(`Sync job timed out: ${jobId}`);
   }
 
+  private async waitForQuickSyncJob(jobId: string): Promise<QuickSyncJobResponse> {
+    const maxPolls = 900;
+    for (let i = 0; i < maxPolls; i += 1) {
+      const response = await fetch(`/api/v1/amp/slots/quick/sync/${jobId}`, {
+        method: 'GET',
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as QuickSyncJobResponse | { detail: unknown };
+      if (!response.ok) {
+        throw new Error(`Quick sync job poll failed: ${JSON.stringify(payload)}`);
+      }
+      const job = payload as QuickSyncJobResponse;
+      if (job.status === 'succeeded' || job.status === 'failed') {
+        return job;
+      }
+      this.status.set(job.status === 'queued' ? 'Quick sync queued...' : 'Quick sync running...');
+      await new Promise<void>((resolve) => {
+        setTimeout(() => resolve(), 1000);
+      });
+    }
+    throw new Error(`Quick sync job timed out: ${jobId}`);
+  }
+
   async refreshDeviceStatus(): Promise<void> {
     try {
       const response = await fetch('/api/v1/amp/device-status', {
@@ -348,6 +442,24 @@ export class App implements OnInit, OnDestroy {
       this.deviceBusy.set(true);
       this.deviceStatusText.set('Device status probe failed');
       this.deviceStatusCheckedAt.set('');
+    }
+  }
+
+  async refreshQueueState(): Promise<void> {
+    try {
+      const response = await fetch('/api/v1/amp/queue', {
+        method: 'GET',
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as QueueStateResponse | { detail: unknown };
+      if (!response.ok) {
+        return;
+      }
+      const queue = payload as QueueStateResponse;
+      this.queueJobs.set(queue.jobs);
+      this.queueGeneratedAt.set(queue.generated_at);
+    } catch {
+      // no-op: queue panel keeps last visible state
     }
   }
 
@@ -421,5 +533,15 @@ export class App implements OnInit, OnDestroy {
 
   formatMs(value: number): string {
     return `${Math.max(0, Math.round(value))} ms`;
+  }
+
+  operationLabel(value: string): string {
+    if (value === 'quick_sync_names') {
+      return 'Quick Sync Names';
+    }
+    if (value === 'full_sync_slots') {
+      return 'Full Sync Slots';
+    }
+    return value;
   }
 }

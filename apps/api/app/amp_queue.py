@@ -4,34 +4,37 @@ from datetime import datetime
 from typing import Literal
 from uuid import uuid4
 
-from app.katana import AmpClient, AmpClientError, SlotsStateSnapshot
+from app.katana import AmpClient, AmpClientError, QuickSlotsSnapshot, SlotsStateSnapshot
 from app.settings import get_settings
 
 JobStatus = Literal["queued", "running", "succeeded", "failed"]
+JobOperation = Literal["full_sync_slots", "quick_sync_names"]
 
 
 @dataclass
-class SlotsSyncJob:
+class AmpQueueJob:
     job_id: str
+    operation: JobOperation
     status: JobStatus
     created_at: str
     started_at: str | None = None
     finished_at: str | None = None
     error: str | None = None
-    result: SlotsStateSnapshot | None = None
+    result_slots: SlotsStateSnapshot | None = None
+    result_quick: QuickSlotsSnapshot | None = None
 
 
 class AmpJobQueue:
     def __init__(self) -> None:
         self._queue: asyncio.Queue[str] = asyncio.Queue()
-        self._jobs: dict[str, SlotsSyncJob] = {}
+        self._jobs: dict[str, AmpQueueJob] = {}
         self._worker_task: asyncio.Task[None] | None = None
         self._jobs_lock = asyncio.Lock()
 
     async def start(self) -> None:
         if self._worker_task is not None and not self._worker_task.done():
             return
-        self._worker_task = asyncio.create_task(self._worker_loop(), name="amp-slots-sync-worker")
+        self._worker_task = asyncio.create_task(self._worker_loop(), name="amp-ops-worker")
 
     async def stop(self) -> None:
         task = self._worker_task
@@ -44,9 +47,16 @@ class AmpJobQueue:
         except asyncio.CancelledError:
             pass
 
-    async def enqueue_slots_sync(self) -> SlotsSyncJob:
-        job = SlotsSyncJob(
+    async def enqueue_slots_sync(self) -> AmpQueueJob:
+        return await self._enqueue("full_sync_slots")
+
+    async def enqueue_quick_sync(self) -> AmpQueueJob:
+        return await self._enqueue("quick_sync_names")
+
+    async def _enqueue(self, operation: JobOperation) -> AmpQueueJob:
+        job = AmpQueueJob(
             job_id=str(uuid4()),
+            operation=operation,
             status="queued",
             created_at=datetime.now().isoformat(timespec="seconds"),
         )
@@ -55,19 +65,32 @@ class AmpJobQueue:
         await self._queue.put(job.job_id)
         return job
 
-    async def get_job(self, job_id: str) -> SlotsSyncJob | None:
+    async def get_job(self, job_id: str) -> AmpQueueJob | None:
         async with self._jobs_lock:
             return self._jobs.get(job_id)
+
+    async def list_jobs(self, limit: int = 25) -> list[AmpQueueJob]:
+        max_items = max(1, min(int(limit), 200))
+        async with self._jobs_lock:
+            jobs = sorted(self._jobs.values(), key=lambda item: item.created_at, reverse=True)
+            return jobs[:max_items]
+
+    async def get_running_job_id(self) -> str | None:
+        async with self._jobs_lock:
+            for job in self._jobs.values():
+                if job.status == "running":
+                    return job.job_id
+        return None
 
     async def _worker_loop(self) -> None:
         while True:
             job_id = await self._queue.get()
             try:
-                await self._run_slots_sync(job_id)
+                await self._run_job(job_id)
             finally:
                 self._queue.task_done()
 
-    async def _run_slots_sync(self, job_id: str) -> None:
+    async def _run_job(self, job_id: str) -> None:
         async with self._jobs_lock:
             job = self._jobs.get(job_id)
             if job is None:
@@ -83,7 +106,14 @@ class AmpJobQueue:
         )
         synced_at = datetime.now().isoformat(timespec="seconds")
         try:
-            result = await client.read_slots_state(synced_at=synced_at)
+            if job.operation == "full_sync_slots":
+                slots_result = await client.read_slots_state(synced_at=synced_at)
+                quick_result = None
+            elif job.operation == "quick_sync_names":
+                quick_result = await client.read_slots_names_quick(synced_at=synced_at)
+                slots_result = None
+            else:
+                raise RuntimeError(f"unknown operation: {job.operation}")
         except AmpClientError as exc:
             async with self._jobs_lock:
                 failed = self._jobs.get(job_id)
@@ -108,7 +138,8 @@ class AmpJobQueue:
             if done is None:
                 return
             done.status = "succeeded"
-            done.result = result
+            done.result_slots = slots_result
+            done.result_quick = quick_result
             done.finished_at = datetime.now().isoformat(timespec="seconds")
 
 
