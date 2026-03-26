@@ -243,6 +243,13 @@ interface SlotCard {
   measured_at: string;
 }
 
+type StageName = 'booster' | 'mod' | 'fx' | 'delay' | 'reverb';
+
+interface TypeOption {
+  value: number;
+  label: string;
+}
+
 function defaultSlotCards(): SlotCard[] {
   return Array.from({ length: 8 }, (_, idx) => {
     const slot = idx + 1;
@@ -298,6 +305,10 @@ export class App implements OnInit, OnDestroy {
   rawModalOpen = signal(false);
   rawModalTitle = signal('');
   rawModalJson = signal('');
+  editorModalOpen = signal(false);
+  editorSlotNumber = signal<number | null>(null);
+  editorSlotLabel = signal('');
+  editorPatchDraft = signal<Record<string, unknown> | null>(null);
   patchSetModalOpen = signal(false);
   patchSetSnapshots = signal<BackupSnapshotSummary[]>([]);
 
@@ -834,6 +845,10 @@ export class App implements OnInit, OnDestroy {
     return slot.in_sync && this.hasFullPatch(slot);
   }
 
+  canOpenEditor(slot: SlotCard): boolean {
+    return this.hasFullPatch(slot);
+  }
+
   canSyncSlot(slot: SlotCard): boolean {
     return !(slot.in_sync && slot.is_saved);
   }
@@ -1016,6 +1031,213 @@ export class App implements OnInit, OnDestroy {
 
   closePatchSetModal(): void {
     this.patchSetModalOpen.set(false);
+  }
+
+  openEditor(slot: SlotCard): void {
+    if (!slot.patch) {
+      this.status.set(`No full patch payload loaded for ${slot.slot_label}. Sync this slot first.`);
+      return;
+    }
+    this.editorSlotNumber.set(slot.slot);
+    this.editorSlotLabel.set(slot.slot_label);
+    this.editorPatchDraft.set(this.clonePatch(slot.patch));
+    this.editorModalOpen.set(true);
+  }
+
+  closeEditorModal(): void {
+    this.editorModalOpen.set(false);
+  }
+
+  editorPatchName(): string {
+    return this.readString(this.editorPatchDraft(), 'patch_name') ?? '';
+  }
+
+  setEditorPatchName(value: string): void {
+    this.updateEditorPatch((draft) => {
+      draft['patch_name'] = value;
+    });
+  }
+
+  editorAmpNumber(field: string): number | null {
+    const amp = this.readObject(this.editorPatchDraft(), 'amp');
+    return this.readNumber(amp, field);
+  }
+
+  setEditorAmpNumber(field: string, value: string): void {
+    const parsed = this.parseInteger(value);
+    this.updateEditorPatch((draft) => {
+      const amp = this.ensureObject(draft, 'amp');
+      amp[field] = parsed;
+    });
+  }
+
+  editorAmpTypeOptions(): TypeOption[] {
+    return AMP_TYPE_NAMES.map((label, index) => ({ value: index, label }));
+  }
+
+  editorStageOn(stageName: StageName): boolean {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const stage = this.readObject(stages, stageName);
+    return this.readBoolean(stage, 'on');
+  }
+
+  setEditorStageOn(stageName: StageName, checked: boolean): void {
+    this.updateEditorPatch((draft) => {
+      const stages = this.ensureObject(draft, 'stages');
+      const stage = this.ensureObject(stages, stageName);
+      stage['on'] = checked;
+    });
+  }
+
+  editorStageType(stageName: StageName): number | null {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const stage = this.readObject(stages, stageName);
+    return this.readNumber(stage, 'type');
+  }
+
+  setEditorStageType(stageName: StageName, value: string): void {
+    const parsed = this.parseInteger(value);
+    this.updateEditorPatch((draft) => {
+      const stages = this.ensureObject(draft, 'stages');
+      const stage = this.ensureObject(stages, stageName);
+      stage['type'] = parsed;
+    });
+  }
+
+  editorStageLevel(stageName: StageName): number | null {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const stage = this.readObject(stages, stageName);
+    return this.readNumber(stage, 'effect_level');
+  }
+
+  setEditorStageLevel(stageName: StageName, value: string): void {
+    const parsed = this.parseInteger(value);
+    this.updateEditorPatch((draft) => {
+      const stages = this.ensureObject(draft, 'stages');
+      const stage = this.ensureObject(stages, stageName);
+      stage['effect_level'] = parsed;
+    });
+  }
+
+  editorBoosterDrive(): number | null {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const stage = this.readObject(stages, 'booster');
+    return this.readNumber(stage, 'drive');
+  }
+
+  setEditorBoosterDrive(value: string): void {
+    const parsed = this.parseInteger(value);
+    this.updateEditorPatch((draft) => {
+      const stages = this.ensureObject(draft, 'stages');
+      const stage = this.ensureObject(stages, 'booster');
+      stage['drive'] = parsed;
+    });
+  }
+
+  stageTypeOptions(stageName: StageName): TypeOption[] {
+    const table =
+      stageName === 'booster'
+        ? BOOSTER_TYPE_NAMES
+        : stageName === 'mod' || stageName === 'fx'
+          ? FX_TYPE_NAMES
+          : stageName === 'delay'
+            ? DELAY_TYPE_NAMES
+            : REVERB_TYPE_NAMES;
+    return table.map((label, index) => ({ value: index, label }));
+  }
+
+  applyEditorDraftToSlot(): void {
+    const slotNumber = this.editorSlotNumber();
+    const draft = this.editorPatchDraft();
+    if (slotNumber === null || draft === null) {
+      return;
+    }
+    const patchName = this.readString(draft, 'patch_name') ?? '';
+    this.slots.update((current) =>
+      current.map((card) => {
+        if (card.slot !== slotNumber) {
+          return card;
+        }
+        return {
+          ...card,
+          patch_name: patchName || card.patch_name,
+          patch: this.clonePatch(draft),
+          config_hash_sha256: '',
+          in_sync: false,
+          is_saved: false,
+          inferred: false,
+        };
+      }),
+    );
+    this.status.set(`Applied editor draft to ${this.editorSlotLabel()} (local only)`);
+    this.editorModalOpen.set(false);
+  }
+
+  async saveEditorDraftToLibrary(): Promise<void> {
+    const slotNumber = this.editorSlotNumber();
+    const draft = this.editorPatchDraft();
+    if (slotNumber === null || draft === null) {
+      return;
+    }
+    this.status.set(`Saving editor draft for ${this.editorSlotLabel()}...`);
+    this.responseJson.set('');
+    try {
+      const saveResponse = await fetch('/api/v1/patches/configs', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ snapshot: draft }),
+      });
+      const savePayload = (await saveResponse.json()) as { hash_id?: string; detail?: unknown };
+      if (!saveResponse.ok || typeof savePayload.hash_id !== 'string') {
+        this.status.set('Failed saving editor draft');
+        this.responseJson.set(JSON.stringify(savePayload, null, 2));
+        return;
+      }
+      const hashId = savePayload.hash_id;
+      const patchName = this.readString(draft, 'patch_name') ?? '';
+      this.slots.update((current) =>
+        current.map((card) => {
+          if (card.slot !== slotNumber) {
+            return card;
+          }
+          return {
+            ...card,
+            patch_name: patchName || card.patch_name,
+            patch: this.clonePatch(draft),
+            config_hash_sha256: hashId,
+            in_sync: false,
+            is_saved: true,
+            inferred: false,
+          };
+        }),
+      );
+      this.status.set(`Editor draft saved for ${this.editorSlotLabel()}`);
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Editor draft saved to library',
+            slot: this.editorSlotLabel(),
+            hash_id: hashId,
+          },
+          null,
+          2,
+        ),
+      );
+      this.editorModalOpen.set(false);
+    } catch (error: unknown) {
+      this.status.set('Failed saving editor draft');
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Browser request failed',
+            error: String(error),
+          },
+          null,
+          2,
+        ),
+      );
+    }
   }
 
   async loadPatchSetSnapshot(snapshot: BackupSnapshotSummary): Promise<void> {
@@ -1380,7 +1602,6 @@ export class App implements OnInit, OnDestroy {
     if (!booster) {
       return 'n/a';
     }
-    const on = this.readBoolean(booster, 'on');
     const type = this.readNumber(booster, 'type');
     const drive = this.readNumber(booster, 'drive');
     const volume = this.readNumber(booster, 'effect_level');
@@ -1485,6 +1706,16 @@ export class App implements OnInit, OnDestroy {
     return candidate as Record<string, unknown>;
   }
 
+  private ensureObject(parent: Record<string, unknown>, key: string): Record<string, unknown> {
+    const existing = parent[key];
+    if (existing && typeof existing === 'object' && !Array.isArray(existing)) {
+      return existing as Record<string, unknown>;
+    }
+    const created: Record<string, unknown> = {};
+    parent[key] = created;
+    return created;
+  }
+
   private readNumber(source: Record<string, unknown> | null, key: string): number | null {
     if (!source) {
       return null;
@@ -1516,6 +1747,29 @@ export class App implements OnInit, OnDestroy {
 
   private hasFullPatch(slot: SlotCard): boolean {
     return slot.patch !== null;
+  }
+
+  private parseInteger(value: string): number {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) {
+      return 0;
+    }
+    return parsed;
+  }
+
+  private clonePatch(patch: Record<string, unknown>): Record<string, unknown> {
+    return JSON.parse(JSON.stringify(patch)) as Record<string, unknown>;
+  }
+
+  private updateEditorPatch(mutator: (draft: Record<string, unknown>) => void): void {
+    this.editorPatchDraft.update((current) => {
+      if (current === null) {
+        return null;
+      }
+      const next = this.clonePatch(current);
+      mutator(next);
+      return next;
+    });
   }
 
   private nv(value: number | null): string {

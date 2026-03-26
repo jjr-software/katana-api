@@ -1055,3 +1055,22 @@
   - `apps/web/src/app/app.html`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Editor Modal v1 Scaffold)
+- Started editor modal development in web UI with first working slice.
+- Slot cards now include an `Editor` action (enabled when a full patch payload exists).
+- Added `Editor` modal with draft editing for:
+  - patch name,
+  - amp controls (`type`, `variation`, `gain`, `volume`, `bass`, `middle`, `treble`, `presence`),
+  - stage controls for `booster`, `mod`, `fx`, `delay`, `reverb` (`enabled`, `type`, `level`),
+  - booster-specific `Gain` (`drive`).
+- Added modal actions:
+  - `Apply Local` (writes draft back to slot card state locally and marks unsynced/unsaved),
+  - `Save Draft` (persists draft snapshot via `/api/v1/patches/configs` and updates slot hash/saved state).
+- No amp device write path added yet in this slice; this is editor/draft workflow only.
+- Files changed:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+  - `apps/web/src/app/app.css`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

@@ -105,6 +105,7 @@
                   <div class="d-flex flex-wrap gap-2 mb-2">
                     <button type="button" class="btn btn-sm btn-primary" (click)="syncAmpSlot(slot.slot)" [disabled]="!canSyncSlot(slot)">Sync</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="saveSlotPatch(slot)" [disabled]="!canSaveSlot(slot)">Save</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openEditor(slot)" [disabled]="!canOpenEditor(slot)">Editor</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="showRaw(slot)" [disabled]="!canUseSlotActions(slot)">Raw</button>
                   </div>
                   <p class="small mb-1 patch-summary"><strong>Amp:</strong> {{ ampSummary(slot) }}</p>
@@ -148,6 +149,7 @@
                   <div class="d-flex flex-wrap gap-2 mb-2">
                     <button type="button" class="btn btn-sm btn-primary" (click)="syncAmpSlot(slot.slot)" [disabled]="!canSyncSlot(slot)">Sync</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="saveSlotPatch(slot)" [disabled]="!canSaveSlot(slot)">Save</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openEditor(slot)" [disabled]="!canOpenEditor(slot)">Editor</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="showRaw(slot)" [disabled]="!canUseSlotActions(slot)">Raw</button>
                   </div>
                   <p class="small mb-1 patch-summary"><strong>Amp:</strong> {{ ampSummary(slot) }}</p>
@@ -212,6 +214,97 @@
             <p class="small text-secondary mb-0">No recent full-sync snapshots found.</p>
           }
         </div>
+      </section>
+    </div>
+  }
+
+  @if (editorModalOpen()) {
+    <div class="raw-modal-backdrop" (click)="closeEditorModal()">
+      <section class="raw-modal editor-modal" role="dialog" aria-modal="true" aria-label="Patch Editor" (click)="$event.stopPropagation()">
+        <header class="raw-modal-head">
+          <h3>Editor · {{ editorSlotLabel() }}</h3>
+          <button type="button" class="btn btn-sm btn-light" (click)="closeEditorModal()">Close</button>
+        </header>
+        @if (editorPatchDraft(); as draft) {
+          <div class="p-3 d-grid gap-3 editor-modal-body">
+            <article class="border rounded p-2">
+              <h4 class="h6 mb-2">Patch</h4>
+              <label class="form-label small mb-1">Name</label>
+              <input
+                type="text"
+                class="form-control form-control-sm"
+                [value]="editorPatchName()"
+                (input)="setEditorPatchName($any($event.target).value)"
+              />
+            </article>
+
+            <article class="border rounded p-2">
+              <h4 class="h6 mb-2">Amp</h4>
+              <div class="row g-2">
+                <div class="col-6 col-md-4">
+                  <label class="form-label small mb-1">Type</label>
+                  <select class="form-select form-select-sm" [value]="editorAmpNumber('amp_type') ?? 0" (change)="setEditorAmpNumber('amp_type', $any($event.target).value)">
+                    @for (opt of editorAmpTypeOptions(); track opt.value) {
+                      <option [value]="opt.value">{{ opt.label }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="col-6 col-md-4">
+                  <label class="form-label small mb-1">Variation</label>
+                  <select class="form-select form-select-sm" [value]="editorAmpNumber('preamp_variation') ?? 0" (change)="setEditorAmpNumber('preamp_variation', $any($event.target).value)">
+                    <option [value]="0">Off</option>
+                    <option [value]="1">On</option>
+                  </select>
+                </div>
+              </div>
+              <div class="row g-2 mt-1">
+                <div class="col-6 col-md-4"><label class="form-label small mb-1">Gain</label><input type="number" min="0" max="100" class="form-control form-control-sm" [value]="editorAmpNumber('gain') ?? 0" (input)="setEditorAmpNumber('gain', $any($event.target).value)" /></div>
+                <div class="col-6 col-md-4"><label class="form-label small mb-1">Volume</label><input type="number" min="0" max="100" class="form-control form-control-sm" [value]="editorAmpNumber('volume') ?? 0" (input)="setEditorAmpNumber('volume', $any($event.target).value)" /></div>
+                <div class="col-6 col-md-4"><label class="form-label small mb-1">Bass</label><input type="number" min="0" max="100" class="form-control form-control-sm" [value]="editorAmpNumber('bass') ?? 0" (input)="setEditorAmpNumber('bass', $any($event.target).value)" /></div>
+                <div class="col-6 col-md-4"><label class="form-label small mb-1">Middle</label><input type="number" min="0" max="100" class="form-control form-control-sm" [value]="editorAmpNumber('middle') ?? 0" (input)="setEditorAmpNumber('middle', $any($event.target).value)" /></div>
+                <div class="col-6 col-md-4"><label class="form-label small mb-1">Treble</label><input type="number" min="0" max="100" class="form-control form-control-sm" [value]="editorAmpNumber('treble') ?? 0" (input)="setEditorAmpNumber('treble', $any($event.target).value)" /></div>
+                <div class="col-6 col-md-4"><label class="form-label small mb-1">Presence</label><input type="number" min="0" max="100" class="form-control form-control-sm" [value]="editorAmpNumber('presence') ?? 0" (input)="setEditorAmpNumber('presence', $any($event.target).value)" /></div>
+              </div>
+            </article>
+
+            @for (stageName of ['booster', 'mod', 'fx', 'delay', 'reverb']; track stageName) {
+              <article class="border rounded p-2">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <h4 class="h6 mb-0 text-capitalize" [class.text-success]="editorStageOn($any(stageName))" [class.text-danger]="!editorStageOn($any(stageName))">{{ stageName }}</h4>
+                  <label class="form-check-label small d-flex align-items-center gap-1">
+                    <input class="form-check-input m-0" type="checkbox" [checked]="editorStageOn($any(stageName))" (change)="setEditorStageOn($any(stageName), $any($event.target).checked)" />
+                    <span>Enabled</span>
+                  </label>
+                </div>
+                <div class="row g-2">
+                  <div class="col-12 col-md-6">
+                    <label class="form-label small mb-1">Type</label>
+                    <select class="form-select form-select-sm" [value]="editorStageType($any(stageName)) ?? 0" (change)="setEditorStageType($any(stageName), $any($event.target).value)">
+                      @for (opt of stageTypeOptions($any(stageName)); track opt.value) {
+                        <option [value]="opt.value">{{ opt.label }}</option>
+                      }
+                    </select>
+                  </div>
+                  <div class="col-6 col-md-3">
+                    <label class="form-label small mb-1">Level</label>
+                    <input type="number" min="0" max="100" class="form-control form-control-sm" [value]="editorStageLevel($any(stageName)) ?? 0" (input)="setEditorStageLevel($any(stageName), $any($event.target).value)" />
+                  </div>
+                  @if (stageName === 'booster') {
+                    <div class="col-6 col-md-3">
+                      <label class="form-label small mb-1">Gain</label>
+                      <input type="number" min="0" max="100" class="form-control form-control-sm" [value]="editorBoosterDrive() ?? 0" (input)="setEditorBoosterDrive($any($event.target).value)" />
+                    </div>
+                  }
+                </div>
+              </article>
+            }
+          </div>
+          <footer class="p-3 pt-2 border-top d-flex gap-2 justify-content-end">
+            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="closeEditorModal()">Cancel</button>
+            <button type="button" class="btn btn-sm btn-outline-primary" (click)="applyEditorDraftToSlot()">Apply Local</button>
+            <button type="button" class="btn btn-sm btn-primary" (click)="saveEditorDraftToLibrary()">Save Draft</button>
+          </footer>
+        }
       </section>
     </div>
   }

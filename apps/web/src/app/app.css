@@ -85,6 +85,15 @@ pre {
   overflow: auto;
 }
 
+.editor-modal {
+  width: min(1080px, 100%);
+}
+
+.editor-modal-body {
+  max-height: calc(90vh - 130px);
+  overflow: auto;
+}
+
 @media (max-width: 1199.98px) {
   .queue-panel {
     position: static;
