@@ -1,10 +1,9 @@
 import asyncio
-import json
 import time
-from hashlib import sha256
 from dataclasses import dataclass
 from typing import Any
 
+from app.hashing import snapshot_hash
 from app.katana.protocol import (
     ADDR_PATCH_AMP,
     ADDR_PATCH_BOOSTER_1,
@@ -697,13 +696,7 @@ class AmpClient:
 
     @staticmethod
     def _config_hash(payload: dict[str, Any]) -> str:
-        base = {
-            key: value
-            for key, value in payload.items()
-            if key not in {"config_hash_sha256", "patch_name"}
-        }
-        blob = json.dumps(base, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
-        return sha256(blob.encode("utf-8")).hexdigest()
+        return snapshot_hash(payload)
 
     @staticmethod
     def is_busy_error(detail: str) -> bool:

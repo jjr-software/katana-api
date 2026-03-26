@@ -1475,3 +1475,19 @@
   - `apps/api/app/katana/client.py`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Hash Canonicalization De-Redundancy)
+- Replaced ad-hoc hash input with a shared canonicalizer that removes redundant/derived snapshot fields.
+- Canonical hash now uses source-of-truth values only (raw blocks + required selectors/flags), and excludes cosmetic/derived duplicates.
+- Implemented shared hashing module used by both:
+  - API patch config hashing (`/api/v1/patches/configs`)
+  - Katana client `config_hash_sha256` generation.
+- Verified behavior:
+  - changing only `patch_name` does not change hash,
+  - changing only derived scalar duplicate (for example `amp.volume` while `amp.raw` unchanged) does not change hash.
+- Files changed:
+  - `apps/api/app/hashing.py`
+  - `apps/api/app/api/patches.py`
+  - `apps/api/app/katana/client.py`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

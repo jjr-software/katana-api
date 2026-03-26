@@ -1,11 +1,9 @@
-import hashlib
-import json
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.deps import get_db
+from app.hashing import snapshot_hash
 from app.models import Patch, PatchConfig, PatchSet, PatchSetMember
 from app.schemas import (
     PatchConfigRead,
@@ -139,10 +137,4 @@ def _upsert_patch_config(db: Session, hash_id: str, snapshot: dict) -> PatchConf
 
 
 def _snapshot_hash(snapshot: dict) -> str:
-    canonical = {
-        key: value
-        for key, value in snapshot.items()
-        if key not in {"config_hash_sha256", "patch_name"}
-    }
-    snapshot_bytes = json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    return hashlib.sha256(snapshot_bytes).hexdigest()
+    return snapshot_hash(snapshot)
