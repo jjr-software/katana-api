@@ -329,6 +329,85 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  async saveSlotPatch(slot: SlotCard): Promise<void> {
+    if (!slot.patch || !slot.config_hash_sha256) {
+      this.status.set(`No full patch payload loaded for ${slot.slot_label}. Sync this slot first.`);
+      return;
+    }
+
+    this.status.set(`Checking library for ${slot.slot_label}...`);
+    this.responseJson.set('');
+
+    try {
+      const lookupResponse = await fetch(`/api/v1/patches/configs/${slot.config_hash_sha256}`, {
+        method: 'GET',
+        cache: 'no-store',
+      });
+      if (lookupResponse.ok) {
+        this.markSlotSaved(slot.slot);
+        this.status.set(`${slot.slot_label} already in library`);
+        this.responseJson.set(
+          JSON.stringify(
+            {
+              message: 'Patch already exists in library',
+              slot: slot.slot_label,
+              hash_id: slot.config_hash_sha256,
+            },
+            null,
+            2,
+          ),
+        );
+        return;
+      }
+
+      if (lookupResponse.status !== 404) {
+        const payload = (await lookupResponse.json()) as { detail?: unknown };
+        this.status.set(`Failed library lookup for ${slot.slot_label}`);
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+
+      const saveResponse = await fetch('/api/v1/patches/configs', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ snapshot: slot.patch }),
+      });
+      const savePayload = (await saveResponse.json()) as { hash_id?: string; detail?: unknown };
+      if (!saveResponse.ok) {
+        this.status.set(`Failed saving ${slot.slot_label}`);
+        this.responseJson.set(JSON.stringify(savePayload, null, 2));
+        return;
+      }
+
+      this.markSlotSaved(slot.slot);
+      this.status.set(`${slot.slot_label} saved to library`);
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Patch saved to library',
+            slot: slot.slot_label,
+            hash_id: savePayload.hash_id ?? slot.config_hash_sha256,
+          },
+          null,
+          2,
+        ),
+      );
+    } catch (error: unknown) {
+      this.status.set(`Failed saving ${slot.slot_label}`);
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Browser request failed',
+            error: String(error),
+          },
+          null,
+          2,
+        ),
+      );
+    }
+  }
+
   async quickSyncAmpSlots(): Promise<void> {
     this.status.set('Quick sync queued...');
     this.responseJson.set('');
@@ -606,6 +685,17 @@ export class App implements OnInit, OnDestroy {
           inferred: false,
           match_count: 1,
         };
+      }),
+    );
+  }
+
+  private markSlotSaved(slotNumber: number): void {
+    this.slots.update((current) =>
+      current.map((card) => {
+        if (card.slot !== slotNumber) {
+          return card;
+        }
+        return { ...card, is_saved: true };
       }),
     );
   }

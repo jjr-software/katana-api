@@ -645,6 +645,16 @@
 - Rebuilt/restarted:
   - `docker compose up -d --build`
 
+## Session Update - 2026-03-26 (Per-Slot Save With Hash Lookup)
+- Added per-slot `Save` button on slot cards.
+- Save workflow now does explicit hash lookup before writing:
+  1. `GET /api/v1/patches/configs/{hash}`
+  2. if 200 -> mark slot as saved (no duplicate write)
+  3. if 404 -> `POST /api/v1/patches/configs` with slot snapshot
+- On success, slot card state is updated to `is_saved=true`.
+- Rebuilt/restarted:
+  - `docker compose up -d --build`
+
 ## Session Update - 2026-03-26 (Queue-Only Amp I/O + No Global UI Lock)
 - Enforced queue-backed amp communication across API amp-read/sync routes:
   - `GET /api/v1/amp/test-connection` now executes via queue job.
