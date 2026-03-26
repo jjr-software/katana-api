@@ -1029,3 +1029,14 @@
   - `apps/web/src/app/app.ts`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Booster Summary Shows G/V)
+- Updated slot card booster summary formatting to include explicit gain/volume style values:
+  - `On/Off | <Booster Type> | G <drive> | V <effect_level>`
+- Mapping uses existing booster payload fields:
+  - `drive` -> `G`
+  - `effect_level` -> `V`
+- File changed:
+  - `apps/web/src/app/app.ts`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

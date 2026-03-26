@@ -1375,7 +1375,22 @@ export class App implements OnInit, OnDestroy {
   }
 
   boosterSummary(slot: SlotCard): string {
-    return this.stageSummary(slot, 'booster');
+    const stages = this.readObject(slot.patch, 'stages');
+    const booster = this.readObject(stages, 'booster');
+    if (!booster) {
+      return 'n/a';
+    }
+    const on = this.readBoolean(booster, 'on');
+    const type = this.readNumber(booster, 'type');
+    const drive = this.readNumber(booster, 'drive');
+    const volume = this.readNumber(booster, 'effect_level');
+    const parts: string[] = [on ? 'On' : 'Off'];
+    if (type !== null) {
+      parts.push(this.effectTypeLabel('booster', type));
+    }
+    parts.push(`G ${this.nv(drive)}`);
+    parts.push(`V ${this.nv(volume)}`);
+    return parts.join(' | ');
   }
 
   modSummary(slot: SlotCard): string {
