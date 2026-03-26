@@ -1461,12 +1461,10 @@ export class App implements OnInit, OnDestroy {
       const stages = this.ensureObject(draft, 'stages');
       const stage = this.ensureObject(stages, stageName);
       stage['type'] = parsed;
-      const variantsRaw = stage['variants_raw'];
-      if (Array.isArray(variantsRaw) && parsed >= 0 && parsed < variantsRaw.length) {
-        const variant = variantsRaw[parsed];
-        if (Array.isArray(variant)) {
-          stage['raw'] = variant.map((item) => this.parseUnknownNumber(item));
-        }
+      const raw = this.ensureNumericRaw(stage);
+      if (raw.length > 0) {
+        raw[0] = parsed;
+        stage['raw'] = raw;
       }
       this.syncStageDerivedFields(stageName, stage);
     });

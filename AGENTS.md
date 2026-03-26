@@ -1499,3 +1499,18 @@
   - `apps/web/src/app/app.ts`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Editor Booster Type Apply Fix)
+- Fixed editor stage type handling so type changes are written into stage raw payload byte 0 (the source-of-truth used by live apply).
+- Root cause:
+  - `setEditorStageType(...)` incorrectly indexed `variants_raw` using the selected type value, which is unrelated to color variant index, so booster `raw[0]` often did not change.
+- Fix:
+  - update `stage.raw[0]` directly to selected type when raw payload exists.
+- Verified with Playwright:
+  - changing Booster Type in editor produced live-apply request with matching:
+    - `stages.booster.type = 1`
+    - `stages.booster.raw[0] = 1`
+- Files changed:
+  - `apps/web/src/app/app.ts`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
