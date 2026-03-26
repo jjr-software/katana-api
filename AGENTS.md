@@ -544,6 +544,24 @@
   - `alembic current` => `20260326_0001 (head)`
   - `alembic history` => `<base> -> 20260326_0001 (head)`
 
+## Session Update - 2026-03-26 (Per-Slot Sync/Saved Status Colors)
+- Added explicit per-slot status fields in amp API responses:
+  - `in_sync`
+  - `is_saved`
+- Applied on:
+  - full slot sync responses
+  - per-slot sync responses
+  - quick sync name responses
+  - full dump/backup slot payload responses
+- Added web slot-card status badges and color coding:
+  - `In Sync` / `Not Synced`
+  - `Saved` / `Not Saved`
+  - card border now reflects sync status (`green` synced, `amber` not synced)
+- Rebuilt/restarted:
+  - `docker compose up -d --build`
+- API verification:
+  - `/api/v1/amp/slots/quick` and `/api/v1/amp/slots` now both include `in_sync` + `is_saved` per slot.
+
 ## Session Update - 2026-03-26 (Queue-Only Amp I/O + No Global UI Lock)
 - Enforced queue-backed amp communication across API amp-read/sync routes:
   - `GET /api/v1/amp/test-connection` now executes via queue job.

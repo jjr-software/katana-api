@@ -31,6 +31,8 @@ class SlotPatchSummaryResponse(BaseModel):
     slot_label: str
     patch_name: str
     config_hash_sha256: str
+    in_sync: bool
+    is_saved: bool
     synced_at: str
     slot_sync_ms: int
     curated: list[dict]
@@ -55,6 +57,8 @@ class QuickSlotSummaryResponse(BaseModel):
     inferred_hash_sha256: str | None = None
     candidate_hashes_sha256: list[str]
     match_count: int
+    in_sync: bool
+    is_saved: bool
     synced_at: str
     slot_sync_ms: int
 
@@ -68,6 +72,8 @@ class QuickSlotsStateResponse(BaseModel):
 class FullDumpSlotResponse(BaseModel):
     slot: int
     slot_label: str
+    in_sync: bool
+    is_saved: bool
     synced_at: str
     slot_sync_ms: int
     patch: dict
@@ -252,11 +258,12 @@ async def slots_state(
 
     state = settled.result_slots
     curated_by_hash = _load_curation_by_hash(db, [slot.config_hash_sha256 for slot in state.slots])
+    saved_hashes = _load_saved_hashes(db, [slot.config_hash_sha256 for slot in state.slots])
     return SlotsStateResponse(
         synced_at=state.synced_at,
         amp_state_hash_sha256=state.amp_state_hash_sha256,
         total_sync_ms=state.total_sync_ms,
-        slots=[SlotPatchSummaryResponse(**_slot_to_dict(slot, curated_by_hash)) for slot in state.slots],
+        slots=[SlotPatchSummaryResponse(**_slot_to_dict(slot, curated_by_hash, saved_hashes)) for slot in state.slots],
     )
 
 
@@ -297,9 +304,10 @@ async def sync_single_slot(
 
     item = settled.result_slot
     curated_by_hash = _load_curation_by_hash(db, [item.config_hash_sha256])
+    saved_hashes = _load_saved_hashes(db, [item.config_hash_sha256])
     return SlotSyncResponse(
         synced_at=item.synced_at,
-        slot=SlotPatchSummaryResponse(**_slot_to_dict(item, curated_by_hash)),
+        slot=SlotPatchSummaryResponse(**_slot_to_dict(item, curated_by_hash, saved_hashes)),
     )
 
 
@@ -400,11 +408,18 @@ async def get_slots_sync_job(job_id: str, db: Session = Depends(get_db)) -> Slot
             db,
             [slot.config_hash_sha256 for slot in job.result_slots.slots],
         )
+        saved_hashes = _load_saved_hashes(
+            db,
+            [slot.config_hash_sha256 for slot in job.result_slots.slots],
+        )
         result = SlotsStateResponse(
             synced_at=job.result_slots.synced_at,
             amp_state_hash_sha256=job.result_slots.amp_state_hash_sha256,
             total_sync_ms=job.result_slots.total_sync_ms,
-            slots=[SlotPatchSummaryResponse(**_slot_to_dict(slot, curated_by_hash)) for slot in job.result_slots.slots],
+            slots=[
+                SlotPatchSummaryResponse(**_slot_to_dict(slot, curated_by_hash, saved_hashes))
+                for slot in job.result_slots.slots
+            ],
         )
 
     return SlotsSyncJobResponse(
@@ -476,15 +491,17 @@ async def get_backup_job(job_id: str, db: Session = Depends(get_db)) -> BackupJo
 
     result: FullAmpDumpResponse | None = None
     if job.result_dump is not None:
+        hash_ids = [str(item.payload.get("config_hash_sha256", "")) for item in job.result_dump.slots]
         curated_by_hash = _load_curation_by_hash(
             db,
-            [str(item.payload.get("config_hash_sha256", "")) for item in job.result_dump.slots],
+            hash_ids,
         )
+        saved_hashes = _load_saved_hashes(db, hash_ids)
         result = FullAmpDumpResponse(
             synced_at=job.result_dump.synced_at,
             amp_state_hash_sha256=job.result_dump.amp_state_hash_sha256,
             total_sync_ms=job.result_dump.total_sync_ms,
-            slots=[FullDumpSlotResponse(**_slot_dump_to_dict(item, curated_by_hash)) for item in job.result_dump.slots],
+            slots=[FullDumpSlotResponse(**_slot_dump_to_dict(item, curated_by_hash, saved_hashes)) for item in job.result_dump.slots],
         )
 
     return BackupJobResponse(
@@ -511,17 +528,21 @@ def _quick_slot_to_dict(slot: QuickSlotName, candidates_by_name: dict[str, list[
         "inferred_hash_sha256": inferred_hash,
         "candidate_hashes_sha256": candidates,
         "match_count": len(candidates),
+        "in_sync": inferred_hash is not None,
+        "is_saved": len(candidates) > 0,
         "synced_at": slot.synced_at,
         "slot_sync_ms": slot.slot_sync_ms,
     }
 
 
-def _slot_to_dict(slot: SlotPatchSummary, curated_by_hash: dict[str, list[dict]]) -> dict:
+def _slot_to_dict(slot: SlotPatchSummary, curated_by_hash: dict[str, list[dict]], saved_hashes: set[str]) -> dict:
     return {
         "slot": slot.slot,
         "slot_label": slot.slot_label,
         "patch_name": slot.patch_name,
         "config_hash_sha256": slot.config_hash_sha256,
+        "in_sync": True,
+        "is_saved": slot.config_hash_sha256 in saved_hashes,
         "synced_at": slot.synced_at,
         "slot_sync_ms": slot.slot_sync_ms,
         "curated": curated_by_hash.get(slot.config_hash_sha256, []),
@@ -591,23 +612,27 @@ async def full_amp_dump(
             },
         )
     dump = settled.result_dump
+    hash_ids = [str(item.payload.get("config_hash_sha256", "")) for item in dump.slots]
     curated_by_hash = _load_curation_by_hash(
         db,
-        [str(item.payload.get("config_hash_sha256", "")) for item in dump.slots],
+        hash_ids,
     )
+    saved_hashes = _load_saved_hashes(db, hash_ids)
     return FullAmpDumpResponse(
         synced_at=dump.synced_at,
         amp_state_hash_sha256=dump.amp_state_hash_sha256,
         total_sync_ms=dump.total_sync_ms,
-        slots=[FullDumpSlotResponse(**_slot_dump_to_dict(item, curated_by_hash)) for item in dump.slots],
+        slots=[FullDumpSlotResponse(**_slot_dump_to_dict(item, curated_by_hash, saved_hashes)) for item in dump.slots],
     )
 
 
-def _slot_dump_to_dict(slot: SlotDump, curated_by_hash: dict[str, list[dict]]) -> dict:
+def _slot_dump_to_dict(slot: SlotDump, curated_by_hash: dict[str, list[dict]], saved_hashes: set[str]) -> dict:
     hash_id = str(slot.payload.get("config_hash_sha256", ""))
     return {
         "slot": slot.slot,
         "slot_label": slot.slot_label,
+        "in_sync": True,
+        "is_saved": bool(hash_id and hash_id in saved_hashes),
         "synced_at": slot.synced_at,
         "slot_sync_ms": slot.slot_sync_ms,
         "patch": slot.payload,
@@ -642,6 +667,16 @@ def _load_curation_by_hash(db: Session, hash_ids: list[str]) -> dict[str, list[d
             }
         )
     return out
+
+
+def _load_saved_hashes(db: Session, hash_ids: list[str]) -> set[str]:
+    clean_hashes = [item for item in hash_ids if item]
+    if not clean_hashes:
+        return set()
+    rows = db.execute(
+        select(PatchConfig.hash_id).where(PatchConfig.hash_id.in_(clean_hashes))
+    ).all()
+    return {str(hash_id) for (hash_id,) in rows}
 
 
 def _load_hash_candidates_by_patch_name(db: Session, patch_names: list[str]) -> dict[str, list[str]]:

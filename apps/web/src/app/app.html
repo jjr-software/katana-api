@@ -60,9 +60,17 @@
     <h2>Channel Bank A</h2>
     <div class="cards">
       @for (slot of slotsForBank('A'); track slot.slot) {
-        <article class="card">
+        <article class="card" [class.sync-ok]="slot.in_sync" [class.sync-missing]="!slot.in_sync">
           <p class="slot">{{ slot.slot_label }}</p>
           <h3>{{ displayPatchName(slot) }}</h3>
+          <p class="status-row">
+            <span class="status-chip" [class.ok]="slot.in_sync" [class.warn]="!slot.in_sync">
+              {{ slotSyncStatusLabel(slot) }}
+            </span>
+            <span class="status-chip" [class.ok]="slot.is_saved" [class.warn]="!slot.is_saved">
+              {{ slotSavedStatusLabel(slot) }}
+            </span>
+          </p>
           <button type="button" (click)="syncAmpSlot(slot.slot)">
             Sync
           </button>
@@ -76,9 +84,17 @@
     <h2>Channel Bank B</h2>
     <div class="cards">
       @for (slot of slotsForBank('B'); track slot.slot) {
-        <article class="card">
+        <article class="card" [class.sync-ok]="slot.in_sync" [class.sync-missing]="!slot.in_sync">
           <p class="slot">{{ slot.slot_label }}</p>
           <h3>{{ displayPatchName(slot) }}</h3>
+          <p class="status-row">
+            <span class="status-chip" [class.ok]="slot.in_sync" [class.warn]="!slot.in_sync">
+              {{ slotSyncStatusLabel(slot) }}
+            </span>
+            <span class="status-chip" [class.ok]="slot.is_saved" [class.warn]="!slot.is_saved">
+              {{ slotSavedStatusLabel(slot) }}
+            </span>
+          </p>
           <button type="button" (click)="syncAmpSlot(slot.slot)">
             Sync
           </button>

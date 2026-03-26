@@ -144,6 +144,14 @@ button[disabled] {
   padding: 0.75rem;
 }
 
+.card.sync-ok {
+  border-color: #16a34a;
+}
+
+.card.sync-missing {
+  border-color: #f59e0b;
+}
+
 .card h3 {
   margin: 0.2rem 0 0.55rem 0;
   font-size: 0.95rem;
@@ -154,6 +162,35 @@ button[disabled] {
   margin: 0.3rem 0;
   font-size: 0.86rem;
   color: #cbd5e1;
+}
+
+.status-row {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #475569;
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.status-chip.ok {
+  border-color: #16a34a;
+  color: #86efac;
+  background: #102a19;
+}
+
+.status-chip.warn {
+  border-color: #f59e0b;
+  color: #fcd34d;
+  background: #2f2208;
 }
 
 .slot {

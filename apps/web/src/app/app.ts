@@ -12,6 +12,8 @@ interface SlotPatchSummary {
   slot_label: string;
   patch_name: string;
   config_hash_sha256: string;
+  in_sync: boolean;
+  is_saved: boolean;
   synced_at: string;
   slot_sync_ms: number;
 }
@@ -23,6 +25,8 @@ interface QuickSlotSummary {
   inferred_hash_sha256: string | null;
   candidate_hashes_sha256: string[];
   match_count: number;
+  in_sync: boolean;
+  is_saved: boolean;
   synced_at: string;
   slot_sync_ms: number;
 }
@@ -86,6 +90,8 @@ interface QuickSyncJobResponse {
 interface FullDumpSlotResponse {
   slot: number;
   slot_label: string;
+  in_sync: boolean;
+  is_saved: boolean;
   synced_at: string;
   slot_sync_ms: number;
   patch: Record<string, unknown>;
@@ -151,6 +157,8 @@ interface SlotCard {
   slot_label: string;
   patch_name: string;
   config_hash_sha256: string;
+  in_sync: boolean;
+  is_saved: boolean;
   synced_at: string;
   slot_sync_ms: number;
   inferred: boolean;
@@ -167,6 +175,8 @@ function defaultSlotCards(): SlotCard[] {
       slot_label: `${bank}:${channel}`,
       patch_name: '',
       config_hash_sha256: '',
+      in_sync: false,
+      is_saved: false,
       synced_at: '',
       slot_sync_ms: 0,
       inferred: false,
@@ -672,6 +682,8 @@ export class App implements OnInit, OnDestroy {
         slot_label: full.slot_label,
         patch_name: full.patch_name,
         config_hash_sha256: full.config_hash_sha256,
+        in_sync: full.in_sync,
+        is_saved: full.is_saved,
         synced_at: full.synced_at,
         slot_sync_ms: full.slot_sync_ms,
         inferred: false,
@@ -692,6 +704,8 @@ export class App implements OnInit, OnDestroy {
         slot_label: quick.slot_label,
         patch_name: quick.patch_name,
         config_hash_sha256: quick.inferred_hash_sha256 ?? '',
+        in_sync: quick.in_sync,
+        is_saved: quick.is_saved,
         synced_at: quick.synced_at,
         slot_sync_ms: quick.slot_sync_ms,
         inferred: quick.inferred_hash_sha256 !== null,
@@ -711,6 +725,8 @@ export class App implements OnInit, OnDestroy {
           slot_label: slot.slot_label,
           patch_name: slot.patch_name,
           config_hash_sha256: slot.config_hash_sha256,
+          in_sync: slot.in_sync,
+          is_saved: slot.is_saved,
           synced_at: slot.synced_at,
           slot_sync_ms: slot.slot_sync_ms,
           inferred: false,
@@ -722,6 +738,14 @@ export class App implements OnInit, OnDestroy {
 
   formatMs(value: number): string {
     return `${Math.max(0, Math.round(value))} ms`;
+  }
+
+  slotSyncStatusLabel(slot: SlotCard): string {
+    return slot.in_sync ? 'In Sync' : 'Not Synced';
+  }
+
+  slotSavedStatusLabel(slot: SlotCard): string {
+    return slot.is_saved ? 'Saved' : 'Not Saved';
   }
 
   operationLabel(value: string): string {
