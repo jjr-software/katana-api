@@ -658,6 +658,19 @@
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
 
+## Session Update - 2026-03-26 (Terminology Split: Measure vs Demo Sample)
+- Clarified feature semantics:
+  - current per-slot and cycle functionality is RMS **measurement**, not demo recording.
+- Renamed measurement API paths:
+  - `POST /api/v1/audio/measure`
+  - `GET /api/v1/audio/measures`
+- Updated web UI labels/calls:
+  - slot button text changed from `Sample` to `Measure`
+  - frontend now calls `/api/v1/audio/measure`
+  - status/response text now says RMS measurement.
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
+
 ## Session Update - 2026-03-26 (Queued Backup Feature + Nested Repo Flatten)
 - Added queued amp backup API endpoints:
   - `POST /api/v1/amp/backup` (enqueue full amp-state dump)

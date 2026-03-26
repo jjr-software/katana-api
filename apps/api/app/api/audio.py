@@ -34,8 +34,8 @@ class AudioSampleResponse(BaseModel):
     created_at: str
 
 
-@router.post("/sample", response_model=AudioSampleResponse)
-async def create_audio_sample(
+@router.post("/measure", response_model=AudioSampleResponse)
+async def create_audio_measurement(
     payload: AudioSampleCreateRequest,
     db: Session = Depends(get_db),
 ) -> AudioSampleResponse:
@@ -86,8 +86,8 @@ async def create_audio_sample(
     )
 
 
-@router.get("/samples", response_model=list[AudioSampleResponse])
-def list_audio_samples(
+@router.get("/measures", response_model=list[AudioSampleResponse])
+def list_audio_measurements(
     limit: int = 50,
     db: Session = Depends(get_db),
 ) -> list[AudioSampleResponse]:

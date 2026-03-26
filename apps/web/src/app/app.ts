@@ -433,11 +433,11 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  async sampleSlotAudio(slot: SlotCard): Promise<void> {
-    this.status.set(`Sampling audio for ${slot.slot_label}...`);
+  async measureSlotRms(slot: SlotCard): Promise<void> {
+    this.status.set(`Measuring 2s RMS for ${slot.slot_label}...`);
     this.responseJson.set('');
     try {
-      const response = await fetch('/api/v1/audio/sample', {
+      const response = await fetch('/api/v1/audio/measure', {
         method: 'POST',
         cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
@@ -449,16 +449,16 @@ export class App implements OnInit, OnDestroy {
       });
       const payload = (await response.json()) as AudioSampleResponse | { detail?: unknown };
       if (!response.ok) {
-        this.status.set(`Sample failed for ${slot.slot_label}`);
+        this.status.set(`RMS measure failed for ${slot.slot_label}`);
         this.responseJson.set(JSON.stringify(payload, null, 2));
         return;
       }
       const sample = payload as AudioSampleResponse;
-      this.status.set(`Sample captured for ${slot.slot_label}`);
+      this.status.set(`RMS measured for ${slot.slot_label}`);
       this.responseJson.set(
         JSON.stringify(
           {
-            message: 'Audio sample captured',
+            message: 'RMS measurement captured',
             slot: slot.slot_label,
             patch_hash: sample.patch_hash,
             rms_dbfs: sample.rms_dbfs,
@@ -471,7 +471,7 @@ export class App implements OnInit, OnDestroy {
         ),
       );
     } catch (error: unknown) {
-      this.status.set(`Sample failed for ${slot.slot_label}`);
+      this.status.set(`RMS measure failed for ${slot.slot_label}`);
       this.responseJson.set(
         JSON.stringify(
           {
@@ -931,7 +931,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   private async captureSlotRmsSample(slot: SlotPatchSummary): Promise<AudioSampleResponse> {
-    const response = await fetch('/api/v1/audio/sample', {
+    const response = await fetch('/api/v1/audio/measure', {
       method: 'POST',
       cache: 'no-store',
       headers: { 'Content-Type': 'application/json' },

@@ -80,7 +80,7 @@
                   <div class="d-flex flex-wrap gap-2 mb-2">
                     <button type="button" class="btn btn-sm btn-primary" (click)="syncAmpSlot(slot.slot)" [disabled]="!canSyncSlot(slot)">Sync</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="saveSlotPatch(slot)" [disabled]="!canSaveSlot(slot)">Save</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="sampleSlotAudio(slot)" [disabled]="!canUseSlotActions(slot)">Sample</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="measureSlotRms(slot)" [disabled]="!canUseSlotActions(slot)">Measure</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="showRaw(slot)" [disabled]="!canUseSlotActions(slot)">Raw</button>
                   </div>
                   <p class="small mb-1 patch-summary"><strong>Amp:</strong> {{ ampSummary(slot) }}</p>
@@ -123,7 +123,7 @@
                   <div class="d-flex flex-wrap gap-2 mb-2">
                     <button type="button" class="btn btn-sm btn-primary" (click)="syncAmpSlot(slot.slot)" [disabled]="!canSyncSlot(slot)">Sync</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="saveSlotPatch(slot)" [disabled]="!canSaveSlot(slot)">Save</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="sampleSlotAudio(slot)" [disabled]="!canUseSlotActions(slot)">Sample</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="measureSlotRms(slot)" [disabled]="!canUseSlotActions(slot)">Measure</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="showRaw(slot)" [disabled]="!canUseSlotActions(slot)">Raw</button>
                   </div>
                   <p class="small mb-1 patch-summary"><strong>Amp:</strong> {{ ampSummary(slot) }}</p>
