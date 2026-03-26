@@ -1,5 +1,10 @@
 # Agent Session Notes
 
+## Hard Rule: Web Build/Run Path
+- Do not run host-local frontend tooling (`npm run ...`, `ng ...`) for this repo.
+- Web build/verification must use the containerized path only (`docker compose ...`).
+- If host tooling is missing, fail hard and switch to Compose; do not use host fallbacks.
+
 ## Scope
 - Date: 2026-03-22
 - Device under test: BOSS/Roland KATANA Gen 3 over USB MIDI
