@@ -36,6 +36,7 @@ ADDR_PATCH_EQ_GE10_1 = (0x20, 0x00, 0x54, 0x00)
 ADDR_PATCH_EQ_GE10_2 = (0x20, 0x00, 0x56, 0x00)
 ADDR_PATCH_NS = (0x20, 0x00, 0x58, 0x00)
 ADDR_PATCH_SENDRETURN = (0x20, 0x00, 0x5A, 0x00)
+PATCH_SELECT_ADDR = (0x7F, 0x00, 0x01, 0x00)
 
 
 @dataclass(frozen=True)
@@ -58,3 +59,10 @@ def addr_add(addr: tuple[int, int, int, int], offset: int) -> tuple[int, int, in
     value = (addr[0] << 24) | (addr[1] << 16) | (addr[2] << 8) | addr[3]
     out = value + int(offset)
     return ((out >> 24) & 0xFF, (out >> 16) & 0xFF, (out >> 8) & 0xFF, out & 0xFF)
+
+
+def slot_label(slot: int) -> str:
+    slot_val = max(1, min(8, int(slot)))
+    bank = "A" if slot_val <= 4 else "B"
+    channel = ((slot_val - 1) % 4) + 1
+    return f"{bank}:{channel}"

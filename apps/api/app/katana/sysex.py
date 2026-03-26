@@ -19,6 +19,12 @@ def build_rq1(addr: tuple[int, int, int, int], size: int) -> str:
     return " ".join(f"{value:02X}" for value in body)
 
 
+def build_dt1(addr: tuple[int, int, int, int], data: list[int]) -> str:
+    cs = checksum([*addr, *data])
+    body = [0xF0, ROLAND_ID, 0x10, *MODEL_ID, CMD_DT1, *addr, *data, cs, 0xF7]
+    return " ".join(f"{value:02X}" for value in body)
+
+
 def extract_sysex_frames(output: str) -> list[list[int]]:
     tokens = extract_hex_pairs(output)
     raw = [int(tok, 16) for tok in tokens]

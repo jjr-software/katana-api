@@ -29,9 +29,11 @@ from app.katana.protocol import (
     ADDR_PATCH_SW,
     EDITOR_MODE_ON,
     IDENTITY_REQUEST_HEX,
+    PATCH_SELECT_ADDR,
     addr_add,
+    slot_label,
 )
-from app.katana.sysex import build_rq1, extract_hex_pairs, extract_sysex_frames, parse_dt1
+from app.katana.sysex import build_dt1, build_rq1, extract_hex_pairs, extract_sysex_frames, parse_dt1
 
 
 class AmpClientError(RuntimeError):
@@ -48,6 +50,22 @@ class AmpConnectionResult:
 @dataclass(frozen=True)
 class CurrentPatchSnapshot:
     payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class SlotPatchSummary:
+    slot: int
+    slot_label: str
+    patch_name: str
+    config_hash_sha256: str
+    synced_at: str
+
+
+@dataclass(frozen=True)
+class SlotsStateSnapshot:
+    synced_at: str
+    amp_state_hash_sha256: str
+    slots: list[SlotPatchSummary]
 
 
 class AmpClient:
@@ -77,7 +95,34 @@ class AmpClient:
 
     async def read_current_patch(self) -> CurrentPatchSnapshot:
         await self._send_only(EDITOR_MODE_ON)
+        return CurrentPatchSnapshot(payload=await self._read_selected_patch_payload())
 
+    async def read_slots_state(self, synced_at: str) -> SlotsStateSnapshot:
+        await self._send_only(EDITOR_MODE_ON)
+        slots: list[SlotPatchSummary] = []
+        slot_hash_parts: list[str] = []
+        for slot in range(1, 9):
+            await self._select_patch(slot)
+            payload = await self._read_selected_patch_payload()
+            slot_hash = str(payload["config_hash_sha256"])
+            slot_hash_parts.append(f"{slot}:{slot_hash}")
+            slots.append(
+                SlotPatchSummary(
+                    slot=slot,
+                    slot_label=slot_label(slot),
+                    patch_name=str(payload.get("patch_name", "")),
+                    config_hash_sha256=slot_hash,
+                    synced_at=synced_at,
+                )
+            )
+        amp_state_hash = sha256("|".join(slot_hash_parts).encode("utf-8")).hexdigest()
+        return SlotsStateSnapshot(
+            synced_at=synced_at,
+            amp_state_hash_sha256=amp_state_hash,
+            slots=slots,
+        )
+
+    async def _read_selected_patch_payload(self) -> dict[str, Any]:
         patch_com = await self._read_rq1(ADDR_PATCH_COM, 16)
         other = await self._read_rq1(ADDR_PATCH_OTHER, 3)
         color = await self._read_rq1(ADDR_PATCH_COLOR, 5)
@@ -237,7 +282,7 @@ class AmpClient:
             },
         }
         payload["config_hash_sha256"] = self._config_hash(payload)
-        return CurrentPatchSnapshot(payload=payload)
+        return payload
 
     async def _run_amidi(self, args: list[str], timeout_seconds: float) -> tuple[int, str, str]:
         proc = await asyncio.create_subprocess_exec(
@@ -275,6 +320,10 @@ class AmpClient:
         )
         if returncode != 0:
             raise AmpClientError(f"amidi send failed: {(stderr.strip() or stdout.strip())}")
+
+    async def _select_patch(self, slot: int) -> None:
+        slot_val = max(1, min(8, int(slot)))
+        await self._send_only(build_dt1(PATCH_SELECT_ADDR, [0x00, slot_val]))
 
     async def _read_rq1(self, addr: tuple[int, int, int, int], size: int) -> list[int]:
         output = await self._send_and_read(

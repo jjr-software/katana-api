@@ -1,14 +1,49 @@
 <main class="shell">
   <h1>Katana Gen 3 Patch Manager</h1>
-  <p>Smoke test real amp communication from the web UI.</p>
+  <p>Live slot sync from amp memory. A and B channels are shown as 4 cards each.</p>
   <div class="actions">
     <button type="button" (click)="testAmpConnection()" [disabled]="isLoading()">
       {{ isLoading() ? 'Working...' : 'Test Amp Connection' }}
     </button>
-    <button type="button" (click)="readCurrentPatch()" [disabled]="isLoading()">
-      {{ isLoading() ? 'Working...' : 'Read Current Patch' }}
+    <button type="button" (click)="syncAmpSlots()" [disabled]="isLoading()">
+      {{ isLoading() ? 'Working...' : 'Sync Slots A:1..B:4' }}
     </button>
   </div>
+  <div class="sync-meta">
+    <span>AMP State Hash: <code>{{ shortHash(ampStateHash()) }}</code></span>
+    <span>Last Sync: <code>{{ lastSyncedAt() || 'n/a' }}</code></span>
+  </div>
   <p class="status">{{ status() }}</p>
-  <pre>{{ responseJson() }}</pre>
+
+  <section class="bank">
+    <h2>Channel Bank A</h2>
+    <div class="cards">
+      @for (slot of slotsForBank('A'); track slot.slot) {
+        <article class="card">
+          <p class="slot">{{ slot.slot_label }}</p>
+          <h3>{{ slot.patch_name || 'Unnamed Patch' }}</h3>
+          <p>Hash: <code>{{ shortHash(slot.config_hash_sha256) }}</code></p>
+          <p>Last Sync: <code>{{ slot.synced_at }}</code></p>
+        </article>
+      }
+    </div>
+  </section>
+
+  <section class="bank">
+    <h2>Channel Bank B</h2>
+    <div class="cards">
+      @for (slot of slotsForBank('B'); track slot.slot) {
+        <article class="card">
+          <p class="slot">{{ slot.slot_label }}</p>
+          <h3>{{ slot.patch_name || 'Unnamed Patch' }}</h3>
+          <p>Hash: <code>{{ shortHash(slot.config_hash_sha256) }}</code></p>
+          <p>Last Sync: <code>{{ slot.synced_at }}</code></p>
+        </article>
+      }
+    </div>
+  </section>
+
+  @if (responseJson()) {
+    <pre>{{ responseJson() }}</pre>
+  }
 </main>
