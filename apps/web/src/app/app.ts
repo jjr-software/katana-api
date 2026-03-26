@@ -1221,6 +1221,15 @@ export class App implements OnInit, OnDestroy {
     return `G ${this.nv(gain)} | V ${this.nv(volume)} | B/M/T/P ${this.nv(bass)}/${this.nv(middle)}/${this.nv(treble)}/${this.nv(presence)}`;
   }
 
+  ampTypeSummary(slot: SlotCard): string {
+    const amp = this.readObject(this.readObject(slot.patch, 'amp'));
+    if (!amp) {
+      return 'n/a';
+    }
+    const ampType = this.readNumber(amp, 'amp_type');
+    return ampType === null ? 'n/a' : `${Math.trunc(ampType)}`;
+  }
+
   boosterSummary(slot: SlotCard): string {
     return this.stageSummary(slot, 'booster');
   }

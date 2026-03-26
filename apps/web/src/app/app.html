@@ -107,6 +107,7 @@
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="showRaw(slot)" [disabled]="!canUseSlotActions(slot)">Raw</button>
                   </div>
                   <p class="small mb-1 patch-summary"><strong>Amp:</strong> {{ ampSummary(slot) }}</p>
+                  <p class="small mb-1 patch-summary"><strong>AMP Type:</strong> {{ ampTypeSummary(slot) }}</p>
                   <p class="small mb-1 patch-summary"><strong>Booster:</strong> {{ boosterSummary(slot) }}</p>
                   <p class="small mb-1 patch-summary"><strong>Mod:</strong> {{ modSummary(slot) }}</p>
                   <p class="small mb-1 patch-summary"><strong>FX:</strong> {{ fxSummary(slot) }}</p>
@@ -149,6 +150,7 @@
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="showRaw(slot)" [disabled]="!canUseSlotActions(slot)">Raw</button>
                   </div>
                   <p class="small mb-1 patch-summary"><strong>Amp:</strong> {{ ampSummary(slot) }}</p>
+                  <p class="small mb-1 patch-summary"><strong>AMP Type:</strong> {{ ampTypeSummary(slot) }}</p>
                   <p class="small mb-1 patch-summary"><strong>Booster:</strong> {{ boosterSummary(slot) }}</p>
                   <p class="small mb-1 patch-summary"><strong>Mod:</strong> {{ modSummary(slot) }}</p>
                   <p class="small mb-1 patch-summary"><strong>FX:</strong> {{ fxSummary(slot) }}</p>
