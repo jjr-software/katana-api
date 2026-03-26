@@ -105,13 +105,28 @@
                   <p class="small mb-1 text-primary fw-semibold">{{ slot.slot_label }}</p>
                   <h3 class="h6 mb-2 text-break">{{ displayPatchName(slot) }}</h3>
                   <p class="d-flex flex-wrap gap-2 mb-2">
-                    <span class="badge rounded-pill" [class.text-bg-success]="isAmpCommitted(slot)" [class.text-bg-danger]="!isAmpCommitted(slot)">
+                    <span
+                      class="badge rounded-pill"
+                      [class.text-bg-success]="ampCommittedState(slot) === 'true'"
+                      [class.text-bg-danger]="ampCommittedState(slot) === 'false'"
+                      [class.text-bg-secondary]="ampCommittedState(slot) === 'unknown'"
+                    >
                       {{ slotSavedStatusLabel(slot) }}
                     </span>
-                    <span class="badge rounded-pill" [class.text-bg-success]="slot.is_saved" [class.text-bg-danger]="!slot.is_saved">
+                    <span
+                      class="badge rounded-pill"
+                      [class.text-bg-success]="dbState(slot) === 'true'"
+                      [class.text-bg-danger]="dbState(slot) === 'false'"
+                      [class.text-bg-secondary]="dbState(slot) === 'unknown'"
+                    >
                       {{ slotDbStatusLabel(slot) }}
                     </span>
-                    <span class="badge rounded-pill" [class.text-bg-success]="isLiveOnAmp(slot)" [class.text-bg-danger]="!isLiveOnAmp(slot)">
+                    <span
+                      class="badge rounded-pill"
+                      [class.text-bg-success]="ampStagedState(slot) === 'true'"
+                      [class.text-bg-danger]="ampStagedState(slot) === 'false'"
+                      [class.text-bg-secondary]="ampStagedState(slot) === 'unknown'"
+                    >
                       {{ slotLiveStatusLabel(slot) }}
                     </span>
                   </p>
@@ -166,13 +181,28 @@
                   <p class="small mb-1 text-primary fw-semibold">{{ slot.slot_label }}</p>
                   <h3 class="h6 mb-2 text-break">{{ displayPatchName(slot) }}</h3>
                   <p class="d-flex flex-wrap gap-2 mb-2">
-                    <span class="badge rounded-pill" [class.text-bg-success]="isAmpCommitted(slot)" [class.text-bg-danger]="!isAmpCommitted(slot)">
+                    <span
+                      class="badge rounded-pill"
+                      [class.text-bg-success]="ampCommittedState(slot) === 'true'"
+                      [class.text-bg-danger]="ampCommittedState(slot) === 'false'"
+                      [class.text-bg-secondary]="ampCommittedState(slot) === 'unknown'"
+                    >
                       {{ slotSavedStatusLabel(slot) }}
                     </span>
-                    <span class="badge rounded-pill" [class.text-bg-success]="slot.is_saved" [class.text-bg-danger]="!slot.is_saved">
+                    <span
+                      class="badge rounded-pill"
+                      [class.text-bg-success]="dbState(slot) === 'true'"
+                      [class.text-bg-danger]="dbState(slot) === 'false'"
+                      [class.text-bg-secondary]="dbState(slot) === 'unknown'"
+                    >
                       {{ slotDbStatusLabel(slot) }}
                     </span>
-                    <span class="badge rounded-pill" [class.text-bg-success]="isLiveOnAmp(slot)" [class.text-bg-danger]="!isLiveOnAmp(slot)">
+                    <span
+                      class="badge rounded-pill"
+                      [class.text-bg-success]="ampStagedState(slot) === 'true'"
+                      [class.text-bg-danger]="ampStagedState(slot) === 'false'"
+                      [class.text-bg-secondary]="ampStagedState(slot) === 'unknown'"
+                    >
                       {{ slotLiveStatusLabel(slot) }}
                     </span>
                   </p>

@@ -277,6 +277,8 @@ interface StageParam {
   value: number;
 }
 
+type TriState = 'true' | 'false' | 'unknown';
+
 function defaultSlotCards(): SlotCard[] {
   return Array.from({ length: 8 }, (_, idx) => {
     const slot = idx + 1;
@@ -2000,25 +2002,60 @@ export class App implements OnInit, OnDestroy {
   }
 
   slotSavedStatusLabel(slot: SlotCard): string {
-    return this.isAmpCommitted(slot) ? 'AMP-COMMITTED ✓' : 'AMP-COMMITTED ✗';
+    const state = this.ampCommittedState(slot);
+    if (state === 'true') {
+      return 'AMP-COMMITTED ✓';
+    }
+    if (state === 'false') {
+      return 'AMP-COMMITTED ✗';
+    }
+    return 'AMP-COMMITTED ?';
   }
 
   isAmpCommitted(slot: SlotCard): boolean {
+    return this.ampCommittedState(slot) === 'true';
+  }
+
+  ampCommittedState(slot: SlotCard): TriState {
     const currentHash = slot.config_hash_sha256;
     const committedHash = slot.committed_hash_sha256;
     if (!currentHash || !committedHash) {
-      return false;
+      return 'unknown';
     }
-    return currentHash === committedHash;
+    return currentHash === committedHash ? 'true' : 'false';
   }
 
   slotDbStatusLabel(slot: SlotCard): string {
-    return slot.is_saved ? 'DB ✓' : 'DB ✗';
+    const state = this.dbState(slot);
+    if (state === 'true') {
+      return 'DB ✓';
+    }
+    if (state === 'false') {
+      return 'DB ✗';
+    }
+    return 'DB ?';
+  }
+
+  dbState(slot: SlotCard): TriState {
+    if (!slot.config_hash_sha256) {
+      return 'unknown';
+    }
+    return slot.is_saved ? 'true' : 'false';
   }
 
   isLiveOnAmp(slot: SlotCard): boolean {
+    return this.ampStagedState(slot) === 'true';
+  }
+
+  ampStagedState(slot: SlotCard): TriState {
+    if (!slot.config_hash_sha256) {
+      return 'unknown';
+    }
     const currentLiveHash = this.currentAmpPatchHash();
-    return Boolean(currentLiveHash) && slot.config_hash_sha256 === currentLiveHash;
+    if (!currentLiveHash) {
+      return 'unknown';
+    }
+    return slot.config_hash_sha256 === currentLiveHash ? 'true' : 'false';
   }
 
   isActiveSlot(slot: SlotCard): boolean {
@@ -2030,7 +2067,14 @@ export class App implements OnInit, OnDestroy {
   }
 
   slotLiveStatusLabel(slot: SlotCard): string {
-    return this.isLiveOnAmp(slot) ? 'AMP-STAGED ✓' : 'AMP-STAGED ✗';
+    const state = this.ampStagedState(slot);
+    if (state === 'true') {
+      return 'AMP-STAGED ✓';
+    }
+    if (state === 'false') {
+      return 'AMP-STAGED ✗';
+    }
+    return 'AMP-STAGED ?';
   }
 
   ampSummary(slot: SlotCard): string {

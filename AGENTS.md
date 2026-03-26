@@ -1328,3 +1328,18 @@
   - `apps/web/src/app/app.html`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Tri-State Status Badges)
+- Converted card state badges from boolean to explicit tri-state rendering:
+  - states are now `true` / `false` / `unknown`.
+- Badge semantics:
+  - `DB`: `?` when no known config hash is available for the card yet.
+  - `AMP-STAGED`: `?` until both card hash and current active amp hash are known.
+  - `AMP-COMMITTED`: `?` until both card hash and committed slot baseline hash are known.
+- UI colors:
+  - `true` => green, `false` => red, `unknown` => gray.
+- Files changed:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
