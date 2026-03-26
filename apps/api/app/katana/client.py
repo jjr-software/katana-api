@@ -88,6 +88,17 @@ class SlotsStateSnapshot:
     slots: list[SlotPatchSummary]
 
 
+@dataclass(frozen=True)
+class AmpDeviceStatus:
+    midi_port: str
+    busy: bool
+    available: bool
+    detail: str
+
+
+_PORT_LOCKS: dict[str, asyncio.Lock] = {}
+
+
 class AmpClient:
     def __init__(self, midi_port: str, timeout_seconds: float) -> None:
         self._midi_port = midi_port
@@ -98,24 +109,26 @@ class AmpClient:
         return self._midi_port
 
     async def test_connection(self) -> AmpConnectionResult:
-        output = await self._send_and_read(IDENTITY_REQUEST_HEX, timeout_seconds=self._timeout_seconds)
-        hex_pairs = extract_hex_pairs(output)
-        if len(hex_pairs) < 2:
-            raise AmpClientError("No SysEx response bytes detected from amp")
+        async with self._port_lock():
+            output = await self._send_and_read(IDENTITY_REQUEST_HEX, timeout_seconds=self._timeout_seconds)
+            hex_pairs = extract_hex_pairs(output)
+            if len(hex_pairs) < 2:
+                raise AmpClientError("No SysEx response bytes detected from amp")
 
-        response_hex = " ".join(pair.upper() for pair in hex_pairs)
-        if not response_hex.startswith("F0") or not response_hex.endswith("F7"):
-            raise AmpClientError(f"Non-SysEx response received: {response_hex}")
+            response_hex = " ".join(pair.upper() for pair in hex_pairs)
+            if not response_hex.startswith("F0") or not response_hex.endswith("F7"):
+                raise AmpClientError(f"Non-SysEx response received: {response_hex}")
 
-        return AmpConnectionResult(
-            midi_port=self._midi_port,
-            request_hex=IDENTITY_REQUEST_HEX,
-            response_hex=response_hex,
-        )
+            return AmpConnectionResult(
+                midi_port=self._midi_port,
+                request_hex=IDENTITY_REQUEST_HEX,
+                response_hex=response_hex,
+            )
 
     async def read_current_patch(self) -> CurrentPatchSnapshot:
-        await self._send_only(EDITOR_MODE_ON)
-        return CurrentPatchSnapshot(payload=await self._read_selected_patch_payload())
+        async with self._port_lock():
+            await self._send_only(EDITOR_MODE_ON)
+            return CurrentPatchSnapshot(payload=await self._read_selected_patch_payload())
 
     async def read_slots_state(self, synced_at: str) -> SlotsStateSnapshot:
         dump = await self.full_amp_dump(synced_at=synced_at)
@@ -138,31 +151,47 @@ class AmpClient:
         )
 
     async def full_amp_dump(self, synced_at: str) -> FullAmpDumpSnapshot:
-        started = time.perf_counter()
-        await self._send_only(EDITOR_MODE_ON)
-        slots: list[SlotDump] = []
-        slot_hash_parts: list[str] = []
-        for slot in range(1, 9):
-            slot_started = time.perf_counter()
-            await self._select_patch(slot)
-            payload = await self._read_selected_patch_payload()
-            slot_hash = str(payload["config_hash_sha256"])
-            slot_hash_parts.append(f"{slot}:{slot_hash}")
-            slots.append(
-                SlotDump(
-                    slot=slot,
-                    slot_label=slot_label(slot),
-                    payload=payload,
-                    synced_at=synced_at,
-                    slot_sync_ms=int(round((time.perf_counter() - slot_started) * 1000)),
+        async with self._port_lock():
+            started = time.perf_counter()
+            await self._send_only(EDITOR_MODE_ON)
+            slots: list[SlotDump] = []
+            slot_hash_parts: list[str] = []
+            for slot in range(1, 9):
+                slot_started = time.perf_counter()
+                await self._select_patch(slot)
+                payload = await self._read_selected_patch_payload()
+                slot_hash = str(payload["config_hash_sha256"])
+                slot_hash_parts.append(f"{slot}:{slot_hash}")
+                slots.append(
+                    SlotDump(
+                        slot=slot,
+                        slot_label=slot_label(slot),
+                        payload=payload,
+                        synced_at=synced_at,
+                        slot_sync_ms=int(round((time.perf_counter() - slot_started) * 1000)),
+                    )
                 )
+            amp_state_hash = sha256("|".join(slot_hash_parts).encode("utf-8")).hexdigest()
+            return FullAmpDumpSnapshot(
+                synced_at=synced_at,
+                amp_state_hash_sha256=amp_state_hash,
+                total_sync_ms=int(round((time.perf_counter() - started) * 1000)),
+                slots=slots,
             )
-        amp_state_hash = sha256("|".join(slot_hash_parts).encode("utf-8")).hexdigest()
-        return FullAmpDumpSnapshot(
-            synced_at=synced_at,
-            amp_state_hash_sha256=amp_state_hash,
-            total_sync_ms=int(round((time.perf_counter() - started) * 1000)),
-            slots=slots,
+
+    async def read_device_status(self) -> AmpDeviceStatus:
+        if self._port_lock().locked():
+            return AmpDeviceStatus(
+                midi_port=self._midi_port,
+                busy=True,
+                available=False,
+                detail="Amp port busy: another API amp operation is in progress",
+            )
+        return AmpDeviceStatus(
+            midi_port=self._midi_port,
+            busy=False,
+            available=True,
+            detail="Amp port idle",
         )
 
     async def _read_selected_patch_payload(self) -> dict[str, Any]:
@@ -343,9 +372,20 @@ class AmpClient:
             proc.kill()
             await proc.wait()
             raise AmpClientError("amidi command timed out") from exc
+        except asyncio.CancelledError:
+            proc.kill()
+            await proc.wait()
+            raise
         stdout = stdout_bytes.decode("utf-8", errors="replace")
         stderr = stderr_bytes.decode("utf-8", errors="replace")
         return proc.returncode, stdout, stderr
+
+    def _port_lock(self) -> asyncio.Lock:
+        lock = _PORT_LOCKS.get(self._midi_port)
+        if lock is None:
+            lock = asyncio.Lock()
+            _PORT_LOCKS[self._midi_port] = lock
+        return lock
 
     async def _send_and_read(self, sysex_hex: str, timeout_seconds: float) -> str:
         returncode, stdout, stderr = await self._run_amidi(
@@ -415,3 +455,8 @@ class AmpClient:
         base = {key: value for key, value in payload.items() if key != "config_hash_sha256"}
         blob = json.dumps(base, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
         return sha256(blob.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def is_busy_error(detail: str) -> bool:
+        text = detail.lower()
+        return "device or resource busy" in text or "resource busy" in text
