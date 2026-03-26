@@ -570,6 +570,16 @@
 - Rebuilt/restarted:
   - `docker compose up -d --build`
 
+## Session Update - 2026-03-26 (Per-Slot Sync Uses Full Timeout)
+- Confirmed per-slot sync operation (`sync_slot`) performs full patch-state read path.
+- Updated queue timeout behavior so `sync_slot` uses full-sync timeout budget:
+  - changed from `quick_sync_timeout_seconds` to `full_sync_timeout_seconds`
+- Updated UI status copy for per-slot sync to make full-read behavior explicit:
+  - start: `Syncing slot N (full patch read)...`
+  - success: `Slot N full sync succeeded (X ms)`
+- Rebuilt/restarted:
+  - `docker compose up -d --build`
+
 ## Session Update - 2026-03-26 (Queue-Only Amp I/O + No Global UI Lock)
 - Enforced queue-backed amp communication across API amp-read/sync routes:
   - `GET /api/v1/amp/test-connection` now executes via queue job.

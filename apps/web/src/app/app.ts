@@ -309,7 +309,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   async syncAmpSlot(slot: number): Promise<void> {
-    this.status.set(`Syncing slot ${slot}...`);
+    this.status.set(`Syncing slot ${slot} (full patch read)...`);
     this.responseJson.set('');
 
     try {
@@ -329,7 +329,7 @@ export class App implements OnInit, OnDestroy {
       this.lastSyncedAt.set(synced.synced_at);
       this.totalSyncMs.set(synced.slot.slot_sync_ms);
       this.ampStateHash.set('');
-      this.status.set(`Slot ${slot} sync succeeded`);
+      this.status.set(`Slot ${slot} full sync succeeded (${this.formatMs(synced.slot.slot_sync_ms)})`);
     } catch (error: unknown) {
       this.status.set(`Slot ${slot} sync failed`);
       this.responseJson.set(

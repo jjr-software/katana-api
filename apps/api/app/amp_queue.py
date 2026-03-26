@@ -170,7 +170,7 @@ class AmpJobQueue:
                     raise RuntimeError("sync_slot operation missing slot")
                 slot_result = await asyncio.wait_for(
                     client.read_slot_state(slot=slot_target, synced_at=synced_at),
-                    timeout=max(5.0, settings.quick_sync_timeout_seconds),
+                    timeout=max(5.0, settings.full_sync_timeout_seconds),
                 )
                 connection_result = None
                 current_patch_result = None
