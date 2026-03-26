@@ -1354,3 +1354,15 @@
   - `apps/web/src/app/app.html`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Editor Footer Simplified To Live-Only)
+- Removed editor footer actions that implied local/draft persistence flows.
+  - dropped `Update Card Only`
+  - dropped `Save to DB`
+- Editor now behaves as live-edit surface only (with live-apply status shown), and DB persistence remains card-level via `Save DB`.
+- Added explicit helper text in editor modal indicating DB save is done on the card.
+- Files changed:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

@@ -356,6 +356,9 @@
               @if (editorLiveApplyError()) {
                 <p class="small mb-0 text-danger mt-1">{{ editorLiveApplyError() }}</p>
               }
+              <p class="small mb-0 text-secondary mt-1">
+                DB save is handled on the card via <code>Save DB</code>.
+              </p>
             </article>
             <article class="border rounded p-2">
               <h4 class="h6 mb-2">Patch</h4>
@@ -448,9 +451,7 @@
             }
           </div>
           <footer class="p-3 pt-2 border-top d-flex gap-2 justify-content-end">
-            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="closeEditorModal()">Cancel</button>
-            <button type="button" class="btn btn-sm btn-outline-primary" (click)="updateEditorCardOnly()">Update Card Only</button>
-            <button type="button" class="btn btn-sm btn-primary" (click)="saveEditorPatchToDb()">Save to DB</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="closeEditorModal()">Close</button>
           </footer>
         }
       </section>
