@@ -25,6 +25,7 @@ JobOperation = Literal[
     "current_patch",
     "apply_current_patch",
     "sync_slot",
+    "write_slot",
     "full_dump",
     "full_sync_slots",
     "quick_sync_names",
@@ -82,6 +83,9 @@ class AmpJobQueue:
 
     async def enqueue_slot_sync(self, slot: int) -> AmpQueueJob:
         return await self._enqueue("sync_slot", slot=slot)
+
+    async def enqueue_slot_write(self, slot: int, patch: dict) -> AmpQueueJob:
+        return await self._enqueue("write_slot", slot=slot, request_patch=patch)
 
     async def enqueue_test_connection(self) -> AmpQueueJob:
         return await self._enqueue("test_connection")
@@ -191,6 +195,22 @@ class AmpJobQueue:
                     raise RuntimeError("sync_slot operation missing slot")
                 slot_result = await asyncio.wait_for(
                     client.read_slot_state(slot=slot_target, synced_at=synced_at),
+                    timeout=max(5.0, settings.full_sync_timeout_seconds),
+                )
+                connection_result = None
+                current_patch_result = None
+                dump_result = None
+                slots_result = None
+                quick_result = None
+                applied_patch_result = None
+            elif job.operation == "write_slot":
+                slot_target = job.slot
+                if slot_target is None:
+                    raise RuntimeError("write_slot operation missing slot")
+                if job.request_patch is None:
+                    raise RuntimeError("write_slot operation missing request patch")
+                slot_result = await asyncio.wait_for(
+                    client.write_slot_state(slot=slot_target, patch_payload=job.request_patch, synced_at=synced_at),
                     timeout=max(5.0, settings.full_sync_timeout_seconds),
                 )
                 connection_result = None
@@ -311,7 +331,7 @@ class AmpJobQueue:
 
     @staticmethod
     def _is_sync_operation(operation: JobOperation) -> bool:
-        return operation in {"sync_slot", "full_dump", "full_sync_slots", "quick_sync_names"}
+        return operation in {"sync_slot", "write_slot", "full_dump", "full_sync_slots", "quick_sync_names"}
 
     @staticmethod
     def _persist_sync_history(job: AmpQueueJob) -> None:

@@ -31,6 +31,7 @@ from app.katana.protocol import (
     CMDID_EXPORT_ADDR,
     CMDID_PREVIEW_MUTE_ADDR,
     EDITOR_MODE_ON,
+    PATCH_WRITE_ADDR,
     IDENTITY_REQUEST_HEX,
     PATCH_SELECT_ADDR,
     ADDR_PATCH_COM,
@@ -186,6 +187,28 @@ class AmpClient:
             started = time.perf_counter()
             await self._send_only(EDITOR_MODE_ON)
             await self._select_patch(slot)
+            payload = await self._read_selected_patch_payload()
+            return SlotPatchSummary(
+                slot=slot,
+                slot_label=slot_label(slot),
+                patch_name=str(payload.get("patch_name", "")),
+                config_hash_sha256=str(payload["config_hash_sha256"]),
+                payload=payload,
+                synced_at=synced_at,
+                slot_sync_ms=int(round((time.perf_counter() - started) * 1000)),
+            )
+
+    async def write_slot_state(self, slot: int, patch_payload: dict[str, Any], synced_at: str) -> SlotPatchSummary:
+        if slot < 1 or slot > 8:
+            raise AmpClientError(f"slot out of range: {slot} (expected 1..8)")
+
+        async with self._port_lock():
+            started = time.perf_counter()
+            await self._send_only(EDITOR_MODE_ON)
+            await self._select_patch(slot)
+            await self._apply_selected_patch_payload(patch_payload)
+            await self._send_only(build_dt1(PATCH_WRITE_ADDR, [0x00, int(slot)]))
+            await asyncio.sleep(0.2)
             payload = await self._read_selected_patch_payload()
             return SlotPatchSummary(
                 slot=slot,

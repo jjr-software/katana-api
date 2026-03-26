@@ -113,6 +113,11 @@ interface SlotSyncResponse {
   slot: SlotPatchSummary;
 }
 
+interface SlotWriteResponse {
+  synced_at: string;
+  slot: SlotPatchSummary;
+}
+
 interface QuickSlotsStateResponse {
   synced_at: string;
   total_sync_ms: number;
@@ -491,54 +496,40 @@ export class App implements OnInit, OnDestroy {
       this.status.set(`No full patch payload loaded for ${slot.slot_label}. Read this slot first.`);
       return;
     }
-    this.status.set(`Writing ${slot.slot_label} to amp...`);
+    this.status.set(`Writing ${slot.slot_label} to amp memory...`);
     this.responseJson.set('');
     try {
-      const response = await fetch('/api/v1/amp/current-patch/live-apply', {
+      const response = await fetch(`/api/v1/amp/slots/${slot.slot}/write`, {
         method: 'POST',
         cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ patch: slot.patch }),
       });
-      const payload = (await response.json()) as ApplyCurrentPatchResponse | { detail?: unknown };
+      const payload = (await response.json()) as SlotWriteResponse | { detail?: unknown };
       if (!response.ok) {
-        this.status.set(`Failed writing ${slot.slot_label} to amp`);
+        this.status.set(`Failed writing ${slot.slot_label} to amp memory`);
         this.responseJson.set(JSON.stringify(payload, null, 2));
         return;
       }
-      const applied = payload as ApplyCurrentPatchResponse;
-      const appliedPatch = this.clonePatch(applied.patch);
-      const appliedHash = this.readString(appliedPatch, 'config_hash_sha256') ?? slot.config_hash_sha256;
-      const appliedName = this.readString(appliedPatch, 'patch_name') ?? slot.patch_name;
-      this.slots.update((current) =>
-        current.map((card) => {
-          if (card.slot !== slot.slot) {
-            return card;
-          }
-          return {
-            ...card,
-            patch_name: appliedName || card.patch_name,
-            patch: this.clonePatch(appliedPatch),
-            config_hash_sha256: appliedHash,
-            is_saved: card.is_saved && appliedHash === card.config_hash_sha256,
-          };
-        }),
-      );
-      this.status.set(`Wrote ${slot.slot_label} to amp`);
+      const written = payload as SlotWriteResponse;
+      this.applySyncedSlot(written.slot);
+      this.lastSyncedAt.set(written.synced_at);
+      this.totalSyncMs.set(written.slot.slot_sync_ms);
+      this.status.set(`Wrote ${slot.slot_label} to amp memory`);
       this.responseJson.set(
         JSON.stringify(
           {
-            message: 'Patch written to amp',
+            message: 'Patch written to amp memory',
             slot: slot.slot_label,
-            applied_at: applied.applied_at,
-            hash_id: appliedHash || null,
+            synced_at: written.synced_at,
+            hash_id: written.slot.config_hash_sha256 || null,
           },
           null,
           2,
         ),
       );
     } catch (error: unknown) {
-      this.status.set(`Failed writing ${slot.slot_label} to amp`);
+      this.status.set(`Failed writing ${slot.slot_label} to amp memory`);
       this.responseJson.set(
         JSON.stringify(
           {

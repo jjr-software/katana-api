@@ -1208,3 +1208,24 @@
   - `apps/web/src/app/app.ts`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Persistent Slot Write Fix)
+- Root cause found:
+  - card `WRITE` was using live apply only (`current-patch/live-apply`), which updates edit buffer but does not commit slot memory.
+- Added true persisted slot write path:
+  - new Katana protocol constant: `PATCH_WRITE_ADDR = (0x7F, 0x00, 0x01, 0x04)`.
+  - new client method:
+    - select slot -> apply payload -> send PATCH_WRITE -> read back slot payload.
+  - new queue operation:
+    - `write_slot`.
+  - new API endpoint:
+    - `POST /api/v1/amp/slots/{slot}/write` with `{ patch }`.
+- Web `WRITE` action now calls slot-write endpoint (persistent memory write), not live-apply endpoint.
+- Files changed:
+  - `apps/api/app/katana/protocol.py`
+  - `apps/api/app/katana/client.py`
+  - `apps/api/app/amp_queue.py`
+  - `apps/api/app/api/amp.py`
+  - `apps/web/src/app/app.ts`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

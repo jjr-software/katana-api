@@ -61,6 +61,15 @@ class SlotSyncResponse(BaseModel):
     slot: SlotPatchSummaryResponse
 
 
+class SlotWriteRequest(BaseModel):
+    patch: dict
+
+
+class SlotWriteResponse(BaseModel):
+    synced_at: str
+    slot: SlotPatchSummaryResponse
+
+
 class QuickSlotSummaryResponse(BaseModel):
     slot: int
     slot_label: str
@@ -350,6 +359,40 @@ async def sync_single_slot(
     curated_by_hash = _load_curation_by_hash(db, [item.config_hash_sha256])
     saved_hashes = _load_saved_hashes(db, [item.config_hash_sha256])
     return SlotSyncResponse(
+        synced_at=item.synced_at,
+        slot=SlotPatchSummaryResponse(**_slot_to_dict(item, curated_by_hash, saved_hashes)),
+    )
+
+
+@router.post("/slots/{slot:int}/write", response_model=SlotWriteResponse)
+async def write_single_slot(
+    slot: int,
+    payload: SlotWriteRequest,
+    db: Session = Depends(get_db),
+) -> SlotWriteResponse:
+    if slot < 1 or slot > 8:
+        raise HTTPException(
+            status_code=400,
+            detail={"message": "slot must be in range 1..8", "slot": slot},
+        )
+
+    job = await amp_job_queue.enqueue_slot_write(slot=slot, patch=payload.patch)
+    settled = await _await_terminal_job(job.job_id, timeout_seconds=120.0)
+    if settled.status != "succeeded" or settled.result_slot is None:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "Failed to write slot to amp memory",
+                "error": settled.error or "queued slot write failed",
+                "job_id": settled.job_id,
+                "slot": slot,
+            },
+        )
+
+    item = settled.result_slot
+    curated_by_hash = _load_curation_by_hash(db, [item.config_hash_sha256])
+    saved_hashes = _load_saved_hashes(db, [item.config_hash_sha256])
+    return SlotWriteResponse(
         synced_at=item.synced_at,
         slot=SlotPatchSummaryResponse(**_slot_to_dict(item, curated_by_hash, saved_hashes)),
     )
