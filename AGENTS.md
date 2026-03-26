@@ -584,6 +584,19 @@
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
 
+## Session Update - 2026-03-26 (Disable Sync/Save When Slot Already Synced + Saved)
+- Updated slot button gating logic in web UI:
+  - `Sync` is disabled when a slot is both `in_sync` and `is_saved`.
+  - `Save` is disabled when a slot is both `in_sync` and `is_saved`.
+  - Existing requirements remain:
+    - `Save` still requires full patch payload + `in_sync`.
+    - `Sample` and `Raw` continue using existing action gating.
+- Files changed:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
+
 ## Session Update - 2026-03-26 (Queued Backup Feature + Nested Repo Flatten)
 - Added queued amp backup API endpoints:
   - `POST /api/v1/amp/backup` (enqueue full amp-state dump)

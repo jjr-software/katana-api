@@ -479,6 +479,17 @@ export class App implements OnInit, OnDestroy {
     return slot.in_sync && this.hasFullPatch(slot);
   }
 
+  canSyncSlot(slot: SlotCard): boolean {
+    return !(slot.in_sync && slot.is_saved);
+  }
+
+  canSaveSlot(slot: SlotCard): boolean {
+    if (slot.in_sync && slot.is_saved) {
+      return false;
+    }
+    return this.canUseSlotActions(slot);
+  }
+
   async quickSyncAmpSlots(): Promise<void> {
     this.status.set('Quick sync queued...');
     this.responseJson.set('');
