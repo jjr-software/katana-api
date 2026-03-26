@@ -1,0 +1,47 @@
+/*
+  Copyright 2016 Roland Corporation. All rights reserved.
+
+  <div id="a" class="item-slider-style">
+    <span class="class" + "-guide"></span>
+    <div></div>
+  </div>
+*/
+
+.item-slider-style {
+  position: absolute;
+  clear: both;
+  outline: none;
+
+  color: #08d;
+  background-color: #aaa;
+}
+.item-slider-style-guide {
+  display: block;
+  position: absolute;
+  clear: both;
+  outline: none;
+  left: 0; top: 0; right: 0; bottom: 0;
+
+  border-color: #000; /* step guide color */
+
+  background-position: left top;
+  background-repeat: repeat;
+}
+.item-slider-style div {
+  position: absolute;
+
+  cursor: pointer;
+
+  background-color: #ccc;
+  border: 1px solid #000;
+  border-radius: 4px;
+
+/*  background-image: url("../images/img_slider_thumb.png"); */
+
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: auto;
+}
+.item-slider-style div:hover {
+  background-color: #ddd;
+}

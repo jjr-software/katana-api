@@ -1,0 +1,35 @@
+/*
+  Copyright 2016 Roland Corporation. All rights reserved.
+*/
+
+.item-group-button-footer-style {
+  position: absolute;
+  clear: both;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+}
+.item-group-button-footer-style input {
+  display: none;
+}
+.item-group-button-footer-style label {
+  display: table-cell;
+  float: left;
+
+  margin-top: 8px;
+  padding: 8px;
+
+  cursor: pointer;
+  text-align: center;
+
+  font-size: 10px;
+
+  color: #fff;
+  background-repeat: no-repeat;
+  background-position: center top;
+
+  opacity: 0.3;
+}
+.item-group-button-footer-style input[type="radio"]:checked + label {
+  opacity: 1.0;
+}

@@ -1,0 +1,32 @@
+/*
+  Copyright 2016 Roland Corporation. All rights reserved.
+
+  <div id="a" class="item-stringer-style" format="format">
+      <p>formatted value</p>
+      <div style="display:none;"> // in the case of resource-id
+        <p style="background-image:url(%icon1)">text 1</p>
+        <p style="background-image:url(%icon2)">text 2</p>
+        ...
+      </div>
+  </div>
+*/
+
+.item-stringer-style {
+  position: absolute;
+  clear: both;
+  display: table;
+  margin: 0;
+  padding: 0;
+
+  text-align: center;
+  color: #000;
+
+/*  pointer-events: none; */
+}
+.item-stringer-style p {
+  display: table-cell;
+  vertical-align: middle;
+
+  background-repeat: no-repeat;
+  background-position: center center;
+}

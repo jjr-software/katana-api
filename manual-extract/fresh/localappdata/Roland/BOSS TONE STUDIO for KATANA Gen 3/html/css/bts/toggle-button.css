@@ -1,0 +1,32 @@
+/*
+  Copyright 2017 Roland Corporation. All rights reserved.
+
+	Override css/toggle-button.css
+  
+  <div id="a" class="item-toggle-button-style" format="format">
+      <p style="background-image:url(%icon1)">text 1</p>
+      <p style="background-image:url(%icon2)">text 2</p>
+      ...
+  </div>
+*/
+
+.item-toggle-button-style {
+  /*
+  position: absolute;
+  clear: both;
+  display: table;
+  margin: 0;
+  padding: 0;
+
+  text-align: center;
+
+  color: #000;
+  background-color: #fff;
+  */
+  border: 1px solid #ccc;
+  /*
+  border-radius: 0;
+
+  cursor: pointer;
+  */
+}

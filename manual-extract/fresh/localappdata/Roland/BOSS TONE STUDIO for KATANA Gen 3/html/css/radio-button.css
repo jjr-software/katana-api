@@ -1,0 +1,72 @@
+/*
+  Copyright 2016 Roland Corporation. All rights reserved.
+
+  <div id="a" class="item-radio-button-style">
+    <input name="a" id="a-0" value="0" type="radio">
+    <label for="a-0">text 1</label>
+    <input name="a" id="a-1" value="1" type="radio">
+    <label for="a-1">text 2</label>
+    ...
+  </div>
+*/
+
+.item-radio-button-style {
+  position: absolute;
+  clear: both;
+  margin: 0;
+  padding: 0;
+
+  color: #000;
+}
+.item-radio-button-style input {
+  display: none;
+}
+.item-radio-button-style label {
+  display: block;
+  position: relative;
+  cursor: pointer;
+  margin-left: 1.5em;
+  line-height: 1.5em;
+}
+.item-radio-button-style label:before {
+  display: block;
+  position: absolute;
+  content: "";
+  cursor: pointer;
+  left: 0; top: 50%;
+  width: 1em; height: 1em;
+  margin-top: -0.5em;
+  margin-left: -1.5em;
+  margin-right: 1.5em;
+
+  border-radius: 50%;
+  background-color: #fff;
+  border: 2px solid #000;
+
+          box-sizing: border-box;
+     -moz-box-sizing: border-box;
+  -webkit-box-sizing: border-box;
+}
+.item-radio-button-style label:after {
+  display: block;
+  position: absolute;
+  content: "";
+  cursor: pointer;
+  left: 0; top: 50%;
+  width: 0.4em; height: 0.4em;
+  margin-top: -0.2em;
+  margin-left: -1.2em;
+
+  border-radius: 50%;
+  background-color: #fff;
+
+          box-sizing: border-box;
+     -moz-box-sizing: border-box;
+  -webkit-box-sizing: border-box;
+}
+.item-radio-button-style label:hover:before {
+  border-color: #ddd;
+}
+.item-radio-button-style input[type="radio"]:checked + label:after {
+  background-color: #000;
+}

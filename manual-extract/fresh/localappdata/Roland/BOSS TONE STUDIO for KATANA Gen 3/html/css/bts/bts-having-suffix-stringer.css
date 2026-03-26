@@ -1,0 +1,24 @@
+/**
+inherit item-stringer-style
+ */
+.bts-having-suffix-stringer-style {
+  position: absolute;
+  clear: both;
+  display: table;
+  margin: 0;
+  padding: 0;
+
+  text-align: center;
+  color: #FFFFFF;
+  font-size: 18px;
+  line-height: 18px;
+  height: 36px;
+
+  /*  pointer-events: none; */
+}
+.bts-having-suffix-stringer-style p {
+  display: table-cell;
+  margin: auto;
+  vertical-align: middle;
+  background-size: contain;
+}

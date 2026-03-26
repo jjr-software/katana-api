@@ -1,0 +1,82 @@
+/**
+inherit item-push-button-style
+ */
+
+.bts-edit-push-button-style {
+  position: absolute;
+  clear: both;
+  display: table;
+  margin: 0;
+  padding: 0;
+
+  text-align: center;
+  cursor: pointer;
+
+  color: #000;
+  background-color: #fff;
+  border: 1px solid #ccc;
+}
+.bts-edit-push-button-style p {
+  display: table-cell;
+  vertical-align: middle;
+
+  padding-right: 16px;
+  line-height: 100%;
+
+  background-repeat: no-repeat;
+  background-position: center right;
+  background-size: 16px 16px;
+  background-image: url("../../images/bts/keyboard_arrow_right_16px@2x.png");
+}
+
+
+.bts-tap-circle-button-style {
+  position: absolute;
+  clear: both;
+  display: table;
+  margin: 0;
+  padding: 0;
+
+  text-align: center;
+  cursor: pointer;
+  font-size: 20px;
+
+  color: #ffffff;
+  background-color: #505254;
+  border-radius: 50%;
+}
+.bts-tap-circle-button-style p {
+  display: table-cell;
+  vertical-align: middle;
+
+  line-height: 100%;
+
+  background-repeat: no-repeat;
+  background-position: center center;
+}
+
+
+.bts-setting-back-push-button-style {
+  position: absolute;
+  clear: both;
+  display: table;
+  margin: 0;
+  padding: 0;
+
+  text-align: center;
+  cursor: pointer;
+
+  color: #FFFFFF;
+  font-size: 12px;
+}
+.bts-setting-back-push-button-style p {
+  display: table-cell;
+  vertical-align: middle;
+
+  padding-left: 24px;
+  line-height: 100%;
+
+  background-repeat: no-repeat;
+  background-position: left center;
+  background-size: 24px 24px;
+}

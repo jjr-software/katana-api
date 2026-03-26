@@ -1,0 +1,27 @@
+.btx-enable-export-inst-btn {
+  left: 0px !important;
+  width: 92px !important;
+}
+
+.btx-disable-export-inst-btn {
+  left: 16px !important;
+  width: 112px !important;
+}
+
+.btx-enable-export-file-btn {
+  left: 92px !important;
+  width: 92px !important;
+}
+
+.btx-disable-export-file-btn {
+  left: 148px !important;
+  width: 112px !important;
+}
+
+.btx-enable-export-btx-btn {
+  visibility: visible;
+}
+
+.btx-disable-export-btx-btn {
+  visibility: hidden;
+}

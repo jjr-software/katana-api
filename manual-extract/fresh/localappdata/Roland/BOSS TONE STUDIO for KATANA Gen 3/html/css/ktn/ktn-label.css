@@ -1,0 +1,32 @@
+/*
+  Copyright 2019 Roland Corporation. All rights reserved.
+*/
+
+.ktn-clickable-label-style {
+	position: absolute;
+	clear: both;
+	display: table;
+	margin: 0;
+	padding: 0;
+	
+	text-align: center;
+	
+	color: rgba(255, 255, 255, 0.8);
+	background-color: transparent;
+	/*
+	border: 1px solid #ccc;
+	border-radius: 0;
+	*/
+}
+.ktn-clickable-label-style p {
+	display: table-cell;
+	vertical-align: middle;
+	padding: 0;
+	line-height: 100%;
+	background-repeat: no-repeat;
+	background-position: center center;
+	cursor: pointer;
+}
+.ktn-clickable-label-style:hover {
+	color: rgba(255, 255, 255, 1.0);
+}

@@ -1,0 +1,242 @@
+/*
+  Copyright 2016 Roland Corporation. All rights reserved.
+
+  <div id="a" class="item-select-list-style">
+    <p>selected option</p>
+    <div id="a-list" class="class" + "-popup" style="display:none;">
+      <label class="class" + "-header"> caption </label>
+      <div class="class" + "-option">
+        <a>option 1</a>
+        <a>option 2</a>
+        ...
+      </div>
+    </div>
+  </div>
+*/
+
+
+/**
+extends item-select-list-style
+ */
+
+.bts-librarian-multiple-select-patch-list-cell {
+    height: 48px;
+    color: #ffffff;
+    background: transparent;
+    box-shadow: inset 0 -1px 0 0 rgba(0, 0, 0, 0.32);
+    padding: 10px 16px 9px 12px;
+}
+
+/* .bts-librarian-multiple-select-patch-list-cell .patch-name-block {
+    float: left;
+} */
+
+.bts-librarian-multiple-select-patch-list-cell .patch-name-block .serial-num {
+    width: 224px;
+    height: 12px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.8);
+    margin-bottom: 3px;
+}
+
+.bts-librarian-multiple-select-patch-list-cell .patch-name-block .patch-name {
+    width: 224px;
+    height: 14px;
+    font-size: 12px;
+}
+.bts-librarian-multiple-select-patch-list-cell input[type="checkbox"] {
+    -webkit-appearance: none;
+    position: relative;
+    left: 0px;
+    top: 2px;
+    width: 24px;
+    height: 24px;
+    vertical-align: middle;
+    outline: none;
+    background-image: url("../../images/bts/check_box_outline_blank@2x.png");
+    background-size: contain;
+    margin: 0 12px 0 0;
+    float: left;
+    border: 0;
+    pointer-events: none;
+    opacity: 1;
+}
+
+.bts-librarian-multiple-select-patch-list-cell input[type="checkbox"]:checked::before {
+    content: "";
+    left: 0;
+    top: 0;
+    width: 24px;
+    height: 24px;
+    background-image: url("../../images/bts/check_box@2x.png");
+    background-size: contain;
+    background-color: #292929;
+    float: left;
+}
+
+.bts-librarian-select-patch-list-style {
+    position: absolute;
+    clear: both;
+    outline: none;
+    margin: 0;
+    padding: 8px 7px;
+    text-align: left;
+    color: #fff;
+    background-color: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.64);
+    /* display: table; */
+    background-repeat: no-repeat;
+    background-position: center right 4px;
+    background-size: 24px 24px;
+    background-image: url("../../images/bts/expand_more@2x.png");
+}
+
+.bts-librarian-select-patch-list-style p {
+    /* display: table-cell; */
+    vertical-align: middle;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 14px;
+
+    max-width: calc(100% - 16px);
+
+    display: block;
+    margin: 0;
+
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+
+/* default 'item-select-list-style' + '-popup' */
+
+.bts-librarian-select-patch-list-style-popup {
+    position: fixed;
+    overflow: hidden;
+    outline: none;
+    width: calc(100% - 40px);
+    height: calc(100% - 64px);
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    margin: auto;
+    padding: 0;
+    background-color: #292929;
+    border: 0;
+    border-radius: 2px;
+    animation: fadeIn 0.3s;
+    -webkit-animation: fadeIn 0.3s;
+}
+
+.bts-librarian-select-patch-list-style-popup__title {
+    display: block;
+    background-color: #4B4F52;
+    width: 100%;
+    height: 48px;
+    line-height: 48px;
+    padding-left: 48px;
+    margin: 0;
+    text-align: left;
+    color: #FFFFFF;
+  }
+
+/* default 'item-select-list-style' + '-header' */
+
+.bts-librarian-select-patch-list-style-header {
+    /* margin-left: 1em;
+    padding-left: 2em;
+    line-height: 2em; */
+    color: #aaa;
+    font-size: 0;
+    background-repeat: no-repeat;
+    background-position: center center;
+    background-size: 24px 24px;
+    background-image: url("../../images/bts/close@2x.png");
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    width: 24px;
+    height: 24px;
+    display: block;
+    cursor: pointer;
+}
+
+
+/* default 'item-select-list-style' + '-option' */
+
+.bts-librarian-select-patch-list-style-option {
+    position: absolute;
+    overflow: auto;
+    outline: none;
+    -webkit-overflow-scrolling: touch;
+    left: 0;
+    top: 48px;
+    right: 0;
+    bottom: 0;
+    margin: auto;
+}
+
+.bts-librarian-select-patch-list-style-option a {
+    display: block;
+    text-decoration: none;
+    margin: 0;
+    padding: 10px 16px 9px 48px;
+    user-drag: none;
+    -moz-user-drag: none;
+    -webkit-user-drag: none;
+    color: #FFFFFF;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.32);
+    text-align: left;
+    background-repeat: no-repeat;
+    background-position: left center;
+    height: 48px;
+    line-height: 48px;
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@media not screen and (min-device-width: 320px) and (max-device-width: 480px) {
+    .bts-librarian-select-patch-list-style-option a:hover {
+        background-color: rgba(255, 255, 255, 0.16);
+    }
+}
+
+.bts-librarian-select-patch-list-style-option a[checked] {
+    background-repeat: no-repeat;
+    background-position: 12px center;
+    background-size: 24px 24px;
+    background-image: url("../../images/bts/check_theme@2x.png");
+}
+
+.bts-librarian-select-patch-list__title {
+    display: block;
+    background-color: #4B4F52;
+    width: 100%;
+    height: 48px;
+    line-height: 48px;
+    padding: 0 0 0 48px;
+    margin: 0;
+    text-align: left;
+    color: #FFFFFF;
+}
+
+.bts-librarian-select-patch-list-style.disabled {
+    background-color: rgba(255, 255, 255, 0.08);
+    background-image:  url("../../images/bts/expand_more_disable@2x.png");
+    color: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.32);
+    pointer-events: none;
+}
+
+/* span */
+.librarian-select-patch-list__prefix {
+    display: block;
+    height: 12px;
+    line-height: 12px;
+    font-size: 12px;
+    /* color: rgba(255, 255, 255, 0.80); */
+    margin-bottom: 3px;
+}

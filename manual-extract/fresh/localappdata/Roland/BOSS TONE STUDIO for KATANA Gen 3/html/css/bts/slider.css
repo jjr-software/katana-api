@@ -1,0 +1,51 @@
+/*
+  Copyright 2016 Roland Corporation. All rights reserved.
+
+  Override css/slider.css
+
+  <div id="a" class="item-slider-style">
+    <span class="class" + "-guide"></span>
+    <div></div>
+  </div>
+*/
+
+.item-slider-style div {
+  /*
+  position: absolute;
+
+  cursor: pointer;
+  */
+  background-color: #fff;
+  border: 1px solid #ccc;
+  /*
+  border-radius: 4px;
+  */
+  /*  background-image: url("../images/img_slider_thumb.png"); */
+  /*
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: auto;
+  */
+}
+
+.slider-style-main {
+  position: absolute;
+  display: block;
+  height: 120px;
+  width: 4px;
+  background: rgba(255, 255, 255, 0.32);
+  border: 0 !important;
+  color: #33D6FF;
+  border-radius: 0px !important;
+  outline: none;
+}
+
+.slider-style-main div {
+  position: absolute;
+  cursor: pointer;
+  background: #fff;
+  border: 0 ;
+  width: 16px;
+  height: 4px;
+  left: -6px !important;
+}

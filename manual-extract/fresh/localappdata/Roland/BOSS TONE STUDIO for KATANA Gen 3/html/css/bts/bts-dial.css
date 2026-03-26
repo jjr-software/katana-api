@@ -1,0 +1,140 @@
+/*
+  Copyright 2016 Roland Corporation. All rights reserved.
+
+  <div id="a" class="bts-dial-style">
+      <p>value</p><span></span>
+      <canvas></canvas>
+  </div>
+
+  customized dom
+  <div id="a" class="bts-dial-style">
+      <div class="bts-dial-style__shadow-overlap">
+      <p>value</p><span></span>
+      <canvas></canvas>
+  </div>
+*/
+
+.bts-dial-style {
+  position: absolute;
+  clear: both;
+  outline: none;
+
+  margin: 0;
+  padding: 0;
+
+  font-size: 18px;
+  font-weight: normal;
+  color: #FFFFFF;
+}
+.bts-dial-style p {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  text-align: center;
+}
+.bts-dial-style span {
+  display: none;
+
+  border-radius: 5px;        /* dial thickness */
+  color: #33D6FF;               /* dial fgcolor */
+  background-color: rgba(255, 255, 255, 0.24);    /* dial bgcolor */
+  border-radius: 5px;        /* dial thickness */
+  color: #33D6FF;               /* dial fgcolor */
+  background-color: rgba(255, 255, 255, 0.24);    /* dial bgcolor */
+  border-top-color: transparent;    /* dial gap color */
+  border-bottom-color: rgba(255, 255, 255, 0.24); /* dial NA color */
+  border-bottom-color: rgba(255, 255, 255, 0.24); /* dial NA color */
+  /* normal type */
+  border-style: none;
+  /* 2 control type */
+  /*  border-style: double; */
+  /*  border-top-color: transparent;*/
+}
+.bts-dial-style canvas {
+  position: absolute;
+  display: block;
+  left: 0; top: 0;
+}
+.bts-dial-style svg {
+  position: absolute;
+  display: block;
+  left: 0; top: 0;
+}
+.bts-dial-style .item-dial-style__shadow-overlap {
+  position: absolute;
+  display: block;
+  left: 0;
+  top: -1px !important;
+  width: 100%;
+  height: 100%;
+  background-image: url("../../images/bts/shadow_overlay@2x.png");
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: left top;
+}
+.bts-dial-style[disabled="disabled"] .item-dial-style__shadow-overlap {
+  background-image: url("../../images/bts/disable_overlay@2x.png");
+}
+
+
+.bts-dial-dialog-style {
+  position: absolute;
+  clear: both;
+  outline: none;
+
+  margin: 0;
+  padding: 0;
+
+  font-size: 18px;
+  font-weight: normal;
+  color: #FFFFFF;
+}
+.bts-dial-dialog-style p {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  text-align: center;
+}
+.bts-dial-dialog-style span {
+  display: none;
+
+  border-radius: 5px;        /* dial thickness */
+  color: #33D6FF;               /* dial fgcolor */
+  background-color: rgba(255, 255, 255, 0.24);    /* dial bgcolor */
+  border-radius: 5px;        /* dial thickness */
+  color: #33D6FF;               /* dial fgcolor */
+  background-color: rgba(255, 255, 255, 0.24);    /* dial bgcolor */
+  border-top-color: transparent;    /* dial gap color */
+  border-bottom-color: rgba(255, 255, 255, 0.24); /* dial NA color */
+  border-bottom-color: rgba(255, 255, 255, 0.24); /* dial NA color */
+  /* normal type */
+  border-style: none;
+  /* 2 control type */
+  /*  border-style: double; */
+  /*  border-top-color: transparent;*/
+}
+.bts-dial-dialog-style canvas {
+  position: absolute;
+  display: block;
+  left: 0; top: 0;
+}
+.bts-dial-dialog-style svg {
+  position: absolute;
+  display: block;
+  left: 0; top: 0;
+}
+.bts-dial-dialog-style .item-dial-style__shadow-overlap {
+  position: absolute;
+  display: block;
+  left: 0;
+  top: -1px !important;
+  width: 100%;
+  height: 100%;
+  background-image: url("../../images/bts/shadow_overlay@2x.png");
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: left top;
+}
+.bts-dial-dialog-style[disabled="disabled"] .item-dial-style__shadow-overlap {
+  background-image: url("../../images/bts/disable_overlay_dialog@2x.png");
+}

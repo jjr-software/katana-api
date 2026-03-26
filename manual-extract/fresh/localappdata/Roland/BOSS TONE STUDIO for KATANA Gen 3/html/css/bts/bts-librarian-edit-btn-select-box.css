@@ -1,0 +1,106 @@
+/*
+  Copyright 2016 Roland Corporation. All rights reserved.
+
+  <div id="a" class="bts-write-btn-select-box-style">
+    <p>selected option</p><div></div>
+    <div id="a-box" class="bts-write-btn-select-box-style" + "-popup" style="display:none;">
+      <a>option 1</a>
+      <a>option 2</a>
+      ...
+    </div>
+  </div>
+*/
+
+.bts-librarian-edit-btn-select-box-style {
+    position: absolute;
+    clear: both;
+    overflow: hidden;
+    outline: none;
+    margin: 0;
+    padding: 0;
+    text-align: left;
+    /**
+    customized
+    change color
+    */
+    color: #fff;
+    background-color: transparent;
+    /* border: 1px solid rgba(255, 255, 255, 0.64); */
+    font-size: 12px;
+    /*  border-radius: 8px; */
+    display: table;
+}
+
+.bts-librarian-edit-btn-select-box-style p {
+    display: table-cell;
+    vertical-align: middle;
+    cursor: pointer;
+    padding-left: 20px;
+    background-image: url("../../images/bts/expand_more@2x.png");
+    background-size: 16px 16px;
+    background-position: right 4px center;
+    background-repeat: no-repeat;
+}
+
+
+/* @media not screen and (min-device-width : 320px) and (max-device-width : 480px) {    
+    .bts-librarian-edit-btn-select-box-style:hover {
+      background-color: rgba(255, 255, 255, 0.32);
+    }
+  } */
+
+.bts-librarian-edit-btn-select-box-style-popup {
+    position: fixed;
+    overflow: auto;
+    outline: none;
+    -webkit-overflow-scrolling: touch;
+    margin: 0;
+    padding: 0;
+    background-color: #292929;
+    top: 88px !important;
+    left: auto !important;
+    right: 9px !important;
+    bottom: auto !important;
+    width: 128px !important;
+    height: 96px !important;
+    border-radius: 2px;
+    box-shadow: 0 0 24px 0 rgba(0, 0, 0, 0.22), 0 24px 24px 0 rgba(0, 0, 0, 0.30);
+}
+
+.bts-librarian-edit-btn-select-box-style-popup a {
+    display: block;
+    text-decoration: none;
+    margin: 0;
+    padding: 0 16px;
+    text-align: left;
+    font-size: 14px;
+    /*  font-size: 0.8em; */
+    color: #fff;
+    height: 48px !important;
+    line-height: 48px;
+    user-drag: none;
+    -moz-user-drag: none;
+    -webkit-user-drag: none;
+}
+
+@media not screen and (min-device-width: 320px) and (max-device-width: 480px) {
+    .bts-write-btn-menu-style-popup a:hover {
+        background-color: rgba(255, 255, 255, 0.32);
+    }
+}
+
+.bts-librarian-edit-btn-select-box-style.disable {
+    color: rgba(255, 255, 255, 0.5);
+    pointer-events: none;
+}
+
+.bts-librarian-edit-btn-select-box-style.disable p {
+    background-image: url("../../images/bts/expand_more_disable@2x.png");
+}
+
+.bts-librarian-edit-patch-rapper {
+    width: 64px;
+    height: 24px;
+    background-color: rgba(49, 58, 71, 0.32);
+    z-index: 10;
+}

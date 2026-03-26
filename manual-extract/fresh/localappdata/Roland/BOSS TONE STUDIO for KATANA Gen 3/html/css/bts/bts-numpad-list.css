@@ -1,0 +1,52 @@
+.bts-numpad-list-popup-wrapper {
+  position: absolute;
+  left: 0; top: 0;
+  width: 100%;
+  height: 100%;
+}
+
+#numpad_list_option {
+  position: absolute;
+  overflow: auto;
+  outline: none;
+  -webkit-overflow-scrolling: touch;
+
+  left: 0; top: 24px; right: 0; bottom: 0;
+  margin: auto;
+}
+#numpad_list_option a {
+  display: block;
+  text-decoration: none;
+  margin: 0;
+  padding-left: 30px;
+  cursor: pointer;
+
+          user-drag: none; 
+     -moz-user-drag: none;
+  -webkit-user-drag: none;
+
+  color: #FFFFFF;
+
+  text-align: left;
+
+  height: 28px;
+  line-height: 28px;
+  font-size: 14px;
+}
+@media (min-width: 1025px) {
+  #numpad_list_option a:hover {
+    background-color: rgba(255, 255, 255, 0.16);
+  }
+}
+#numpad_list_option a[checked] {
+  background-repeat: no-repeat;
+  background-position: 6px center;
+  background-size: 18px 18px;
+  background-image: url("../../images/bts/check_theme@2x.png");
+}
+
+.bts-numpad-list-popup-wrapper div[wrapper-style="numpad-list"] {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 0 24px 0 rgba(0, 0, 0, 0.22), 0 24px 24px 0 rgba(0, 0, 0, 0.30);
+}
+

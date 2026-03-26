@@ -1,0 +1,32 @@
+#mono-sharp-triangle {
+  background-image: url("../../images/bts/mono_indicator_sharp0@2x.png");
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-size: 54px 24px;
+}
+#mono-sharp-triangle.is-lighten {
+  background-image: url("../../images/bts/mono_indicator_sharp1@2x.png");
+}
+#mono-flat-triangle{
+  background-image: url("../../images/bts/mono_indicator_flat0@2x.png");
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-size: 54px 24px;
+}
+#mono-flat-triangle.is-lighten {
+  background-image: url("../../images/bts/mono_indicator_flat1@2x.png");
+}
+#mono-indicator {
+  display: none;
+  left: -282px;
+}
+
+#mono-tuner {
+  overflow: hidden;
+}
+
+#mono-note-label {
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-size: 76px 66px;
+}

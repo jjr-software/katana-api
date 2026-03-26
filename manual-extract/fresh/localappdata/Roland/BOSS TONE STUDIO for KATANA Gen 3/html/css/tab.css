@@ -1,0 +1,93 @@
+/*
+  Copyright 2017 Roland Corporation. All rights reserved.
+
+  <div id="a" class="item-tab-style">
+    <div>
+      <label value="0" style="background-image:url(img1.png)">group 1</label>
+      <label value="1" style="background-image:url(img2.png)">group 2</label>
+      ...
+    </div>
+    <p class="left-arrow" > < </p>
+    <p class="right-arrow"> > </p>
+  </div>
+*/
+
+.item-tab-style {
+  position: absolute;
+  clear: both;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+
+  background-color: #fff;
+  border: 1px solid #ccc;
+}
+
+.item-tab-style div {
+  position: absolute;
+  clear: both;
+  margin: 0;
+  padding: 0;
+  left: 0; top: 0;
+}
+
+.item-tab-style div label {
+  float: left;
+  margin: 0;
+  padding: 0;
+
+  height: 100%;
+
+  cursor: pointer;
+  text-align: center;
+
+  color: #000;
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: contain;
+
+  border-right: 1px solid #ccc;
+}
+.item-tab-style div label:last-of-type {
+  border-right: none;
+}
+.item-tab-style div label:hover {
+  background-color: #ddd;
+}
+.item-tab-style div label[checked] {
+  color: #fff;
+  background-color: #000;
+}
+
+.item-tab-style .left-arrow {
+  display: none;
+
+  position: absolute;
+  clear: both;
+  cursor: pointer;
+  margin: 0;
+  padding: 0 1em;
+  left: 0; top: 0; bottom: 0;
+
+  background-color: #fff;
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: contain;
+  background-image: url("../images/left-arrow.png");
+}
+.item-tab-style .right-arrow {
+  display: none;
+
+  position: absolute;
+  clear: both;
+  cursor: pointer;
+  margin: 0;
+  padding: 0 1em;
+  right: 0; top: 0; bottom: 0;
+
+  background-color: #fff;
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: contain;
+  background-image: url("../images/right-arrow.png");
+}

@@ -1,0 +1,41 @@
+/* bluetooth setup */
+.btxMsgCheckBox {
+    position: absolute;
+    left: 15px;
+    top: 335px;
+    clear: both;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+    color: #FFFFFF;
+    font-size: 13px;
+    line-height: 20px;
+    font-family: RobotoCondensedRegular;
+}
+
+.btxMsgCheckBox>input {
+    display: none;
+}
+
+.btxMsgCheckBox>label {
+    display: inline;
+    position: relative;
+    margin-left: 30px;
+}
+
+.btxMsgCheckBox>label:before {
+    position: absolute;
+    top: -9px;
+    left: -35px;
+    width: 33px;
+    height: 33px;
+    transform: scale(0.75, 0.75);
+    background-image: url(../images/bts/check_box_outline_blank@2x.png);
+    background-size: contain;
+    background-repeat: no-repeat;
+    content: "";
+}
+
+.btxMsgCheckBox>input:checked+label:before {
+    background-image: url(../images/bts/check_box@2x.png);
+}

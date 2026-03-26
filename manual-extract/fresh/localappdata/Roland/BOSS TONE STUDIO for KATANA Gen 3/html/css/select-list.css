@@ -1,0 +1,130 @@
+/*
+  Copyright 2016 Roland Corporation. All rights reserved.
+
+  <div id="a" class="item-select-list-style">
+    <p>selected option</p>
+    <div id="a-list" class="class" + "-popup" style="display:none;">
+      <label class="class" + "-header"> caption </label>
+      <div class="class" + "-option">
+        <a>option 1</a>
+        <a>option 2</a>
+        ...
+      </div>
+    </div>
+  </div>
+*/
+
+.item-select-list-style {
+  position: absolute;
+  clear: both;
+  overflow: hidden;
+  outline: none;
+
+  margin: 0;
+  padding: 0;
+
+  text-align: center;
+
+  color: #000;
+  background-color: #fff;
+  border: 4px double #ccc;
+
+  display: table;
+}
+.item-select-list-style p {
+  display: table-cell;
+  vertical-align: middle;
+  cursor: pointer;
+}
+.item-select-list-style:hover {
+  background-color: #eee;
+}
+
+/* default 'item-select-list-style' + '-popup' */
+.item-select-list-style-popup {
+  position: fixed;
+  overflow: hidden;
+  outline: none;
+
+  width:  80%;
+  height: 80%;
+  left: 0; top: 0; right: 0; bottom: 0;
+  margin: auto;
+  padding: 0;
+
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+
+          animation: fadeIn 0.3s;
+  -webkit-animation: fadeIn 0.3s;
+}
+.item-select-list-style-overlap {
+  position: fixed;
+  overflow: hidden;
+  outline: none;
+
+  width:  100%;
+  height: 100%;
+  left: 0; top: 0; right: 0; bottom: 0;
+  margin: auto;
+  padding: 0;
+
+  background-color: #fff;
+
+          animation: slideUp 0.3s;
+  -webkit-animation: slideUp 0.3s;
+}
+
+/* default 'item-select-list-style' + '-header' */
+.item-select-list-style-header {
+  margin-left: 1em;
+  padding-left: 2em;
+  line-height: 2em;
+
+  color: #aaa;
+
+  background-repeat: no-repeat;
+  background-position: left center;
+  background-size: contain;
+  background-image: url("../images/close.png");
+}
+
+/* default 'item-select-list-style' + '-option' */
+.item-select-list-style-option {
+  position: absolute;
+  overflow: auto;
+  outline: none;
+  -webkit-overflow-scrolling: touch;
+
+  left: 0; top: 2em; right: 0; bottom: 0;
+  margin: auto;
+
+  border-bottom: 1px solid #ccc;
+}
+.item-select-list-style-option a {
+  display: block;
+  text-decoration: none;
+  margin: 0;
+  padding: 2px;
+
+          user-drag: none; 
+     -moz-user-drag: none;
+  -webkit-user-drag: none;
+
+  color: #000;
+  border-top: 1px solid #ccc;
+
+  text-align: left;
+  text-indent: 1.5em;
+
+  background-repeat: no-repeat;
+  background-position: left center;
+}
+.item-select-list-style-option a:hover {
+  background-color: #ddd;
+}
+.item-select-list-style-option a[checked] {
+  color: #fff;
+  background-color: #000;
+}

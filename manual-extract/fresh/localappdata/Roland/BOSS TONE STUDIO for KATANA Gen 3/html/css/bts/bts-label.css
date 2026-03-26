@@ -1,0 +1,40 @@
+/*
+  Copyright 2016 Roland Corporation. All rights reserved.
+
+  Override css/label.css
+
+  <div id="a" class="bts-dial-desc-label-style">
+      <p>text</p>
+  </div>
+*/
+
+.bts-dial-desc-label-style {
+  position: absolute;
+  clear: both;
+  display: table;
+  margin: 0;
+  padding: 0;
+
+  font-size: 11px;
+  text-align: center;
+
+  color: rgba(255, 255, 255, 0.8);
+  background-color: transparent;
+  /*
+  border: 1px solid #ccc;
+  */
+  border: 0;
+}
+.bts-dial-desc-label-style p {
+  display: table-cell;
+  vertical-align: middle;
+  padding: 0;
+
+  line-height: 100%;
+
+  background-repeat: no-repeat;
+  background-position: center center;
+}
+.bts-dial-desc-label-style[disabled='disabled'] {
+  color: rgba(255, 255, 255, 0.4);
+}

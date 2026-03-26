@@ -1,0 +1,40 @@
+/*
+  item-input-style.css
+
+  Copyright 2016 Roland Corporation. All rights reserved.
+
+  <div id="a" class="item-text-input-style">
+    <input type="text" maxlength="n" />
+  </div>
+*/
+
+.item-text-input-style {
+  position: absolute;
+  clear: both;
+  overflow: hidden;
+  margin: 0;
+  padding: 4px;
+
+  color: #000;
+  background-color: #fff;
+  border: 1px solid #ccc;
+/*  border-radius: 2px; */
+}
+.item-text-input-style input[type="text"] {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 4px;
+
+  color: inherit;
+  font: inherit;
+  background: inherit;
+  border: none;
+
+          user-select: text;
+     -moz-user-select: text;
+  -webkit-user-select: text;
+}
+.item-text-input-style input[type="text"]:focus {
+  background-color: #eee;
+}

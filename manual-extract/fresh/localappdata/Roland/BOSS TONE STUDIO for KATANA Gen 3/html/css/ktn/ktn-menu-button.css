@@ -1,0 +1,86 @@
+/*
+  Copyright 2019 Roland Corporation. All rights reserved.
+
+  <div id="a" class="ktn-menu-button-style">
+    <input type="radio" id="a-0" name="a" value="0" >
+    <label for="a-0" style="background-image:url(img1.png)">group 1</label>
+    <input type="radio" id="a-1" name="a" value="1" >
+    <label for="a-1" style="background-image:url(img2.png)">group 2</label>
+    ...
+  </div>
+*/
+
+.ktn-menu-button-style {
+  position: absolute;
+  clear: both;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  /*
+  border: 2px solid #ccc;
+  border-radius: 2px;
+  */
+  border: none;
+}
+.ktn-menu-button-style input {
+  display: none;
+}
+.ktn-menu-button-style label {
+  /*
+  display: block;
+  */
+  float:  left;
+  margin:  0;
+  padding-left: 40px;
+
+  cursor: pointer;
+/*  text-align: center; */
+/*          writing-mode: vertical-rl; */
+/*  -webkit-writing-mode: vertical-rl; */
+
+  color: rgba(255, 255, 255, 0.64);
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-position: center center;
+
+  background-size: 16px 16px;
+  background-position: left 16px center;
+  background-repeat: no-repeat;
+
+  /*
+  border-bottom: 2px solid #ccc;
+  */
+
+  box-shadow: 0px 0px 0px 1px #A3A3A3 inset;
+}
+.ktn-menu-button-style label:last-of-type {
+  border-bottom: none;
+}
+.ktn-menu-button-style label:hover {
+  background-color: rgba(255, 255, 255, 0.32);
+}
+.ktn-menu-button-style input[type="radio"]:checked + label {
+  color: #2EC1E6;
+  /* background-color: #2EC1E6; */
+  box-shadow: 0px 0px 0px 3px #2EC1E6 inset;
+
+  background-image: url("../../images/bts/radio_button_checked@2x.png");
+}
+.ktn-menu-button-style input[type="radio"]:not(:checked) + label {
+
+  background-image: url("../../images/bts/radio_button_unchecked@2x.png");
+}
+.ktn-menu-button-style.disabled label {
+  color: rgba(255, 255, 255, 0.32);
+  box-shadow: 0px 0px 0px 1px rgba(163, 163, 163, 0.5) inset;
+  pointer-events: none;
+}
+.ktn-menu-button-style.disabled label:hover {
+  background-color: transparent;
+}
+.ktn-menu-button-style.disabled input[type="radio"]:checked + label {
+  color: rgba(255, 255, 255, 0.32);
+  background-color: #246F84;
+
+  background-image: url("../../images/bts/radio_button_checked@2x.png");
+}

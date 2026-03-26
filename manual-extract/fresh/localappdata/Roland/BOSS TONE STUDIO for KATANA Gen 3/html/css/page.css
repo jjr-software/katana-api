@@ -1,0 +1,87 @@
+/*
+  Copyright 2016 Roland Corporation. All rights reserved.
+*/
+
+.page-flexible-style {
+  position: absolute;
+  clear: both;
+  overflow: auto;
+
+  left: 0; top: 0;
+  width: 100%;
+  height: 100%;
+
+  margin: 0;
+  padding: 0;
+}
+.page-left-style {
+  position: absolute;
+  clear: both;
+  overflow: auto;
+
+  left: 0; top: 0;
+  height: 100%;
+
+  margin: 0 auto;
+  padding: 0;
+}
+.page-center-style {
+  position: absolute;
+  clear: both;
+  overflow: auto;
+
+  left: 0; right: 0; top: 0;
+  height: 100%;
+
+  margin: 0 auto;
+  padding: 0;
+}
+.page-right-style {
+  position: absolute;
+  clear: both;
+  overflow: auto;
+
+  right: 0; top: 0;
+  height: 100%;
+
+  margin: 0 auto;
+  padding: 0;
+}
+.page-middle-style {
+  position: absolute;
+  clear: both;
+  overflow: auto;
+
+  left: 0; top: 0; right: 0; bottom: 0;
+
+  margin: auto;
+  padding: 0;
+}
+.page-fix-style {
+  position: absolute;
+  clear: both;
+  overflow: auto;
+}
+.page-popup-wrapper {
+  position: absolute;
+  left: 0; top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
+.item-frame-style {
+  position: absolute;
+  clear: both;
+  overflow: auto;
+
+  padding: 0;
+}
+
+/* for select-box/list/panel */
+.select-popup-wrapper {
+  position: absolute;
+  left: 0; top: 0;
+  width: 100%;
+  height: 100%;
+}

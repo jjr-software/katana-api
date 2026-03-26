@@ -1,0 +1,20 @@
+/**
+inherit item-toggle-button-style
+ */
+.bts-switch-toggle-button-style {
+  position: absolute;
+  clear: both;
+  display: table;
+  margin: 0;
+  padding: 0;
+
+  cursor: pointer;
+}
+.bts-switch-toggle-button-style p {
+  display: table-cell;
+  vertical-align: middle;
+
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center center;
+}

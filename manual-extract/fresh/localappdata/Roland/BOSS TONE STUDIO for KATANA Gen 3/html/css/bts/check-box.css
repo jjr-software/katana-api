@@ -1,0 +1,72 @@
+/*
+  Copyright 2016 Roland Corporation. All rights reserved.
+
+  <div id="a" class="item-check-box-style">
+    <input type="checkbox" id="a-0" />
+    <label for="a-0">check</label>
+  </div>
+*/
+
+.item-check-box-style {
+  position: absolute;
+  clear: both;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+
+  color: #000;
+}
+.item-check-box-style input {
+  display: none;
+}
+.item-check-box-style label {
+  display: inline-block;
+  position: relative;
+  margin-left: 1.5em;
+  cursor: pointer;
+}
+.item-check-box-style label:before {
+  display: block;
+  position: absolute;
+  content: "";
+  cursor: pointer;
+  left: 0; top: 50%;
+  width: 1em; height: 1em;
+  margin-left: -1.5em;
+  margin-top: -0.5em;
+
+  background-color: #fff;
+  border: 2px solid #000;
+
+          box-sizing: border-box;
+     -moz-box-sizing: border-box;
+  -webkit-box-sizing: border-box;
+}
+.item-check-box-style label:after {
+  display: block;
+  position: absolute;
+  content: "";
+  cursor: pointer;
+  top: 50%;
+  margin-top: -0.3em; margin-left: 0.2em;
+  width: 0.6em;
+  height: 0.4em;
+
+  border-left: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+          transform: rotate(-45deg);
+     -moz-transform: rotate(-45deg);
+  -webkit-transform: rotate(-45deg);
+
+          box-sizing: border-box;
+     -moz-box-sizing: border-box;
+  -webkit-box-sizing: border-box;
+}
+@media (min-width: 1025px) {
+  .item-check-box-style label:hover:before {
+    border-color: #ddd;
+  }
+}
+.item-check-box-style input[type="checkbox"]:checked + label:before {
+  background-color: #000;
+}

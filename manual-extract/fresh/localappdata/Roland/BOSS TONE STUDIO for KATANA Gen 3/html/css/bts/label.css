@@ -1,0 +1,58 @@
+/*
+  Copyright 2016 Roland Corporation. All rights reserved.
+
+  Override css/label.css
+
+  <div id="a" class="item-label-style">
+      <p>text</p>
+  </div>
+*/
+
+.item-label-style {
+  /*
+  position: absolute;
+  clear: both;
+  display: table;
+  margin: 0;
+  padding: 0;
+  
+  text-align: center;
+  
+  color: #000;
+  */
+  background-color: transparent;
+  /*
+  border: 1px solid #ccc;
+  */
+  border-radius: 0;
+}
+.item-label-style p {
+  /*
+  display: table-cell;
+  vertical-align: middle;
+  */
+  padding: 0;
+  line-height: 100%;
+  /*
+  background-repeat: no-repeat;
+  background-position: center center;
+  */
+}
+.item-label-style.disabled {
+  /*
+  position: absolute;
+  clear: both;
+  display: table;
+  margin: 0;
+  padding: 0;
+  
+  text-align: center;
+  
+  */
+  color: #555555 !important;
+  /* background-color: transparent; */
+  /*
+  border: 1px solid #ccc;
+  */
+  /* border-radius: 0; */
+}

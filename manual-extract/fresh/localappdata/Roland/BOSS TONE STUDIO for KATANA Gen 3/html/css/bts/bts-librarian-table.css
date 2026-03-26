@@ -1,0 +1,64 @@
+.librarian-table {
+    height: 100%;
+    width: 100%;
+    border-collapse: collapse;
+    /* left: 0px;
+    right: 0px; */
+    bottom: 0px;
+    position: absolute;
+    overflow: auto;
+}
+
+.librarian-table .emptyPatch {
+    position: relative;
+    top: 40%;
+}
+
+.librarian-table .emptyPatch p {
+    font-size: 14px;
+    font-family: RobotoCondensedRegular;
+    color: #ffffff;
+    text-align: center;
+}
+
+#librarian-liveset-table .sortable-placeholder {
+    padding-top: 30px;
+    height: 62px;
+    border-bottom: 2px solid #E62B0E;
+}
+
+#librarian-patch-table .sortable-placeholder {
+    padding-top: 30px;
+    height: 48px;
+    border-bottom: 2px solid #E62B0E;
+}
+
+
+/** パッチ画面のlivesetのラベル */
+
+.bts-librarian-label-style {
+    position: absolute;
+    clear: both;
+    display: table;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+    color: #000;
+    /*  background-color: #fff; */
+    border: 1px solid #ccc;
+    border-radius: 2px;
+}
+
+.bts-librarian-label-style p {
+    display: table-cell;
+    display: block;
+    vertical-align: middle;
+    white-space: nowrap;
+    width: 232px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    /* padding: 4px; */
+    line-height: 100%;
+    background-repeat: no-repeat;
+    background-position: center center;
+}

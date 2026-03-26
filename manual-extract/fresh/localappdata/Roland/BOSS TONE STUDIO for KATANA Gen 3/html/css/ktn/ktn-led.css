@@ -1,0 +1,97 @@
+/*
+  Copyright 2019 Roland Corporation. All rights reserved.
+*/
+
+.ktn-bg-led-off {
+	background-color: transparent;
+}
+.ktn-bg-led-grn {
+	background-color: #40C057 !important;
+}
+.ktn-bg-led-red {
+	background-color: #E62B0E !important;
+}
+.ktn-bg-led-ylw {
+	background-color: #FCC419 !important;
+}
+
+.ktn-border-led-grn {
+  border: 1px solid #40C057 !important;
+}
+.ktn-border-led-red {
+	border: 1px solid #E62B0E !important;
+}
+.ktn-border-led-ylw {
+	border: 1px solid #FCC419 !important;
+}
+
+.ktn-bg-led-grn .bts-switch-toggle-button-style :checked {
+  background-image: url(../../images/bts/switch_effects_green_on@2x.png) !important;
+  background-size: 42px 42px;
+  background-repeat: no-repeat;
+}
+.ktn-bg-led-red .bts-switch-toggle-button-style :checked {
+  background-image: url(../../images/bts/switch_effects_red_on@2x.png) !important;
+  background-size: 42px 42px;
+  background-repeat: no-repeat;
+}
+.ktn-bg-led-ylw .bts-switch-toggle-button-style :checked {
+  background-image: url(../../images/bts/switch_effects_orange_on@2x.png) !important;
+  background-size: 42px 42px;
+  background-repeat: no-repeat;
+}
+
+.ktn-indicate-led-style {
+  position: absolute;
+  clear: both;
+
+  cursor: pointer;
+
+  /*
+  width: 20px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  background-image: url(../../images/ktn/img_amp_lampoff.png);
+  background-size: 20px 18px;
+  background-repeat: no-repeat;
+  */
+  background-color: rgba(163, 163, 163, 0.5);
+  border-radius: 50%
+}
+.ktn-indicate-led-style:hover {
+  background-color: rgba(163, 163, 163, 0.8);
+}
+.ktn-indicate-led-style[state='on'] {
+  /*
+  background-image: url(../../images/ktn/img_amp_lampon.png);
+  */
+  background-color: #E62B0E;
+}
+.ktn-indicate-led-style[state='on']:hover {
+  background-color: #E62B0E;
+}
+
+.ktn-led-toggle-button-style {
+  position: absolute;
+  clear: both;
+  display: table;
+  margin: 0;
+  padding: 0;
+
+  text-align: center;
+
+  color: #fff;
+  background-color: transparent;
+  border: 1px solid #fff;
+  border-radius: 0;
+
+  cursor: pointer;
+}
+.ktn-led-toggle-button-style:hover {
+  background-color: rgba(255, 255, 255, 0.32);
+}
+.ktn-led-toggle-button-style p {
+  display: table-cell;
+  vertical-align: middle;
+}

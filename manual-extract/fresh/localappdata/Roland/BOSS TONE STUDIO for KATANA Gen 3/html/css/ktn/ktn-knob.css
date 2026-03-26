@@ -1,0 +1,72 @@
+/*
+  Copyright 2019 Roland Corporation. All rights reserved.
+
+  <div id="a" class="ktn-panel-knob-style">
+    <div></div>
+  </div>
+*/
+
+.ktn-panel-knob-style {
+  position: absolute;
+  clear: both;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+
+  outline : none;
+  /* cursor: pointer; */
+
+  border: none;
+  border-radius: 0;
+}
+.ktn-panel-knob-style:hover {
+  background-color: transparent;
+}
+.ktn-panel-knob-style:focus {
+  background-color: transparent;
+}
+.ktn-panel-knob-style div {
+  width: 100%; height: 100%;
+  background-image: url("../../images/ktn/ktn_panel_knob@2x.png");
+  /*
+  background-image: url("../../images/bts/amp_type_knob@2x.png");
+  */
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: contain;
+
+  transform: rotate(0deg);
+  -moz-transform: rotate(0deg);
+  -webkit-transform: rotate(0deg);
+}
+
+.ktn-select-knob-style {
+  position: absolute;
+  clear: both;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+
+  outline : none;
+  /* cursor: pointer; */
+
+  border: none;
+  border-radius: 0;
+}
+.ktn-select-knob-style:hover {
+  background-color: transparent;
+}
+.ktn-select-knob-style:focus {
+  background-color: transparent;
+}
+.ktn-select-knob-style div {
+  width: 100%; height: 100%;
+  background-image: url("../../images/ktn/ktn_select_knob@2x.png");
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: contain;
+
+  transform: rotate(0deg);
+  -moz-transform: rotate(0deg);
+  -webkit-transform: rotate(0deg);
+}

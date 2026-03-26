@@ -1,0 +1,33 @@
+/*
+  Copyright 2017 Roland Corporation. All rights reserved.
+
+  <div id="a" class="item-toggle-button-style" format="format">
+      <p style="background-image:url(%icon1)">text 1</p>
+      <p style="background-image:url(%icon2)">text 2</p>
+      ...
+  </div>
+*/
+
+.item-toggle-button-style {
+  position: absolute;
+  clear: both;
+  display: table;
+  margin: 0;
+  padding: 0;
+
+  text-align: center;
+
+  color: #000;
+  background-color: #fff;
+  border: 2px solid #ccc;
+  border-radius: 4px;
+
+  cursor: pointer;
+}
+.item-toggle-button-style:hover {
+  background-color: #ddd;
+}
+.item-toggle-button-style p {
+  display: table-cell;
+  vertical-align: middle;
+}

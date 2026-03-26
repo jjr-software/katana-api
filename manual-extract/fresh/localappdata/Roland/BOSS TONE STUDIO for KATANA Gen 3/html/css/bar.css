@@ -1,0 +1,37 @@
+/*
+  Copyright 2016 Roland Corporation. All rights reserved.
+
+  <div id="a" class="item-bar-style">
+    <div></div>
+    <p>value</p>
+  </div>
+*/
+
+.item-bar-style {
+  position: absolute;
+  clear: both;
+  overflow: hidden;
+  outline: none;
+
+  margin: 0;
+  padding: 0;
+
+  cursor: pointer;
+
+  color: #fff;
+  background-color: #aaa;
+}
+.item-bar-style div {
+  position: absolute;
+  margin: 0;
+  padding: 0;
+  left: 0; top: 0;
+  background-color: #08d;
+}
+.item-bar-style p {
+  position: absolute;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  text-align: center;
+}

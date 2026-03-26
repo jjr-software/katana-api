@@ -1,0 +1,158 @@
+/*
+  Copyright 2016 Roland Corporation. All rights reserved.
+
+  <div id="a" class="bts-write-btn-select-box-style">
+    <p>selected option</p><div></div>
+    <div id="a-box" class="bts-write-btn-select-box-style" + "-popup" style="display:none;">
+      <a>option 1</a>
+      <a>option 2</a>
+      ...
+    </div>
+  </div>
+*/
+
+
+/**
+inherit item-select-box-style
+ */
+
+.bts-write-btn-select-box-style {
+    position: absolute;
+    clear: both;
+    overflow: hidden;
+    outline: none;
+    margin: 0;
+    padding: 0;
+    text-align: left;
+    color: #fff;
+    background-color: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.64);
+    font-size: 12px;
+    display: table;
+    width: 100%;
+    height: 100%;
+}
+
+.bts-write-btn-select-box-style p {
+    display: table-cell;
+    vertical-align: middle;
+    cursor: pointer;
+    padding-left: 10px;
+    background-image: url("../../images/bts/expand_more@2x.png");
+    background-size: 16px 16px;
+    background-position: right 4px center;
+    background-repeat: no-repeat;
+}
+
+@media (min-width: 1025px) {
+    .bts-write-btn-select-box-style:hover {
+        background-color: rgba(255, 255, 255, 0.32);
+    }
+}
+
+.bts-write-btn-menu-style-popup {
+    position: fixed;
+    overflow: auto;
+    outline: none;
+    -webkit-overflow-scrolling: touch;
+    margin: 0;
+    padding: 0;
+    background-color: #292929;
+    top: 37px !important;
+    left: auto !important;
+    right: 18px !important;
+    bottom: auto !important;
+    width: 128px !important;
+    height: 96px !important;
+    border-radius: 2px;
+    box-shadow: 0 0 24px 0 rgba(0, 0, 0, 0.22), 0 24px 24px 0 rgba(0, 0, 0, 0.30);
+}
+
+.bts-write-btn-menu-style-popup a {
+    display: block;
+    text-decoration: none;
+    margin: 0;
+    padding: 0 16px;
+    text-align: left;
+    font-size: 14px;
+    color: #fff;
+    height: 48px !important;
+    line-height: 48px;
+    user-drag: none;
+    -moz-user-drag: none;
+    -webkit-user-drag: none;
+}
+
+@media (min-width: 1025px) {
+    .bts-write-btn-menu-style-popup a:hover {
+        background-color: rgba(255, 255, 255, 0.32);
+    }
+}
+
+.bts-write-btn-select-box-style.disabled {
+    color: rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.32);
+    pointer-events: none;
+}
+
+.bts-write-btn-select-box-style.disabled p {
+    background-image: url("../../images/bts/expand_more_disable@2x.png");
+}
+
+/*
+ * Effect画面以外の時に強制的に無効にするためのclass
+ */
+.bts-write-btn-select-box-style.invalid {
+    color: rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.32);
+    pointer-events: none;
+}
+
+.bts-write-btn-select-box-style.invalid p {
+    background-image: url("../../images/bts/expand_more_disable@2x.png");
+}
+
+/*
+effects画面のライトボタン用
+(ヘッダの高さが異なるため)
+*/
+
+.bts-write-btn-2-menu-style-popup {
+    position: fixed;
+    overflow: auto;
+    outline: none;
+    -webkit-overflow-scrolling: touch;
+    margin: 0;
+    padding: 0;
+    background-color: #292929;
+    top: 37px !important;
+    left: auto !important;
+    right: 9px !important;
+    bottom: auto !important;
+    width: 128px !important;
+    height: 96px !important;
+    border-radius: 2px;
+    box-shadow: 0 0 24px 0 rgba(0, 0, 0, 0.22), 0 24px 24px 0 rgba(0, 0, 0, 0.30);
+}
+
+.bts-write-btn-2-menu-style-popup a {
+    display: block;
+    text-decoration: none;
+    margin: 0;
+    padding: 0 16px;
+    text-align: left;
+    font-size: 14px;
+    /*  font-size: 0.8em; */
+    color: #fff;
+    height: 48px !important;
+    line-height: 48px;
+    user-drag: none;
+    -moz-user-drag: none;
+    -webkit-user-drag: none;
+}
+
+@media (min-width: 1025px) {
+    .bts-write-btn-2-menu-style-popup a:hover {
+        background-color: rgba(255, 255, 255, 0.32);
+    }
+}

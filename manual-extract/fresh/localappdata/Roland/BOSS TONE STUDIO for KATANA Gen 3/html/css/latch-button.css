@@ -1,0 +1,43 @@
+/*
+  Copyright 2016 Roland Corporation. All rights reserved.
+
+  <div id="a" class="item-latch-button-style">
+    <input type="checkbox" id="a-0" />
+    <label for="a-0"></label>
+  </div>
+*/
+
+.item-latch-button-style {
+  position: absolute;
+  clear: both;
+  display: table;
+  margin: 0;
+  padding: 0;
+
+  text-align: center;
+
+  color: #fff;
+  background-color: #000;
+  border: 1px solid #ccc;
+/*  border-radius: 4px; */
+}
+.item-latch-button-style input {
+   display: none;
+}
+.item-latch-button-style label {
+  display: table-cell;
+  vertical-align: middle;
+  cursor: pointer;
+  width: 100%;
+  padding: 4px;
+
+  background-repeat: no-repeat;
+  background-position: center center;
+}
+.item-latch-button-style label:hover {
+/*  background-color: #ddd; */
+}
+.item-latch-button-style input[type="checkbox"]:checked + label {
+  color: #000;
+  background-color: #fff;
+}

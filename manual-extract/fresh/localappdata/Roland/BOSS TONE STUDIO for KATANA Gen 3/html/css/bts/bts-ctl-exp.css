@@ -1,0 +1,262 @@
+.bts-ctl-exp-list-style {
+  position: absolute;
+  clear: both;
+  overflow: hidden;
+  margin: 0;
+  padding: 0; 
+  width: 100%;
+}
+.bts-ctl-exp-list-style input {
+  display: none;
+}
+.bts-ctl-exp-list-style label {
+  display: block;
+  margin:  0;
+  padding: 10px 0 26px 15px;
+  height: 48px !important;
+  width: 100%;
+  background-color: #222C3D;
+  box-shadow: inset 0 -1px 0 0 rgba(255,255,255,0.32);
+  line-height: 12px !important;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  background-image: url("../../images/bts/keyboard_arrow_right_16px@2x.png");
+  background-size: 24px 24px;
+  background-repeat: no-repeat;
+  background-position: center right 12px;
+}
+.bts-ctl-exp-list-style label:last-of-type {
+  border-bottom: none;
+}
+.bts-ctl-exp-list-style label.off {
+  background-color: rgba(255,255,255,0.16);
+}
+
+.bts-assign-list-style {
+  position: absolute;
+  clear: both;
+  overflow: hidden;
+  margin: 0;
+  padding: 0; 
+  width: 100%;
+}
+.bts-assign-list-style input {
+  display: none;
+}
+.bts-assign-list-style label {
+  display: block;
+  margin:  0;
+  padding: 15px 0 66px 64px;
+  width: 100%;
+  background-color: transparent;
+  box-shadow: inset 0 -1px 0 0 rgba(255,255,255,0.32);
+  line-height: 19px !important;
+  font-size: 16px;
+  color: #FFFFFF;
+  background-image: url("../../images/bts/keyboard_arrow_right_16px@2x.png");
+  background-size: 24px 24px;
+  background-repeat: no-repeat;
+  background-position: center right 8px;
+}
+.bts-assign-list-style label:last-of-type {
+  border-bottom: none;
+}
+.bts-assign-list-style label.off {
+  background-color: rgba(255,255,255,0.16);
+}
+
+.bts-patch-midi-list-style {
+  position: absolute;
+  clear: both;
+  overflow: hidden;
+  margin: 0;
+  padding: 0; 
+  width: 100%;
+  height: 100% !important;
+}
+.bts-patch-midi-list-style input {
+  display: none;
+}
+.bts-patch-midi-list-style label {
+  display: block;
+  margin:  0;
+  padding: 15px 0 74px 16px;
+  height: 113px !important;
+  width: 100%;
+  background-color: transparent;
+  box-shadow: inset 0 -1px 0 0 rgba(255,255,255,0.32);
+  line-height: 19px !important;
+  font-size: 16px;
+  color: #FFFFFF;
+  background-image: url("../../images/bts/keyboard_arrow_right_16px@2x.png");
+  background-size: 24px 24px;
+  background-repeat: no-repeat;
+  background-position: center right 8px;
+}
+.bts-patch-midi-list-style label:last-of-type {
+  border-bottom: none;
+}
+.bts-patch-midi-list-style label.off {
+  background-color: rgba(255,255,255,0.16);
+}
+
+.bts-ctl-exp-select-list-style {
+  position: absolute;
+  clear: both;
+  overflow: hidden;
+  outline: none;
+
+  margin: 0;
+  padding: 25px 45px 9px 15px;
+  width: calc(100% - 48px);
+
+  text-align: left;
+
+  color: #fff;
+  background-color: transparent;
+  border: 0;
+
+  display: table;
+  background-repeat: no-repeat;
+  background-position: center right 10px;
+  background-size: 24px 24px;
+  background-image: url("../../images/bts/expand_more@2x.png");
+}
+.bts-ctl-exp-select-list-style p {
+  display: table-cell;
+  vertical-align: middle;
+  font-size: 14px;
+  line-height: 14px;
+}
+
+/* default 'item-select-list-style' + '-popup' */
+.bts-ctl-exp-select-list-style-popup {
+  position: fixed;
+  overflow: hidden;
+  outline: none;
+
+  width:  calc(100% - 40px);
+  height: calc(100% - 64px);
+  left: 0; top: 0; right: 0; bottom: 0;
+  margin: auto;
+  padding: 0;
+
+  background-color: #292929;
+  border: 0;
+  border-radius: 4px;
+
+          animation: fadeIn 0.3s;
+  -webkit-animation: fadeIn 0.3s;
+}
+
+/* default 'item-select-list-style' + '-header' */
+.bts-ctl-exp-select-list-style-header {
+  /* margin-left: 1em;
+  padding-left: 2em;
+  line-height: 2em; */
+
+  color: #aaa;
+  font-size: 0;
+
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: 24px 24px;
+  background-image: url("../../images/bts/close@2x.png");
+
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 24px;
+  height: 24px;
+  display: block;
+  cursor: pointer;
+}
+
+/* default 'item-select-list-style' + '-option' */
+.bts-ctl-exp-select-list-style-option {
+  position: absolute;
+  overflow: auto;
+  outline: none;
+  -webkit-overflow-scrolling: touch;
+
+  left: 0; top: 48px; right: 0; bottom: 0;
+  margin: auto;
+}
+.bts-ctl-exp-select-list-style-option a {
+  display: block;
+  text-decoration: none;
+  margin: 0;
+  padding: 0 0 0 48px;
+
+          user-drag: none; 
+     -moz-user-drag: none;
+  -webkit-user-drag: none;
+
+  color: #FFFFFF;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.32);
+
+  text-align: left;
+
+  background-repeat: no-repeat;
+  background-position: left center;
+  height: 48px;
+  line-height: 48px;
+  font-size: 14px;
+}
+@media not screen and (min-device-width : 320px) and (max-device-width : 480px) {
+  .bts-ctl-exp-select-list-style-option a:hover {
+    background-color: rgba(255, 255, 255, 0.16);
+  }
+}
+.bts-ctl-exp-select-list-style-option a[checked] {
+  background-repeat: no-repeat;
+  background-position: 12px center;
+  background-size: 24px 24px;
+  background-image: url("../../images/bts/check_theme@2x.png");
+}
+
+.bts-ctl-exp-select-list__title {
+  display: block;
+  background-color: #4B4F52;
+  width: 100%;
+  height: 48px;
+  line-height: 48px;
+  padding: 0 0 0 48px;
+  margin: 0;
+  text-align: left;
+  color: #FFFFFF;
+}
+
+.bts-ctl-exp-stringer-style {
+  position: absolute;
+  clear: both;
+  display: table;
+  margin: 0;
+  padding: 0;
+
+  text-align: left;
+  color: #FFFFFF;
+  font-size: 12px;
+  line-height: 12px;
+  height: 12px;
+
+/*  pointer-events: none; */
+}
+.bts-ctl-exp-stringer-style p {
+  display: table-cell;
+  margin: auto;
+  vertical-align: middle;
+  background-size: contain;
+}
+
+
+#ctl-exp-background {
+  background: linear-gradient(180deg,
+  #4B4F52, #4B4F52 32px,
+  #313A47 32px, #313A47 64px,
+  transparent 64px, transparent 104px,
+  rgba(214,231,255,0.10) 104px, rgba(214,231,255,0.10) 130px,
+  rgba(194,219,255,0.04) 130px, rgba(194,219,255,0.04) 156px,
+  rgba(214,231,255,0.10) 156px, rgba(214,231,255,0.10) 192px
+  );
+}

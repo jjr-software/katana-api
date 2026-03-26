@@ -1,0 +1,48 @@
+/*
+  Copyright 2016 Roland Corporation. All rights reserved.
+
+  <div id="a" class="item-dial-style">
+      <p>value</p><span></span>
+      <canvas></canvas>
+  </div>
+*/
+
+.item-dial-style {
+  position: absolute;
+  clear: both;
+  outline: none;
+
+  margin: 0;
+  padding: 0;
+
+  font-size: 18px;
+  font-weight: bold;
+  color: #000;
+}
+.item-dial-style p {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  text-align: center;
+}
+.item-dial-style span {
+  display: none;
+
+  border-radius: 6px;        /* dial thickness */
+  color: #08d;               /* dial fgcolor */
+  background-color: #aaa;    /* dial bgcolor */
+  border-top-color: #000;    /* dial gap color */
+  border-bottom-color: #666; /* dial NA color */
+
+/* normal type */
+  border-style: none;
+
+/* 2 control type */
+/*  border-style: double; */
+/*  border-top-color: transparent;*/
+}
+.item-dial-style canvas {
+  position: absolute;
+  display: block;
+  left: 0; top: 0;
+}

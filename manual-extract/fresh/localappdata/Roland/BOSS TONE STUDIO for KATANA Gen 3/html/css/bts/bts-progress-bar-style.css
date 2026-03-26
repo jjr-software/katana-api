@@ -1,0 +1,28 @@
+.bts-progress-bar-style {
+    position: absolute;
+    clear: both;
+    overflow: hidden;
+    outline: none;
+    margin: 0;
+    padding: 0;
+    cursor: pointer;
+    color: #fff;
+    background-color: rgba(255, 255, 255, 0.32);
+}
+
+.bts-progress-bar-style div {
+    position: absolute;
+    margin: 0;
+    padding: 0;
+    /* left: 0;
+    top: 0; */
+    background-color: #33D6FF;
+}
+
+.bts-progress-bar-style p {
+    position: absolute;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    text-align: center;
+}

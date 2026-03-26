@@ -1,0 +1,19 @@
+/*
+  Copyright 2017 Roland Corporation. All rights reserved.
+
+  <div id="a" class="item-label-border-style">
+      <p>text</p>
+  </div>
+*/
+
+.item-label-border-style {
+  position: absolute;
+  clear: both;
+  margin: 0;
+  padding: 0;
+
+  border-top: 3px solid #888;
+}
+.item-label-border-style p {
+  display: none;
+}

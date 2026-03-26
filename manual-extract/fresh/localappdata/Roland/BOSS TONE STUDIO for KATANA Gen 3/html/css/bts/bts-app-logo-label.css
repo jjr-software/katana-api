@@ -1,0 +1,25 @@
+/**
+inherit item-label-style
+ */
+.bts-app-logo-label-style {
+  font-family: RobotoCondensedRegular;
+  position: absolute;
+  clear: both;
+  display: table;
+  margin: 0;
+  padding: 0;
+
+  text-align: center;
+
+  color: #000;
+  border: 1px solid #ccc;
+}
+.bts-app-logo-label-style p {
+  display: table-cell;
+  vertical-align: middle;
+
+  line-height: 100%;
+
+  background-repeat: no-repeat;
+  background-position: center center;
+}

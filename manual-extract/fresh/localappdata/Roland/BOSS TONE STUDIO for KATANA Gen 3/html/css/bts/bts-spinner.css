@@ -1,0 +1,130 @@
+/*
+  Copyright 2019 Roland Corporation. All rights reserved.
+
+  <div id="a" class="bts-spinner-style">
+    <input type="text" />
+    <div class="up-arrow"></div>
+    <div class="down-arrow"></div>
+  </div>
+*/
+
+/*
+ Small font size
+ */
+.bts-spinner-small-font-style {
+  position: absolute;
+  clear: both;
+  overflow: hidden;
+  outline: none;
+  margin: 0;
+  padding-right: 24px;
+  
+  font-size: 12px;
+  text-align: right;
+  
+  color: #fff;
+  background-color: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.64);
+  /*
+  display: table;
+  */
+}
+.bts-spinner-small-font-style.disabled {
+  background-color: #424243;
+  /*
+  background-image:  url("../../images/bts/expand_more_disable@2x.png");
+  */
+  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  pointer-events: none;
+}
+.bts-spinner-small-font-style input[type="text"] {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /*
+  padding-right: 20px;
+  */
+  cursor: pointer;
+
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  background: inherit;
+  border: none;
+
+          user-select: text;
+     -moz-user-select: text;
+  -webkit-user-select: text;
+}
+.bts-spinner-small-font-style .up-arrow {
+  display: inline-block;
+  position: absolute;
+  top:0; right: 0;
+  width: 16px;
+  height: 50%;
+
+  background-color: transparent;
+
+  border-left: 1px solid rgba(255, 255, 255, 0.64);
+}
+.bts-spinner-small-font-style .down-arrow {
+  display: inline-block;
+  position: absolute;
+  right: 0; bottom:0;
+  width: 16px;
+  height: 50%;
+
+  background-color: transparent;
+
+  border-top: 1px solid rgba(255, 255, 255, 0.64);
+  border-left: 1px solid rgba(255, 255, 255, 0.64);
+}
+.bts-spinner-small-font-style input[type="text"]:focus {
+  background-color: inherit;
+  border: 1px solid #33D6FF;
+}
+/*
+.bts-spinner-small-font-style:hover > .up-arrow,
+.bts-spinner-small-font-style:hover > .down-arrow {
+  display: inline-block;
+}
+*/
+.bts-spinner-small-font-style .up-arrow:hover,
+.bts-spinner-small-font-style .down-arrow:hover {
+  background-color: rgba(255, 255, 255, 0.16);
+}
+.bts-spinner-small-font-style .up-arrow:before {
+  display: block;
+  content: "";
+  position: absolute;
+  cursor: pointer;
+
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+
+  background-repeat: no-repeat;
+  background-position: center right;
+  background-size: 16px 16px;
+  background-image: url("../../images/bts/expand_more@2x.png");
+
+          transform: rotate(180deg);
+     -moz-transform: rotate(180deg);
+  -webkit-transform: rotate(180deg);
+}
+.bts-spinner-small-font-style .down-arrow:after {
+  display: block;
+  content: "";
+  position: absolute;
+  cursor: pointer;
+
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+
+  background-repeat: no-repeat;
+  background-position: center left;
+  background-size: 16px 16px;
+  background-image: url("../../images/bts/expand_more@2x.png");
+}

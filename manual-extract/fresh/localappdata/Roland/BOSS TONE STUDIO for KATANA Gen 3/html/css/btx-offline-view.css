@@ -1,0 +1,17 @@
+#tone-exchange-reload-btn {
+    position: absolute;
+    left: 0;
+    right: 0;
+    margin-left: auto;
+    margin-right: auto;
+    top: calc((100% - 48px) / 2) !important;
+}
+
+#tone-exchange-state-label {
+    position: absolute;
+    left: 0;
+    right: 0;
+    margin-left: auto;
+    margin-right: auto;
+    top: calc((100% - 48px - 72px) / 2) !important;
+}

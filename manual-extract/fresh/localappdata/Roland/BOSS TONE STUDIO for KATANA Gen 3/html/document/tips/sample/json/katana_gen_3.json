@@ -1,0 +1,70 @@
+{
+  "model": "KATANA3",
+  "version" : "1.0.0",
+  "enable": "true",
+  "connect": "true",
+  "btc": {
+    "domain": "http://dev.bosstonecentral.com",
+    "dataapi": "/apps/katana_3/",
+    "update_xml": "/apps/katana_3/update.xml",
+    "update_xml_list": {
+      "katana100_212_3": "/apps/katana-100_212_3/update.xml",
+      "katana100_3": "/apps/katana-100_3/update.xml",
+      "katana50_3": "/apps/katana-50_3/update.xml",
+      "katana_head_3": "/apps/katana-head_3/update.xml"
+    },
+    "preset_artwork": "/apps/katana_3/presetArtwork/index.json",
+    "liveset": "/liveset/category/katana_3/index.json",
+    "promotion": "/promotion/index.json",
+    "pickup": "/pickup/index.json",
+    "liveset_file": "/apps/katana_3/liveset/",
+    "tags": "/tags.json"
+  },
+  "api": {
+    "domain": "http://dev-api.roland.com",
+    "user": "/app/btc/1/user/",
+    "errorlogs": "/app/btc/1/errorlogs/",
+    "statuslogs": "/app/btc/1/statuslogs/",
+    "updatelogs": "/app/btc/1/updatelogs/",
+    "patchuselogs": "/app/btc/1/patchuselogs/",
+    "livesetaddlogs": "/app/btc/1/livesetaddlogs/",
+    "livesetlogs": "/app/btc/1/liveset_logs/",
+    "youtubelogs": "/app/btc/1/youtube_logs/",
+    "soundcloudlogs": "/app/btc/1/soundcloud_logs/"
+  },
+  "external_service": {
+    "youtube": {
+      "enable": "true",
+      "url": "http://www.youtube.com/v/"
+    },
+    "soundcloud": {
+      "enable": "true",
+      "client_id": "b2432090a67bd92ab40c6e8090660c4b",
+      "domain": "http://api.soundcloud.com",
+      "resolve": "/resolve.json"
+    }
+  },
+  "firmDownload": {
+    "katana_100_212_3": {
+      "jp": "https://www.boss.info/jp/support/by_product/katana-100_212_3/updates_drivers/",
+      "en": "https://www.boss.info/global/support/by_product/katana-100_212_3/updates_drivers/"
+    },
+    "katana_100_3": {
+      "jp": "https://www.boss.info/jp/support/by_product/katana-100_3/updates_drivers/",
+      "en": "https://www.boss.info/global/support/by_product/katana-100_3/updates_drivers/"
+    },
+    "katana_50_3": {
+      "jp": "https://www.boss.info/jp/support/by_product/katana-50_3/updates_drivers/",
+      "en": "https://www.boss.info/global/support/by_product/katana-50_3/updates_drivers/"
+    },
+    "katana_head_3": {
+      "jp": "https://www.boss.info/jp/support/by_product/katana-head_3/updates_drivers/",
+      "en": "https://www.boss.info/global/support/by_product/katana-head_3/updates_drivers/"
+    }
+  },
+  "tips": {
+    "domain": "http://dev-api.roland.com/app/btc/define/tips/katana_gen_3/",
+    "api": "tipsapi.js",
+    "def": "tipsdef.js"
+  }
+}

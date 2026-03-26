@@ -1,0 +1,128 @@
+/*
+  Copyright 2016 Roland Corporation. All rights reserved.
+
+  <div id="a" class="item-select-box-style">
+    <p>selected option</p><div></div>
+    <div id="a-box" class="item-select-box-style" + "-popup" style="display:none;">
+      <a>option 1</a>
+      <a>option 2</a>
+      ...
+    </div>
+  </div>
+*/
+
+.item-select-box-style {
+  position: absolute;
+  clear: both;
+  overflow: hidden;
+  outline: none;
+
+  margin: 0;
+  padding: 0;
+
+  text-align: center;
+
+  color: #000;
+  background-color: #fff;
+  border: 1px solid #ccc;
+/*  border-radius: 8px; */
+  display: table;
+}
+.item-select-box-style p {
+  display: table-cell;
+  vertical-align: middle;
+  cursor: pointer;
+  padding-left: 4px;
+  padding-right: 24px;
+}
+.item-select-box-style p:after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  margin-top: -7px;
+  width: 10px;
+  height: 10px;
+
+  border-left: 2px solid #000;
+  border-bottom: 2px solid #000;
+          transform: rotate(-45deg);
+     -moz-transform: rotate(-45deg);
+  -webkit-transform: rotate(-45deg);
+
+          box-sizing: border-box;
+     -moz-box-sizing: border-box;
+  -webkit-box-sizing: border-box;
+}
+.item-select-box-style:hover {
+  background-color: #ddd;
+}
+
+/* default 'item-select-box-style' + '-popup' */
+.item-select-box-style-popup {
+  position: fixed;
+  overflow: auto;
+  outline: none;
+  -webkit-overflow-scrolling: touch;
+
+  margin: 0;
+  padding: 0;
+
+  background-color: #fff;
+  border: 1px solid #ccc;
+
+  max-height: 150px;
+}
+.item-select-box-style-popup a {
+  display: block;
+  text-decoration: none;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  font-size: 0.8em;
+
+  color: #000;
+  border-top: 1px solid #ccc;
+
+          user-drag: none; 
+     -moz-user-drag: none;
+  -webkit-user-drag: none;
+}
+.item-select-box-style-popup a:hover {
+  background-color: #ddd;
+}
+.item-select-box-style-popup a[checked] {
+  color: #fff;
+  background-color: #000;
+}
+
+/* default 'item-menu-style' + '-popup' */
+.item-menu-style-popup {
+  position: fixed;
+  overflow: auto;
+  outline: none;
+  -webkit-overflow-scrolling: touch;
+
+  margin: 0;
+  padding: 0;
+
+  background-color: #fff;
+  border: 1px solid #ccc;
+}
+.item-menu-style-popup a {
+  display: block;
+  text-decoration: none;
+  margin: 0;
+  padding: 6px;
+  text-align: left;
+/*  font-size: 0.8em; */
+
+  color: #000;
+
+          user-drag: none; 
+     -moz-user-drag: none;
+  -webkit-user-drag: none;
+}
+.item-menu-style-popup a:hover {
+  background-color: #ddd;
+}

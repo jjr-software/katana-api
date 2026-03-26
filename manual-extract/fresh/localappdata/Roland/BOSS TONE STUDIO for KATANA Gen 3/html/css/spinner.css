@@ -1,0 +1,115 @@
+/*
+  Copyright 2016 Roland Corporation. All rights reserved.
+
+  <div id="a" class="item-spinner-style">
+    <input type="text" />
+    <div class="up-arrow"></div>
+    <div class="down-arrow"></div>
+  </div>
+*/
+
+.item-spinner-style {
+  position: absolute;
+  clear: both;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+
+  text-align: right;
+
+  color: #000;
+  background-color: #fff;
+  border: 1px solid #ccc;
+/*  border-radius: 2px; */
+}
+.item-spinner-style input[type="text"] {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding-right: 24px;
+  cursor: pointer;
+
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  background: inherit;
+  border: none;
+
+          user-select: text;
+     -moz-user-select: text;
+  -webkit-user-select: text;
+}
+.item-spinner-style .up-arrow {
+  display: none;
+  position: absolute;
+  top:0; right: 0;
+  width: 20%;
+  height: 50%;
+
+  background-color: #eee;
+  border-left: 1px solid #ccc;
+}
+.item-spinner-style .down-arrow {
+  display: none;
+  position: absolute;
+  right: 0; bottom:0;
+  width: 20%;
+  height: 50%;
+
+  background-color: #eee;
+  border-top:1px solid #ccc;
+  border-left: 1px solid #ccc;
+}
+.item-spinner-style input[type="text"]:focus {
+  background-color: #eee;
+}
+.item-spinner-style:hover > .up-arrow,
+.item-spinner-style:hover > .down-arrow {
+  display: inline-block;
+}
+.item-spinner-style .up-arrow:hover,
+.item-spinner-style .down-arrow:hover {
+  background-color: #ddd;
+}
+.item-spinner-style .up-arrow:before {
+  display: block;
+  content: "";
+  position: absolute;
+  cursor: pointer;
+
+  top: 50%; left: 50%;
+  margin-top: -3px; margin-left: -3px;
+  width: 6px;
+  height: 6px;
+
+  border-left: 1px solid #000;
+  border-top: 1px solid #000;
+          transform: rotate(45deg);
+     -moz-transform: rotate(45deg);
+  -webkit-transform: rotate(45deg);
+
+          box-sizing: border-box;
+     -moz-box-sizing: border-box;
+  -webkit-box-sizing: border-box;
+}
+.item-spinner-style .down-arrow:after {
+  display: block;
+  content: "";
+  position: absolute;
+  cursor: pointer;
+
+  top: 50%; left: 50%;
+  margin-top: -3px; margin-left: -3px;
+  width: 6px;
+  height: 6px;
+
+  border-left: 1px solid #000;
+  border-bottom: 1px solid #000;
+          transform: rotate(-45deg);
+     -moz-transform: rotate(-45deg);
+  -webkit-transform: rotate(-45deg);
+
+          box-sizing: border-box;
+     -moz-box-sizing: border-box;
+  -webkit-box-sizing: border-box;
+}

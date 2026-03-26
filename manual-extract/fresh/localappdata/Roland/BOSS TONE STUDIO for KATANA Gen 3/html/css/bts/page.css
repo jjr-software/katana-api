@@ -1,0 +1,51 @@
+/*
+  Copyright 2016 Roland Corporation. All rights reserved.
+
+  Override css/page.css
+*/
+
+.page-popup-wrapper {
+  position: absolute;
+  left: 0; top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.86);
+}
+.page-select-list-popup-wrapper {
+  position: absolute;
+  left: 0; top: 0;
+  width: 100%;
+  height: 100%;
+  /*background-color: rgba(0, 0, 0, 0.86);*/
+  z-index: 1;
+}
+
+/* for select-box/list/panel */
+.select-popup-wrapper {
+  position: absolute;
+  left: 0; top: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+}
+
+/*  for loading page */
+.bts-loading-frame-style {
+  position: absolute;
+  clear: both;
+  overflow: auto;
+
+  padding: 0;
+  animation-duration: 0.3s;
+  animation-name: flash;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+@keyframes flash {
+  0% { opacity: 1; }
+100% { opacity: 0; }
+}
+
+#splash {
+  z-index: 9999;
+}

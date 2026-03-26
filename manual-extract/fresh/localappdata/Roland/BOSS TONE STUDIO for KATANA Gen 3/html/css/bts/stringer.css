@@ -1,0 +1,24 @@
+/*
+  Copyright 2016 Roland Corporation. All rights reserved.
+
+  Override css/stringer.css
+
+  <div id="a" class="item-stringer-style" format="format">
+      <p>formatted value</p>
+      <div style="display:none;"> // in the case of resource-id
+        <p style="background-image:url(%icon1)">text 1</p>
+        <p style="background-image:url(%icon2)">text 2</p>
+        ...
+      </div>
+  </div>
+*/
+
+.item-stringer-style p {
+  /*
+  display: table-cell;
+  vertical-align: middle;
+  */
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: 0 0;
+}

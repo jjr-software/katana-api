@@ -1,0 +1,412 @@
+/*
+  Copyright 2016 Roland Corporation. All rights reserved.
+
+  <div id="a" class="item-select-list-style">
+    <p>selected option</p>
+    <div id="a-list" class="class" + "-popup" style="display:none;">
+      <label class="class" + "-header"> caption </label>
+      <div class="class" + "-option">
+        <a>option 1</a>
+        <a>option 2</a>
+        ...
+      </div>
+    </div>
+  </div>
+*/
+
+/**
+extends item-select-list-style
+ */
+.bts-small-select-list-style {
+  position: absolute;
+  clear: both;
+  overflow: hidden;
+  outline: none;
+
+  margin: 0;
+  padding: 8px 7px;
+
+  text-align: left;
+
+  color: #fff;
+  background-color: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.64);
+
+  display: table;
+  background-repeat: no-repeat;
+  background-position: center right 4px;
+  background-size: 24px 24px;
+  background-image: url("../../images/bts/expand_more@2x.png");
+}
+.bts-small-select-list-style.disabled {
+  background-color: rgba(255, 255, 255, 0.08);
+  background-image:  url("../../images/bts/expand_more_disable@2x.png");
+  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  pointer-events: none;
+}
+.bts-small-select-list-style p {
+  display: table-cell;
+  vertical-align: middle;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 14px;
+}
+
+/* default 'item-select-list-style' + '-popup' */
+.bts-small-select-list-style-popup {
+  position: fixed;
+  overflow: hidden;
+  outline: none;
+
+  /*width:  128px;*/
+  max-height: 252px;
+  left: 0; top: 0; right: 0; bottom: 0;
+  margin: auto;
+  padding: 0;
+
+  background-color: #292929;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+
+  animation: fadeIn 0.3s;
+  -webkit-animation: fadeIn 0.3s;
+
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 0 24px 0 rgba(0, 0, 0, 0.22), 0 24px 24px 0 rgba(0, 0, 0, 0.30);
+}
+
+/* default 'item-select-list-style' + '-header' */
+.bts-small-select-list-style-header {
+  color: #aaa;
+  font-size: 0;
+
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: 24px 24px;
+  background-image: url("../../images/bts/close@2x.png");
+
+  display: none;
+  /*position: absolute;*/
+  top: 12px;
+  left: 12px;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+}
+
+/* default 'item-select-list-style' + '-option' */
+.bts-small-select-list-style-option {
+  /*position: absolute;*/
+  overflow: hidden;
+  outline: none;
+  -webkit-overflow-scrolling: touch;
+
+  left: 0; top: 0; right: 0; bottom: 0;
+  margin: auto;
+}
+.bts-small-select-list-style-option a {
+  display: block;
+  text-decoration: none;
+  margin: 0;
+  padding: 0 0 0 30px;
+
+  user-drag: none;
+  -moz-user-drag: none;
+  -webkit-user-drag: none;
+
+  color: #FFFFFF;
+
+  text-align: left;
+
+  background-repeat: no-repeat;
+  background-position: left center;
+  height: 28px;
+  line-height: 28px;
+  font-size: 14px;
+}
+@media (min-width: 1025px) {
+  .bts-small-select-list-style-option a:hover {
+    background-color: rgba(255, 255, 255, 0.16);
+  }
+}
+.bts-small-select-list-style-option a[checked] {
+  background-repeat: no-repeat;
+  background-position: 6px center;
+  background-size: 18px 18px;
+  background-image: url("../../images/bts/check_theme@2x.png");
+}
+/*
+jsで生成する部分
+*/
+.bts-small-select-list__title {
+  display: block;
+  background-color: #4B4F52;
+  width: 100%;
+  height: 48px;
+  line-height: 48px;
+  padding: 0 0 0 48px;
+  margin: 0;
+  text-align: left;
+  color: #FFFFFF;
+}
+
+/**
+文字サイズ小
+*/
+.bts-small-select-list-small-font-style {
+  position: absolute;
+  clear: both;
+  overflow: hidden;
+  outline: none;
+
+  margin: 0;
+  padding: 5px 8px;
+
+  text-align: left;
+
+  color: #fff;
+  background-color: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.64);
+
+  display: table;
+  background-repeat: no-repeat;
+  background-position: center right 4px;
+  background-size: 16px 16px;
+  background-image: url("../../images/bts/expand_more@2x.png");
+}
+.bts-small-select-list-small-font-style.disabled {
+  background-color: #424243;
+  background-image:  url("../../images/bts/expand_more_disable@2x.png");
+  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  pointer-events: none;
+}
+.bts-small-select-list-small-font-style p {
+  display: table-cell;
+  vertical-align: middle;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 12px;
+}
+
+/* default 'item-select-list-style' + '-popup' */
+.bts-small-select-list-small-font-style-popup {
+  position: fixed;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  outline: none;
+
+  /*width:  128px;*/
+  max-height: 252px;
+  left: 0; top: 0; right: 0; bottom: 0;
+  margin: auto;
+  padding: 0;
+
+  background-color: #292929;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+
+  animation: fadeIn 0.3s;
+  -webkit-animation: fadeIn 0.3s;
+
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 0 24px 0 rgba(0, 0, 0, 0.22), 0 24px 24px 0 rgba(0, 0, 0, 0.30);
+}
+
+/* default 'item-select-list-style' + '-header' */
+.bts-small-select-list-small-font-style-header {
+  /* margin-left: 1em;
+  padding-left: 2em;
+  line-height: 2em; */
+
+  color: #aaa;
+  font-size: 0;
+
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: 24px 24px;
+  background-image: url("../../images/bts/close@2x.png");
+
+  display: none;
+  /*position: absolute;*/
+  top: 12px;
+  left: 12px;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+}
+
+/* default 'item-select-list-style' + '-option' */
+.bts-small-select-list-small-font-style-option {
+  /*position: absolute;*/
+  overflow: hidden;
+  outline: none;
+  -webkit-overflow-scrolling: touch;
+
+  left: 0; top: 0; right: 0; bottom: 0;
+  margin: auto;
+}
+.bts-small-select-list-small-font-style-option a {
+  display: block;
+  text-decoration: none;
+  margin: 0;
+  padding: 0 0 0 30px;
+
+  user-drag: none;
+  -moz-user-drag: none;
+  -webkit-user-drag: none;
+
+  color: #FFFFFF;
+
+  text-align: left;
+
+  background-repeat: no-repeat;
+  background-position: left center;
+  height: 28px;
+  line-height: 28px;
+  font-size: 14px;
+}
+.bts-small-select-list-small-font-style-option a:hover {
+  background-color: rgba(255, 255, 255, 0.16);
+}
+.bts-small-select-list-small-font-style-option a[checked] {
+  background-repeat: no-repeat;
+  background-position: 6px center;
+  background-size: 18px 18px;
+  background-image: url("../../images/bts/check_theme@2x.png");
+}
+
+/*最小サイズ*/
+.bts-small-select-list-xsmall-font-style {
+  position: absolute;
+  clear: both;
+  overflow: hidden;
+  outline: none;
+
+  margin: 0;
+  padding: 2px 8px;
+
+  text-align: left;
+
+  color: #fff;
+  background-color: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.64);
+
+  display: table;
+  background-repeat: no-repeat;
+  background-position: center right 2px;
+  background-size: 16px 16px;
+  background-image: url("../../images/bts/expand_more@2x.png");
+}
+.bts-small-select-list-xsmall-font-style.disabled {
+  background-color: rgba(255, 255, 255, 0.08);
+  background-image:  url("../../images/bts/expand_more_disable@2x.png");
+  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  pointer-events: none;
+}
+.bts-small-select-list-xsmall-font-style p {
+  display: table-cell;
+  vertical-align: middle;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 12px;
+}
+
+/* default 'item-select-list-style' + '-popup' */
+.bts-small-select-list-xsmall-font-style-popup {
+  position: fixed;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  outline: none;
+
+  max-height: 252px;
+  left: 0; top: 0; right: 0; bottom: 0;
+  margin: auto;
+  padding: 0;
+
+  background-color: #292929;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+
+  animation: fadeIn 0.3s;
+  -webkit-animation: fadeIn 0.3s;
+
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 0 24px 0 rgba(0, 0, 0, 0.22), 0 24px 24px 0 rgba(0, 0, 0, 0.30);
+}
+
+/* default 'item-select-list-style' + '-header' */
+.bts-small-select-list-xsmall-font-style-header {
+  /* margin-left: 1em;
+  padding-left: 2em;
+  line-height: 2em; */
+
+  color: #aaa;
+  font-size: 0;
+
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: 24px 24px;
+  background-image: url("../../images/bts/images/close@2x.png");
+
+  display: none;
+  top: 12px;
+  left: 12px;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+}
+
+/* default 'item-select-list-style' + '-option' */
+.bts-small-select-list-xsmall-font-style-option {
+  overflow: hidden;
+  outline: none;
+  -webkit-overflow-scrolling: touch;
+
+  /*height: 224px;*/
+
+  left: 0; top: 0; right: 0; bottom: 0;
+  margin: auto;
+}
+.bts-small-select-list-xsmall-font-style-option a {
+  display: block;
+  text-decoration: none;
+  margin: 0;
+  padding: 0 0 0 30px;
+
+  user-drag: none;
+  -moz-user-drag: none;
+  -webkit-user-drag: none;
+
+  color: #FFFFFF;
+
+  text-align: left;
+
+  background-repeat: no-repeat;
+  background-position: left center;
+  height: 28px;
+  line-height: 28px;
+  font-size: 14px;
+}
+@media (min-width: 1025px) {
+  .bts-small-select-list-xsmall-font-style-option a:hover {
+    background-color: rgba(255, 255, 255, 0.16);
+  }
+}
+.bts-small-select-list-xsmall-font-style-option a[checked] {
+  background-repeat: no-repeat;
+  background-position: 6px center;
+  background-size: 18px 18px;
+  background-image: url("../../images/bts/check_theme@2x.png");
+}
+
+.hyphen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding-left: 8px;
+  width: 80%;
+  height: 24px;
+  line-height: 24px;
+  color: rgba(255, 255, 255, 0.5);
+  background: #424243;
+}

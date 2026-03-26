@@ -1,0 +1,23 @@
+/* #terms-of-use {
+    z-index: 1;
+} */
+
+#terms-of-use-page-contents {
+    font-family: RobotoCondensedRegular;
+    position: absolute;
+    top: 28px;
+    left: 10px;
+    right: 10px;
+    bottom: 60px;
+    overflow: scroll;
+    border: 1px solid rgba(255, 255, 255, .16);
+}
+
+#terms-of-use-page-accept-btn {
+    position: absolute;
+    bottom: 20px;
+    left: 0;
+    right: 0;
+    margin-left: auto;
+    margin-right: auto;
+}

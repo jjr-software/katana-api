@@ -1,0 +1,50 @@
+/*
+  Copyright 2016 Roland Corporation. All rights reserved.
+
+  <div id="a" class="item-group-button-style">
+    <input type="radio" id="a-0" name="a" value="0" >
+    <label for="a-0" style="background-image:url(img1.png)">group 1</label>
+    <input type="radio" id="a-1" name="a" value="1" >
+    <label for="a-1" style="background-image:url(img2.png)">group 2</label>
+    ...
+  </div>
+*/
+
+.item-group-button-style {
+  position: absolute;
+  clear: both;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+
+  border: 2px solid #ccc;
+  border-radius: 8px;
+}
+.item-group-button-style input {
+  display: none;
+}
+.item-group-button-style label {
+  float: left;
+  margin: 0;
+  padding: 0 8px;
+
+  cursor: pointer;
+  text-align: center;
+
+  color: #000;
+  background-color: #fff;
+  background-repeat: no-repeat;
+  background-position: center center;
+
+  border-right: 2px solid #ccc;
+}
+.item-group-button-style label:last-of-type {
+  border-right: none;
+}
+.item-group-button-style label:hover {
+  background-color: #ddd;
+}
+.item-group-button-style input[type="radio"]:checked + label {
+  color: #fff;
+  background-color: #000;
+}

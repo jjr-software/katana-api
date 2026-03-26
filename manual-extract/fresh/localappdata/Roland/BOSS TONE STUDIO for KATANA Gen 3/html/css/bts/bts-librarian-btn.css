@@ -1,0 +1,396 @@
+/** create btn **/
+
+.bts-librarian-create-button-style-pc {
+    position: absolute;
+    clear: both;
+    display: table;
+    margin: 0;
+    cursor: pointer;
+    color: #ffffff;
+    padding-left: 28px;
+    padding-top: 4px;
+    background-repeat: no-repeat;
+    background-image: url("../../images/bts/add_mini@2x.png");
+    background-position-x: 12px;
+    background-position-y: 2px;
+    background-size: 16px 16px;
+    background-color: transparent;
+    border: 1px solid #ffffff;
+    /*  border-radius: 8px; */
+}
+
+.bts-librarian-create-button-style-pc:hover {
+    background-color: rgba(255,255,255,0.32);
+}
+
+.bts-librarian-create-button-style-pc p {
+    display: table-cell;
+    /* vertical-align: middle; */
+    text-align: left;
+    font-size: 12px;
+    line-height: 100%;
+    background-repeat: no-repeat;
+    /* background-position: center center; */
+}
+
+.bts-librarian-create-button-style-pc.disabled {
+    background-color: rgba(255, 255, 255, 0.5);
+    border: none;
+    cursor: default;
+    pointer-events: none;
+}
+
+
+/** import btn **/
+
+.bts-librarian-import-button-style {
+    position: absolute;
+    clear: both;
+    display: table;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+    cursor: pointer;
+    color: #000;
+    background-repeat: no-repeat;
+    background-image: url("../../images/bts/import@2x.png");
+    background-size: contain;
+    background-color: transparent;
+    border: none;
+    /*  border-radius: 8px; */
+}
+
+.bts-librarian-import-button-style:hover {
+    background-color: rgba(255,255,255,0.32);
+}
+
+.bts-librarian-import-button-style p {
+    display: table-cell;
+    vertical-align: middle;
+    /* padding: 4px; */
+    line-height: 100%;
+    background-repeat: no-repeat;
+    background-position: center center;
+}
+
+.bts-librarian-import-button-style.disabled {
+    background-color: rgba(255, 255, 255, 0.5);
+    border: none;
+    cursor: default;
+    pointer-events: none;
+}
+
+
+/** export btn **/
+
+.bts-librarian-export-button-style {
+    position: absolute;
+    clear: both;
+    display: table;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+    cursor: pointer;
+    color: #000;
+    background-repeat: no-repeat;
+    background-color: transparent;
+    background-image: url("../../images/bts/export@2x.png");
+    background-size: contain;
+    border: none;
+    /*  border-radius: 8px; */
+}
+
+.bts-librarian-export-button-style:hover {
+    background-color: rgba(255,255,255,0.32);
+}
+
+.bts-librarian-export-button-style p {
+    display: table-cell;
+    vertical-align: middle;
+    /* padding: 4px; */
+    line-height: 100%;
+    background-repeat: no-repeat;
+    background-position: center center;
+}
+
+
+/** push-btn **/
+
+.bts-librarian-push-button-style {
+    position: absolute;
+    clear: both;
+    display: table;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+    cursor: pointer;
+    color: #000;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    /*  border-radius: 8px; */
+}
+
+.bts-librarian-push-button-style p {
+    display: table-cell;
+    vertical-align: middle;
+    /* padding: 4px; */
+    line-height: 100%;
+    background-repeat: no-repeat;
+    background-position: center center;
+}
+
+@media not screen and (min-device-width: 320px) and (max-device-width: 480px) {
+    .bts-librarian-push-button-style:hover {
+        background-color: #ddd;
+    }
+}
+
+.bts-librarian-push-button-style:active {
+    background-color: #eee;
+}
+
+.bts-librarian-push-button-style.disabled {
+    background-color: rgba(255, 255, 255, 0.5);
+    color: rgba(51, 214, 255, 0.5) !important;
+    border: 1px solid rgba(51, 214, 255, 0.5) !important;
+    cursor: default;
+    pointer-events: none;
+}
+
+/** check-btn */
+
+.bts-librarian-check-btn-style {
+    position: absolute;
+    clear: both;
+    display: table;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+    cursor: pointer;
+    color: #000;
+    background-image: url("../../images/bts/check_box_outline_blank@2x.png");
+    background-size: contain;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    /*  border-radius: 8px; */
+}
+
+.bts-librarian-check-btn-style p {
+    display: table-cell;
+    vertical-align: middle;
+    /* padding: 4px; */
+    line-height: 100%;
+    background-repeat: no-repeat;
+    background-position: center center;
+}
+
+.bts-librarian-check-btn-style:active {
+    background-color: #eee;
+}
+
+.bts-librarian-check-btn-style.disabled {
+    background-color: rgba(255, 255, 255, 0);
+    color: rgba(255, 255, 255, 0.5) !important;
+    border: 1px solid rgba(255, 255, 255, 0.32);
+    cursor: default;
+}
+
+.bts-librarian-check-btn-style.checked {
+    background-image: url("../../images/bts/check_box@2x.png");
+    background-size: contain;
+}
+
+/** import pc**/
+/** inst **/
+
+.bts-librarian-import-from-inst-btn-style-pc {
+    position: absolute;
+    clear: both;
+    display: table;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+    cursor: pointer;
+    color: #000;
+    background-image: url("../../images/bts/btn_icon_USER_PATCHES@2x.png");
+    background-size: contain;
+    background-repeat: no-repeat;
+}
+
+.bts-librarian-import-from-inst-btn-style-pc p {
+    display: table-cell;
+    vertical-align: middle;
+    /* padding: 4px; */
+    line-height: 100%;
+    background-repeat: no-repeat;
+    background-position: center center;
+}
+
+.bts-librarian-import-from-inst-btn-style-pc:active {
+    background-color: #292929;
+}
+
+.bts-librarian-import-from-inst-btn-style-pc.disabled {
+    background-image: url("../../images/bts/btn_icon_USER_PATCHES_disable@2x.png");
+    background-repeat: no-repeat;
+    background-size: contain;
+    cursor: default;
+    pointer-events: none;
+}
+
+
+/** file **/
+
+.bts-librarian-import-from-file-btn-style-pc {
+    position: absolute;
+    clear: both;
+    display: table;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+    cursor: pointer;
+    color: #000;
+    background-image: url("../../images/bts/import_file_pc@2x.png");
+    background-size: contain;
+    background-repeat: no-repeat;
+    border: 1px solid #ccc;
+}
+
+.bts-librarian-import-from-file-btn-style-pc p {
+    display: table-cell;
+    vertical-align: middle;
+    /* padding: 4px; */
+    line-height: 100%;
+    background-repeat: no-repeat;
+    background-position: center center;
+}
+
+.bts-librarian-import-from-file-btn-style-pc:active {
+    background-color: #292929;
+}
+
+.bts-librarian-import-from-file-btn-style-pc.disabled {
+    background-image: url("../../images/bts/import_file_pc_disable@2x.png");
+    background-repeat: no-repeat;
+    background-size: contain;
+    cursor: default;
+    pointer-events: none;
+}
+
+
+/** export **/
+/** inst **/
+
+.bts-librarian-export-to-inst-btn-style-pc {
+    position: absolute;
+    clear: both;
+    display: table;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+    cursor: pointer;
+    color: #000;
+    background-image: url("../../images/bts/btn_icon_USER_PATCHES@2x.png");
+    background-size: contain;
+    background-repeat: no-repeat;
+}
+
+.bts-librarian-export-to-inst-btn-style-pc p {
+    display: table-cell;
+    vertical-align: middle;
+    /* padding: 4px; */
+    line-height: 100%;
+    background-repeat: no-repeat;
+    background-position: center center;
+}
+
+.bts-librarian-export-to-inst-btn-style-pc:active {
+    background-color: #292929;
+}
+
+.bts-librarian-export-to-inst-btn-style-pc.disabled {
+    background-image: url("../../images/bts/btn_icon_USER_PATCHES_disable@2x.png");
+    background-repeat: no-repeat;
+    background-size: contain;
+    cursor: default;
+    pointer-events: none;
+}
+
+
+/** file **/
+
+.bts-librarian-export-to-file-btn-style-pc {
+    position: absolute;
+    clear: both;
+    display: table;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+    cursor: pointer;
+    color: #000;
+    background-image: url("../../images/bts/export_file_pc@2x.png");
+    background-size: contain;
+    background-repeat: no-repeat;
+    border: 1px solid #ccc;
+}
+
+.bts-librarian-export-to-file-btn-style-pc p {
+    display: table-cell;
+    vertical-align: middle;
+    /* padding: 4px; */
+    line-height: 100%;
+    background-repeat: no-repeat;
+    background-position: center center;
+}
+
+.bts-librarian-export-to-file-btn-style-pc:active {
+    background-color: #292929;
+}
+
+.bts-librarian-export-to-file-btn-style-pc.disabled {
+    background-image: url("../../images/bts/export_file_pc_disable@2x.png");
+    background-repeat: no-repeat;
+    background-size: contain;
+    cursor: default;
+    pointer-events: none;
+}
+
+/** btx **/
+
+.bts-librarian-export-to-btx-btn-style-pc {
+    position: absolute;
+    clear: both;
+    display: table;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+    cursor: pointer;
+    color: #000;
+    background-image: url("../../images/bts/export_btx_pc@2x.png");
+    background-size: contain;
+    background-repeat: no-repeat;
+    border: 1px solid #ccc;
+}
+
+.bts-librarian-export-to-btx-btn-style-pc p {
+    display: table-cell;
+    vertical-align: middle;
+    /* padding: 4px; */
+    line-height: 100%;
+    background-repeat: no-repeat;
+    background-position: center center;
+}
+
+.bts-librarian-export-to-btx-btn-style-pc:active {
+    background-color: #292929;
+}
+
+.bts-librarian-export-to-btx-btn-style-pc.disabled {
+    /* background-image: url("../../images/bts/export_btx_selected@2x.png"); */
+    opacity: 0.5;
+    pointer-events: none;
+    background-repeat: no-repeat;
+    background-size: contain;
+    cursor: default;
+    pointer-events: none;
+}

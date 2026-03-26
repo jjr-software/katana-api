@@ -1,0 +1,409 @@
+#librarian-liveset-table-frame {
+  overflow: hidden;
+}
+.ui-helper-hidden-accessible {
+	display: none;
+}
+.librarian-liveset-table-pc {
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  display: flex;
+  flex-wrap: nowrap;
+  flex-direction: row;
+}
+
+.librarian-liveset-table-pc::-webkit-scrollbar {
+  position: absolute;
+  display: block;
+  height: 8px;
+  box-shadow: inset -1px 0 0 0 rgba(255,255,255,0.50);
+}
+.librarian-liveset-table-pc::-webkit-scrollbar-thumb {
+  width: 10px;
+  height: 8px;
+  background-color: rgba(255,255,255,0.50);
+}
+.librarian-liveset-table-pc::-webkit-scrollbar-track-piece {
+  background-color: #000000;
+}
+.librarian-liveset-table-pc::-webkit-scrollbar .librarian-patch-cell-pc {
+  width: 200px;
+}
+
+.librarian-liveset-table-pc .sortable-placeholder-pc {
+  border-right: 2px solid #E62B0E;
+}
+
+.librarian-liveset-table-cell-pc {
+  background-color: rgb(26, 28, 31);
+  width: 208px;
+  min-width: 208px;
+  height: 100%;
+  color: #FFFFFF;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: inset -1px 0 0 0 rgba(255,255,255,0.32);
+}
+
+.librarian-liveset-name-two-line-pc{
+  font-size: 14px;
+  color: #FFFFFF;
+  letter-spacing: 0;
+  line-height: 14px;
+  width: 152px;
+  max-height: 28px;
+  margin-left: 12px;
+  word-wrap: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  cursor: default;
+}
+
+.librarian-liveset-info-block-pc {
+  float: left;
+  background: rgba(255,255,255,0.00);
+  box-shadow: inset 0 -1px 0 0 rgba(255,255,255,0.32);
+  width: 208px;
+  height: 60px;
+  min-height: 60px;
+}
+.librarian-liveset-info-pc {
+  float: left;
+  display: flex;
+  flex-direction: column;
+  width: 152px;
+  height: 100%;
+  justify-content: center;
+}
+.librarian-liveset-info-pc .librarian-liveset-name-pc {
+  min-height: 14px;
+  font-size: 14px;
+  color: #FFFFFF;
+  letter-spacing: 0;
+  line-height: 14px;
+  width: 152px;
+  max-height: 28px;
+  margin-left: 12px;
+  cursor: default;
+}
+.librarian-liveset-info-pc .librarian-patch-num-pc {
+  opacity: 0.8;
+  font-size: 11px;
+  color: #FFFFFF;
+  letter-spacing: 0;
+  line-height: 9px;
+  height: 9px;
+  max-width: 17px;
+  margin-top: 5px;
+  margin-left: 12px;
+  cursor: default;
+}
+.librarian-liveset-info-block-pc .librarian-edit-liveset-btn-pc {
+  float: right;
+  width: 16px;
+  height: 16px;
+  background-image: url("../../images/bts/more_vert@2x.png");
+  background-size: contain;
+  margin: 22px 16px 22px 12px;
+}
+
+.librarian-liveset-info-block-pc .librarian-edit-liveset-btn-pc:hover {
+  background-color: rgba(255,255,255,0.32);
+}
+.librarian-liveset-info-block-pc input[type="text"] {
+  float: left;
+  background-color: #1A1C1F;
+  border: 1px solid #33D6FF;
+  color: #FFFFFF;
+  user-select: text;
+  -moz-user-select: text;
+  -webkit-user-select: text;
+}
+.librarian-rename-liveset-check-btn-pc {
+  float: left;
+  width: 22px;
+  height: 22px;
+  background-image: url("../../images/bts/done_22px_normal@2x.png");
+  background-size: cover;
+  margin: 19px 6px 19px 0px;
+  padding: 3px;
+}
+
+.librarian-rename-liveset-check-btn-pc:hover {
+  background-image: url("../../images/bts/done_22px_ov@2x.png");
+}
+
+.librarian-delete-liveset-btn-pc {
+  float: right;
+  width: 16px;
+  height: 16px;
+  background-size: contain;
+  margin: 22px 12px 12px 0px;
+  background-image: url("../../images/bts/delete@2x.png");
+}
+
+
+.librarian-patch-table-pc {
+  flex-grow: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  color: #FFFFFF;
+  background: #1A1C1F;
+  box-shadow: inset -1px 0 0 0 rgba(255,255,255,0.24);
+}
+
+.librarian-patch-table-pc .sortable-placeholder-pc {
+  border-bottom: 2px solid #E62B0E;
+}
+#user-patch-select-menu .sortable-placeholder-pc {
+  display: none;
+}
+
+.librarian-user-patch-table-pc {
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: 100%;
+  color: #FFFFFF;
+  background: #1A1C1F;
+}
+
+.librarian-patch-table-pc::-webkit-scrollbar {
+  display: block;
+  width: 8px;
+  box-shadow: inset -1px 0 0 0 rgba(255,255,255,0.50);
+}
+.librarian-patch-table-pc::-webkit-scrollbar-thumb {
+  width: 8px;
+  height: 10px;
+  background-color: rgba(255,255,255,0.50);
+}
+.librarian-patch-table-pc::-webkit-scrollbar-track-piece {
+  background-color: #000000;
+}
+.librarian-user-patch-table-pc::-webkit-scrollbar {
+  display: block;
+  width: 8px;
+  box-shadow: inset -1px 0 0 0 rgba(255,255,255,0.50);
+}
+.librarian-user-patch-table-pc::-webkit-scrollbar-thumb {
+  width: 8px;
+  height: 10px;
+  background-color: rgba(255,255,255,0.50);
+}
+.librarian-user-patch-table-pc::-webkit-scrollbar-track-piece {
+  background-color: #000000;
+}
+
+.librarian-patch-cell-pc {
+  width: 207px;
+  height: 40px;
+  background: #222C3D;
+  box-shadow: inset 0 -1px 0 0 rgba(255,255,255,0.32);
+  font-size: 13px;
+  letter-spacing: 0;
+  line-height: 9px;
+  color: #FFFFFF;
+}
+.librarian-patch-cell-pc input[type="text"] {
+  float: left;
+  background-color: #1A1C1F;
+  border: 1px solid #33D6FF;
+  color: #FFFFFF;
+  user-select: text;
+  -moz-user-select: text;
+  -webkit-user-select: text;
+}
+.librarian-patch-cell-pc .librarian-patch-name-pc {
+  float: left;
+  width: 117px;
+  height: 13px;
+  margin: 15px 0px 12px 0px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+.librarian-patch-cell-pc .librarian-serial-num-pc {
+  float: left;
+  margin: 15px 8px 16px 12px;
+  width: 20px;
+  height: 9px;
+  margin-right: 8px;
+  cursor: default;
+}
+.librarian-patch-cell-pc .librarian-edit-patch-btn-pc {
+  float: right;
+  width: 16px;
+  height: 16px;
+  background-image: url("../../images/bts/more_vert@2x.png");
+  background-size: contain;
+  margin: 12px 14px 12px 19px;
+}
+.librarian-patch-cell-pc .librarian-edit-patch-btn-pc:hover {
+  background-color: rgba(255,255,255,0.32);
+}
+.librarian-patch-table-pc .librarian-patch-cell-pc .rename-patch-input-text {
+  height: 22px;
+  width: 108px;
+  margin: 9px 0px;
+  font-size: 13px;
+  font-family: RobotoCondensedBold;
+  line-height: 9px;
+  padding-left: 4px;
+  /* outline: none; */
+}
+.librarian-liveset-table-cell-pc .librarian-liveset-info-block-pc .rename-liveset-input-text {
+  height: 22px;
+  width: 135px;
+  margin: 19px 0px 19px 12px;
+  font-size: 14px;
+  font-family: RobotoCondensedBold;
+  line-height: 9px;
+  padding-left: 4px;
+  /* letter-spacing: 0; */
+  /* outline: none; */
+}
+
+.librarian-rename-patch-check-btn-pc {
+  float: left;
+  width: 22px;
+  height: 22px;
+  background-image: url("../../images/bts/done_22px_normal@2x.png");
+  background-size: contain;
+  margin: 9px 7px 9px 0px;
+  padding: 3px;
+}
+
+.librarian-rename-patch-check-btn-pc:hover {
+  background-image: url("../../images/bts/done_22px_ov@2x.png");
+}
+
+.librarian-delete-patch-btn-pc {
+  float: right;
+  width: 16px;
+  height: 16px;
+  background-size: contain;
+  margin: 12px 14px 12px 0px;
+  background-image: url("../../images/bts/delete@2x.png");
+}
+
+.edit-hover{
+  position: absolute;
+  color: #FFFFFF;
+  width: 40px;
+  height: 24px;
+  display: block;
+  font-size: 12px;
+  background: rgba(17,18,20,0.84);
+  border-radius: 2px;
+  text-align: center;
+  line-height: 24px;
+}
+
+.librarian-patch-table-pc .librarian-patch-cell-pc {
+  width: 207px;
+  height: 40px;
+  background: #222C3D;
+  box-shadow: inset 0 -1px 0 0 rgba(255,255,255,0.32);
+  font-size: 13px;
+  letter-spacing: 0;
+  line-height: 13px;
+}
+.librarian-patch-table-pc .librarian-patch-cell-pc .librarian-patch-name-pc {
+  float: left;
+  width: 117px;
+  height: 13px;
+  margin: 13px 0px 12px 0px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.librarian-patch-table-pc .librarian-patch-cell-pc .librarian-serial-num-pc {
+  float: left;
+  margin: 13px 8px 12px 12px;
+  width: 20px;
+  height: 13px;
+  margin-right: 8px;
+}
+.librarian-patch-table-pc .librarian-patch-cell-pc .librarian-edit-patch-btn-pc {
+  float: right;
+  width: 16px;
+  height: 16px;
+  background-image: url("../../images/bts/more_vert@2x.png");
+  background-size: contain;
+  margin: 12px 14px 12px 19px;
+}
+.librarian-patch-table-pc .librarian-patch-cell-pc .librarian-edit-patch-btn-pc:hover {
+  background-color: rgba(255,255,255,0.32);
+}
+
+.librarian-select-liveset-pc .librarian-patch-table-pc {
+  box-shadow: inset 0 -2px 0 0 #33D6FF,inset 2px 0 0 0  #33D6FF, inset -2px 0 0 0  #33D6FF;
+}
+
+.librarian-select-liveset-pc .librarian-liveset-info-block-pc {
+  box-shadow: inset 0 -1px 0 0 rgba(255,255,255,0.32), inset 0 2px 0 0  #33D6FF, inset 2px 0 0 0  #33D6FF, inset -2px 0 0 0 #33D6FF;
+}
+
+.librarian-select-liveset-pc .librarian-patch-table-pc .librarian-patch-cell-pc {
+  box-shadow: inset 0 -1px 0 0 rgba(255,255,255,0.32), inset 2px 0 0 0  #33D6FF, inset -1px 0 0 0 #33D6FF;
+}
+
+.librarian-select-liveset-pc .librarian-patch-table-pc .librarian-select-patch-cell-pc {
+  background: #3B495C;
+  box-shadow: inset 0 -1px 0 0 rgba(255,255,255,0.32), inset 4px 0 0 0 #33D6FF, inset -1px 0 0 0 #33D6FF;
+}
+
+.librarian-patch-cell-pc:hover {
+  background: #3B495C;
+}
+
+
+.librarian-user-patch-helper-child {
+  width: 160px;
+  height: 40px;
+  background-color: #222C3D;
+  color: #FFFFFF;
+  box-shadow: inset 0 -1px 0 0 rgba(255,255,255,0.32);
+}
+.librarian-user-patch-helper-child .user-patch-helper-num {
+  height: 9px;
+  font-size: 11px;
+  letter-spacing: 0;
+  line-height: 9px;
+  padding: 9px 0px 5px 12px;
+}
+.librarian-user-patch-helper-child .user-patch-helper-title {
+  width: 139px;
+  height: 9px;
+  font-size: 13px;
+  letter-spacing: 0px;
+  line-height: 9px;
+  padding: 9px 12px 8px 12px;
+}
+ 
+.bts-patch-list-pc-style .librarian-select-user-patch-cell {
+  background: #2F3947;
+  box-shadow: inset 0 -1px 0 0 rgba(255,255,255,0.32), inset 4px 0 0 0 #307D97;
+}
+
+.bts-patch-list-pc-style input[type="radio"]:checked + label.librarian-select-user-patch-cell {
+  background: #3B495C;
+  box-shadow: inset 0 -1px 0 0 rgba(255,255,255,0.32), inset 4px 0 0 0 #33D6FF;
+}
+
+.librarian-patch-cell-pc.librarian-update-patch-cell-pc {
+  opacity: 0.5;
+  background-color: #E62B0E;
+}
+#user-patch-select-menu > label.librarian-update-patch-cell-pc {
+  opacity: 0.5;
+  background-color: #E62B0E;
+}
+
+#sub {
+  overflow-y: hidden;
+}

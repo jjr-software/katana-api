@@ -1,0 +1,65 @@
+/*
+  Copyright 2016 Roland Corporation. All rights reserved.
+
+  Override css/group-button.css
+
+  <div id="a" class="item-group-button-style">
+    <input type="radio" id="a-0" name="a" value="0" >
+    <label for="a-0" style="background-image:url(img1.png)">group 1</label>
+    <input type="radio" id="a-1" name="a" value="1" >
+    <label for="a-1" style="background-image:url(img2.png)">group 2</label>
+    ...
+  </div>
+*/
+
+.item-group-button-style {
+  /*
+  position: absolute;
+  clear: both;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  */
+  border: none;
+  border-radius: 0;
+}
+.item-group-button-style label {
+  /*
+  float: left;
+  margin: 0;
+  */
+  padding: 8px 8px;
+  /*
+  cursor: pointer;
+  text-align: center;
+  */
+  font-size: 14px;
+  line-height: 14px !important;
+  
+  color: rgba(255, 255, 255, 0.64);
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-position: center center;
+  
+  box-shadow: 0px 0px 0px 1px #A3A3A3 inset;
+}
+.item-group-button-style label:hover {
+  background-color: rgba(255, 255, 255, 0.32);
+}
+.item-group-button-style input[type="radio"]:checked + label {
+  color: #FFFFFF;
+  background-color: #2EC1E6;
+  box-shadow: 0px 0px 0px 1px transparent inset;
+}
+.item-group-button-style.disabled label {
+  color: rgba(255, 255, 255, 0.32);
+  box-shadow: 0px 0px 0px 1px rgba(163, 163, 163, 0.5) inset;
+  pointer-events: none;
+}
+.item-group-button-style.disabled label:hover {
+  background-color: transparent;
+}
+.item-group-button-style.disabled input[type="radio"]:checked + label {
+  color: rgba(255, 255, 255, 0.32);
+  background-color: #246F84;
+}

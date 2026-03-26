@@ -1,0 +1,247 @@
+#main-chain-frame-1, #tiny-chain-frame-1 {
+  position: absolute;
+  z-index: 0;
+}
+
+.chain-block {
+  position: absolute;
+  z-index: 10;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center center;
+  /* cursor: pointer; */
+  width: auto;
+  height: 100px;
+}
+
+.chain-block .bgrSelected {
+  cursor: move;
+}
+
+#in.chain-block {
+  background-position: center 33px;
+  cursor: auto;
+}
+
+#speaker.chain-block {
+  background-position: center 30px;
+  cursor: auto;
+}
+
+#spl1.chain-block {
+  cursor: auto;
+}
+
+#spl2.chain-block {
+  cursor: auto;
+}
+
+#spl3.chain-block {
+  cursor: auto;
+}
+
+.chain-unit--flashing {
+  animation-name: flashChainPoint;
+  animation-duration: .5s;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
+.chain-line {
+  position: absolute;
+  width: 40px;
+  height: 48px;
+  z-index: -2;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center center;
+}
+
+.tiny-chain-block {
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  z-index: 10;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center center;
+}
+
+.tiny-chain-line {
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  z-index: 9;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center center;
+}
+
+.flashing {
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  z-index: 11;
+  background-image: url("../images/chain/effectblock_insertpoint@2x.png");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center center;
+}
+
+.flashing.droppable_out {
+  background-image: url("../images/chain/effectblock_insertpoint_out@2x.png");
+}
+
+@keyframes flashChainPoint {
+  0% {
+    opacity: 1
+  }
+
+  100% {
+    opacity: 0.5
+  }
+}
+
+.overlay {
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  z-index: 11;
+  background-image: url("../images/chain/effectblock_overlay_selected@2x.png");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center center;
+  animation-name: flashOverlay;
+  animation-duration: 0.6s;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
+.overlay-fv {
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  z-index: 11;
+  background-image: url("../images/chain/effectblock_overlay_fv_selected@2x.png");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center center;
+  animation-name: flashOverlay;
+  animation-duration: 0.6s;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
+.overlay-div {
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  z-index: 11;
+  background-image: url("../images/chain/effectblock_overlay_div_selected@2x.png");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center center;
+  animation-name: flashOverlay;
+  animation-duration: 0.6s;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
+@keyframes flashOverlay {
+  0% {
+    opacity: 0
+  }
+
+  100% {
+    opacity: 0.5
+  }
+}
+
+#main-chain-frame-1 {
+  margin: auto auto;
+  top: auto;
+  left: auto;
+  bottom: auto;
+  right: auto;
+}
+
+.chain-block .bgrMain {
+  width: auto;
+  height: 78px;
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center;
+  margin: 17px 5px 5px 5px;
+}
+
+.chain-block .chainTypeName {
+  font-size: 8px;
+  color: #465064;
+  position: absolute;
+  top: 55px;
+  left: 50%;
+  width: calc(100% - 14px);
+  background-color: #e8e8e8;
+  text-align: center;
+  transform: translate(-50%, -50%);
+  padding: 1px;
+  margin: 0;
+  border-radius: 1px;
+  border: 1px solid #465064;
+}
+
+.chain-block .bgrBlock {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  z-index: -1;
+  background-color: #828282;
+  border-radius: 7px;
+}
+
+.chain-block .bgrOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  z-index: 1;
+  background-color: rgba(0, 0, 0, 0.4);
+  border-radius: 7px;
+  display: none;
+}
+
+.chain-block.isTurnOff .bgrOverlay {
+  display: block;
+}
+
+.chain-block .bgrSelected {
+  position: absolute;
+  top: 0px;
+  left: 0;
+  height: 14px;
+  width: 100%;
+  z-index: 2;
+  background-size: contain;
+  border-radius: 7px 7px 0 0;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.chain-block.isSelected .bgrSelected,
+.chain-block.isHovered .bgrSelected {
+  background-color: #33D6FF;
+}
+
+.blockName {
+  position: absolute;
+  text-align: center;
+  color: #fff;
+  font-size: 15px;
+}
+
+.blockName.isTurnOff {
+  opacity: 0.4;
+}

@@ -1,0 +1,96 @@
+/*
+  Copyright 2016 Roland Corporation. All rights reserved.
+
+  Override css/common.css
+*/
+
+/* bold */
+@font-face {
+  font-family: 'RobotoCondensedBold';
+  src: url(../../js/fonts/RobotoCondensed-Bold.ttf);
+}
+/* regular */
+@font-face {
+  font-family: 'RobotoCondensedRegular';
+  src: url(../../js/fonts/RobotoCondensed-Regular.ttf);
+}
+/* light */
+@font-face {
+  font-family: 'RobotoCondensedLight';
+  src: url(../../js/fonts/RobotoCondensed-Light.ttf);
+}
+
+/*bold*/
+@font-face {
+  font-family: 'NotoSansjpBold';
+  src: url(../../js/fonts/NotoSansJP-Bold.otf);
+}
+/*regular*/
+@font-face {
+  font-family: 'NotoSansjpRegular';
+  src: url(../../js/fonts/NotoSansJP-Regular.otf);
+}
+/*light*/
+@font-face {
+  font-family: 'NotoSansjpLight';
+  src: url(../../js/fonts/NotoSansJP-Light.otf);
+}
+.regular-font {
+  font-family: RobotoCondensedRegular;
+}
+
+body {
+  font: 12pt RobotoCondensedBold, NotoSansjpRegular;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  -webkit-touch-callout: none;
+  overflow: hidden;
+}
+
+@keyframes slideUp {
+    0% { bottom: -548px }
+  100% { bottom: 0; }
+}
+@-webkit-keyframes slideUp {
+    0% { bottom: -548px }
+  100% { bottom: 0; }
+}
+
+/* webkit scroll bar design */
+::-webkit-scrollbar {
+  display: none;
+}
+::-webkit-scrollbar {
+  display: block;
+  width: 8px;
+  background-color: #1A1C1F;
+}
+::-webkit-scrollbar-track {
+  border-radius: 0;
+  background-color: transparent;
+}
+::-webkit-scrollbar-thumb {
+  border-radius: 0;
+  background-color: rgba(255,255,255,0.50);
+}
+::-webkit-scrollbar:horizontal {
+  display: block;
+  height: 8px;
+  background-color: #1A1C1F;
+}
+
+/* 慣性スクロール */
+* {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* iOS, AndroidのTAP時のハイライトを無効 */
+* {
+  -webkit-tap-highlight-color: rgba(0,0,0,0);
+}
+/* iOS, AndroidのTAP時の背景色を変更 */
+.tap-hover {
+  background-color: rgba(255,255,255,0.32);
+}
