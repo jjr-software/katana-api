@@ -686,6 +686,16 @@
 - Rebuilt/restarted:
   - `docker compose up -d --build`
 
+## Session Update - 2026-03-26 (Save->Sample Hash Mismatch Fix)
+- Fixed root cause where `save` could create a different library hash than amp slot hash:
+  - server patch-config hashing now uses canonical snapshot excluding `config_hash_sha256` field (matches amp hash logic)
+- Frontend save flow now updates slot hash from server save response when needed.
+- Result:
+  - save confirmation and subsequent sample-linking now operate on the same hash id.
+- Validation:
+  - sync slot -> save config -> sample with hash link
+  - confirmed `amp_hash == saved_hash` and sample insert succeeded.
+
 ## Session Update - 2026-03-26 (Queue-Only Amp I/O + No Global UI Lock)
 - Enforced queue-backed amp communication across API amp-read/sync routes:
   - `GET /api/v1/amp/test-connection` now executes via queue job.

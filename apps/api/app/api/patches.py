@@ -28,8 +28,7 @@ def list_patches(db: Session = Depends(get_db)) -> list[Patch]:
 
 @router.post("", response_model=PatchRead)
 def create_patch(payload: PatchCreate, db: Session = Depends(get_db)) -> Patch:
-    snapshot_bytes = json.dumps(payload.snapshot, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    checksum = hashlib.sha256(snapshot_bytes).hexdigest()
+    checksum = _snapshot_hash(payload.snapshot)
     _upsert_patch_config(db, checksum, payload.snapshot)
     patch = Patch(
         name=payload.name,
@@ -46,8 +45,7 @@ def create_patch(payload: PatchCreate, db: Session = Depends(get_db)) -> Patch:
 
 @router.post("/configs", response_model=PatchConfigRead)
 def upsert_patch_config(payload: PatchConfigUpsert, db: Session = Depends(get_db)) -> PatchConfig:
-    snapshot_bytes = json.dumps(payload.snapshot, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    hash_id = hashlib.sha256(snapshot_bytes).hexdigest()
+    hash_id = _snapshot_hash(payload.snapshot)
     config = _upsert_patch_config(db, hash_id, payload.snapshot)
     db.commit()
     db.refresh(config)
@@ -133,3 +131,9 @@ def _upsert_patch_config(db: Session, hash_id: str, snapshot: dict) -> PatchConf
     config = PatchConfig(hash_id=hash_id, snapshot=snapshot)
     db.add(config)
     return config
+
+
+def _snapshot_hash(snapshot: dict) -> str:
+    canonical = {key: value for key, value in snapshot.items() if key != "config_hash_sha256"}
+    snapshot_bytes = json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(snapshot_bytes).hexdigest()

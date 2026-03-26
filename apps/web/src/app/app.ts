@@ -394,14 +394,15 @@ export class App implements OnInit, OnDestroy {
         return;
       }
 
-      this.markSlotSaved(slot.slot);
+      const persistedHash = typeof savePayload.hash_id === 'string' ? savePayload.hash_id : slot.config_hash_sha256;
+      this.markSlotSaved(slot.slot, persistedHash);
       this.status.set(`${slot.slot_label} saved to library`);
       this.responseJson.set(
         JSON.stringify(
           {
             message: 'Patch saved to library',
             slot: slot.slot_label,
-            hash_id: savePayload.hash_id ?? slot.config_hash_sha256,
+            hash_id: persistedHash,
           },
           null,
           2,
@@ -759,13 +760,17 @@ export class App implements OnInit, OnDestroy {
     );
   }
 
-  private markSlotSaved(slotNumber: number): void {
+  private markSlotSaved(slotNumber: number, hashId?: string): void {
     this.slots.update((current) =>
       current.map((card) => {
         if (card.slot !== slotNumber) {
           return card;
         }
-        return { ...card, is_saved: true };
+        return {
+          ...card,
+          is_saved: true,
+          config_hash_sha256: hashId ?? card.config_hash_sha256,
+        };
       }),
     );
   }
