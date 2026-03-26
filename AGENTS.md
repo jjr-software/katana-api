@@ -595,6 +595,18 @@
 - Rebuilt/restarted:
   - `docker compose up -d --build`
 
+## Session Update - 2026-03-26 (Backup Queue Uses BTS Export Command)
+- Updated API backup/full-dump queue path to use BTS export command sequence before slot reads:
+  - send `CMDID_PREVIEW_MUTE` (`0x7F010109`) with value `01`
+  - send `CMDID_EXPORT` (`0x7F01010A`) with value `7F7F`
+  - require DT1 reply on export command address before continuing
+- Implementation:
+  - `AmpClient.full_amp_dump_via_export(...)`
+  - queue `full_dump` operation now calls export-based method
+- Preserved existing full payload collection after command ack (slot sweep still returns full patch JSON).
+- Validation:
+  - queued `POST /api/v1/amp/backup` run completed with `status=succeeded`.
+
 ## Session Update - 2026-03-26 (Queue-Only Amp I/O + No Global UI Lock)
 - Enforced queue-backed amp communication across API amp-read/sync routes:
   - `GET /api/v1/amp/test-connection` now executes via queue job.

@@ -179,7 +179,7 @@ class AmpJobQueue:
                 quick_result = None
             elif job.operation == "full_dump":
                 dump_result = await asyncio.wait_for(
-                    client.full_amp_dump(synced_at=synced_at),
+                    client.full_amp_dump_via_export(synced_at=synced_at),
                     timeout=max(5.0, settings.full_sync_timeout_seconds),
                 )
                 connection_result = None

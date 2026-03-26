@@ -28,6 +28,8 @@ from app.katana.protocol import (
     ADDR_PATCH_SENDRETURN,
     ADDR_PATCH_SOLO_COM,
     ADDR_PATCH_SW,
+    CMDID_EXPORT_ADDR,
+    CMDID_PREVIEW_MUTE_ADDR,
     EDITOR_MODE_ON,
     IDENTITY_REQUEST_HEX,
     PATCH_SELECT_ADDR,
@@ -190,32 +192,15 @@ class AmpClient:
 
     async def full_amp_dump(self, synced_at: str) -> FullAmpDumpSnapshot:
         async with self._port_lock():
-            started = time.perf_counter()
             await self._send_only(EDITOR_MODE_ON)
-            slots: list[SlotDump] = []
-            slot_hash_parts: list[str] = []
-            for slot in range(1, 9):
-                slot_started = time.perf_counter()
-                await self._select_patch(slot)
-                payload = await self._read_selected_patch_payload()
-                slot_hash = str(payload["config_hash_sha256"])
-                slot_hash_parts.append(f"{slot}:{slot_hash}")
-                slots.append(
-                    SlotDump(
-                        slot=slot,
-                        slot_label=slot_label(slot),
-                        payload=payload,
-                        synced_at=synced_at,
-                        slot_sync_ms=int(round((time.perf_counter() - slot_started) * 1000)),
-                    )
-                )
-            amp_state_hash = sha256("|".join(slot_hash_parts).encode("utf-8")).hexdigest()
-            return FullAmpDumpSnapshot(
-                synced_at=synced_at,
-                amp_state_hash_sha256=amp_state_hash,
-                total_sync_ms=int(round((time.perf_counter() - started) * 1000)),
-                slots=slots,
-            )
+            return await self._collect_full_amp_dump(synced_at=synced_at)
+
+    async def full_amp_dump_via_export(self, synced_at: str) -> FullAmpDumpSnapshot:
+        async with self._port_lock():
+            await self._send_only(EDITOR_MODE_ON)
+            await self._send_only(build_dt1(CMDID_PREVIEW_MUTE_ADDR, [0x01]))
+            await self._send_export_command_multiple_preview_unmute()
+            return await self._collect_full_amp_dump(synced_at=synced_at)
 
     async def read_slots_names_quick(self, synced_at: str) -> QuickSlotsSnapshot:
         async with self._port_lock():
@@ -484,6 +469,48 @@ class AmpClient:
             if dt1_addr == addr:
                 return data[:size]
         raise AmpClientError(f"No DT1 response for address {addr}")
+
+    async def _send_export_command_multiple_preview_unmute(self) -> None:
+        output = await self._send_and_read(
+            build_dt1(CMDID_EXPORT_ADDR, [0x7F, 0x7F]),
+            timeout_seconds=self._timeout_seconds,
+        )
+        frames = extract_sysex_frames(output)
+        for frame in frames:
+            parsed = parse_dt1(frame)
+            if parsed is None:
+                continue
+            dt1_addr, _data = parsed
+            if dt1_addr == CMDID_EXPORT_ADDR:
+                return
+        raise AmpClientError("No DT1 response for CMDID_EXPORT")
+
+    async def _collect_full_amp_dump(self, synced_at: str) -> FullAmpDumpSnapshot:
+        started = time.perf_counter()
+        slots: list[SlotDump] = []
+        slot_hash_parts: list[str] = []
+        for slot in range(1, 9):
+            slot_started = time.perf_counter()
+            await self._select_patch(slot)
+            payload = await self._read_selected_patch_payload()
+            slot_hash = str(payload["config_hash_sha256"])
+            slot_hash_parts.append(f"{slot}:{slot_hash}")
+            slots.append(
+                SlotDump(
+                    slot=slot,
+                    slot_label=slot_label(slot),
+                    payload=payload,
+                    synced_at=synced_at,
+                    slot_sync_ms=int(round((time.perf_counter() - slot_started) * 1000)),
+                )
+            )
+        amp_state_hash = sha256("|".join(slot_hash_parts).encode("utf-8")).hexdigest()
+        return FullAmpDumpSnapshot(
+            synced_at=synced_at,
+            amp_state_hash_sha256=amp_state_hash,
+            total_sync_ms=int(round((time.perf_counter() - started) * 1000)),
+            slots=slots,
+        )
 
     @staticmethod
     def _color_name(value: int) -> str:
