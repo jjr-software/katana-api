@@ -1019,3 +1019,13 @@
 - Validation:
   - `GET /api/v1/amp/backup/snapshots?limit=3` returns snapshot list.
   - `POST /api/v1/amp/backup/snapshots/{id}/load` returns 8 slots with `in_sync=false` and `is_saved=true`.
+
+## Session Update - 2026-03-26 (AMP Type Human-Readable + Variation)
+- Updated slot card AMP type display to decode the numeric amp type into names:
+  - `Acoustic`, `Clean`, `Crunch`, `Lead`, `Brown`.
+- AMP type line now also shows variation state from patch payload:
+  - `Variation On/Off` (derived from `amp.preamp_variation`).
+- File changed:
+  - `apps/web/src/app/app.ts`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

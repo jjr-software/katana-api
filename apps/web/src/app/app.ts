@@ -70,6 +70,7 @@ const DELAY_TYPE_NAMES = [
   'Modulate Delay',
   'Roland SDE-3000 Delay',
 ];
+const AMP_TYPE_NAMES = ['Acoustic', 'Clean', 'Crunch', 'Lead', 'Brown'];
 const REVERB_TYPE_NAMES = ['Plate Reverb', 'Room Reverb', 'Hall Reverb', 'Spring Reverb', 'Modulate Reverb'];
 const LIVE_RMS_WINDOW_POINTS = 96;
 
@@ -1362,7 +1363,15 @@ export class App implements OnInit, OnDestroy {
       return 'n/a';
     }
     const ampType = this.readNumber(amp, 'amp_type');
-    return ampType === null ? 'n/a' : `${Math.trunc(ampType)}`;
+    if (ampType === null) {
+      return 'n/a';
+    }
+    const ampTypeIndex = Math.trunc(ampType);
+    const ampTypeName =
+      ampTypeIndex >= 0 && ampTypeIndex < AMP_TYPE_NAMES.length ? AMP_TYPE_NAMES[ampTypeIndex] : `Unknown (${ampTypeIndex})`;
+    const preampVariation = this.readNumber(amp, 'preamp_variation');
+    const variationLabel = preampVariation === null ? 'n/a' : (Math.trunc(preampVariation) === 1 ? 'On' : 'Off');
+    return `${ampTypeName} | Variation ${variationLabel}`;
   }
 
   boosterSummary(slot: SlotCard): string {
