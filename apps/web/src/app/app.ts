@@ -12,6 +12,7 @@ interface SlotPatchSummary {
   slot_label: string;
   patch_name: string;
   config_hash_sha256: string;
+  patch: Record<string, unknown> | null;
   in_sync: boolean;
   is_saved: boolean;
   synced_at: string;
@@ -148,6 +149,7 @@ interface SlotCard {
   slot_label: string;
   patch_name: string;
   config_hash_sha256: string;
+  patch: Record<string, unknown> | null;
   in_sync: boolean;
   is_saved: boolean;
   synced_at: string;
@@ -166,6 +168,7 @@ function defaultSlotCards(): SlotCard[] {
       slot_label: `${bank}:${channel}`,
       patch_name: '',
       config_hash_sha256: '',
+      patch: null,
       in_sync: false,
       is_saved: false,
       synced_at: '',
@@ -192,6 +195,9 @@ export class App implements OnInit, OnDestroy {
   queueJobs = signal<QueueJobSummary[]>([]);
   queueGeneratedAt = signal('');
   queuePollHandle: ReturnType<typeof setInterval> | null = null;
+  rawModalOpen = signal(false);
+  rawModalTitle = signal('');
+  rawModalJson = signal('');
 
   ngOnInit(): void {
     void this.refreshQueueState();
@@ -597,6 +603,7 @@ export class App implements OnInit, OnDestroy {
         slot_label: full.slot_label,
         patch_name: full.patch_name,
         config_hash_sha256: full.config_hash_sha256,
+        patch: full.patch ?? null,
         in_sync: full.in_sync,
         is_saved: full.is_saved,
         synced_at: full.synced_at,
@@ -609,16 +616,19 @@ export class App implements OnInit, OnDestroy {
 
   private mergeQuickState(state: QuickSlotsStateResponse): SlotCard[] {
     const bySlot = new Map<number, QuickSlotSummary>(state.slots.map((slot) => [slot.slot, slot]));
+    const currentBySlot = new Map<number, SlotCard>(this.slots().map((slot) => [slot.slot, slot]));
     return defaultSlotCards().map((base) => {
       const quick = bySlot.get(base.slot);
+      const current = currentBySlot.get(base.slot);
       if (!quick) {
-        return base;
+        return current ?? base;
       }
       return {
         slot: quick.slot,
         slot_label: quick.slot_label,
         patch_name: quick.patch_name,
         config_hash_sha256: quick.inferred_hash_sha256 ?? '',
+        patch: current?.patch ?? null,
         in_sync: quick.in_sync,
         is_saved: quick.is_saved,
         synced_at: quick.synced_at,
@@ -640,6 +650,7 @@ export class App implements OnInit, OnDestroy {
           slot_label: slot.slot_label,
           patch_name: slot.patch_name,
           config_hash_sha256: slot.config_hash_sha256,
+          patch: slot.patch ?? null,
           in_sync: slot.in_sync,
           is_saved: slot.is_saved,
           synced_at: slot.synced_at,
@@ -661,6 +672,115 @@ export class App implements OnInit, OnDestroy {
 
   slotSavedStatusLabel(slot: SlotCard): string {
     return slot.is_saved ? 'Saved' : 'Not Saved';
+  }
+
+  ampSummary(slot: SlotCard): string {
+    const amp = this.readObject(this.readObject(slot.patch, 'amp'));
+    if (!amp) {
+      return 'n/a';
+    }
+    const gain = this.readNumber(amp, 'gain');
+    const volume = this.readNumber(amp, 'volume');
+    const bass = this.readNumber(amp, 'bass');
+    const middle = this.readNumber(amp, 'middle');
+    const treble = this.readNumber(amp, 'treble');
+    const presence = this.readNumber(amp, 'presence');
+    return `G ${this.nv(gain)} | V ${this.nv(volume)} | B/M/T/P ${this.nv(bass)}/${this.nv(middle)}/${this.nv(treble)}/${this.nv(presence)}`;
+  }
+
+  boosterSummary(slot: SlotCard): string {
+    return this.stageSummary(slot, 'booster');
+  }
+
+  modSummary(slot: SlotCard): string {
+    return this.stageSummary(slot, 'mod');
+  }
+
+  fxSummary(slot: SlotCard): string {
+    return this.stageSummary(slot, 'fx');
+  }
+
+  delaySummary(slot: SlotCard): string {
+    return this.stageSummary(slot, 'delay');
+  }
+
+  reverbSummary(slot: SlotCard): string {
+    return this.stageSummary(slot, 'reverb');
+  }
+
+  showRaw(slot: SlotCard): void {
+    if (!slot.patch) {
+      this.status.set(`No raw patch payload loaded for ${slot.slot_label}. Run full sync or slot sync first.`);
+      return;
+    }
+    this.rawModalTitle.set(`${slot.slot_label} · ${slot.patch_name || 'Unnamed Patch'}`);
+    this.rawModalJson.set(JSON.stringify(slot.patch, null, 2));
+    this.rawModalOpen.set(true);
+  }
+
+  closeRawModal(): void {
+    this.rawModalOpen.set(false);
+  }
+
+  onRawModalBackdropClick(event: MouseEvent): void {
+    if (event.target === event.currentTarget) {
+      this.closeRawModal();
+    }
+  }
+
+  private stageSummary(slot: SlotCard, stageName: string): string {
+    const stages = this.readObject(slot.patch, 'stages');
+    const stage = this.readObject(stages, stageName);
+    if (!stage) {
+      return 'n/a';
+    }
+    const on = this.readBoolean(stage, 'on');
+    const type = this.readNumber(stage, 'type');
+    const level = this.readNumber(stage, 'effect_level');
+    const parts: string[] = [on ? 'On' : 'Off'];
+    if (type !== null) {
+      parts.push(`Type ${type}`);
+    }
+    if (level !== null) {
+      parts.push(`Lvl ${level}`);
+    }
+    return parts.join(' | ');
+  }
+
+  private readObject(value: unknown, key?: string): Record<string, unknown> | null {
+    let candidate: unknown = value;
+    if (key !== undefined) {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return null;
+      }
+      candidate = (value as Record<string, unknown>)[key];
+    }
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+      return null;
+    }
+    return candidate as Record<string, unknown>;
+  }
+
+  private readNumber(source: Record<string, unknown> | null, key: string): number | null {
+    if (!source) {
+      return null;
+    }
+    const value = source[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+    return null;
+  }
+
+  private readBoolean(source: Record<string, unknown> | null, key: string): boolean {
+    if (!source) {
+      return false;
+    }
+    return source[key] === true;
+  }
+
+  private nv(value: number | null): string {
+    return value === null ? 'n/a' : `${value}`;
   }
 
   operationLabel(value: string): string {

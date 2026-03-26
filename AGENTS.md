@@ -580,6 +580,21 @@
 - Rebuilt/restarted:
   - `docker compose up -d --build`
 
+## Session Update - 2026-03-26 (Card Details + Raw JSON Modal)
+- Extended slot sync payload to include full patch object on per-slot/full sync responses:
+  - `SlotPatchSummary` now carries `payload` from amp read
+  - API `SlotPatchSummaryResponse` now includes `patch`
+- Updated slot cards to show key patch details directly:
+  - amp summary (gain/volume/eq/presence)
+  - stage summaries for booster/mod/fx/delay/reverb
+- Added per-slot `Raw` button:
+  - opens modal overlay with pretty-printed JSON payload for that slot
+  - modal supports close button and backdrop-click close
+- Quick sync behavior:
+  - preserves previously loaded detailed patch payload per slot instead of wiping it
+- Rebuilt/restarted:
+  - `docker compose up -d --build`
+
 ## Session Update - 2026-03-26 (Queue-Only Amp I/O + No Global UI Lock)
 - Enforced queue-backed amp communication across API amp-read/sync routes:
   - `GET /api/v1/amp/test-connection` now executes via queue job.

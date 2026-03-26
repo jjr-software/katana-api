@@ -59,6 +59,7 @@ class SlotPatchSummary:
     slot_label: str
     patch_name: str
     config_hash_sha256: str
+    payload: dict[str, Any] | None
     synced_at: str
     slot_sync_ms: int
 
@@ -155,6 +156,7 @@ class AmpClient:
                 slot_label=item.slot_label,
                 patch_name=str(item.payload.get("patch_name", "")),
                 config_hash_sha256=str(item.payload["config_hash_sha256"]),
+                payload=item.payload,
                 synced_at=item.synced_at,
                 slot_sync_ms=item.slot_sync_ms,
             )
@@ -181,6 +183,7 @@ class AmpClient:
                 slot_label=slot_label(slot),
                 patch_name=str(payload.get("patch_name", "")),
                 config_hash_sha256=str(payload["config_hash_sha256"]),
+                payload=payload,
                 synced_at=synced_at,
                 slot_sync_ms=int(round((time.perf_counter() - started) * 1000)),
             )

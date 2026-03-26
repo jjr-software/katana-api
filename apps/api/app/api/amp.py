@@ -31,6 +31,7 @@ class SlotPatchSummaryResponse(BaseModel):
     slot_label: str
     patch_name: str
     config_hash_sha256: str
+    patch: dict | None = None
     in_sync: bool
     is_saved: bool
     synced_at: str
@@ -541,6 +542,7 @@ def _slot_to_dict(slot: SlotPatchSummary, curated_by_hash: dict[str, list[dict]]
         "slot_label": slot.slot_label,
         "patch_name": slot.patch_name,
         "config_hash_sha256": slot.config_hash_sha256,
+        "patch": slot.payload,
         "in_sync": True,
         "is_saved": slot.config_hash_sha256 in saved_hashes,
         "synced_at": slot.synced_at,
