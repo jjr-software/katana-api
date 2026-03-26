@@ -361,6 +361,7 @@ export class App implements OnInit, OnDestroy {
   ngOnInit(): void {
     void this.refreshQueueState();
     void this.loadAudioLevelMarker();
+    void this.refreshCurrentCommitState();
     this.queuePollHandle = setInterval(() => {
       void this.refreshQueueState();
     }, 1000);
@@ -448,8 +449,8 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  async readCurrentPatchIntoSlot(slot: SlotCard): Promise<void> {
-    this.status.set(`Selecting ${slot.slot_label} on amp and reading from memory...`);
+  async activateSlot(slot: SlotCard): Promise<void> {
+    this.status.set(`Activating ${slot.slot_label} on amp...`);
     this.responseJson.set('');
     try {
       const response = await fetch(`/api/v1/amp/slots/${slot.slot}/sync`, {
@@ -458,7 +459,7 @@ export class App implements OnInit, OnDestroy {
       });
       const payload = (await response.json()) as SlotSyncResponse | { detail?: unknown };
       if (!response.ok) {
-        this.status.set(`Failed reading ${slot.slot_label} from amp memory`);
+        this.status.set(`Failed activating ${slot.slot_label}`);
         this.responseJson.set(JSON.stringify(payload, null, 2));
         return;
       }
@@ -467,12 +468,13 @@ export class App implements OnInit, OnDestroy {
       this.selectedAmpSlot.set(slot.slot);
       this.lastSyncedAt.set(synced.synced_at);
       this.totalSyncMs.set(synced.slot.slot_sync_ms);
+      this.currentAmpPatchHash.set(synced.slot.config_hash_sha256 || '');
       if (this.selectedAmpSlot() !== null) {
         await this.refreshCurrentCommitState();
       }
-      this.status.set(`Selected+read ${slot.slot_label} from amp memory`);
+      this.status.set(`Activated ${slot.slot_label} on amp`);
     } catch (error: unknown) {
-      this.status.set(`Failed selecting+reading ${slot.slot_label}`);
+      this.status.set(`Failed activating ${slot.slot_label}`);
       this.responseJson.set(
         JSON.stringify(
           {
@@ -486,12 +488,89 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  async writeSlotToAmp(slot: SlotCard): Promise<void> {
-    if (!slot.patch) {
-      this.status.set(`No full patch payload loaded for ${slot.slot_label}. Read this slot first.`);
+  async stageSlotToAmp(slot: SlotCard): Promise<void> {
+    if (!this.isActiveSlot(slot)) {
+      this.status.set(`${slot.slot_label} is not active on amp. Activate it first.`);
       return;
     }
-    this.status.set(`Writing ${slot.slot_label} to amp memory...`);
+    if (!slot.patch) {
+      this.status.set(`No full patch payload loaded for ${slot.slot_label}. Load or activate first.`);
+      return;
+    }
+    this.status.set(`Staging ${slot.slot_label} to active amp patch...`);
+    this.responseJson.set('');
+    try {
+      const response = await fetch('/api/v1/amp/current-patch/live-apply', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patch: slot.patch }),
+      });
+      const payload = (await response.json()) as ApplyCurrentPatchResponse | { detail?: unknown };
+      if (!response.ok) {
+        this.status.set(`Failed staging ${slot.slot_label} to active amp patch`);
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      const staged = payload as ApplyCurrentPatchResponse;
+      const appliedPatch = this.clonePatch(staged.patch);
+      const patchName = this.readString(appliedPatch, 'patch_name') ?? '';
+      const hash = this.readString(appliedPatch, 'config_hash_sha256') ?? '';
+      this.currentAmpPatchHash.set(hash);
+      this.slots.update((rows) =>
+        rows.map((card) =>
+          card.slot === slot.slot
+            ? {
+                ...card,
+                patch_name: patchName || card.patch_name,
+                patch: appliedPatch,
+                config_hash_sha256: hash,
+                in_sync: true,
+                out_synced: true,
+                is_saved: false,
+              }
+            : card,
+        ),
+      );
+      await this.refreshCurrentCommitState();
+      this.status.set(`Staged ${slot.slot_label} to active amp patch`);
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Patch staged to active amp patch',
+            slot: slot.slot_label,
+            applied_at: staged.applied_at,
+            hash_id: hash || null,
+          },
+          null,
+          2,
+        ),
+      );
+    } catch (error: unknown) {
+      this.status.set(`Failed staging ${slot.slot_label} to active amp patch`);
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Browser request failed',
+            error: String(error),
+          },
+          null,
+          2,
+        ),
+      );
+    }
+  }
+
+  async commitSlotToAmp(slot: SlotCard): Promise<void> {
+    if (!this.isActiveSlot(slot)) {
+      this.status.set(`${slot.slot_label} is not active on amp. Activate it first.`);
+      return;
+    }
+    if (!slot.patch) {
+      this.status.set(`No full patch payload loaded for ${slot.slot_label}. Load or activate first.`);
+      return;
+    }
+    this.status.set(`Committing ${slot.slot_label} to amp memory...`);
     this.responseJson.set('');
     try {
       const response = await fetch(`/api/v1/amp/slots/${slot.slot}/write`, {
@@ -502,31 +581,32 @@ export class App implements OnInit, OnDestroy {
       });
       const payload = (await response.json()) as SlotWriteResponse | { detail?: unknown };
       if (!response.ok) {
-        this.status.set(`Failed writing ${slot.slot_label} to amp memory`);
+        this.status.set(`Failed committing ${slot.slot_label} to amp memory`);
         this.responseJson.set(JSON.stringify(payload, null, 2));
         return;
       }
-      const written = payload as SlotWriteResponse;
-      this.applySyncedSlot(written.slot);
+      const committed = payload as SlotWriteResponse;
+      this.applySyncedSlot(committed.slot);
       this.selectedAmpSlot.set(slot.slot);
-      this.lastSyncedAt.set(written.synced_at);
-      this.totalSyncMs.set(written.slot.slot_sync_ms);
+      this.lastSyncedAt.set(committed.synced_at);
+      this.totalSyncMs.set(committed.slot.slot_sync_ms);
+      this.currentAmpPatchHash.set(committed.slot.config_hash_sha256 || '');
       await this.refreshCurrentCommitState();
-      this.status.set(`Wrote ${slot.slot_label} to amp memory`);
+      this.status.set(`Committed ${slot.slot_label} to amp memory`);
       this.responseJson.set(
         JSON.stringify(
           {
-            message: 'Patch written to amp memory',
+            message: 'Patch committed to amp memory',
             slot: slot.slot_label,
-            synced_at: written.synced_at,
-            hash_id: written.slot.config_hash_sha256 || null,
+            synced_at: committed.synced_at,
+            hash_id: committed.slot.config_hash_sha256 || null,
           },
           null,
           2,
         ),
       );
     } catch (error: unknown) {
-      this.status.set(`Failed writing ${slot.slot_label} to amp memory`);
+      this.status.set(`Failed committing ${slot.slot_label} to amp memory`);
       this.responseJson.set(
         JSON.stringify(
           {
@@ -1053,19 +1133,27 @@ export class App implements OnInit, OnDestroy {
   }
 
   canOpenEditor(slot: SlotCard): boolean {
-    return this.hasFullPatch(slot);
+    return this.hasFullPatch(slot) && this.isActiveSlot(slot);
   }
 
-  canReadSlot(_slot: SlotCard): boolean {
-    return true;
+  canActivateSlot(slot: SlotCard): boolean {
+    return !this.isActiveSlot(slot);
+  }
+
+  canReadActiveSlot(slot: SlotCard): boolean {
+    return this.isActiveSlot(slot);
   }
 
   canLoadSlot(_slot: SlotCard): boolean {
     return true;
   }
 
-  canWriteSlot(slot: SlotCard): boolean {
-    return this.hasFullPatch(slot);
+  canStageSlot(slot: SlotCard): boolean {
+    return this.hasFullPatch(slot) && this.isActiveSlot(slot);
+  }
+
+  canCommitSlot(slot: SlotCard): boolean {
+    return this.hasFullPatch(slot) && this.isActiveSlot(slot);
   }
 
   canSaveSlot(slot: SlotCard): boolean {
@@ -1912,7 +2000,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   slotSavedStatusLabel(slot: SlotCard): string {
-    return this.isAmpCommitted(slot) ? 'Saved' : 'Not Saved';
+    return this.isAmpCommitted(slot) ? 'AMP-COMMITTED ✓' : 'AMP-COMMITTED ✗';
   }
 
   isAmpCommitted(slot: SlotCard): boolean {
@@ -1925,7 +2013,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   slotDbStatusLabel(slot: SlotCard): string {
-    return slot.is_saved ? 'DB Saved' : 'DB Not Saved';
+    return slot.is_saved ? 'DB ✓' : 'DB ✗';
   }
 
   isLiveOnAmp(slot: SlotCard): boolean {
@@ -1933,8 +2021,16 @@ export class App implements OnInit, OnDestroy {
     return Boolean(currentLiveHash) && slot.config_hash_sha256 === currentLiveHash;
   }
 
+  isActiveSlot(slot: SlotCard): boolean {
+    const selected = this.selectedAmpSlot();
+    if (selected !== null) {
+      return selected === slot.slot;
+    }
+    return this.isLiveOnAmp(slot);
+  }
+
   slotLiveStatusLabel(slot: SlotCard): string {
-    return this.isLiveOnAmp(slot) ? 'Live on AMP' : 'Not Live';
+    return this.isLiveOnAmp(slot) ? 'AMP-STAGED ✓' : 'AMP-STAGED ✗';
   }
 
   ampSummary(slot: SlotCard): string {
@@ -2397,11 +2493,6 @@ export class App implements OnInit, OnDestroy {
 
   private async refreshCurrentCommitState(): Promise<void> {
     const selectedSlot = this.selectedAmpSlot();
-    if (selectedSlot === null) {
-      this.currentAmpPatchHash.set('');
-      this.currentAmpCommitState.set('unknown');
-      return;
-    }
     try {
       const response = await fetch('/api/v1/amp/current-patch', {
         method: 'GET',
@@ -2415,6 +2506,10 @@ export class App implements OnInit, OnDestroy {
       const current = payload as CurrentPatchResponse;
       const currentHash = this.readString(current.patch, 'config_hash_sha256') ?? '';
       this.currentAmpPatchHash.set(currentHash);
+      if (selectedSlot === null) {
+        this.currentAmpCommitState.set('unknown');
+        return;
+      }
       const selectedCard = this.slots().find((card) => card.slot === selectedSlot) ?? null;
       const selectedHash = selectedCard?.committed_hash_sha256 ?? '';
       if (!currentHash || !selectedHash) {
@@ -2439,10 +2534,13 @@ export class App implements OnInit, OnDestroy {
       return 'Current Patch';
     }
     if (value === 'apply_current_patch') {
-      return 'Live Apply Patch';
+      return 'Stage To AMP';
     }
     if (value === 'sync_slot') {
-      return 'Select+Read Slot';
+      return 'Activate Slot';
+    }
+    if (value === 'write_slot') {
+      return 'Commit To AMP';
     }
     if (value === 'full_dump') {
       return 'Load Amp State';

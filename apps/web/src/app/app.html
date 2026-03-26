@@ -40,7 +40,7 @@
       <div class="card mb-3">
         <div class="card-body py-2">
           <div class="alert alert-warning py-2 mb-2 small" role="alert">
-            Katana limitation: reading a slot requires selecting that slot on amp first. There is no non-switching slot-read command.
+            Katana limitation: only the active slot can be read/staged/committed. Activate a card first.
           </div>
           <div class="d-flex flex-wrap gap-2 mb-2">
             <button type="button" class="btn btn-primary btn-sm" (click)="testAmpConnection()">Test Amp Connection</button>
@@ -105,22 +105,34 @@
                   <p class="small mb-1 text-primary fw-semibold">{{ slot.slot_label }}</p>
                   <h3 class="h6 mb-2 text-break">{{ displayPatchName(slot) }}</h3>
                   <p class="d-flex flex-wrap gap-2 mb-2">
-                    <span class="badge rounded-pill" [class.text-bg-success]="isAmpCommitted(slot)" [class.text-bg-warning]="!isAmpCommitted(slot)">
+                    <span class="badge rounded-pill" [class.text-bg-success]="isAmpCommitted(slot)" [class.text-bg-danger]="!isAmpCommitted(slot)">
                       {{ slotSavedStatusLabel(slot) }}
                     </span>
-                    <span class="badge rounded-pill" [class.text-bg-success]="slot.is_saved" [class.text-bg-warning]="!slot.is_saved">
+                    <span class="badge rounded-pill" [class.text-bg-success]="slot.is_saved" [class.text-bg-danger]="!slot.is_saved">
                       {{ slotDbStatusLabel(slot) }}
                     </span>
-                    <span class="badge rounded-pill" [class.text-bg-success]="isLiveOnAmp(slot)" [class.text-bg-secondary]="!isLiveOnAmp(slot)">
+                    <span class="badge rounded-pill" [class.text-bg-success]="isLiveOnAmp(slot)" [class.text-bg-danger]="!isLiveOnAmp(slot)">
                       {{ slotLiveStatusLabel(slot) }}
                     </span>
                   </p>
                   <div class="d-flex flex-wrap gap-2 mb-2">
-                    <button type="button" class="btn btn-sm btn-primary" (click)="readCurrentPatchIntoSlot(slot)" [disabled]="!canReadSlot(slot)">Select+Read</button>
+                    @if (canActivateSlot(slot)) {
+                      <button type="button" class="btn btn-sm btn-primary" (click)="activateSlot(slot)">Activate</button>
+                    }
+                    @if (canReadActiveSlot(slot)) {
+                      <button type="button" class="btn btn-sm btn-outline-primary" (click)="activateSlot(slot)">Read AMP</button>
+                    }
                     <button type="button" class="btn btn-sm btn-outline-primary" (click)="openPatchConfigLoadModal(slot)" [disabled]="!canLoadSlot(slot)">Load</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="writeSlotToAmp(slot)" [disabled]="!canWriteSlot(slot)">Write+Commit</button>
+                    @if (canStageSlot(slot)) {
+                      <button type="button" class="btn btn-sm btn-outline-warning" (click)="stageSlotToAmp(slot)">Stage to AMP</button>
+                    }
+                    @if (canCommitSlot(slot)) {
+                      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="commitSlotToAmp(slot)">Commit to AMP</button>
+                    }
                     <button type="button" class="btn btn-sm btn-outline-success" (click)="saveSlotToDb(slot)" [disabled]="!canUseSlotActions(slot)">Save DB</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openEditor(slot)" [disabled]="!canOpenEditor(slot)">Editor</button>
+                    @if (canOpenEditor(slot)) {
+                      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openEditor(slot)">Editor</button>
+                    }
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="showRaw(slot)" [disabled]="!canUseSlotActions(slot)">Raw</button>
                   </div>
                   <p class="small mb-1 patch-summary"><strong>Amp:</strong> {{ ampSummary(slot) }}</p>
@@ -154,22 +166,34 @@
                   <p class="small mb-1 text-primary fw-semibold">{{ slot.slot_label }}</p>
                   <h3 class="h6 mb-2 text-break">{{ displayPatchName(slot) }}</h3>
                   <p class="d-flex flex-wrap gap-2 mb-2">
-                    <span class="badge rounded-pill" [class.text-bg-success]="isAmpCommitted(slot)" [class.text-bg-warning]="!isAmpCommitted(slot)">
+                    <span class="badge rounded-pill" [class.text-bg-success]="isAmpCommitted(slot)" [class.text-bg-danger]="!isAmpCommitted(slot)">
                       {{ slotSavedStatusLabel(slot) }}
                     </span>
-                    <span class="badge rounded-pill" [class.text-bg-success]="slot.is_saved" [class.text-bg-warning]="!slot.is_saved">
+                    <span class="badge rounded-pill" [class.text-bg-success]="slot.is_saved" [class.text-bg-danger]="!slot.is_saved">
                       {{ slotDbStatusLabel(slot) }}
                     </span>
-                    <span class="badge rounded-pill" [class.text-bg-success]="isLiveOnAmp(slot)" [class.text-bg-secondary]="!isLiveOnAmp(slot)">
+                    <span class="badge rounded-pill" [class.text-bg-success]="isLiveOnAmp(slot)" [class.text-bg-danger]="!isLiveOnAmp(slot)">
                       {{ slotLiveStatusLabel(slot) }}
                     </span>
                   </p>
                   <div class="d-flex flex-wrap gap-2 mb-2">
-                    <button type="button" class="btn btn-sm btn-primary" (click)="readCurrentPatchIntoSlot(slot)" [disabled]="!canReadSlot(slot)">Select+Read</button>
+                    @if (canActivateSlot(slot)) {
+                      <button type="button" class="btn btn-sm btn-primary" (click)="activateSlot(slot)">Activate</button>
+                    }
+                    @if (canReadActiveSlot(slot)) {
+                      <button type="button" class="btn btn-sm btn-outline-primary" (click)="activateSlot(slot)">Read AMP</button>
+                    }
                     <button type="button" class="btn btn-sm btn-outline-primary" (click)="openPatchConfigLoadModal(slot)" [disabled]="!canLoadSlot(slot)">Load</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="writeSlotToAmp(slot)" [disabled]="!canWriteSlot(slot)">Write+Commit</button>
+                    @if (canStageSlot(slot)) {
+                      <button type="button" class="btn btn-sm btn-outline-warning" (click)="stageSlotToAmp(slot)">Stage to AMP</button>
+                    }
+                    @if (canCommitSlot(slot)) {
+                      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="commitSlotToAmp(slot)">Commit to AMP</button>
+                    }
                     <button type="button" class="btn btn-sm btn-outline-success" (click)="saveSlotToDb(slot)" [disabled]="!canUseSlotActions(slot)">Save DB</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openEditor(slot)" [disabled]="!canOpenEditor(slot)">Editor</button>
+                    @if (canOpenEditor(slot)) {
+                      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openEditor(slot)">Editor</button>
+                    }
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="showRaw(slot)" [disabled]="!canUseSlotActions(slot)">Raw</button>
                   </div>
                   <p class="small mb-1 patch-summary"><strong>Amp:</strong> {{ ampSummary(slot) }}</p>

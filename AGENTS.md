@@ -1312,3 +1312,19 @@
   - `apps/web/src/app/app.html`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Active-Only Stage/Commit UI + Activate Flow)
+- Reworked card actions to reflect active-slot-only amp operations:
+  - added `Activate` button for non-active cards,
+  - active cards now show `Read AMP`, `Stage to AMP`, and `Commit to AMP`,
+  - non-active cards do not render active-dependent buttons.
+- Clarified status booleans on cards:
+  - `DB ✓/✗`,
+  - `AMP-STAGED ✓/✗` (card hash matches current active amp patch hash),
+  - `AMP-COMMITTED ✓/✗` (card hash matches committed slot-memory baseline hash).
+- Updated commit-state refresh behavior to always refresh current active hash, even when no selected slot is tracked.
+- Files changed:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
