@@ -1,126 +1,133 @@
 <main class="shell">
   <h1>Katana Gen 3 Patch Manager</h1>
   <p>Live slot sync from amp memory. A and B channels are shown as 4 cards each.</p>
-  <div class="actions">
-    <button type="button" (click)="testAmpConnection()">
-      Test Amp Connection
-    </button>
-    <button type="button" (click)="quickSyncAmpSlots()">
-      Quick Sync Names
-    </button>
-    <button type="button" (click)="backupAmpState()">
-      Backup Amp State
-    </button>
-  </div>
-  <div class="sync-meta">
-    <span>AMP State Hash: <code>{{ shortHash(ampStateHash()) }}</code></span>
-    <span>Last Sync: <code>{{ lastSyncedAt() || 'n/a' }}</code></span>
-    <span>Total Sync Time: <code>{{ formatMs(totalSyncMs()) }}</code></span>
-  </div>
-  <section class="queue-panel">
-    <p class="queue-title">
-      Queue Monitor
-      <span class="queue-updated">updated: <code>{{ queueGeneratedAt() || 'n/a' }}</code></span>
-    </p>
-    <div class="queue-list">
-      @for (job of queueJobs(); track job.job_id) {
-        <article class="queue-item">
-          <p>
-            <strong>{{ operationLabel(job.operation) }}</strong>
-            @if (job.slot !== null) {
-              <span> (slot {{ job.slot }})</span>
-            }
-            · <code>{{ job.status }}</code>
-          </p>
-          <p>
-            elapsed: <code>{{ formatMs(job.elapsed_ms) }}</code> |
-            created: <code>{{ job.created_at }}</code>
-          </p>
-        </article>
-      }
-      @if (queueJobs().length === 0) {
-        <p class="queue-empty">No queue jobs yet.</p>
-      }
-    </div>
-  </section>
-  <p class="status">{{ status() }}</p>
+  <section class="workspace">
+    <aside class="queue-column">
+      <section class="queue-panel">
+        <p class="queue-title">
+          Queue Monitor
+          <span class="queue-updated">updated: <code>{{ queueGeneratedAt() || 'n/a' }}</code></span>
+        </p>
+        <div class="queue-list">
+          @for (job of queueJobs(); track job.job_id) {
+            <article class="queue-item">
+              <p>
+                <strong>{{ operationLabel(job.operation) }}</strong>
+                @if (job.slot !== null) {
+                  <span> (slot {{ job.slot }})</span>
+                }
+                · <code>{{ job.status }}</code>
+              </p>
+              <p>
+                elapsed: <code>{{ formatMs(job.elapsed_ms) }}</code> |
+                created: <code>{{ job.created_at }}</code>
+              </p>
+            </article>
+          }
+          @if (queueJobs().length === 0) {
+            <p class="queue-empty">No queue jobs yet.</p>
+          }
+        </div>
+      </section>
+    </aside>
 
-  <section class="bank">
-    <h2>Channel Bank A</h2>
-    <div class="cards">
-      @for (slot of slotsForBank('A'); track slot.slot) {
-        <article class="card" [class.sync-ok]="slot.in_sync" [class.sync-missing]="!slot.in_sync">
-          <p class="slot">{{ slot.slot_label }}</p>
-          <h3>{{ displayPatchName(slot) }}</h3>
-          <p class="status-row">
-            <span class="status-chip" [class.ok]="slot.in_sync" [class.warn]="!slot.in_sync">
-              {{ slotSyncStatusLabel(slot) }}
-            </span>
-            <span class="status-chip" [class.ok]="slot.is_saved" [class.warn]="!slot.is_saved">
-              {{ slotSavedStatusLabel(slot) }}
-            </span>
-          </p>
-          <button type="button" (click)="syncAmpSlot(slot.slot)">
-            Sync
-          </button>
-          <button type="button" (click)="saveSlotPatch(slot)" [disabled]="!canUseSlotActions(slot)">
-            Save
-          </button>
-          <button type="button" (click)="sampleSlotAudio(slot)" [disabled]="!canUseSlotActions(slot)">
-            Sample
-          </button>
-          <button type="button" (click)="showRaw(slot)" [disabled]="!canUseSlotActions(slot)">
-            Raw
-          </button>
-          <p class="patch-detail"><strong>Amp:</strong> {{ ampSummary(slot) }}</p>
-          <p class="patch-detail"><strong>Booster:</strong> {{ boosterSummary(slot) }}</p>
-          <p class="patch-detail"><strong>Mod:</strong> {{ modSummary(slot) }}</p>
-          <p class="patch-detail"><strong>FX:</strong> {{ fxSummary(slot) }}</p>
-          <p class="patch-detail"><strong>Delay:</strong> {{ delaySummary(slot) }}</p>
-          <p class="patch-detail"><strong>Reverb:</strong> {{ reverbSummary(slot) }}</p>
-          <p>Last Sync: <code>{{ slot.synced_at || 'n/a' }}</code></p>
-        </article>
-      }
-    </div>
-  </section>
+    <section class="main-column">
+      <div class="actions">
+        <button type="button" (click)="testAmpConnection()">
+          Test Amp Connection
+        </button>
+        <button type="button" (click)="quickSyncAmpSlots()">
+          Quick Sync Names
+        </button>
+        <button type="button" (click)="backupAmpState()">
+          Backup Amp State
+        </button>
+      </div>
+      <div class="sync-meta">
+        <span>AMP State Hash: <code>{{ shortHash(ampStateHash()) }}</code></span>
+        <span>Last Sync: <code>{{ lastSyncedAt() || 'n/a' }}</code></span>
+        <span>Total Sync Time: <code>{{ formatMs(totalSyncMs()) }}</code></span>
+      </div>
+      <p class="status">{{ status() }}</p>
 
-  <section class="bank">
-    <h2>Channel Bank B</h2>
-    <div class="cards">
-      @for (slot of slotsForBank('B'); track slot.slot) {
-        <article class="card" [class.sync-ok]="slot.in_sync" [class.sync-missing]="!slot.in_sync">
-          <p class="slot">{{ slot.slot_label }}</p>
-          <h3>{{ displayPatchName(slot) }}</h3>
-          <p class="status-row">
-            <span class="status-chip" [class.ok]="slot.in_sync" [class.warn]="!slot.in_sync">
-              {{ slotSyncStatusLabel(slot) }}
-            </span>
-            <span class="status-chip" [class.ok]="slot.is_saved" [class.warn]="!slot.is_saved">
-              {{ slotSavedStatusLabel(slot) }}
-            </span>
-          </p>
-          <button type="button" (click)="syncAmpSlot(slot.slot)">
-            Sync
-          </button>
-          <button type="button" (click)="saveSlotPatch(slot)" [disabled]="!canUseSlotActions(slot)">
-            Save
-          </button>
-          <button type="button" (click)="sampleSlotAudio(slot)" [disabled]="!canUseSlotActions(slot)">
-            Sample
-          </button>
-          <button type="button" (click)="showRaw(slot)" [disabled]="!canUseSlotActions(slot)">
-            Raw
-          </button>
-          <p class="patch-detail"><strong>Amp:</strong> {{ ampSummary(slot) }}</p>
-          <p class="patch-detail"><strong>Booster:</strong> {{ boosterSummary(slot) }}</p>
-          <p class="patch-detail"><strong>Mod:</strong> {{ modSummary(slot) }}</p>
-          <p class="patch-detail"><strong>FX:</strong> {{ fxSummary(slot) }}</p>
-          <p class="patch-detail"><strong>Delay:</strong> {{ delaySummary(slot) }}</p>
-          <p class="patch-detail"><strong>Reverb:</strong> {{ reverbSummary(slot) }}</p>
-          <p>Last Sync: <code>{{ slot.synced_at || 'n/a' }}</code></p>
-        </article>
-      }
-    </div>
+      <section class="bank">
+        <h2>Channel Bank A</h2>
+        <div class="cards">
+          @for (slot of slotsForBank('A'); track slot.slot) {
+            <article class="card" [class.sync-ok]="slot.in_sync" [class.sync-missing]="!slot.in_sync">
+              <p class="slot">{{ slot.slot_label }}</p>
+              <h3>{{ displayPatchName(slot) }}</h3>
+              <p class="status-row">
+                <span class="status-chip" [class.ok]="slot.in_sync" [class.warn]="!slot.in_sync">
+                  {{ slotSyncStatusLabel(slot) }}
+                </span>
+                <span class="status-chip" [class.ok]="slot.is_saved" [class.warn]="!slot.is_saved">
+                  {{ slotSavedStatusLabel(slot) }}
+                </span>
+              </p>
+              <button type="button" (click)="syncAmpSlot(slot.slot)">
+                Sync
+              </button>
+              <button type="button" (click)="saveSlotPatch(slot)" [disabled]="!canUseSlotActions(slot)">
+                Save
+              </button>
+              <button type="button" (click)="sampleSlotAudio(slot)" [disabled]="!canUseSlotActions(slot)">
+                Sample
+              </button>
+              <button type="button" (click)="showRaw(slot)" [disabled]="!canUseSlotActions(slot)">
+                Raw
+              </button>
+              <p class="patch-detail"><strong>Amp:</strong> {{ ampSummary(slot) }}</p>
+              <p class="patch-detail"><strong>Booster:</strong> {{ boosterSummary(slot) }}</p>
+              <p class="patch-detail"><strong>Mod:</strong> {{ modSummary(slot) }}</p>
+              <p class="patch-detail"><strong>FX:</strong> {{ fxSummary(slot) }}</p>
+              <p class="patch-detail"><strong>Delay:</strong> {{ delaySummary(slot) }}</p>
+              <p class="patch-detail"><strong>Reverb:</strong> {{ reverbSummary(slot) }}</p>
+              <p>Last Sync: <code>{{ slot.synced_at || 'n/a' }}</code></p>
+            </article>
+          }
+        </div>
+      </section>
+
+      <section class="bank">
+        <h2>Channel Bank B</h2>
+        <div class="cards">
+          @for (slot of slotsForBank('B'); track slot.slot) {
+            <article class="card" [class.sync-ok]="slot.in_sync" [class.sync-missing]="!slot.in_sync">
+              <p class="slot">{{ slot.slot_label }}</p>
+              <h3>{{ displayPatchName(slot) }}</h3>
+              <p class="status-row">
+                <span class="status-chip" [class.ok]="slot.in_sync" [class.warn]="!slot.in_sync">
+                  {{ slotSyncStatusLabel(slot) }}
+                </span>
+                <span class="status-chip" [class.ok]="slot.is_saved" [class.warn]="!slot.is_saved">
+                  {{ slotSavedStatusLabel(slot) }}
+                </span>
+              </p>
+              <button type="button" (click)="syncAmpSlot(slot.slot)">
+                Sync
+              </button>
+              <button type="button" (click)="saveSlotPatch(slot)" [disabled]="!canUseSlotActions(slot)">
+                Save
+              </button>
+              <button type="button" (click)="sampleSlotAudio(slot)" [disabled]="!canUseSlotActions(slot)">
+                Sample
+              </button>
+              <button type="button" (click)="showRaw(slot)" [disabled]="!canUseSlotActions(slot)">
+                Raw
+              </button>
+              <p class="patch-detail"><strong>Amp:</strong> {{ ampSummary(slot) }}</p>
+              <p class="patch-detail"><strong>Booster:</strong> {{ boosterSummary(slot) }}</p>
+              <p class="patch-detail"><strong>Mod:</strong> {{ modSummary(slot) }}</p>
+              <p class="patch-detail"><strong>FX:</strong> {{ fxSummary(slot) }}</p>
+              <p class="patch-detail"><strong>Delay:</strong> {{ delaySummary(slot) }}</p>
+              <p class="patch-detail"><strong>Reverb:</strong> {{ reverbSummary(slot) }}</p>
+              <p>Last Sync: <code>{{ slot.synced_at || 'n/a' }}</code></p>
+            </article>
+          }
+        </div>
+      </section>
+    </section>
   </section>
 
   @if (responseJson()) {

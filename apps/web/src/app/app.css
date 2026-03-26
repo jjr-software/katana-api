@@ -1,5 +1,5 @@
 .shell {
-  max-width: 1200px;
+  max-width: 1420px;
   margin: 2rem auto;
   padding: 1.25rem;
   border: 1px solid #2f3946;
@@ -28,6 +28,23 @@ button {
   flex-wrap: wrap;
 }
 
+.workspace {
+  margin-top: 0.9rem;
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  gap: 0.9rem;
+  align-items: start;
+}
+
+.queue-column {
+  position: sticky;
+  top: 1rem;
+}
+
+.main-column {
+  min-width: 0;
+}
+
 button[disabled] {
   opacity: 0.6;
   cursor: not-allowed;
@@ -47,7 +64,6 @@ button[disabled] {
 }
 
 .queue-panel {
-  margin-top: 0.9rem;
   border: 1px solid #334155;
   border-radius: 10px;
   background: #111827;
@@ -235,6 +251,14 @@ pre {
 }
 
 @media (max-width: 980px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .queue-column {
+    position: static;
+  }
+
   .cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

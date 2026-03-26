@@ -506,6 +506,19 @@
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
 
+## Session Update - 2026-03-26 (Queue Panel Moved To Left Column)
+- Updated web app layout to place the queue monitor on the left-hand side instead of stacking it above cards.
+- Introduced a two-column workspace shell:
+  - left: sticky queue panel (`Queue Monitor`)
+  - right: actions, sync metadata, status, and both bank card grids
+- Added responsive fallback:
+  - below `980px`, layout collapses back to a single vertical column.
+- Files changed:
+  - `apps/web/src/app/app.html`
+  - `apps/web/src/app/app.css`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
+
 ## Session Update - 2026-03-26 (Queued Backup Feature + Nested Repo Flatten)
 - Added queued amp backup API endpoints:
   - `POST /api/v1/amp/backup` (enqueue full amp-state dump)
