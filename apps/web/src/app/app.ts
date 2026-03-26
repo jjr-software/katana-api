@@ -104,13 +104,6 @@ interface QuickSlotSummary {
   slot_sync_ms: number;
 }
 
-interface SlotsStateResponse {
-  synced_at: string;
-  amp_state_hash_sha256: string;
-  total_sync_ms: number;
-  slots: SlotPatchSummary[];
-}
-
 interface SlotSyncResponse {
   synced_at: string;
   slot: SlotPatchSummary;
@@ -120,25 +113,6 @@ interface QuickSlotsStateResponse {
   synced_at: string;
   total_sync_ms: number;
   slots: QuickSlotSummary[];
-}
-
-interface SlotsSyncEnqueueResponse {
-  job_id: string;
-  operation: string;
-  status: string;
-  created_at: string;
-}
-
-interface SlotsSyncJobResponse {
-  job_id: string;
-  operation: string;
-  status: 'queued' | 'running' | 'succeeded' | 'failed';
-  created_at: string;
-  started_at: string | null;
-  finished_at: string | null;
-  elapsed_ms: number;
-  error: string | null;
-  result: SlotsStateResponse | null;
 }
 
 interface QuickSyncEnqueueResponse {
@@ -318,74 +292,6 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  async syncAmpSlots(): Promise<void> {
-    this.status.set('Queueing amp sync...');
-    this.responseJson.set('');
-
-    try {
-      const enqueueResponse = await fetch('/api/v1/amp/slots/sync', {
-        method: 'POST',
-        cache: 'no-store',
-      });
-
-      const enqueuePayload = (await enqueueResponse.json()) as SlotsSyncEnqueueResponse | { detail: unknown };
-      if (!enqueueResponse.ok) {
-        this.status.set('Amp sync failed');
-        this.ampStateHash.set('');
-        this.lastSyncedAt.set('');
-        this.totalSyncMs.set(0);
-        this.responseJson.set(JSON.stringify(enqueuePayload, null, 2));
-        return;
-      }
-
-      const queued = enqueuePayload as SlotsSyncEnqueueResponse;
-      this.status.set('Amp sync queued...');
-      const job = await this.waitForSyncJob(queued.job_id);
-      if (job.status !== 'succeeded' || job.result === null) {
-        this.status.set('Amp sync failed');
-        this.ampStateHash.set('');
-        this.lastSyncedAt.set('');
-        this.totalSyncMs.set(0);
-        this.responseJson.set(
-          JSON.stringify(
-            {
-              message: 'Queued sync job failed',
-              job_id: job.job_id,
-              status: job.status,
-              error: job.error,
-            },
-            null,
-            2,
-          ),
-        );
-        return;
-      }
-
-      const state = job.result;
-      this.status.set('Amp sync succeeded');
-      this.slots.set(this.mergeFullState(state));
-      this.ampStateHash.set(state.amp_state_hash_sha256);
-      this.lastSyncedAt.set(state.synced_at);
-      this.totalSyncMs.set(state.total_sync_ms);
-      this.responseJson.set('');
-    } catch (error: unknown) {
-      this.status.set('Amp sync failed');
-      this.ampStateHash.set('');
-      this.lastSyncedAt.set('');
-      this.totalSyncMs.set(0);
-      this.responseJson.set(
-        JSON.stringify(
-          {
-            message: 'Browser request failed',
-            error: String(error),
-          },
-          null,
-          2,
-        ),
-      );
-    }
-  }
-
   async syncAmpSlot(slot: number): Promise<void> {
     this.status.set(`Syncing slot ${slot} (full patch read)...`);
     this.responseJson.set('');
@@ -515,6 +421,10 @@ export class App implements OnInit, OnDestroy {
         return;
       }
 
+      this.slots.set(this.mergeDumpState(job.result));
+      this.ampStateHash.set(job.result.amp_state_hash_sha256);
+      this.lastSyncedAt.set(job.result.synced_at);
+      this.totalSyncMs.set(job.result.total_sync_ms);
       this.status.set('Backup stored');
       this.responseJson.set(
         JSON.stringify(
@@ -542,29 +452,6 @@ export class App implements OnInit, OnDestroy {
         ),
       );
     }
-  }
-
-  private async waitForSyncJob(jobId: string): Promise<SlotsSyncJobResponse> {
-    const maxPolls = 150;
-    for (let i = 0; i < maxPolls; i += 1) {
-      const response = await fetch(`/api/v1/amp/slots/sync/${jobId}`, {
-        method: 'GET',
-        cache: 'no-store',
-      });
-      const payload = (await response.json()) as SlotsSyncJobResponse | { detail: unknown };
-      if (!response.ok) {
-        throw new Error(`Sync job poll failed: ${JSON.stringify(payload)}`);
-      }
-      const job = payload as SlotsSyncJobResponse;
-      if (job.status === 'succeeded' || job.status === 'failed') {
-        return job;
-      }
-      this.status.set(job.status === 'queued' ? 'Amp sync queued...' : 'Amp sync running...');
-      await new Promise<void>((resolve) => {
-        setTimeout(() => resolve(), 1000);
-      });
-    }
-    throw new Error(`Sync job timed out: ${jobId}`);
   }
 
   private async waitForQuickSyncJob(jobId: string): Promise<QuickSyncJobResponse> {
@@ -650,19 +537,21 @@ export class App implements OnInit, OnDestroy {
     return 'Unsynced';
   }
 
-  private mergeFullState(state: SlotsStateResponse): SlotCard[] {
-    const bySlot = new Map<number, SlotPatchSummary>(state.slots.map((slot) => [slot.slot, slot]));
+  private mergeDumpState(state: FullAmpDumpResponse): SlotCard[] {
+    const bySlot = new Map<number, FullDumpSlotResponse>(state.slots.map((slot) => [slot.slot, slot]));
     return defaultSlotCards().map((base) => {
       const full = bySlot.get(base.slot);
       if (!full) {
         return base;
       }
+      const patchName = this.readString(full.patch, 'patch_name');
+      const hash = this.readString(full.patch, 'config_hash_sha256');
       return {
         slot: full.slot,
         slot_label: full.slot_label,
-        patch_name: full.patch_name,
-        config_hash_sha256: full.config_hash_sha256,
-        patch: full.patch ?? null,
+        patch_name: patchName ?? '',
+        config_hash_sha256: hash ?? '',
+        patch: full.patch,
         in_sync: full.in_sync,
         is_saved: full.is_saved,
         synced_at: full.synced_at,
@@ -854,6 +743,17 @@ export class App implements OnInit, OnDestroy {
       return false;
     }
     return source[key] === true;
+  }
+
+  private readString(source: Record<string, unknown> | null, key: string): string | null {
+    if (!source) {
+      return null;
+    }
+    const value = source[key];
+    if (typeof value === 'string') {
+      return value;
+    }
+    return null;
   }
 
   private nv(value: number | null): string {

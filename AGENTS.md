@@ -635,6 +635,16 @@
 - Rebuilt/restarted:
   - `docker compose up -d --build`
 
+## Session Update - 2026-03-26 (Retired Frontend Sync Slots Action)
+- Removed `Sync Slots A:1..B:4` action from web UI.
+- Unified full-state refresh behavior under `Backup Amp State`:
+  - queued backup/full-dump now also hydrates all slot cards with live patch data
+  - updates AMP state hash, last sync timestamp, and total sync time on completion
+- Rationale:
+  - eliminate duplicate full-state actions; `backup/full-dump` is the authoritative full amp read path.
+- Rebuilt/restarted:
+  - `docker compose up -d --build`
+
 ## Session Update - 2026-03-26 (Queue-Only Amp I/O + No Global UI Lock)
 - Enforced queue-backed amp communication across API amp-read/sync routes:
   - `GET /api/v1/amp/test-connection` now executes via queue job.
