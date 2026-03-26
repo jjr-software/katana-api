@@ -1152,3 +1152,20 @@
   - `apps/web/src/app/app.html`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Card Action Wording: Read/Write)
+- Updated slot card primary actions to directional wording:
+  - `Sync` -> `Read`
+  - `Save` -> `Write`
+- Behavior remains the same:
+  - `Read` uses per-slot full patch read from amp.
+  - `Write` uses existing patch-library write path for the loaded slot payload.
+- Added explicit UI gate helpers:
+  - `canReadSlot(...)`
+  - `canWriteSlot(...)`
+- Updated status text to use read/write terminology in the affected flows.
+- Files changed:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

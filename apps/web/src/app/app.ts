@@ -392,7 +392,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   async syncAmpSlot(slot: number): Promise<void> {
-    this.status.set(`Syncing slot ${slot} (full patch read)...`);
+    this.status.set(`Reading slot ${slot} (full patch)...`);
     this.responseJson.set('');
 
     try {
@@ -402,7 +402,7 @@ export class App implements OnInit, OnDestroy {
       });
       const payload = (await response.json()) as SlotSyncResponse | { detail: unknown };
       if (!response.ok) {
-        this.status.set(`Slot ${slot} sync failed`);
+        this.status.set(`Slot ${slot} read failed`);
         this.responseJson.set(JSON.stringify(payload, null, 2));
         return;
       }
@@ -412,9 +412,9 @@ export class App implements OnInit, OnDestroy {
       this.lastSyncedAt.set(synced.synced_at);
       this.totalSyncMs.set(synced.slot.slot_sync_ms);
       this.ampStateHash.set('');
-      this.status.set(`Slot ${slot} full sync succeeded (${this.formatMs(synced.slot.slot_sync_ms)})`);
+      this.status.set(`Slot ${slot} read succeeded (${this.formatMs(synced.slot.slot_sync_ms)})`);
     } catch (error: unknown) {
-      this.status.set(`Slot ${slot} sync failed`);
+      this.status.set(`Slot ${slot} read failed`);
       this.responseJson.set(
         JSON.stringify(
           {
@@ -430,11 +430,11 @@ export class App implements OnInit, OnDestroy {
 
   async saveSlotPatch(slot: SlotCard): Promise<void> {
     if (!slot.patch || !slot.config_hash_sha256) {
-      this.status.set(`No full patch payload loaded for ${slot.slot_label}. Sync this slot first.`);
+      this.status.set(`No full patch payload loaded for ${slot.slot_label}. Read this slot first.`);
       return;
     }
 
-    this.status.set(`Checking library for ${slot.slot_label}...`);
+    this.status.set(`Writing ${slot.slot_label} to library...`);
     this.responseJson.set('');
 
     try {
@@ -444,11 +444,11 @@ export class App implements OnInit, OnDestroy {
       });
       if (lookupResponse.ok) {
         this.markSlotSaved(slot.slot);
-        this.status.set(`${slot.slot_label} already in library`);
+        this.status.set(`${slot.slot_label} already written to library`);
         this.responseJson.set(
           JSON.stringify(
             {
-              message: 'Patch already exists in library',
+              message: 'Patch already written to library',
               slot: slot.slot_label,
               hash_id: slot.config_hash_sha256,
             },
@@ -481,11 +481,11 @@ export class App implements OnInit, OnDestroy {
 
       const persistedHash = typeof savePayload.hash_id === 'string' ? savePayload.hash_id : slot.config_hash_sha256;
       this.markSlotSaved(slot.slot, persistedHash);
-      this.status.set(`${slot.slot_label} saved to library`);
+      this.status.set(`${slot.slot_label} written to library`);
       this.responseJson.set(
         JSON.stringify(
           {
-            message: 'Patch saved to library',
+            message: 'Patch written to library',
             slot: slot.slot_label,
             hash_id: persistedHash,
           },
@@ -879,8 +879,12 @@ export class App implements OnInit, OnDestroy {
     return this.hasFullPatch(slot);
   }
 
-  canSyncSlot(slot: SlotCard): boolean {
+  canReadSlot(slot: SlotCard): boolean {
     return !(slot.in_sync && slot.is_saved);
+  }
+
+  canSyncSlot(slot: SlotCard): boolean {
+    return this.canReadSlot(slot);
   }
 
   slotSyncInLabel(slot: SlotCard): string {
@@ -889,6 +893,10 @@ export class App implements OnInit, OnDestroy {
 
   slotSyncOutLabel(slot: SlotCard): string {
     return slot.out_synced ? 'Sync-Out OK' : 'Sync-Out Pending';
+  }
+
+  canWriteSlot(slot: SlotCard): boolean {
+    return this.canSaveSlot(slot);
   }
 
   canSaveSlot(slot: SlotCard): boolean {
