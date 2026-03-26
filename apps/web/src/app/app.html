@@ -54,9 +54,14 @@
         <article class="card">
           <p class="slot">{{ slot.slot_label }}</p>
           <h3>{{ displayPatchName(slot) }}</h3>
-          <button type="button" (click)="syncAmpSlot(slot.slot)" [disabled]="isLoading()">
-            {{ isLoading() ? 'Working...' : 'Sync Slot' }}
-          </button>
+          <div class="slot-actions">
+            <button type="button" (click)="refreshAmpSlot(slot.slot)" [disabled]="isLoading()">
+              {{ isLoading() ? 'Working...' : 'Refresh' }}
+            </button>
+            <button type="button" (click)="syncAmpSlot(slot.slot)" [disabled]="isLoading()">
+              {{ isLoading() ? 'Working...' : 'Sync' }}
+            </button>
+          </div>
           <p>Hash: <code>{{ displayHash(slot) }}</code></p>
           <p>Last Sync: <code>{{ slot.synced_at || 'n/a' }}</code></p>
           <p>Match: <code>{{ slot.inferred ? 'inferred' : (slot.match_count > 1 ? 'ambiguous' : 'unknown') }}</code></p>
@@ -72,9 +77,14 @@
         <article class="card">
           <p class="slot">{{ slot.slot_label }}</p>
           <h3>{{ displayPatchName(slot) }}</h3>
-          <button type="button" (click)="syncAmpSlot(slot.slot)" [disabled]="isLoading()">
-            {{ isLoading() ? 'Working...' : 'Sync Slot' }}
-          </button>
+          <div class="slot-actions">
+            <button type="button" (click)="refreshAmpSlot(slot.slot)" [disabled]="isLoading()">
+              {{ isLoading() ? 'Working...' : 'Refresh' }}
+            </button>
+            <button type="button" (click)="syncAmpSlot(slot.slot)" [disabled]="isLoading()">
+              {{ isLoading() ? 'Working...' : 'Sync' }}
+            </button>
+          </div>
           <p>Hash: <code>{{ displayHash(slot) }}</code></p>
           <p>Last Sync: <code>{{ slot.synced_at || 'n/a' }}</code></p>
           <p>Match: <code>{{ slot.inferred ? 'inferred' : (slot.match_count > 1 ? 'ambiguous' : 'unknown') }}</code></p>

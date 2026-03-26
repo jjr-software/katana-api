@@ -185,6 +185,23 @@ class AmpClient:
                 slot_sync_ms=int(round((time.perf_counter() - started) * 1000)),
             )
 
+    async def read_slot_name_quick(self, slot: int, synced_at: str) -> QuickSlotName:
+        if slot < 1 or slot > 8:
+            raise AmpClientError(f"slot out of range: {slot} (expected 1..8)")
+
+        async with self._port_lock():
+            started = time.perf_counter()
+            await self._send_only(EDITOR_MODE_ON)
+            await self._select_patch(slot)
+            patch_com = await self._read_rq1(ADDR_PATCH_COM, 16)
+            return QuickSlotName(
+                slot=slot,
+                slot_label=slot_label(slot),
+                patch_name=self._decode_patch_name(patch_com),
+                synced_at=synced_at,
+                slot_sync_ms=int(round((time.perf_counter() - started) * 1000)),
+            )
+
     async def full_amp_dump(self, synced_at: str) -> FullAmpDumpSnapshot:
         async with self._port_lock():
             started = time.perf_counter()

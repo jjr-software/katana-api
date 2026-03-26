@@ -452,3 +452,21 @@
     - `setups/analysis/*.json`
     - `setups/analysis/*.txt`
 - Kept patch/snapshot sources under `setups/variations/**` unaffected.
+
+## Session Update - 2026-03-26 (Per-Slot Refresh + Sync Buttons)
+- Added dedicated quick-refresh API for a single slot:
+  - `POST /api/v1/amp/slots/{slot}/quick`
+  - reads only patch name for the selected slot and returns quick match metadata.
+- Added backend client helper:
+  - `AmpClient.read_slot_name_quick(slot, synced_at)`
+- Updated web slot cards (both banks) to include two per-slot controls:
+  - `Refresh` (quick name-only refresh)
+  - `Sync` (full per-slot sync with config hash)
+- Files changed:
+  - `apps/api/app/katana/client.py`
+  - `apps/api/app/api/amp.py`
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+  - `apps/web/src/app/app.css`
+- Containerized verification run:
+  - `docker compose build api web` succeeded.

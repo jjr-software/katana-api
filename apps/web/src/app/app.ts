@@ -45,6 +45,11 @@ interface QuickSlotsStateResponse {
   slots: QuickSlotSummary[];
 }
 
+interface QuickSlotSyncResponse {
+  synced_at: string;
+  slot: QuickSlotSummary;
+}
+
 interface SlotsSyncEnqueueResponse {
   job_id: string;
   operation: string;
@@ -348,6 +353,50 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  async refreshAmpSlot(slot: number): Promise<void> {
+    this.isLoading.set(true);
+    this.status.set(`Refreshing slot ${slot}...`);
+    this.responseJson.set('');
+
+    try {
+      const response = await fetch(`/api/v1/amp/slots/${slot}/quick`, {
+        method: 'POST',
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as QuickSlotSyncResponse | { detail: unknown };
+      if (!response.ok) {
+        this.status.set(`Slot ${slot} refresh failed`);
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        this.updateBusyFromPayload(payload);
+        await this.refreshDeviceStatus();
+        return;
+      }
+
+      const refreshed = payload as QuickSlotSyncResponse;
+      this.applyQuickSlot(refreshed.slot);
+      this.lastSyncedAt.set(refreshed.synced_at);
+      this.totalSyncMs.set(refreshed.slot.slot_sync_ms);
+      this.ampStateHash.set('');
+      this.status.set(`Slot ${slot} refresh succeeded`);
+      await this.refreshDeviceStatus();
+    } catch (error: unknown) {
+      this.status.set(`Slot ${slot} refresh failed`);
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Browser request failed',
+            error: String(error),
+          },
+          null,
+          2,
+        ),
+      );
+      await this.refreshDeviceStatus();
+    } finally {
+      this.isLoading.set(false);
+    }
+  }
+
   async quickSyncAmpSlots(): Promise<void> {
     this.isLoading.set(true);
     this.status.set('Quick sync queued...');
@@ -595,6 +644,26 @@ export class App implements OnInit, OnDestroy {
           slot_sync_ms: slot.slot_sync_ms,
           inferred: false,
           match_count: 1,
+        };
+      }),
+    );
+  }
+
+  private applyQuickSlot(slot: QuickSlotSummary): void {
+    this.slots.update((current) =>
+      current.map((card) => {
+        if (card.slot !== slot.slot) {
+          return card;
+        }
+        return {
+          slot: slot.slot,
+          slot_label: slot.slot_label,
+          patch_name: slot.patch_name,
+          config_hash_sha256: slot.inferred_hash_sha256 ?? '',
+          synced_at: slot.synced_at,
+          slot_sync_ms: slot.slot_sync_ms,
+          inferred: slot.inferred_hash_sha256 !== null,
+          match_count: slot.match_count,
         };
       }),
     );
