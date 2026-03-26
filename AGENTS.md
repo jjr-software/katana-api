@@ -735,6 +735,23 @@
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
 
+## Session Update - 2026-03-26 (Per-Slot Measure: 10s Frontend Max Capture + Countdown)
+- Reworked per-slot `Measure` behavior to run fully in frontend timing window:
+  - duration fixed to 10 seconds,
+  - slot is synced first (queued amp slot sync),
+  - frontend subscribes to SSE live metrics (`/api/v1/audio/live/sse`) during window,
+  - records maximum RMS/Peak dBFS seen during that 10-second interval.
+- UX updates:
+  - button now shows live countdown (`Measuring (Ns)`) for active slot,
+  - only one slot measure can run at a time.
+- Card display updated:
+  - shows `10s Max RMS/Peak` and capture timestamp.
+- Files changed:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
+
 ## Session Update - 2026-03-26 (Queued Backup Feature + Nested Repo Flatten)
 - Added queued amp backup API endpoints:
   - `POST /api/v1/amp/backup` (enqueue full amp-state dump)

@@ -219,6 +219,7 @@ interface SlotCard {
   inferred: boolean;
   match_count: number;
   measured_rms_dbfs: number | null;
+  measured_peak_dbfs: number | null;
   measured_at: string;
 }
 
@@ -240,6 +241,7 @@ function defaultSlotCards(): SlotCard[] {
       inferred: false,
       match_count: 0,
       measured_rms_dbfs: null,
+      measured_peak_dbfs: null,
       measured_at: '',
     };
   });
@@ -269,6 +271,8 @@ export class App implements OnInit, OnDestroy {
   liveMeterConnected = signal(false);
   liveRmsHistory = signal<number[]>([]);
   isMeasuringSlotsRms = signal(false);
+  activeMeasureSlot = signal<number | null>(null);
+  measureCountdownSec = signal(0);
   queuePollHandle: ReturnType<typeof setInterval> | null = null;
   liveMeterSource: EventSource | null = null;
   rawModalOpen = signal(false);
@@ -442,55 +446,100 @@ export class App implements OnInit, OnDestroy {
   }
 
   async measureSlotRms(slot: SlotCard): Promise<void> {
-    this.status.set(`Measuring 2s RMS for ${slot.slot_label}...`);
+    if (this.activeMeasureSlot() !== null) {
+      return;
+    }
+    const durationSec = 10;
+    this.activeMeasureSlot.set(slot.slot);
+    this.measureCountdownSec.set(durationSec);
     this.responseJson.set('');
+    let countdownHandle: ReturnType<typeof setInterval> | null = null;
+    let source: EventSource | null = null;
     try {
-      const response = await fetch('/api/v1/audio/measure', {
-        method: 'POST',
-        cache: 'no-store',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          patch_hash: slot.is_saved ? (slot.config_hash_sha256 || null) : null,
-          slot: slot.slot,
-          duration_sec: 2.0,
-        }),
+      this.status.set(`Preparing ${slot.slot_label} for 10s max-level measurement...`);
+      const synced = await this.syncSlotForMeasurement(slot.slot);
+      this.applySyncedSlot(synced.slot);
+      this.lastSyncedAt.set(synced.synced_at);
+      this.totalSyncMs.set(synced.slot.slot_sync_ms);
+      this.ampStateHash.set('');
+
+      let maxRms = Number.NEGATIVE_INFINITY;
+      let maxPeak = Number.NEGATIVE_INFINITY;
+      let samples = 0;
+      let lastTs = '';
+      source = new EventSource('/api/v1/audio/live/sse?window_sec=0.25');
+      source.onmessage = (event: MessageEvent<string>) => {
+        try {
+          const payload = JSON.parse(event.data) as Record<string, unknown>;
+          if (String(payload['type'] ?? '') !== 'audio_metrics') {
+            return;
+          }
+          const rms = Number(payload['rms_dbfs']);
+          const peak = Number(payload['peak_dbfs']);
+          if (Number.isFinite(rms)) {
+            maxRms = Math.max(maxRms, rms);
+          }
+          if (Number.isFinite(peak)) {
+            maxPeak = Math.max(maxPeak, peak);
+          }
+          samples += 1;
+          lastTs = String(payload['ts'] ?? '');
+        } catch {
+          // ignore malformed event payloads; measurement window continues
+        }
+      };
+
+      const startedAt = Date.now();
+      countdownHandle = setInterval(() => {
+        const remaining = durationSec - Math.floor((Date.now() - startedAt) / 1000);
+        this.measureCountdownSec.set(Math.max(0, remaining));
+      }, 200);
+      this.status.set(`Measuring ${slot.slot_label} max levels for ${durationSec}s...`);
+      await new Promise<void>((resolve) => {
+        setTimeout(() => resolve(), durationSec * 1000);
       });
-      const payload = (await response.json()) as AudioSampleResponse | { detail?: unknown };
-      if (!response.ok) {
-        this.status.set(`RMS measure failed for ${slot.slot_label}`);
-        this.responseJson.set(JSON.stringify(payload, null, 2));
-        return;
+
+      if (samples <= 0 || !Number.isFinite(maxRms) || !Number.isFinite(maxPeak)) {
+        throw new Error('No live audio metric samples captured during 10-second window');
       }
-      const sample = payload as AudioSampleResponse;
-      this.setSlotMeasuredRms(slot.slot, sample.rms_dbfs, sample.created_at);
-      this.status.set(`RMS measured for ${slot.slot_label}`);
+
+      this.setSlotMeasuredRms(slot.slot, maxRms, maxPeak, lastTs || new Date().toISOString());
+      this.status.set(`Max-level measurement complete for ${slot.slot_label}`);
       this.responseJson.set(
         JSON.stringify(
           {
-            message: 'RMS measurement captured',
+            message: '10-second max-level measurement captured',
             slot: slot.slot_label,
-            patch_hash: sample.patch_hash,
-            rms_dbfs: sample.rms_dbfs,
-            peak_dbfs: sample.peak_dbfs,
-            sample_count: sample.sample_count,
-            captured_at: sample.created_at,
+            max_rms_dbfs: maxRms,
+            max_peak_dbfs: maxPeak,
+            events: samples,
+            captured_at: lastTs || null,
           },
           null,
           2,
         ),
       );
     } catch (error: unknown) {
-      this.status.set(`RMS measure failed for ${slot.slot_label}`);
+      this.status.set(`Measure failed for ${slot.slot_label}`);
       this.responseJson.set(
         JSON.stringify(
           {
-            message: 'Browser request failed',
+            message: 'Measure failed',
             error: String(error),
           },
           null,
           2,
         ),
       );
+    } finally {
+      if (countdownHandle !== null) {
+        clearInterval(countdownHandle);
+      }
+      if (source !== null) {
+        source.close();
+      }
+      this.measureCountdownSec.set(0);
+      this.activeMeasureSlot.set(null);
     }
   }
 
@@ -708,7 +757,7 @@ export class App implements OnInit, OnDestroy {
 
         this.status.set(`Slot ${slot}/8: measuring RMS (5s)...`);
         const sample = await this.captureSlotRmsSample(synced.slot);
-        this.setSlotMeasuredRms(synced.slot.slot, sample.rms_dbfs, sample.created_at);
+        this.setSlotMeasuredRms(synced.slot.slot, sample.rms_dbfs, sample.peak_dbfs, sample.created_at);
         measurements.push({
           slot: synced.slot.slot,
           slot_label: synced.slot.slot_label,
@@ -757,6 +806,17 @@ export class App implements OnInit, OnDestroy {
       return false;
     }
     return this.canUseSlotActions(slot);
+  }
+
+  canMeasureSlot(slot: SlotCard): boolean {
+    return this.canUseSlotActions(slot) && this.activeMeasureSlot() === null;
+  }
+
+  measureButtonLabel(slot: SlotCard): string {
+    if (this.activeMeasureSlot() === slot.slot) {
+      return `Measuring (${this.measureCountdownSec()}s)`;
+    }
+    return 'Measure';
   }
 
   async quickSyncAmpSlots(): Promise<void> {
@@ -991,6 +1051,7 @@ export class App implements OnInit, OnDestroy {
         inferred: false,
         match_count: 1,
         measured_rms_dbfs: current?.measured_rms_dbfs ?? null,
+        measured_peak_dbfs: current?.measured_peak_dbfs ?? null,
         measured_at: current?.measured_at ?? '',
       };
     });
@@ -1018,6 +1079,7 @@ export class App implements OnInit, OnDestroy {
         inferred: quick.inferred_hash_sha256 !== null,
         match_count: quick.match_count,
         measured_rms_dbfs: current?.measured_rms_dbfs ?? null,
+        measured_peak_dbfs: current?.measured_peak_dbfs ?? null,
         measured_at: current?.measured_at ?? '',
       };
     });
@@ -1042,6 +1104,7 @@ export class App implements OnInit, OnDestroy {
           inferred: false,
           match_count: 1,
           measured_rms_dbfs: card.measured_rms_dbfs,
+          measured_peak_dbfs: card.measured_peak_dbfs,
           measured_at: card.measured_at,
         };
       }),
@@ -1078,7 +1141,7 @@ export class App implements OnInit, OnDestroy {
     return payload as AudioSampleResponse;
   }
 
-  private setSlotMeasuredRms(slotNumber: number, rmsDbfs: number, measuredAt: string): void {
+  private setSlotMeasuredRms(slotNumber: number, rmsDbfs: number, peakDbfs: number, measuredAt: string): void {
     this.slots.update((current) =>
       current.map((card) => {
         if (card.slot !== slotNumber) {
@@ -1087,6 +1150,7 @@ export class App implements OnInit, OnDestroy {
         return {
           ...card,
           measured_rms_dbfs: rmsDbfs,
+          measured_peak_dbfs: peakDbfs,
           measured_at: measuredAt,
         };
       }),
