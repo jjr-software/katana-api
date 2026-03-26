@@ -239,7 +239,7 @@ async def enqueue_slots_sync() -> SlotsSyncEnqueueResponse:
     )
 
 
-@router.post("/slots/{slot}/sync", response_model=SlotSyncResponse)
+@router.post("/slots/{slot:int}/sync", response_model=SlotSyncResponse)
 async def sync_single_slot(
     slot: int,
     db: Session = Depends(get_db),

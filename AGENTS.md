@@ -523,3 +523,17 @@
   - queue monitor now shows slot context for slot-targeted jobs.
 - Containerized verification:
   - `docker compose build api web` succeeded.
+
+## Session Update - 2026-03-26 (Quick Sync Route Collision Fixed)
+- Reproduced web failure via Playwright:
+  - `Quick Sync Names` returned validation error with `slot='quick'`.
+- Root cause:
+  - route collision where dynamic per-slot path could capture quick-sync path.
+- Fix:
+  - changed per-slot route to explicit integer converter:
+    - `POST /api/v1/amp/slots/{slot:int}/sync`
+  - file: `apps/api/app/api/amp.py`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
+- Playwright re-check:
+  - `Quick Sync Names` now succeeds and updates slot names.
