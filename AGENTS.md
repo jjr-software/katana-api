@@ -670,6 +670,15 @@
 - Validation:
   - live API sample call succeeded and stored row id `1` with returned RMS/Peak dBFS.
 
+## Session Update - 2026-03-26 (Audio Sample Failure Fix)
+- Fixed sample failure caused by foreign-key linkage to unsaved patch hashes.
+- Changes:
+  - frontend now links `patch_hash` only when slot is marked saved
+  - backend now validates supplied `patch_hash` and returns HTTP `400` with clear message when hash is unknown (instead of DB `500`)
+- Validation:
+  - sample with `patch_hash=null` succeeded and persisted
+  - sample with unknown hash returned expected `400` JSON error payload
+
 ## Session Update - 2026-03-26 (Queue-Only Amp I/O + No Global UI Lock)
 - Enforced queue-backed amp communication across API amp-read/sync routes:
   - `GET /api/v1/amp/test-connection` now executes via queue job.

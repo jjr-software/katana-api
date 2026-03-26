@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.audio_capture import capture_audio_metrics
 from app.deps import get_db
-from app.models import AudioSample
+from app.models import AudioSample, PatchConfig
 
 router = APIRouter(prefix="/api/v1/audio", tags=["audio"])
 
@@ -38,6 +38,16 @@ async def create_audio_sample(
     payload: AudioSampleCreateRequest,
     db: Session = Depends(get_db),
 ) -> AudioSampleResponse:
+    if payload.patch_hash:
+        exists = db.get(PatchConfig, payload.patch_hash)
+        if exists is None:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "patch_hash is not in patch library; save patch first or omit hash linkage",
+                    "patch_hash": payload.patch_hash,
+                },
+            )
     sample = await capture_audio_metrics(
         source=payload.source,
         duration_sec=payload.duration_sec,

@@ -431,7 +431,7 @@ export class App implements OnInit, OnDestroy {
         cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          patch_hash: slot.config_hash_sha256 || null,
+          patch_hash: slot.is_saved ? (slot.config_hash_sha256 || null) : null,
           slot: slot.slot,
           duration_sec: 2.0,
         }),
