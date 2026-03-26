@@ -1436,3 +1436,17 @@
   - `apps/web/src/app/app.html`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Editor Live-Apply 5s Grace + Countdown)
+- Increased editor live-apply hysteresis to a 5-second grace period after each edit before sending live apply.
+- Added countdown display in editor `State` line during grace window:
+  - shows `grace X.Xs` until apply triggers.
+- Countdown is cleared when:
+  - live-apply is disabled,
+  - editor modal closes,
+  - live apply starts.
+- Files changed:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

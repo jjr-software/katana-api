@@ -73,7 +73,7 @@ const DELAY_TYPE_NAMES = [
 const AMP_TYPE_NAMES = ['Acoustic', 'Clean', 'Crunch', 'Lead', 'Brown'];
 const REVERB_TYPE_NAMES = ['Plate Reverb', 'Room Reverb', 'Hall Reverb', 'Spring Reverb', 'Modulate Reverb'];
 const LIVE_RMS_WINDOW_POINTS = 96;
-const EDITOR_LIVE_APPLY_DEBOUNCE_MS = 180;
+const EDITOR_LIVE_APPLY_DEBOUNCE_MS = 5000;
 const EDITOR_LIVE_APPLY_MIN_GAP_MS = 120;
 
 interface AmpConnectionTestResponse {
@@ -348,7 +348,10 @@ export class App implements OnInit, OnDestroy {
   editorLiveApplyEnabled = signal(true);
   editorLiveApplyPending = signal(false);
   editorLiveApplyError = signal('');
+  editorLiveApplyCountdownSec = signal<number | null>(null);
   editorLiveApplyHandle: ReturnType<typeof setTimeout> | null = null;
+  editorLiveApplyCountdownHandle: ReturnType<typeof setInterval> | null = null;
+  editorLiveApplyDueAtMs: number | null = null;
   editorLiveApplyInFlight = false;
   editorLiveApplyLastStartedAtMs = 0;
   editorLiveApplyLastAppliedFingerprint = '';
@@ -379,6 +382,7 @@ export class App implements OnInit, OnDestroy {
       clearTimeout(this.editorLiveApplyHandle);
       this.editorLiveApplyHandle = null;
     }
+    this.stopEditorLiveApplyCountdown();
   }
 
   async testAmpConnection(): Promise<void> {
@@ -1362,6 +1366,7 @@ export class App implements OnInit, OnDestroy {
       clearTimeout(this.editorLiveApplyHandle);
       this.editorLiveApplyHandle = null;
     }
+    this.stopEditorLiveApplyCountdown();
     this.editorLiveApplyInFlight = false;
     this.editorLiveApplyQueuedFingerprint = null;
     this.editorBaseFingerprint.set('');
@@ -1370,6 +1375,9 @@ export class App implements OnInit, OnDestroy {
 
   setEditorLiveApplyEnabled(enabled: boolean): void {
     this.editorLiveApplyEnabled.set(enabled);
+    if (!enabled) {
+      this.stopEditorLiveApplyCountdown();
+    }
     if (enabled) {
       this.scheduleEditorLiveApply();
     }
@@ -2373,8 +2381,10 @@ export class App implements OnInit, OnDestroy {
     const sinceLastStartMs = Date.now() - this.editorLiveApplyLastStartedAtMs;
     const gapWaitMs = Math.max(0, EDITOR_LIVE_APPLY_MIN_GAP_MS - sinceLastStartMs);
     const waitMs = Math.max(EDITOR_LIVE_APPLY_DEBOUNCE_MS, gapWaitMs);
+    this.startEditorLiveApplyCountdown(waitMs);
     this.editorLiveApplyHandle = setTimeout(() => {
       this.editorLiveApplyHandle = null;
+      this.stopEditorLiveApplyCountdown();
       void this.flushEditorLiveApplyQueue();
     }, waitMs);
   }
@@ -2410,6 +2420,7 @@ export class App implements OnInit, OnDestroy {
     const draftSnapshot = this.clonePatch(draft);
     this.editorLiveApplyInFlight = true;
     this.editorLiveApplyLastStartedAtMs = Date.now();
+    this.stopEditorLiveApplyCountdown();
     this.editorLiveApplyPending.set(true);
     try {
       const response = await fetch('/api/v1/amp/current-patch/live-apply', {
@@ -2470,10 +2481,45 @@ export class App implements OnInit, OnDestroy {
     return this.patchFingerprint(draft);
   }
 
+  editorLiveApplyGraceLabel(): string {
+    const remaining = this.editorLiveApplyCountdownSec();
+    if (remaining === null) {
+      return '';
+    }
+    return `${remaining.toFixed(1)}s`;
+  }
+
   private patchFingerprint(patch: Record<string, unknown>): string {
     const normalized = this.clonePatch(patch);
     delete normalized['config_hash_sha256'];
     return this.stableStringify(normalized);
+  }
+
+  private startEditorLiveApplyCountdown(waitMs: number): void {
+    this.stopEditorLiveApplyCountdown();
+    this.editorLiveApplyDueAtMs = Date.now() + waitMs;
+    this.updateEditorLiveApplyCountdown();
+    this.editorLiveApplyCountdownHandle = setInterval(() => {
+      this.updateEditorLiveApplyCountdown();
+    }, 100);
+  }
+
+  private updateEditorLiveApplyCountdown(): void {
+    if (this.editorLiveApplyDueAtMs === null) {
+      this.editorLiveApplyCountdownSec.set(null);
+      return;
+    }
+    const remainingMs = Math.max(0, this.editorLiveApplyDueAtMs - Date.now());
+    this.editorLiveApplyCountdownSec.set(remainingMs / 1000);
+  }
+
+  private stopEditorLiveApplyCountdown(): void {
+    if (this.editorLiveApplyCountdownHandle !== null) {
+      clearInterval(this.editorLiveApplyCountdownHandle);
+      this.editorLiveApplyCountdownHandle = null;
+    }
+    this.editorLiveApplyDueAtMs = null;
+    this.editorLiveApplyCountdownSec.set(null);
   }
 
   private stableStringify(value: unknown): string {

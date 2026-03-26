@@ -338,6 +338,8 @@
                   <code>applying...</code>
                 } @else if (editorLiveApplyError()) {
                   <code class="text-danger">error</code>
+                } @else if (editorLiveApplyEnabled() && editorLiveApplyCountdownSec() !== null) {
+                  <code class="text-warning">grace {{ editorLiveApplyGraceLabel() }}</code>
                 } @else if (editorLiveApplyEnabled()) {
                   <code class="text-success">ready</code>
                 } @else {
