@@ -1397,3 +1397,16 @@
   - `apps/web/src/app/app.html`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Removed Extra Editor Readback UI State)
+- Removed the added editor readback status line/hash from modal UI.
+- Kept the underlying non-overwrite behavior fix:
+  - editor draft is not replaced by readback payload during live apply.
+- Outcome:
+  - no extra visible state noise in editor,
+  - live edits still protected from reset.
+- Files changed:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

@@ -353,17 +353,6 @@
                 }
                 · Hash: <code>{{ editorHashLabel() }}</code>
               </p>
-              <p class="small mb-0 text-secondary">
-                Readback:
-                @if (editorReadbackState() === 'match') {
-                  <code class="text-success">match</code>
-                } @else if (editorReadbackState() === 'mismatch') {
-                  <code class="text-warning">mismatch</code>
-                } @else {
-                  <code>unknown</code>
-                }
-                · Hash: <code>{{ editorReadbackHashLabel() }}</code>
-              </p>
               @if (editorLiveApplyError()) {
                 <p class="small mb-0 text-danger mt-1">{{ editorLiveApplyError() }}</p>
               }
