@@ -1462,3 +1462,16 @@
   - `apps/web/src/app/app.ts`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Hash No Longer Includes Patch Name)
+- Updated patch hash canonicalization to exclude `patch_name` (in addition to excluding `config_hash_sha256`).
+- Applied at both hash sources to keep behavior consistent:
+  - API patch config hash (`/api/v1/patches/configs`)
+  - Katana client computed `config_hash_sha256` during amp reads/applies
+- Outcome:
+  - renaming a patch no longer changes hash.
+- Files changed:
+  - `apps/api/app/api/patches.py`
+  - `apps/api/app/katana/client.py`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

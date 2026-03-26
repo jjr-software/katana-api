@@ -139,6 +139,10 @@ def _upsert_patch_config(db: Session, hash_id: str, snapshot: dict) -> PatchConf
 
 
 def _snapshot_hash(snapshot: dict) -> str:
-    canonical = {key: value for key, value in snapshot.items() if key != "config_hash_sha256"}
+    canonical = {
+        key: value
+        for key, value in snapshot.items()
+        if key not in {"config_hash_sha256", "patch_name"}
+    }
     snapshot_bytes = json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(snapshot_bytes).hexdigest()

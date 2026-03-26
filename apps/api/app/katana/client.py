@@ -697,7 +697,11 @@ class AmpClient:
 
     @staticmethod
     def _config_hash(payload: dict[str, Any]) -> str:
-        base = {key: value for key, value in payload.items() if key != "config_hash_sha256"}
+        base = {
+            key: value
+            for key, value in payload.items()
+            if key not in {"config_hash_sha256", "patch_name"}
+        }
         blob = json.dumps(base, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
         return sha256(blob.encode("utf-8")).hexdigest()
 
