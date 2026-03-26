@@ -2,9 +2,12 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-from app.deps import get_amp_client
+from app.deps import get_amp_client, get_db
 from app.katana import AmpClient, AmpClientError, SlotDump, SlotPatchSummary
+from app.models import PatchSet, PatchSetMember
 
 router = APIRouter(prefix="/api/v1/amp", tags=["amp"])
 
@@ -28,6 +31,7 @@ class SlotPatchSummaryResponse(BaseModel):
     config_hash_sha256: str
     synced_at: str
     slot_sync_ms: int
+    curated: list[dict]
 
 
 class SlotsStateResponse(BaseModel):
@@ -43,6 +47,7 @@ class FullDumpSlotResponse(BaseModel):
     synced_at: str
     slot_sync_ms: int
     patch: dict
+    curated: list[dict]
 
 
 class FullAmpDumpResponse(BaseModel):
@@ -95,7 +100,10 @@ async def current_patch(client: AmpClient = Depends(get_amp_client)) -> CurrentP
 
 
 @router.get("/slots", response_model=SlotsStateResponse)
-async def slots_state(client: AmpClient = Depends(get_amp_client)) -> SlotsStateResponse:
+async def slots_state(
+    client: AmpClient = Depends(get_amp_client),
+    db: Session = Depends(get_db),
+) -> SlotsStateResponse:
     synced_at = datetime.now().isoformat(timespec="seconds")
     try:
         state = await client.read_slots_state(synced_at=synced_at)
@@ -109,15 +117,16 @@ async def slots_state(client: AmpClient = Depends(get_amp_client)) -> SlotsState
             },
         ) from exc
 
+    curated_by_hash = _load_curation_by_hash(db, [slot.config_hash_sha256 for slot in state.slots])
     return SlotsStateResponse(
         synced_at=state.synced_at,
         amp_state_hash_sha256=state.amp_state_hash_sha256,
         total_sync_ms=state.total_sync_ms,
-        slots=[SlotPatchSummaryResponse(**_slot_to_dict(slot)) for slot in state.slots],
+        slots=[SlotPatchSummaryResponse(**_slot_to_dict(slot, curated_by_hash)) for slot in state.slots],
     )
 
 
-def _slot_to_dict(slot: SlotPatchSummary) -> dict:
+def _slot_to_dict(slot: SlotPatchSummary, curated_by_hash: dict[str, list[dict]]) -> dict:
     return {
         "slot": slot.slot,
         "slot_label": slot.slot_label,
@@ -125,11 +134,15 @@ def _slot_to_dict(slot: SlotPatchSummary) -> dict:
         "config_hash_sha256": slot.config_hash_sha256,
         "synced_at": slot.synced_at,
         "slot_sync_ms": slot.slot_sync_ms,
+        "curated": curated_by_hash.get(slot.config_hash_sha256, []),
     }
 
 
 @router.get("/full-dump", response_model=FullAmpDumpResponse)
-async def full_amp_dump(client: AmpClient = Depends(get_amp_client)) -> FullAmpDumpResponse:
+async def full_amp_dump(
+    client: AmpClient = Depends(get_amp_client),
+    db: Session = Depends(get_db),
+) -> FullAmpDumpResponse:
     synced_at = datetime.now().isoformat(timespec="seconds")
     try:
         dump = await client.full_amp_dump(synced_at=synced_at)
@@ -142,19 +155,54 @@ async def full_amp_dump(client: AmpClient = Depends(get_amp_client)) -> FullAmpD
                 "midi_port": client.midi_port,
             },
         ) from exc
+    curated_by_hash = _load_curation_by_hash(
+        db,
+        [str(item.payload.get("config_hash_sha256", "")) for item in dump.slots],
+    )
     return FullAmpDumpResponse(
         synced_at=dump.synced_at,
         amp_state_hash_sha256=dump.amp_state_hash_sha256,
         total_sync_ms=dump.total_sync_ms,
-        slots=[FullDumpSlotResponse(**_slot_dump_to_dict(item)) for item in dump.slots],
+        slots=[FullDumpSlotResponse(**_slot_dump_to_dict(item, curated_by_hash)) for item in dump.slots],
     )
 
 
-def _slot_dump_to_dict(slot: SlotDump) -> dict:
+def _slot_dump_to_dict(slot: SlotDump, curated_by_hash: dict[str, list[dict]]) -> dict:
+    hash_id = str(slot.payload.get("config_hash_sha256", ""))
     return {
         "slot": slot.slot,
         "slot_label": slot.slot_label,
         "synced_at": slot.synced_at,
         "slot_sync_ms": slot.slot_sync_ms,
         "patch": slot.payload,
+        "curated": curated_by_hash.get(hash_id, []),
     }
+
+
+def _load_curation_by_hash(db: Session, hash_ids: list[str]) -> dict[str, list[dict]]:
+    clean_hashes = [item for item in hash_ids if item]
+    if not clean_hashes:
+        return {}
+    rows = db.execute(
+        select(
+            PatchSetMember.hash_id,
+            PatchSet.id,
+            PatchSet.name,
+            PatchSet.notes,
+            PatchSetMember.variation_note,
+        )
+        .join(PatchSet, PatchSet.id == PatchSetMember.patch_set_id)
+        .where(PatchSetMember.hash_id.in_(clean_hashes))
+        .order_by(PatchSet.name.asc(), PatchSetMember.id.asc())
+    ).all()
+    out: dict[str, list[dict]] = {}
+    for hash_id, set_id, set_name, set_notes, variation_note in rows:
+        out.setdefault(hash_id, []).append(
+            {
+                "patch_set_id": set_id,
+                "patch_set_name": set_name,
+                "patch_set_notes": set_notes or "",
+                "variation_note": variation_note or "",
+            }
+        )
+    return out
