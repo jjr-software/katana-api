@@ -192,6 +192,11 @@ interface CurrentPatchResponse {
   patch: Record<string, unknown>;
 }
 
+interface ApplyCurrentPatchResponse {
+  applied_at: string;
+  patch: Record<string, unknown>;
+}
+
 interface AudioSampleResponse {
   id: number;
   patch_hash: string | null;
@@ -238,6 +243,7 @@ interface SlotCard {
   slot_sync_ms: number;
   inferred: boolean;
   match_count: number;
+  out_synced: boolean;
   measured_rms_dbfs: number | null;
   measured_peak_dbfs: number | null;
   measured_at: string;
@@ -274,6 +280,7 @@ function defaultSlotCards(): SlotCard[] {
       slot_sync_ms: 0,
       inferred: false,
       match_count: 0,
+      out_synced: false,
       measured_rms_dbfs: null,
       measured_peak_dbfs: null,
       measured_at: '',
@@ -316,6 +323,10 @@ export class App implements OnInit, OnDestroy {
   editorSlotNumber = signal<number | null>(null);
   editorSlotLabel = signal('');
   editorPatchDraft = signal<Record<string, unknown> | null>(null);
+  editorLiveApplyEnabled = signal(true);
+  editorLiveApplyPending = signal(false);
+  editorLiveApplyError = signal('');
+  editorLiveApplyHandle: ReturnType<typeof setTimeout> | null = null;
   patchSetModalOpen = signal(false);
   patchSetSnapshots = signal<BackupSnapshotSummary[]>([]);
 
@@ -333,6 +344,10 @@ export class App implements OnInit, OnDestroy {
       this.queuePollHandle = null;
     }
     this.stopLiveMeter();
+    if (this.editorLiveApplyHandle !== null) {
+      clearTimeout(this.editorLiveApplyHandle);
+      this.editorLiveApplyHandle = null;
+    }
   }
 
   async testAmpConnection(): Promise<void> {
@@ -860,6 +875,14 @@ export class App implements OnInit, OnDestroy {
     return !(slot.in_sync && slot.is_saved);
   }
 
+  slotSyncInLabel(slot: SlotCard): string {
+    return slot.in_sync ? 'Sync-In OK' : 'Sync-In Missing';
+  }
+
+  slotSyncOutLabel(slot: SlotCard): string {
+    return slot.out_synced ? 'Sync-Out OK' : 'Sync-Out Pending';
+  }
+
   canSaveSlot(slot: SlotCard): boolean {
     if (slot.in_sync && slot.is_saved) {
       return false;
@@ -1053,6 +1076,19 @@ export class App implements OnInit, OnDestroy {
 
   closeEditorModal(): void {
     this.editorModalOpen.set(false);
+    this.editorLiveApplyPending.set(false);
+    this.editorLiveApplyError.set('');
+    if (this.editorLiveApplyHandle !== null) {
+      clearTimeout(this.editorLiveApplyHandle);
+      this.editorLiveApplyHandle = null;
+    }
+  }
+
+  setEditorLiveApplyEnabled(enabled: boolean): void {
+    this.editorLiveApplyEnabled.set(enabled);
+    if (enabled) {
+      this.scheduleEditorLiveApply();
+    }
   }
 
   editorPatchName(): string {
@@ -1245,6 +1281,7 @@ export class App implements OnInit, OnDestroy {
           patch: this.clonePatch(draft),
           config_hash_sha256: '',
           in_sync: false,
+          out_synced: false,
           is_saved: false,
           inferred: false,
         };
@@ -1288,6 +1325,7 @@ export class App implements OnInit, OnDestroy {
             patch: this.clonePatch(draft),
             config_hash_sha256: hashId,
             in_sync: false,
+            out_synced: false,
             is_saved: true,
             inferred: false,
           };
@@ -1475,6 +1513,7 @@ export class App implements OnInit, OnDestroy {
         slot_sync_ms: full.slot_sync_ms,
         inferred: false,
         match_count: 1,
+        out_synced: true,
         measured_rms_dbfs: current?.measured_rms_dbfs ?? null,
         measured_peak_dbfs: current?.measured_peak_dbfs ?? null,
         measured_at: current?.measured_at ?? '',
@@ -1505,6 +1544,7 @@ export class App implements OnInit, OnDestroy {
         slot_sync_ms: full.slot_sync_ms,
         inferred: false,
         match_count: 1,
+        out_synced: false,
         measured_rms_dbfs: current?.measured_rms_dbfs ?? null,
         measured_peak_dbfs: current?.measured_peak_dbfs ?? null,
         measured_at: current?.measured_at ?? '',
@@ -1533,6 +1573,7 @@ export class App implements OnInit, OnDestroy {
         slot_sync_ms: quick.slot_sync_ms,
         inferred: quick.inferred_hash_sha256 !== null,
         match_count: quick.match_count,
+        out_synced: current?.out_synced ?? false,
         measured_rms_dbfs: current?.measured_rms_dbfs ?? null,
         measured_peak_dbfs: current?.measured_peak_dbfs ?? null,
         measured_at: current?.measured_at ?? '',
@@ -1558,6 +1599,7 @@ export class App implements OnInit, OnDestroy {
           slot_sync_ms: slot.slot_sync_ms,
           inferred: false,
           match_count: 1,
+          out_synced: true,
           measured_rms_dbfs: card.measured_rms_dbfs,
           measured_peak_dbfs: card.measured_peak_dbfs,
           measured_at: card.measured_at,
@@ -1959,6 +2001,77 @@ export class App implements OnInit, OnDestroy {
       mutator(next);
       return next;
     });
+    this.editorLiveApplyError.set('');
+    const slotNumber = this.editorSlotNumber();
+    if (slotNumber !== null) {
+      this.slots.update((current) =>
+        current.map((card) => (card.slot === slotNumber ? { ...card, out_synced: false, in_sync: false } : card)),
+      );
+    }
+    this.scheduleEditorLiveApply();
+  }
+
+  private scheduleEditorLiveApply(): void {
+    if (!this.editorModalOpen() || !this.editorLiveApplyEnabled()) {
+      return;
+    }
+    if (this.editorPatchDraft() === null || this.editorSlotNumber() === null) {
+      return;
+    }
+    if (this.editorLiveApplyHandle !== null) {
+      clearTimeout(this.editorLiveApplyHandle);
+    }
+    this.editorLiveApplyHandle = setTimeout(() => {
+      this.editorLiveApplyHandle = null;
+      void this.applyEditorPatchLive();
+    }, 180);
+  }
+
+  private async applyEditorPatchLive(): Promise<void> {
+    const draft = this.editorPatchDraft();
+    const slotNumber = this.editorSlotNumber();
+    if (!this.editorLiveApplyEnabled() || draft === null || slotNumber === null) {
+      return;
+    }
+    this.editorLiveApplyPending.set(true);
+    try {
+      const response = await fetch('/api/v1/amp/current-patch/live-apply', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patch: draft }),
+      });
+      const payload = (await response.json()) as ApplyCurrentPatchResponse | { detail?: unknown };
+      if (!response.ok) {
+        this.editorLiveApplyError.set(typeof payload === 'object' ? JSON.stringify(payload) : 'live apply failed');
+        return;
+      }
+      const applied = payload as ApplyCurrentPatchResponse;
+      const appliedPatch = this.clonePatch(applied.patch);
+      this.editorPatchDraft.set(appliedPatch);
+      const patchName = this.readString(appliedPatch, 'patch_name') ?? '';
+      const hash = this.readString(appliedPatch, 'config_hash_sha256') ?? '';
+      this.slots.update((current) =>
+        current.map((card) => {
+          if (card.slot !== slotNumber) {
+            return card;
+          }
+          return {
+            ...card,
+            patch_name: patchName || card.patch_name,
+            patch: this.clonePatch(appliedPatch),
+            config_hash_sha256: hash,
+            in_sync: true,
+            out_synced: true,
+            is_saved: false,
+          };
+        }),
+      );
+    } catch (error: unknown) {
+      this.editorLiveApplyError.set(String(error));
+    } finally {
+      this.editorLiveApplyPending.set(false);
+    }
   }
 
   private nv(value: number | null): string {
@@ -1971,6 +2084,9 @@ export class App implements OnInit, OnDestroy {
     }
     if (value === 'current_patch') {
       return 'Current Patch';
+    }
+    if (value === 'apply_current_patch') {
+      return 'Live Apply Patch';
     }
     if (value === 'sync_slot') {
       return 'Sync Slot';

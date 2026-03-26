@@ -33,6 +33,7 @@ from app.katana.protocol import (
     EDITOR_MODE_ON,
     IDENTITY_REQUEST_HEX,
     PATCH_SELECT_ADDR,
+    ADDR_PATCH_COM,
     addr_add,
     slot_label,
 )
@@ -148,6 +149,12 @@ class AmpClient:
     async def read_current_patch(self) -> CurrentPatchSnapshot:
         async with self._port_lock():
             await self._send_only(EDITOR_MODE_ON)
+            return CurrentPatchSnapshot(payload=await self._read_selected_patch_payload())
+
+    async def apply_current_patch(self, patch_payload: dict[str, Any]) -> CurrentPatchSnapshot:
+        async with self._port_lock():
+            await self._send_only(EDITOR_MODE_ON)
+            await self._apply_selected_patch_payload(patch_payload)
             return CurrentPatchSnapshot(payload=await self._read_selected_patch_payload())
 
     async def read_slots_state(self, synced_at: str) -> SlotsStateSnapshot:
@@ -402,6 +409,132 @@ class AmpClient:
         }
         payload["config_hash_sha256"] = self._config_hash(payload)
         return payload
+
+    async def _apply_selected_patch_payload(self, payload: dict[str, Any]) -> None:
+        patch_name = self._normalize_patch_name(str(payload.get("patch_name", "")))
+        await self._send_only(build_dt1(ADDR_PATCH_COM, patch_name))
+
+        amp_obj = payload.get("amp")
+        if isinstance(amp_obj, dict):
+            amp_raw = amp_obj.get("raw")
+            amp_data = self._to_int_list(amp_raw, expected_size=10, field_name="amp.raw")
+            await self._send_only(build_dt1(ADDR_PATCH_AMP, amp_data))
+
+        sw_data = await self._read_rq1(ADDR_PATCH_SW, 6)
+        stage_map = {
+            "booster": 0,
+            "mod": 1,
+            "fx": 2,
+            "delay": 3,
+            "reverb": 5,
+        }
+        stages_obj = payload.get("stages")
+        if isinstance(stages_obj, dict):
+            for stage_name, sw_index in stage_map.items():
+                stage_obj = stages_obj.get(stage_name)
+                if not isinstance(stage_obj, dict):
+                    continue
+                if "on" in stage_obj:
+                    sw_data[sw_index] = 1 if bool(stage_obj.get("on")) else 0
+        await self._send_only(build_dt1(ADDR_PATCH_SW, sw_data[:6]))
+
+        color_data = await self._read_rq1(ADDR_PATCH_COLOR, 5)
+        colors_obj = payload.get("colors")
+        if isinstance(colors_obj, dict):
+            color_index_map = {
+                "booster": 0,
+                "mod": 1,
+                "fx": 2,
+                "delay": 3,
+                "reverb": 4,
+            }
+            for stage_name, color_index in color_index_map.items():
+                stage_color_obj = colors_obj.get(stage_name)
+                if not isinstance(stage_color_obj, dict):
+                    continue
+                color_value = stage_color_obj.get("index")
+                if isinstance(color_value, (int, float)):
+                    color_data[color_index] = max(0, min(2, int(color_value)))
+        await self._send_only(build_dt1(ADDR_PATCH_COLOR, color_data[:5]))
+
+        if isinstance(stages_obj, dict):
+            await self._write_stage_variant(
+                stages_obj.get("booster"),
+                color_index=color_data[0] if len(color_data) >= 1 else 0,
+                base_addr=ADDR_PATCH_BOOSTER_1,
+                size=8,
+                field_name="stages.booster.raw",
+            )
+            await self._write_stage_variant(
+                stages_obj.get("mod"),
+                color_index=color_data[1] if len(color_data) >= 2 else 0,
+                base_addr=ADDR_PATCH_FX_1,
+                size=1,
+                field_name="stages.mod.raw",
+            )
+            await self._write_stage_variant(
+                stages_obj.get("fx"),
+                color_index=color_data[2] if len(color_data) >= 3 else 0,
+                base_addr=ADDR_PATCH_FX_4,
+                size=1,
+                field_name="stages.fx.raw",
+            )
+            await self._write_stage_variant(
+                stages_obj.get("delay"),
+                color_index=color_data[3] if len(color_data) >= 4 else 0,
+                base_addr=ADDR_PATCH_DELAY_1,
+                size=17,
+                field_name="stages.delay.raw",
+            )
+            await self._write_stage_variant(
+                stages_obj.get("reverb"),
+                color_index=color_data[4] if len(color_data) >= 5 else 0,
+                base_addr=ADDR_PATCH_REVERB_1,
+                size=13,
+                field_name="stages.reverb.raw",
+            )
+
+    async def _write_stage_variant(
+        self,
+        stage_obj: Any,
+        color_index: int,
+        base_addr: tuple[int, int, int, int],
+        size: int,
+        field_name: str,
+    ) -> None:
+        if not isinstance(stage_obj, dict):
+            return
+        raw = stage_obj.get("raw")
+        if not isinstance(raw, list):
+            return
+        data = self._to_int_list(raw, expected_size=size, field_name=field_name)
+        addr = addr_add(base_addr, 0x200 * max(0, min(2, int(color_index))))
+        await self._send_only(build_dt1(addr, data))
+
+    @staticmethod
+    def _to_int_list(value: Any, expected_size: int, field_name: str) -> list[int]:
+        if not isinstance(value, list):
+            raise AmpClientError(f"Invalid payload: {field_name} must be a list")
+        if len(value) != expected_size:
+            raise AmpClientError(
+                f"Invalid payload: {field_name} must have length {expected_size} (got {len(value)})"
+            )
+        out: list[int] = []
+        for idx, item in enumerate(value):
+            if not isinstance(item, (int, float)):
+                raise AmpClientError(f"Invalid payload: {field_name}[{idx}] must be numeric")
+            ivalue = int(item)
+            if ivalue < 0 or ivalue > 127:
+                raise AmpClientError(f"Invalid payload: {field_name}[{idx}] out of range 0..127")
+            out.append(ivalue)
+        return out
+
+    @staticmethod
+    def _normalize_patch_name(name: str) -> list[int]:
+        clipped = (name or "")[:16]
+        encoded = [ord(ch) if 32 <= ord(ch) <= 126 else ord("?") for ch in clipped]
+        padded = encoded + [0] * (16 - len(encoded))
+        return padded
 
     async def _run_amidi(self, args: list[str], timeout_seconds: float) -> tuple[int, str, str]:
         proc = await asyncio.create_subprocess_exec(

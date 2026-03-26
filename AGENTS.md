@@ -1104,3 +1104,36 @@
   - `apps/web/src/app/app.html`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Live Editor Apply + Sync-In/Sync-Out Status)
+- Added live patch apply endpoint (queue-backed) so editor changes can push immediately to amp current patch:
+  - `POST /api/v1/amp/current-patch/live-apply`
+  - request: `{ "patch": <full patch payload> }`
+  - response: applied/readback patch payload.
+- Amp client now supports applying a full selected-patch payload by writing:
+  - patch name (`PATCH_COM`),
+  - amp raw block,
+  - stage on/off switches,
+  - color block,
+  - stage variant raw blocks for booster/mod/fx/delay/reverb based on active color variant.
+- Web editor modal:
+  - added `Live Apply To Amp While Editing` switch (enabled by default),
+  - debounced live apply while editing (`~180ms`),
+  - live state indicator (`applying`, `ready`, `disabled`, error).
+- Card status model now includes explicit `Sync-In` and `Sync-Out` badges:
+  - `Sync-In` tracks amp->UI freshness (`in_sync`),
+  - `Sync-Out` tracks UI->amp push state (`out_synced`).
+- Queue label added for new operation:
+  - `apply_current_patch` -> `Live Apply Patch`.
+- Files changed:
+  - `apps/api/app/katana/client.py`
+  - `apps/api/app/amp_queue.py`
+  - `apps/api/app/api/amp.py`
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
+- Validation:
+  - containerized API call succeeded:
+    - `GET /api/v1/amp/current-patch`
+    - `POST /api/v1/amp/current-patch/live-apply` using current payload returned `200` with readback hash.

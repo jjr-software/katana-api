@@ -27,6 +27,15 @@ class CurrentPatchResponse(BaseModel):
     patch: dict
 
 
+class ApplyCurrentPatchRequest(BaseModel):
+    patch: dict
+
+
+class ApplyCurrentPatchResponse(BaseModel):
+    applied_at: str
+    patch: dict
+
+
 class SlotPatchSummaryResponse(BaseModel):
     slot: int
     slot_label: str
@@ -253,6 +262,25 @@ async def current_patch() -> CurrentPatchResponse:
     return CurrentPatchResponse(
         created_at=datetime.now().isoformat(timespec="seconds"),
         patch=settled.result_current_patch,
+    )
+
+
+@router.post("/current-patch/live-apply", response_model=ApplyCurrentPatchResponse)
+async def apply_current_patch_live(payload: ApplyCurrentPatchRequest) -> ApplyCurrentPatchResponse:
+    job = await amp_job_queue.enqueue_apply_current_patch(payload.patch)
+    settled = await _await_terminal_job(job.job_id, timeout_seconds=120.0)
+    if settled.status != "succeeded" or settled.result_applied_patch is None:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "Failed to apply patch live to amp",
+                "error": settled.error or "queued current patch apply failed",
+                "job_id": settled.job_id,
+            },
+        )
+    return ApplyCurrentPatchResponse(
+        applied_at=datetime.now().isoformat(timespec="seconds"),
+        patch=settled.result_applied_patch,
     )
 
 
