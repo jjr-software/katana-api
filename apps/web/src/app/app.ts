@@ -73,7 +73,7 @@ const DELAY_TYPE_NAMES = [
 const AMP_TYPE_NAMES = ['Acoustic', 'Clean', 'Crunch', 'Lead', 'Brown'];
 const REVERB_TYPE_NAMES = ['Plate Reverb', 'Room Reverb', 'Hall Reverb', 'Spring Reverb', 'Modulate Reverb'];
 const LIVE_RMS_WINDOW_POINTS = 96;
-const EDITOR_LIVE_APPLY_DEBOUNCE_MS = 5000;
+const EDITOR_LIVE_APPLY_DEBOUNCE_MS = 2000;
 const EDITOR_LIVE_APPLY_MIN_GAP_MS = 120;
 
 interface AmpConnectionTestResponse {

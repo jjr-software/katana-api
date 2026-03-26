@@ -1491,3 +1491,11 @@
   - `apps/api/app/katana/client.py`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Editor Grace Window Tuned To 2s)
+- Reduced editor live-apply grace/hysteresis window from `5s` to `2s`.
+- Countdown behavior in editor state remains unchanged, now counting down from 2.0 seconds.
+- Files changed:
+  - `apps/web/src/app/app.ts`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
