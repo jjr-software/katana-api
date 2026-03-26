@@ -101,6 +101,12 @@ Keep:
 - `patch_configs` as immutable hash library nucleus.
 - `audio_samples` as capture log with optional patch linkage.
 
+`patch_set_slot_assignments` is a junction table between `patch_sets` and `patch_configs`, with slot position as part of the link:
+- `patch_set_id` -> `patch_sets.id`
+- `desired_hash` -> `patch_configs.hash_id`
+- `slot` (1..8)
+- unique `(patch_set_id, slot)`
+
 ## 6) API Work Items
 Planned target surface:
 - `POST /api/v1/amp/full-sync` (queued)

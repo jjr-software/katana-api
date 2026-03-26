@@ -608,6 +608,8 @@
   - done vs partial vs pending status,
   - phased forward roadmap,
   - immediate next sprint checklist.
+- Follow-up clarification added:
+  - explicitly states `patch_set_slot_assignments` is a junction table between `patch_sets` and `patch_configs` with `slot` and unique `(patch_set_id, slot)`.
 
 ## Session Update - 2026-03-26 (Queued Backup Feature + Nested Repo Flatten)
 - Added queued amp backup API endpoints:
