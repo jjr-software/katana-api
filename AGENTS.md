@@ -1074,3 +1074,22 @@
   - `apps/web/src/app/app.css`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Editor Modal v2: Type-Schema Foundation)
+- Extended editor modal to handle differing pedal schemas by stage/type using raw variant payloads.
+- Added stage parameter grid driven from each stage `raw` payload:
+  - renders `P1..Pn` style parameters for all stage types,
+  - applies stage-specific labels where known:
+    - booster (`Drive`, `Tone`, `Effect Level`, etc.),
+    - delay (`Feedback`, `Effect Level`, `Direct Level`, etc.),
+    - reverb (`Layer Mode`, `Time`, `Effect Level`, `Direct Level`).
+- Type changes now hydrate stage `raw` from `variants_raw[type]` when available (schema switch behavior).
+- Added synchronization of derived fields from raw payload for key stage summaries:
+  - booster: `type`, `drive`, `effect_level`
+  - delay: `type`, `effect_level`
+  - reverb: `type`, `effect_level`
+- Files changed:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

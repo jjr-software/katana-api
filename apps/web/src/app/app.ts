@@ -250,6 +250,13 @@ interface TypeOption {
   label: string;
 }
 
+interface StageParam {
+  id: string;
+  label: string;
+  rawIndex: number;
+  value: number;
+}
+
 function defaultSlotCards(): SlotCard[] {
   return Array.from({ length: 8 }, (_, idx) => {
     const slot = idx + 1;
@@ -1101,6 +1108,14 @@ export class App implements OnInit, OnDestroy {
       const stages = this.ensureObject(draft, 'stages');
       const stage = this.ensureObject(stages, stageName);
       stage['type'] = parsed;
+      const variantsRaw = stage['variants_raw'];
+      if (Array.isArray(variantsRaw) && parsed >= 0 && parsed < variantsRaw.length) {
+        const variant = variantsRaw[parsed];
+        if (Array.isArray(variant)) {
+          stage['raw'] = variant.map((item) => this.parseUnknownNumber(item));
+        }
+      }
+      this.syncStageDerivedFields(stageName, stage);
     });
   }
 
@@ -1116,6 +1131,12 @@ export class App implements OnInit, OnDestroy {
       const stages = this.ensureObject(draft, 'stages');
       const stage = this.ensureObject(stages, stageName);
       stage['effect_level'] = parsed;
+      const raw = this.ensureNumericRaw(stage);
+      const rawIndex = this.effectLevelRawIndex(stageName);
+      if (rawIndex !== null && rawIndex < raw.length) {
+        raw[rawIndex] = parsed;
+      }
+      stage['raw'] = raw;
     });
   }
 
@@ -1131,6 +1152,11 @@ export class App implements OnInit, OnDestroy {
       const stages = this.ensureObject(draft, 'stages');
       const stage = this.ensureObject(stages, 'booster');
       stage['drive'] = parsed;
+      const raw = this.ensureNumericRaw(stage);
+      if (raw.length > 1) {
+        raw[1] = parsed;
+      }
+      stage['raw'] = raw;
     });
   }
 
@@ -1144,6 +1170,44 @@ export class App implements OnInit, OnDestroy {
             ? DELAY_TYPE_NAMES
             : REVERB_TYPE_NAMES;
     return table.map((label, index) => ({ value: index, label }));
+  }
+
+  editorStageParams(stageName: StageName): StageParam[] {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const stage = this.readObject(stages, stageName);
+    if (!stage) {
+      return [];
+    }
+    const raw = this.ensureNumericRaw(stage);
+    if (raw.length <= 1) {
+      return [];
+    }
+    const labels = this.stageParamLabels(stageName, raw.length);
+    const params: StageParam[] = [];
+    for (let idx = 1; idx < raw.length; idx += 1) {
+      params.push({
+        id: `${stageName}-${idx}`,
+        label: labels[idx] ?? `P${idx}`,
+        rawIndex: idx,
+        value: raw[idx],
+      });
+    }
+    return params;
+  }
+
+  setEditorStageParam(stageName: StageName, rawIndex: number, value: string): void {
+    const parsed = this.parseInteger(value);
+    this.updateEditorPatch((draft) => {
+      const stages = this.ensureObject(draft, 'stages');
+      const stage = this.ensureObject(stages, stageName);
+      const raw = this.ensureNumericRaw(stage);
+      if (rawIndex >= raw.length) {
+        return;
+      }
+      raw[rawIndex] = parsed;
+      stage['raw'] = raw;
+      this.syncStageDerivedFields(stageName, stage);
+    });
   }
 
   applyEditorDraftToSlot(): void {
@@ -1714,6 +1778,114 @@ export class App implements OnInit, OnDestroy {
     const created: Record<string, unknown> = {};
     parent[key] = created;
     return created;
+  }
+
+  private ensureNumericRaw(stage: Record<string, unknown>): number[] {
+    const rawUnknown = stage['raw'];
+    if (!Array.isArray(rawUnknown)) {
+      return [];
+    }
+    return rawUnknown.map((item) => this.parseUnknownNumber(item));
+  }
+
+  private parseUnknownNumber(value: unknown): number {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return Math.trunc(value);
+    }
+    if (typeof value === 'string') {
+      const parsed = Number.parseInt(value, 10);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+    return 0;
+  }
+
+  private effectLevelRawIndex(stageName: StageName): number | null {
+    if (stageName === 'booster') {
+      return 6;
+    }
+    if (stageName === 'delay') {
+      return 7;
+    }
+    if (stageName === 'reverb') {
+      return 10;
+    }
+    return null;
+  }
+
+  private syncStageDerivedFields(stageName: StageName, stage: Record<string, unknown>): void {
+    const raw = this.ensureNumericRaw(stage);
+    if (raw.length === 0) {
+      return;
+    }
+    if (stageName === 'booster') {
+      if (raw.length > 0) {
+        stage['type'] = raw[0];
+      }
+      if (raw.length > 1) {
+        stage['drive'] = raw[1];
+      }
+      if (raw.length > 6) {
+        stage['effect_level'] = raw[6];
+      }
+      return;
+    }
+    if (stageName === 'delay') {
+      if (raw.length > 0) {
+        stage['type'] = raw[0];
+      }
+      if (raw.length > 7) {
+        stage['effect_level'] = raw[7];
+      }
+      return;
+    }
+    if (stageName === 'reverb') {
+      if (raw.length > 0) {
+        stage['type'] = raw[0];
+      }
+      if (raw.length > 10) {
+        stage['effect_level'] = raw[10];
+      }
+      return;
+    }
+    if (raw.length > 0) {
+      stage['type'] = raw[0];
+    }
+  }
+
+  private stageParamLabels(stageName: StageName, rawLength: number): string[] {
+    const labels: string[] = Array.from({ length: rawLength }, (_, index) => `P${index}`);
+    labels[0] = 'Type';
+    if (stageName === 'booster') {
+      if (rawLength > 1) labels[1] = 'Drive';
+      if (rawLength > 2) labels[2] = 'Bottom';
+      if (rawLength > 3) labels[3] = 'Tone';
+      if (rawLength > 4) labels[4] = 'Solo SW';
+      if (rawLength > 5) labels[5] = 'Solo Level';
+      if (rawLength > 6) labels[6] = 'Effect Level';
+      if (rawLength > 7) labels[7] = 'Direct Mix';
+      return labels;
+    }
+    if (stageName === 'delay') {
+      if (rawLength > 1) labels[1] = 'Time LSB';
+      if (rawLength > 2) labels[2] = 'Time';
+      if (rawLength > 3) labels[3] = 'Time';
+      if (rawLength > 4) labels[4] = 'Time MSB';
+      if (rawLength > 5) labels[5] = 'Feedback';
+      if (rawLength > 6) labels[6] = 'High Cut';
+      if (rawLength > 7) labels[7] = 'Effect Level';
+      if (rawLength > 8) labels[8] = 'Direct Level';
+      return labels;
+    }
+    if (stageName === 'reverb') {
+      if (rawLength > 1) labels[1] = 'Layer Mode';
+      if (rawLength > 2) labels[2] = 'Time';
+      if (rawLength > 10) labels[10] = 'Effect Level';
+      if (rawLength > 11) labels[11] = 'Direct Level';
+      return labels;
+    }
+    return labels;
   }
 
   private readNumber(source: Record<string, unknown> | null, key: string): number | null {

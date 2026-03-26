@@ -296,6 +296,21 @@
                     </div>
                   }
                 </div>
+                <div class="row g-2 mt-1">
+                  @for (param of editorStageParams($any(stageName)); track param.id) {
+                    <div class="col-6 col-md-3">
+                      <label class="form-label small mb-1">{{ param.label }}</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="127"
+                        class="form-control form-control-sm"
+                        [value]="param.value"
+                        (input)="setEditorStageParam($any(stageName), param.rawIndex, $any($event.target).value)"
+                      />
+                    </div>
+                  }
+                </div>
               </article>
             }
           </div>
