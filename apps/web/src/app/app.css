@@ -12,35 +12,6 @@ h1 {
   margin-bottom: 0.35rem;
 }
 
-.device-banner {
-  margin: 0.75rem 0 0.9rem 0;
-  border: 1px solid #58687a;
-  border-radius: 10px;
-  background: #1b2532;
-  padding: 0.65rem 0.8rem;
-}
-
-.device-banner.busy {
-  border-color: #dc2626;
-  background: #331717;
-}
-
-.device-banner.available {
-  border-color: #16a34a;
-  background: #132e1e;
-}
-
-.device-line {
-  margin: 0;
-  font-size: 0.95rem;
-}
-
-.device-meta {
-  margin: 0.35rem 0 0 0;
-  color: #cbd5e1;
-  font-size: 0.83rem;
-}
-
 button {
   background: var(--accent);
   color: var(--fg);

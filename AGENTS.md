@@ -562,6 +562,14 @@
 - API verification:
   - `/api/v1/amp/slots/quick` and `/api/v1/amp/slots` now both include `in_sync` + `is_saved` per slot.
 
+## Session Update - 2026-03-26 (Removed Auto Device Banner Polling)
+- Removed auto `/api/v1/amp/device-status` banner and polling from web UI.
+- Kept explicit manual health check via `Test Amp Connection` action only.
+- Reason:
+  - reduce random red/busy banner flips caused by transient status polling/probe noise.
+- Rebuilt/restarted:
+  - `docker compose up -d --build`
+
 ## Session Update - 2026-03-26 (Queue-Only Amp I/O + No Global UI Lock)
 - Enforced queue-backed amp communication across API amp-read/sync routes:
   - `GET /api/v1/amp/test-connection` now executes via queue job.

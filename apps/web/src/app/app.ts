@@ -124,15 +124,6 @@ interface BackupJobResponse {
   result: FullAmpDumpResponse | null;
 }
 
-interface DeviceStatusResponse {
-  midi_port: string;
-  busy: boolean;
-  available: boolean;
-  concurrency_supported: boolean;
-  detail: string;
-  checked_at: string;
-}
-
 interface QueueJobSummary {
   job_id: string;
   operation: string;
@@ -192,39 +183,24 @@ function defaultSlotCards(): SlotCard[] {
   styleUrl: './app.css',
 })
 export class App implements OnInit, OnDestroy {
-  private pollHandle: ReturnType<typeof setInterval> | null = null;
-
   status = signal('Idle');
   responseJson = signal('');
   slots = signal<SlotCard[]>(defaultSlotCards());
   ampStateHash = signal('');
   lastSyncedAt = signal('');
   totalSyncMs = signal(0);
-  deviceBusy = signal(false);
-  deviceAvailable = signal(false);
-  deviceStatusText = signal('Checking amp device...');
-  deviceStatusCheckedAt = signal('');
-  deviceMidiPort = signal('');
   queueJobs = signal<QueueJobSummary[]>([]);
   queueGeneratedAt = signal('');
   queuePollHandle: ReturnType<typeof setInterval> | null = null;
 
   ngOnInit(): void {
-    void this.refreshDeviceStatus();
     void this.refreshQueueState();
-    this.pollHandle = setInterval(() => {
-      void this.refreshDeviceStatus();
-    }, 4000);
     this.queuePollHandle = setInterval(() => {
       void this.refreshQueueState();
     }, 1000);
   }
 
   ngOnDestroy(): void {
-    if (this.pollHandle !== null) {
-      clearInterval(this.pollHandle);
-      this.pollHandle = null;
-    }
     if (this.queuePollHandle !== null) {
       clearInterval(this.queuePollHandle);
       this.queuePollHandle = null;
@@ -245,8 +221,6 @@ export class App implements OnInit, OnDestroy {
       if (!response.ok) {
         this.status.set('Connection test failed');
         this.responseJson.set(JSON.stringify(payload, null, 2));
-        this.updateBusyFromPayload(payload);
-        await this.refreshDeviceStatus();
         return;
       }
 
@@ -263,7 +237,6 @@ export class App implements OnInit, OnDestroy {
         null,
         2,
       ));
-      await this.refreshDeviceStatus();
     }
   }
 
@@ -284,8 +257,6 @@ export class App implements OnInit, OnDestroy {
         this.lastSyncedAt.set('');
         this.totalSyncMs.set(0);
         this.responseJson.set(JSON.stringify(enqueuePayload, null, 2));
-        this.updateBusyFromPayload(enqueuePayload);
-        await this.refreshDeviceStatus();
         return;
       }
 
@@ -309,7 +280,6 @@ export class App implements OnInit, OnDestroy {
             2,
           ),
         );
-        await this.refreshDeviceStatus();
         return;
       }
 
@@ -320,7 +290,6 @@ export class App implements OnInit, OnDestroy {
       this.lastSyncedAt.set(state.synced_at);
       this.totalSyncMs.set(state.total_sync_ms);
       this.responseJson.set('');
-      await this.refreshDeviceStatus();
     } catch (error: unknown) {
       this.status.set('Amp sync failed');
       this.ampStateHash.set('');
@@ -336,7 +305,6 @@ export class App implements OnInit, OnDestroy {
           2,
         ),
       );
-      await this.refreshDeviceStatus();
     }
   }
 
@@ -353,8 +321,6 @@ export class App implements OnInit, OnDestroy {
       if (!response.ok) {
         this.status.set(`Slot ${slot} sync failed`);
         this.responseJson.set(JSON.stringify(payload, null, 2));
-        this.updateBusyFromPayload(payload);
-        await this.refreshDeviceStatus();
         return;
       }
 
@@ -364,7 +330,6 @@ export class App implements OnInit, OnDestroy {
       this.totalSyncMs.set(synced.slot.slot_sync_ms);
       this.ampStateHash.set('');
       this.status.set(`Slot ${slot} sync succeeded`);
-      await this.refreshDeviceStatus();
     } catch (error: unknown) {
       this.status.set(`Slot ${slot} sync failed`);
       this.responseJson.set(
@@ -377,7 +342,6 @@ export class App implements OnInit, OnDestroy {
           2,
         ),
       );
-      await this.refreshDeviceStatus();
     }
   }
 
@@ -395,8 +359,6 @@ export class App implements OnInit, OnDestroy {
       if (!enqueueResponse.ok) {
         this.status.set('Quick sync failed');
         this.responseJson.set(JSON.stringify(enqueuePayload, null, 2));
-        this.updateBusyFromPayload(enqueuePayload);
-        await this.refreshDeviceStatus();
         return;
       }
 
@@ -416,7 +378,6 @@ export class App implements OnInit, OnDestroy {
             2,
           ),
         );
-        await this.refreshDeviceStatus();
         return;
       }
 
@@ -426,7 +387,6 @@ export class App implements OnInit, OnDestroy {
       this.lastSyncedAt.set(quick.synced_at);
       this.totalSyncMs.set(quick.total_sync_ms);
       this.status.set('Quick sync succeeded');
-      await this.refreshDeviceStatus();
     } catch (error: unknown) {
       this.status.set('Quick sync failed');
       this.responseJson.set(
@@ -439,7 +399,6 @@ export class App implements OnInit, OnDestroy {
           2,
         ),
       );
-      await this.refreshDeviceStatus();
     }
   }
 
@@ -589,41 +548,6 @@ export class App implements OnInit, OnDestroy {
     window.URL.revokeObjectURL(url);
   }
 
-  async refreshDeviceStatus(): Promise<void> {
-    try {
-      const response = await fetch('/api/v1/amp/device-status', {
-        method: 'GET',
-        cache: 'no-store',
-      });
-      const payload = (await response.json()) as DeviceStatusResponse | { detail: unknown };
-      if (!response.ok) {
-        this.deviceAvailable.set(false);
-        this.deviceBusy.set(true);
-        this.deviceStatusText.set('Device status probe failed');
-        this.deviceStatusCheckedAt.set('');
-        return;
-      }
-
-      const status = payload as DeviceStatusResponse;
-      this.deviceBusy.set(status.busy);
-      this.deviceAvailable.set(status.available);
-      this.deviceMidiPort.set(status.midi_port);
-      this.deviceStatusCheckedAt.set(status.checked_at);
-      if (status.busy) {
-        this.deviceStatusText.set('Device busy: amp does not support concurrent control');
-      } else if (status.available) {
-        this.deviceStatusText.set('Device available for control');
-      } else {
-        this.deviceStatusText.set('Device unavailable');
-      }
-    } catch {
-      this.deviceAvailable.set(false);
-      this.deviceBusy.set(true);
-      this.deviceStatusText.set('Device status probe failed');
-      this.deviceStatusCheckedAt.set('');
-    }
-  }
-
   async refreshQueueState(): Promise<void> {
     try {
       const response = await fetch('/api/v1/amp/queue', {
@@ -639,15 +563,6 @@ export class App implements OnInit, OnDestroy {
       this.queueGeneratedAt.set(queue.generated_at);
     } catch {
       // no-op: queue panel keeps last visible state
-    }
-  }
-
-  private updateBusyFromPayload(payload: unknown): void {
-    const encoded = JSON.stringify(payload).toLowerCase();
-    if (encoded.includes('device or resource busy') || encoded.includes('resource busy')) {
-      this.deviceBusy.set(true);
-      this.deviceAvailable.set(false);
-      this.deviceStatusText.set('Device busy: amp does not support concurrent control');
     }
   }
 

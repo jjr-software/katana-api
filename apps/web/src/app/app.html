@@ -1,14 +1,6 @@
 <main class="shell">
   <h1>Katana Gen 3 Patch Manager</h1>
   <p>Live slot sync from amp memory. A and B channels are shown as 4 cards each.</p>
-  <section class="device-banner" [class.busy]="deviceBusy()" [class.available]="deviceAvailable() && !deviceBusy()">
-    <p class="device-line"><strong>Device:</strong> {{ deviceStatusText() }}</p>
-    <p class="device-meta">
-      Port: <code>{{ deviceMidiPort() || 'n/a' }}</code>
-      |
-      Last Check: <code>{{ deviceStatusCheckedAt() || 'n/a' }}</code>
-    </p>
-  </section>
   <div class="actions">
     <button type="button" (click)="testAmpConnection()">
       Test Amp Connection
