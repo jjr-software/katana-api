@@ -63,13 +63,13 @@
           <button type="button" (click)="syncAmpSlot(slot.slot)">
             Sync
           </button>
-          <button type="button" (click)="saveSlotPatch(slot)">
+          <button type="button" (click)="saveSlotPatch(slot)" [disabled]="!canUseSlotActions(slot)">
             Save
           </button>
-          <button type="button" (click)="sampleSlotAudio(slot)">
+          <button type="button" (click)="sampleSlotAudio(slot)" [disabled]="!canUseSlotActions(slot)">
             Sample
           </button>
-          <button type="button" (click)="showRaw(slot)">
+          <button type="button" (click)="showRaw(slot)" [disabled]="!canUseSlotActions(slot)">
             Raw
           </button>
           <p class="patch-detail"><strong>Amp:</strong> {{ ampSummary(slot) }}</p>
@@ -102,13 +102,13 @@
           <button type="button" (click)="syncAmpSlot(slot.slot)">
             Sync
           </button>
-          <button type="button" (click)="saveSlotPatch(slot)">
+          <button type="button" (click)="saveSlotPatch(slot)" [disabled]="!canUseSlotActions(slot)">
             Save
           </button>
-          <button type="button" (click)="sampleSlotAudio(slot)">
+          <button type="button" (click)="sampleSlotAudio(slot)" [disabled]="!canUseSlotActions(slot)">
             Sample
           </button>
-          <button type="button" (click)="showRaw(slot)">
+          <button type="button" (click)="showRaw(slot)" [disabled]="!canUseSlotActions(slot)">
             Raw
           </button>
           <p class="patch-detail"><strong>Amp:</strong> {{ ampSummary(slot) }}</p>

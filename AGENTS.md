@@ -679,6 +679,13 @@
   - sample with `patch_hash=null` succeeded and persisted
   - sample with unknown hash returned expected `400` JSON error payload
 
+## Session Update - 2026-03-26 (Disable Non-Usable Slot Buttons)
+- Slot card actions now respect slot sync state:
+  - when slot has no full patch payload, only `Sync` remains usable
+  - `Save`, `Sample`, and `Raw` are disabled until full slot sync/backup hydration loads patch payload
+- Rebuilt/restarted:
+  - `docker compose up -d --build`
+
 ## Session Update - 2026-03-26 (Queue-Only Amp I/O + No Global UI Lock)
 - Enforced queue-backed amp communication across API amp-read/sync routes:
   - `GET /api/v1/amp/test-connection` now executes via queue job.

@@ -474,6 +474,10 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  canUseSlotActions(slot: SlotCard): boolean {
+    return this.hasFullPatch(slot);
+  }
+
   async quickSyncAmpSlots(): Promise<void> {
     this.status.set('Quick sync queued...');
     this.responseJson.set('');
@@ -910,6 +914,10 @@ export class App implements OnInit, OnDestroy {
       return value;
     }
     return null;
+  }
+
+  private hasFullPatch(slot: SlotCard): boolean {
+    return slot.patch !== null;
   }
 
   private nv(value: number | null): string {
