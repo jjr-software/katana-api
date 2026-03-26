@@ -1260,3 +1260,31 @@
   - `apps/web/src/app/app.ts`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Saved Badge Clarification)
+- Clarified slot card saved badge wording to avoid amp-memory confusion:
+  - `Saved` -> `Saved DB`
+  - `Not Saved` -> `Not in DB`
+- This badge now clearly communicates patch-library persistence status only.
+- File changed:
+  - `apps/web/src/app/app.ts`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Protocol-Limit UX Reorg)
+- Reorganized card UX around confirmed Katana protocol limitation:
+  - slot read requires slot select first (no non-switching slot-read command known).
+- UI updates:
+  - added prominent warning banner near controls stating this limitation clearly.
+  - removed separate `Select` button.
+  - renamed card read action to `Select+Read`.
+  - renamed write action to `Write+Commit`.
+  - queue label for slot read changed to `Select+Read Slot`.
+- Saved badges clarified by splitting concerns:
+  - `Saved / Not Saved` now reflects amp-memory commit state (hash vs committed baseline).
+  - separate `DB Saved / DB Not Saved` badge reflects patch DB persistence.
+- File changes:
+  - `apps/web/src/app/app.html`
+  - `apps/web/src/app/app.ts`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
