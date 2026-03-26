@@ -493,3 +493,13 @@
   - `POST /api/v1/amp/slots/quick/sync`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Single Per-Slot Action Button)
+- Simplified slot cards to one per-slot action button only:
+  - kept `Sync`
+  - removed duplicate `Refresh` button
+- Removed now-unused UI code/styling tied to dual-button layout:
+  - removed `refreshAmpSlot(...)` from `apps/web/src/app/app.ts`
+  - removed `.slot-actions` styles from `apps/web/src/app/app.css`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

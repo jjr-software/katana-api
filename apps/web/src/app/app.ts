@@ -348,10 +348,6 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  async refreshAmpSlot(slot: number): Promise<void> {
-    await this.syncAmpSlot(slot);
-  }
-
   async quickSyncAmpSlots(): Promise<void> {
     this.isLoading.set(true);
     this.status.set('Quick sync queued...');

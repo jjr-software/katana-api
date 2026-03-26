@@ -156,18 +156,6 @@ button[disabled] {
   color: #cbd5e1;
 }
 
-.slot-actions {
-  display: flex;
-  gap: 0.45rem;
-  margin-bottom: 0.35rem;
-}
-
-.slot-actions button {
-  flex: 1;
-  padding: 0.5rem 0.7rem;
-  font-size: 0.85rem;
-}
-
 .slot {
   font-weight: 700;
   color: #90cdf4;
