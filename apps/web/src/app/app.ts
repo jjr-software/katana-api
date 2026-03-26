@@ -217,6 +217,8 @@ interface SlotCard {
   slot_sync_ms: number;
   inferred: boolean;
   match_count: number;
+  measured_rms_dbfs: number | null;
+  measured_at: string;
 }
 
 function defaultSlotCards(): SlotCard[] {
@@ -236,6 +238,8 @@ function defaultSlotCards(): SlotCard[] {
       slot_sync_ms: 0,
       inferred: false,
       match_count: 0,
+      measured_rms_dbfs: null,
+      measured_at: '',
     };
   });
 }
@@ -258,6 +262,7 @@ export class App implements OnInit, OnDestroy {
   levelMarkerRmsDbfs = signal<number | null>(null);
   levelMarkerPeakDbfs = signal<number | null>(null);
   levelMarkerCapturedAt = signal('');
+  isMeasuringSlotsRms = signal(false);
   queuePollHandle: ReturnType<typeof setInterval> | null = null;
   rawModalOpen = signal(false);
   rawModalTitle = signal('');
@@ -555,6 +560,60 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  async measureAllSlotsRms(): Promise<void> {
+    if (this.isMeasuringSlotsRms()) {
+      return;
+    }
+    this.isMeasuringSlotsRms.set(true);
+    this.responseJson.set('');
+    const measurements: Array<{ slot: number; slot_label: string; rms_dbfs: number; captured_at: string }> = [];
+    try {
+      for (let slot = 1; slot <= 8; slot += 1) {
+        this.status.set(`Slot ${slot}/8: syncing patch...`);
+        const synced = await this.syncSlotForMeasurement(slot);
+        this.applySyncedSlot(synced.slot);
+        this.lastSyncedAt.set(synced.synced_at);
+        this.totalSyncMs.set(synced.slot.slot_sync_ms);
+        this.ampStateHash.set('');
+
+        this.status.set(`Slot ${slot}/8: measuring RMS (5s)...`);
+        const sample = await this.captureSlotRmsSample(synced.slot);
+        this.setSlotMeasuredRms(synced.slot.slot, sample.rms_dbfs, sample.created_at);
+        measurements.push({
+          slot: synced.slot.slot,
+          slot_label: synced.slot.slot_label,
+          rms_dbfs: sample.rms_dbfs,
+          captured_at: sample.created_at,
+        });
+      }
+      this.status.set('Completed 5-second RMS measurement across all slots');
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Measured 5-second RMS for all slots',
+            measurements,
+          },
+          null,
+          2,
+        ),
+      );
+    } catch (error: unknown) {
+      this.status.set('5-second RMS slot cycle failed');
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Measure all slots RMS failed',
+            error: String(error),
+          },
+          null,
+          2,
+        ),
+      );
+    } finally {
+      this.isMeasuringSlotsRms.set(false);
+    }
+  }
+
   canUseSlotActions(slot: SlotCard): boolean {
     return slot.in_sync && this.hasFullPatch(slot);
   }
@@ -779,12 +838,14 @@ export class App implements OnInit, OnDestroy {
   }
 
   private mergeDumpState(state: FullAmpDumpResponse): SlotCard[] {
+    const currentBySlot = new Map<number, SlotCard>(this.slots().map((slot) => [slot.slot, slot]));
     const bySlot = new Map<number, FullDumpSlotResponse>(state.slots.map((slot) => [slot.slot, slot]));
     return defaultSlotCards().map((base) => {
       const full = bySlot.get(base.slot);
       if (!full) {
         return base;
       }
+      const current = currentBySlot.get(base.slot);
       const patchName = this.readString(full.patch, 'patch_name');
       const hash = this.readString(full.patch, 'config_hash_sha256');
       return {
@@ -799,6 +860,8 @@ export class App implements OnInit, OnDestroy {
         slot_sync_ms: full.slot_sync_ms,
         inferred: false,
         match_count: 1,
+        measured_rms_dbfs: current?.measured_rms_dbfs ?? null,
+        measured_at: current?.measured_at ?? '',
       };
     });
   }
@@ -824,6 +887,8 @@ export class App implements OnInit, OnDestroy {
         slot_sync_ms: quick.slot_sync_ms,
         inferred: quick.inferred_hash_sha256 !== null,
         match_count: quick.match_count,
+        measured_rms_dbfs: current?.measured_rms_dbfs ?? null,
+        measured_at: current?.measured_at ?? '',
       };
     });
   }
@@ -846,6 +911,53 @@ export class App implements OnInit, OnDestroy {
           slot_sync_ms: slot.slot_sync_ms,
           inferred: false,
           match_count: 1,
+          measured_rms_dbfs: card.measured_rms_dbfs,
+          measured_at: card.measured_at,
+        };
+      }),
+    );
+  }
+
+  private async syncSlotForMeasurement(slot: number): Promise<SlotSyncResponse> {
+    const response = await fetch(`/api/v1/amp/slots/${slot}/sync`, {
+      method: 'POST',
+      cache: 'no-store',
+    });
+    const payload = (await response.json()) as SlotSyncResponse | { detail?: unknown };
+    if (!response.ok) {
+      throw new Error(`slot ${slot} sync failed: ${JSON.stringify(payload)}`);
+    }
+    return payload as SlotSyncResponse;
+  }
+
+  private async captureSlotRmsSample(slot: SlotPatchSummary): Promise<AudioSampleResponse> {
+    const response = await fetch('/api/v1/audio/sample', {
+      method: 'POST',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        patch_hash: slot.is_saved ? (slot.config_hash_sha256 || null) : null,
+        slot: slot.slot,
+        duration_sec: 5.0,
+      }),
+    });
+    const payload = (await response.json()) as AudioSampleResponse | { detail?: unknown };
+    if (!response.ok) {
+      throw new Error(`slot ${slot.slot} sample failed: ${JSON.stringify(payload)}`);
+    }
+    return payload as AudioSampleResponse;
+  }
+
+  private setSlotMeasuredRms(slotNumber: number, rmsDbfs: number, measuredAt: string): void {
+    this.slots.update((current) =>
+      current.map((card) => {
+        if (card.slot !== slotNumber) {
+          return card;
+        }
+        return {
+          ...card,
+          measured_rms_dbfs: rmsDbfs,
+          measured_at: measuredAt,
         };
       }),
     );

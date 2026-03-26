@@ -637,6 +637,27 @@
   - `docker compose up -d --build`
   - `docker compose exec -T api alembic upgrade head`
 
+## Session Update - 2026-03-26 (One-Click 5s RMS Cycle Across All Slots)
+- Added a new web action button:
+  - `Measure 5s RMS (All Slots)`
+- Behavior:
+  - iterates slots `1..8` sequentially,
+  - for each slot:
+    - performs queued full slot sync (`POST /api/v1/amp/slots/{slot}/sync`),
+    - captures a 5-second audio sample (`POST /api/v1/audio/sample` with `duration_sec=5.0`),
+    - stores measured RMS dBFS and timestamp on that slot card.
+- UI additions on each patch card:
+  - `5s RMS` value,
+  - `RMS At` timestamp.
+- State handling:
+  - cycle button disables while a cycle is running,
+  - measured RMS values are preserved across quick/full state refresh merges in the UI model.
+- Files changed:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
+
 ## Session Update - 2026-03-26 (Queued Backup Feature + Nested Repo Flatten)
 - Added queued amp backup API endpoints:
   - `POST /api/v1/amp/backup` (enqueue full amp-state dump)
