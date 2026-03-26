@@ -1172,6 +1172,23 @@ export class App implements OnInit, OnDestroy {
     return table.map((label, index) => ({ value: index, label }));
   }
 
+  editorStageTypeLabel(stageName: StageName): string {
+    const type = this.editorStageType(stageName);
+    if (type === null) {
+      return 'n/a';
+    }
+    return this.effectTypeLabel(stageName, type);
+  }
+
+  editorStageRawLength(stageName: StageName): number {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const stage = this.readObject(stages, stageName);
+    if (!stage) {
+      return 0;
+    }
+    return this.ensureNumericRaw(stage).length;
+  }
+
   editorStageParams(stageName: StageName): StageParam[] {
     const stages = this.readObject(this.editorPatchDraft(), 'stages');
     const stage = this.readObject(stages, stageName);

@@ -1093,3 +1093,14 @@
   - `apps/web/src/app/app.html`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Editor Modal v2.1: Schema Visibility)
+- Improved schema-debug visibility in stage editor blocks to handle mixed pedal option layouts:
+  - shows active stage type label + raw schema length per stage,
+  - shows raw index for every editable stage parameter (`[#index]`).
+- This makes per-type schema differences explicit while editing and helps verify correct byte mapping.
+- Files changed:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
