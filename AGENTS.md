@@ -1366,3 +1366,20 @@
   - `apps/web/src/app/app.html`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Editor Live-Apply Draft Reset Fix)
+- Fixed editor live-apply flow resetting typed values during in-flight apply cycles.
+- Root cause:
+  - success path replaced `editorPatchDraft` with amp readback payload, which could overwrite newer local edits.
+- Fix:
+  - keep editor draft as source of truth while editing,
+  - send a cloned snapshot for each live-apply request,
+  - update card patch from sent snapshot (not readback payload),
+  - only take hash from apply response,
+  - do not clear queued newer fingerprint unless it matches the just-applied request.
+- Outcome:
+  - rapid edits no longer snap back to older values due to readback churn.
+- Files changed:
+  - `apps/web/src/app/app.ts`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

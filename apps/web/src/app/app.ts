@@ -2357,6 +2357,7 @@ export class App implements OnInit, OnDestroy {
     if (currentFingerprint === this.editorLiveApplyLastAppliedFingerprint) {
       return;
     }
+    const draftSnapshot = this.clonePatch(draft);
     this.editorLiveApplyInFlight = true;
     this.editorLiveApplyLastStartedAtMs = Date.now();
     this.editorLiveApplyPending.set(true);
@@ -2365,7 +2366,7 @@ export class App implements OnInit, OnDestroy {
         method: 'POST',
         cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ patch: draft }),
+        body: JSON.stringify({ patch: draftSnapshot }),
       });
       const payload = (await response.json()) as ApplyCurrentPatchResponse | { detail?: unknown };
       if (!response.ok) {
@@ -2373,15 +2374,13 @@ export class App implements OnInit, OnDestroy {
         return;
       }
       const applied = payload as ApplyCurrentPatchResponse;
-      const appliedPatch = this.clonePatch(applied.patch);
-      this.editorPatchDraft.set(appliedPatch);
-      this.editorLiveApplyQueuedFingerprint = null;
-      const appliedFingerprint = this.patchFingerprint(appliedPatch);
-      this.editorLiveApplyLastAppliedFingerprint = appliedFingerprint;
-      this.editorBaseFingerprint.set(appliedFingerprint);
-      const patchName = this.readString(appliedPatch, 'patch_name') ?? '';
-      const hash = this.readString(appliedPatch, 'config_hash_sha256') ?? '';
-      this.editorBaseConfigHash.set(hash);
+      const stagedFingerprint = expectedFingerprint;
+      this.editorLiveApplyLastAppliedFingerprint = stagedFingerprint;
+      if (this.editorLiveApplyQueuedFingerprint === expectedFingerprint) {
+        this.editorLiveApplyQueuedFingerprint = null;
+      }
+      const patchName = this.readString(draftSnapshot, 'patch_name') ?? '';
+      const hash = this.readString(applied.patch, 'config_hash_sha256') ?? '';
       this.slots.update((current) =>
         current.map((card) => {
           if (card.slot !== slotNumber) {
@@ -2390,7 +2389,7 @@ export class App implements OnInit, OnDestroy {
           return {
             ...card,
             patch_name: patchName || card.patch_name,
-            patch: this.clonePatch(appliedPatch),
+            patch: this.clonePatch(draftSnapshot),
             config_hash_sha256: hash,
             in_sync: true,
             out_synced: true,
@@ -2398,6 +2397,7 @@ export class App implements OnInit, OnDestroy {
           };
         }),
       );
+      this.currentAmpPatchHash.set(hash);
       if (this.selectedAmpSlot() !== null) {
         await this.refreshCurrentCommitState();
       }
