@@ -73,6 +73,8 @@ const DELAY_TYPE_NAMES = [
 const AMP_TYPE_NAMES = ['Acoustic', 'Clean', 'Crunch', 'Lead', 'Brown'];
 const REVERB_TYPE_NAMES = ['Plate Reverb', 'Room Reverb', 'Hall Reverb', 'Spring Reverb', 'Modulate Reverb'];
 const LIVE_RMS_WINDOW_POINTS = 96;
+const EDITOR_LIVE_APPLY_DEBOUNCE_MS = 180;
+const EDITOR_LIVE_APPLY_MIN_GAP_MS = 120;
 
 interface AmpConnectionTestResponse {
   ok: boolean;
@@ -323,10 +325,16 @@ export class App implements OnInit, OnDestroy {
   editorSlotNumber = signal<number | null>(null);
   editorSlotLabel = signal('');
   editorPatchDraft = signal<Record<string, unknown> | null>(null);
+  editorBaseFingerprint = signal('');
+  editorBaseConfigHash = signal('');
   editorLiveApplyEnabled = signal(true);
   editorLiveApplyPending = signal(false);
   editorLiveApplyError = signal('');
   editorLiveApplyHandle: ReturnType<typeof setTimeout> | null = null;
+  editorLiveApplyInFlight = false;
+  editorLiveApplyLastStartedAtMs = 0;
+  editorLiveApplyLastAppliedFingerprint = '';
+  editorLiveApplyQueuedFingerprint: string | null = null;
   patchSetModalOpen = signal(false);
   patchSetSnapshots = signal<BackupSnapshotSummary[]>([]);
 
@@ -1068,9 +1076,17 @@ export class App implements OnInit, OnDestroy {
       this.status.set(`No full patch payload loaded for ${slot.slot_label}. Sync this slot first.`);
       return;
     }
+    const draft = this.clonePatch(slot.patch);
     this.editorSlotNumber.set(slot.slot);
     this.editorSlotLabel.set(slot.slot_label);
-    this.editorPatchDraft.set(this.clonePatch(slot.patch));
+    this.editorPatchDraft.set(draft);
+    this.editorBaseFingerprint.set(this.patchFingerprint(draft));
+    this.editorBaseConfigHash.set(slot.config_hash_sha256);
+    this.editorLiveApplyLastAppliedFingerprint = this.patchFingerprint(draft);
+    this.editorLiveApplyQueuedFingerprint = null;
+    this.editorLiveApplyInFlight = false;
+    this.editorLiveApplyPending.set(false);
+    this.editorLiveApplyError.set('');
     this.editorModalOpen.set(true);
   }
 
@@ -1082,6 +1098,10 @@ export class App implements OnInit, OnDestroy {
       clearTimeout(this.editorLiveApplyHandle);
       this.editorLiveApplyHandle = null;
     }
+    this.editorLiveApplyInFlight = false;
+    this.editorLiveApplyQueuedFingerprint = null;
+    this.editorBaseFingerprint.set('');
+    this.editorBaseConfigHash.set('');
   }
 
   setEditorLiveApplyEnabled(enabled: boolean): void {
@@ -1093,6 +1113,30 @@ export class App implements OnInit, OnDestroy {
 
   editorPatchName(): string {
     return this.readString(this.editorPatchDraft(), 'patch_name') ?? '';
+  }
+
+  editorIsModified(): boolean {
+    const draftFingerprint = this.editorDraftFingerprint();
+    const baseline = this.editorBaseFingerprint();
+    if (!draftFingerprint || !baseline) {
+      return false;
+    }
+    return draftFingerprint !== baseline;
+  }
+
+  editorHashLabel(): string {
+    const draftHash = this.readString(this.editorPatchDraft(), 'config_hash_sha256') ?? '';
+    const baselineHash = this.editorBaseConfigHash();
+    if (this.editorIsModified()) {
+      if (baselineHash) {
+        return `${this.shortHash(baselineHash)} -> pending`;
+      }
+      return 'pending';
+    }
+    if (draftHash) {
+      return this.shortHash(draftHash);
+    }
+    return 'n/a';
   }
 
   setEditorPatchName(value: string): void {
@@ -1288,7 +1332,7 @@ export class App implements OnInit, OnDestroy {
       }),
     );
     this.status.set(`Applied editor draft to ${this.editorSlotLabel()} (local only)`);
-    this.editorModalOpen.set(false);
+    this.closeEditorModal();
   }
 
   async saveEditorDraftToLibrary(): Promise<void> {
@@ -1343,7 +1387,7 @@ export class App implements OnInit, OnDestroy {
           2,
         ),
       );
-      this.editorModalOpen.set(false);
+      this.closeEditorModal();
     } catch (error: unknown) {
       this.status.set('Failed saving editor draft');
       this.responseJson.set(
@@ -1999,6 +2043,7 @@ export class App implements OnInit, OnDestroy {
       }
       const next = this.clonePatch(current);
       mutator(next);
+      next['config_hash_sha256'] = '';
       return next;
     });
     this.editorLiveApplyError.set('');
@@ -2015,24 +2060,56 @@ export class App implements OnInit, OnDestroy {
     if (!this.editorModalOpen() || !this.editorLiveApplyEnabled()) {
       return;
     }
-    if (this.editorPatchDraft() === null || this.editorSlotNumber() === null) {
+    const draftFingerprint = this.editorDraftFingerprint();
+    if (draftFingerprint === '' || this.editorSlotNumber() === null) {
+      return;
+    }
+    this.editorLiveApplyQueuedFingerprint = draftFingerprint;
+    if (this.editorLiveApplyInFlight) {
       return;
     }
     if (this.editorLiveApplyHandle !== null) {
       clearTimeout(this.editorLiveApplyHandle);
     }
+    const sinceLastStartMs = Date.now() - this.editorLiveApplyLastStartedAtMs;
+    const gapWaitMs = Math.max(0, EDITOR_LIVE_APPLY_MIN_GAP_MS - sinceLastStartMs);
+    const waitMs = Math.max(EDITOR_LIVE_APPLY_DEBOUNCE_MS, gapWaitMs);
     this.editorLiveApplyHandle = setTimeout(() => {
       this.editorLiveApplyHandle = null;
-      void this.applyEditorPatchLive();
-    }, 180);
+      void this.flushEditorLiveApplyQueue();
+    }, waitMs);
   }
 
-  private async applyEditorPatchLive(): Promise<void> {
-    const draft = this.editorPatchDraft();
-    const slotNumber = this.editorSlotNumber();
-    if (!this.editorLiveApplyEnabled() || draft === null || slotNumber === null) {
+  private async flushEditorLiveApplyQueue(): Promise<void> {
+    if (!this.editorModalOpen() || !this.editorLiveApplyEnabled()) {
       return;
     }
+    if (this.editorLiveApplyInFlight) {
+      return;
+    }
+    const queuedFingerprint = this.editorLiveApplyQueuedFingerprint;
+    if (!queuedFingerprint || queuedFingerprint === this.editorLiveApplyLastAppliedFingerprint) {
+      return;
+    }
+    await this.applyEditorPatchLive(queuedFingerprint);
+  }
+
+  private async applyEditorPatchLive(expectedFingerprint: string): Promise<void> {
+    const draft = this.editorPatchDraft();
+    const slotNumber = this.editorSlotNumber();
+    if (!this.editorLiveApplyEnabled() || draft === null || slotNumber === null || this.editorLiveApplyInFlight) {
+      return;
+    }
+    const currentFingerprint = this.patchFingerprint(draft);
+    if (currentFingerprint !== expectedFingerprint) {
+      this.scheduleEditorLiveApply();
+      return;
+    }
+    if (currentFingerprint === this.editorLiveApplyLastAppliedFingerprint) {
+      return;
+    }
+    this.editorLiveApplyInFlight = true;
+    this.editorLiveApplyLastStartedAtMs = Date.now();
     this.editorLiveApplyPending.set(true);
     try {
       const response = await fetch('/api/v1/amp/current-patch/live-apply', {
@@ -2049,8 +2126,13 @@ export class App implements OnInit, OnDestroy {
       const applied = payload as ApplyCurrentPatchResponse;
       const appliedPatch = this.clonePatch(applied.patch);
       this.editorPatchDraft.set(appliedPatch);
+      this.editorLiveApplyQueuedFingerprint = null;
+      const appliedFingerprint = this.patchFingerprint(appliedPatch);
+      this.editorLiveApplyLastAppliedFingerprint = appliedFingerprint;
+      this.editorBaseFingerprint.set(appliedFingerprint);
       const patchName = this.readString(appliedPatch, 'patch_name') ?? '';
       const hash = this.readString(appliedPatch, 'config_hash_sha256') ?? '';
+      this.editorBaseConfigHash.set(hash);
       this.slots.update((current) =>
         current.map((card) => {
           if (card.slot !== slotNumber) {
@@ -2070,8 +2152,39 @@ export class App implements OnInit, OnDestroy {
     } catch (error: unknown) {
       this.editorLiveApplyError.set(String(error));
     } finally {
+      this.editorLiveApplyInFlight = false;
       this.editorLiveApplyPending.set(false);
+      if (this.editorLiveApplyQueuedFingerprint && this.editorLiveApplyQueuedFingerprint !== this.editorLiveApplyLastAppliedFingerprint) {
+        this.scheduleEditorLiveApply();
+      }
     }
+  }
+
+  private editorDraftFingerprint(): string {
+    const draft = this.editorPatchDraft();
+    if (!draft) {
+      return '';
+    }
+    return this.patchFingerprint(draft);
+  }
+
+  private patchFingerprint(patch: Record<string, unknown>): string {
+    const normalized = this.clonePatch(patch);
+    delete normalized['config_hash_sha256'];
+    return this.stableStringify(normalized);
+  }
+
+  private stableStringify(value: unknown): string {
+    if (Array.isArray(value)) {
+      return `[${value.map((item) => this.stableStringify(item)).join(',')}]`;
+    }
+    if (value && typeof value === 'object') {
+      const record = value as Record<string, unknown>;
+      const keys = Object.keys(record).sort();
+      const parts = keys.map((key) => `${JSON.stringify(key)}:${this.stableStringify(record[key])}`);
+      return `{${parts.join(',')}}`;
+    }
+    return JSON.stringify(value);
   }
 
   private nv(value: number | null): string {

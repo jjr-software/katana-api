@@ -1137,3 +1137,18 @@
   - containerized API call succeeded:
     - `GET /api/v1/amp/current-patch`
     - `POST /api/v1/amp/current-patch/live-apply` using current payload returned `200` with readback hash.
+
+## Session Update - 2026-03-26 (Editor Hysteresis + Modified/Hash Indicator)
+- Editor live-apply flow now uses short hysteresis/coalescing to avoid spam while typing:
+  - debounce + minimum inter-apply gap,
+  - in-flight coalescing so rapid consecutive changes collapse into the latest draft apply.
+- Editor now explicitly shows draft modification and hash-change state:
+  - `Modified: yes/no` in modal header block,
+  - `Hash` displays current short hash when clean, and `... -> pending` when draft differs from baseline.
+- Draft edits now clear stale `config_hash_sha256` in the editor draft immediately, so hash state reflects that a recompute/apply is pending.
+- Baseline fingerprint/hash is updated on successful live apply so modified state returns to clean after amp readback.
+- Files changed:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

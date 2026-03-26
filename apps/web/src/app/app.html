@@ -250,6 +250,15 @@
                   <code>disabled</code>
                 }
               </p>
+              <p class="small mb-0 text-secondary">
+                Modified:
+                @if (editorIsModified()) {
+                  <code class="text-warning">yes</code>
+                } @else {
+                  <code class="text-success">no</code>
+                }
+                · Hash: <code>{{ editorHashLabel() }}</code>
+              </p>
               @if (editorLiveApplyError()) {
                 <p class="small mb-0 text-danger mt-1">{{ editorLiveApplyError() }}</p>
               }
