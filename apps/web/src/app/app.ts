@@ -95,6 +95,7 @@ interface DeviceStatusResponse {
 interface QueueJobSummary {
   job_id: string;
   operation: string;
+  slot: number | null;
   status: 'queued' | 'running' | 'succeeded' | 'failed';
   created_at: string;
   started_at: string | null;
@@ -148,7 +149,6 @@ function defaultSlotCards(): SlotCard[] {
 export class App implements OnInit, OnDestroy {
   private pollHandle: ReturnType<typeof setInterval> | null = null;
 
-  isLoading = signal(false);
   status = signal('Idle');
   responseJson = signal('');
   slots = signal<SlotCard[]>(defaultSlotCards());
@@ -168,9 +168,6 @@ export class App implements OnInit, OnDestroy {
     void this.refreshDeviceStatus();
     void this.refreshQueueState();
     this.pollHandle = setInterval(() => {
-      if (this.isLoading()) {
-        return;
-      }
       void this.refreshDeviceStatus();
     }, 4000);
     this.queuePollHandle = setInterval(() => {
@@ -190,7 +187,6 @@ export class App implements OnInit, OnDestroy {
   }
 
   async testAmpConnection(): Promise<void> {
-    this.isLoading.set(true);
     this.status.set('Running amp identity request...');
     this.responseJson.set('');
 
@@ -223,13 +219,10 @@ export class App implements OnInit, OnDestroy {
         2,
       ));
       await this.refreshDeviceStatus();
-    } finally {
-      this.isLoading.set(false);
     }
   }
 
   async syncAmpSlots(): Promise<void> {
-    this.isLoading.set(true);
     this.status.set('Queueing amp sync...');
     this.responseJson.set('');
 
@@ -299,13 +292,10 @@ export class App implements OnInit, OnDestroy {
         ),
       );
       await this.refreshDeviceStatus();
-    } finally {
-      this.isLoading.set(false);
     }
   }
 
   async syncAmpSlot(slot: number): Promise<void> {
-    this.isLoading.set(true);
     this.status.set(`Syncing slot ${slot}...`);
     this.responseJson.set('');
 
@@ -343,13 +333,10 @@ export class App implements OnInit, OnDestroy {
         ),
       );
       await this.refreshDeviceStatus();
-    } finally {
-      this.isLoading.set(false);
     }
   }
 
   async quickSyncAmpSlots(): Promise<void> {
-    this.isLoading.set(true);
     this.status.set('Quick sync queued...');
     this.responseJson.set('');
 
@@ -408,8 +395,6 @@ export class App implements OnInit, OnDestroy {
         ),
       );
       await this.refreshDeviceStatus();
-    } finally {
-      this.isLoading.set(false);
     }
   }
 
@@ -605,6 +590,18 @@ export class App implements OnInit, OnDestroy {
   }
 
   operationLabel(value: string): string {
+    if (value === 'test_connection') {
+      return 'Test Connection';
+    }
+    if (value === 'current_patch') {
+      return 'Current Patch';
+    }
+    if (value === 'sync_slot') {
+      return 'Sync Slot';
+    }
+    if (value === 'full_dump') {
+      return 'Full Dump';
+    }
     if (value === 'quick_sync_names') {
       return 'Quick Sync Names';
     }

@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -7,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.amp_queue import amp_job_queue
 from app.deps import get_amp_client, get_db
-from app.katana import AmpClient, AmpClientError, QuickSlotName, SlotDump, SlotPatchSummary
+from app.katana import AmpClient, QuickSlotName, SlotDump, SlotPatchSummary
 from app.models import PatchConfig, PatchSet, PatchSetMember
 
 router = APIRouter(prefix="/api/v1/amp", tags=["amp"])
@@ -130,6 +131,7 @@ class QuickSyncJobResponse(BaseModel):
 class QueueJobSummaryResponse(BaseModel):
     job_id: str
     operation: str
+    slot: int | None = None
     status: str
     created_at: str
     started_at: str | None = None
@@ -146,24 +148,24 @@ class QueueStateResponse(BaseModel):
 
 
 @router.get("/test-connection", response_model=AmpConnectionTestResponse)
-async def test_connection(client: AmpClient = Depends(get_amp_client)) -> AmpConnectionTestResponse:
-    try:
-        result = await client.test_connection()
-    except AmpClientError as exc:
+async def test_connection() -> AmpConnectionTestResponse:
+    job = await amp_job_queue.enqueue_test_connection()
+    settled = await _await_terminal_job(job.job_id, timeout_seconds=60.0)
+    if settled.status != "succeeded" or settled.result_connection is None:
         raise HTTPException(
             status_code=502,
             detail={
                 "message": "Failed to query amp identity",
-                "error": str(exc),
-                "midi_port": client.midi_port,
+                "error": settled.error or "queued test connection failed",
+                "job_id": settled.job_id,
             },
-        ) from exc
+        )
 
     return AmpConnectionTestResponse(
         ok=True,
-        midi_port=result.midi_port,
-        request_hex=result.request_hex,
-        response_hex=result.response_hex,
+        midi_port=settled.result_connection.midi_port,
+        request_hex=settled.result_connection.request_hex,
+        response_hex=settled.result_connection.response_hex,
     )
 
 
@@ -181,43 +183,42 @@ async def device_status(client: AmpClient = Depends(get_amp_client)) -> AmpDevic
 
 
 @router.get("/current-patch", response_model=CurrentPatchResponse)
-async def current_patch(client: AmpClient = Depends(get_amp_client)) -> CurrentPatchResponse:
-    try:
-        snapshot = await client.read_current_patch()
-    except AmpClientError as exc:
+async def current_patch() -> CurrentPatchResponse:
+    job = await amp_job_queue.enqueue_current_patch()
+    settled = await _await_terminal_job(job.job_id, timeout_seconds=60.0)
+    if settled.status != "succeeded" or settled.result_current_patch is None:
         raise HTTPException(
             status_code=502,
             detail={
                 "message": "Failed to read current patch from amp",
-                "error": str(exc),
-                "midi_port": client.midi_port,
+                "error": settled.error or "queued current patch read failed",
+                "job_id": settled.job_id,
             },
-        ) from exc
+        )
 
     return CurrentPatchResponse(
         created_at=datetime.now().isoformat(timespec="seconds"),
-        patch=snapshot.payload,
+        patch=settled.result_current_patch,
     )
 
 
 @router.get("/slots", response_model=SlotsStateResponse)
 async def slots_state(
-    client: AmpClient = Depends(get_amp_client),
     db: Session = Depends(get_db),
 ) -> SlotsStateResponse:
-    synced_at = datetime.now().isoformat(timespec="seconds")
-    try:
-        state = await client.read_slots_state(synced_at=synced_at)
-    except AmpClientError as exc:
+    job = await amp_job_queue.enqueue_slots_sync()
+    settled = await _await_terminal_job(job.job_id, timeout_seconds=180.0)
+    if settled.status != "succeeded" or settled.result_slots is None:
         raise HTTPException(
             status_code=502,
             detail={
                 "message": "Failed to read amp slots",
-                "error": str(exc),
-                "midi_port": client.midi_port,
+                "error": settled.error or "queued slots read failed",
+                "job_id": settled.job_id,
             },
-        ) from exc
+        )
 
+    state = settled.result_slots
     curated_by_hash = _load_curation_by_hash(db, [slot.config_hash_sha256 for slot in state.slots])
     return SlotsStateResponse(
         synced_at=state.synced_at,
@@ -241,7 +242,6 @@ async def enqueue_slots_sync() -> SlotsSyncEnqueueResponse:
 @router.post("/slots/{slot}/sync", response_model=SlotSyncResponse)
 async def sync_single_slot(
     slot: int,
-    client: AmpClient = Depends(get_amp_client),
     db: Session = Depends(get_db),
 ) -> SlotSyncResponse:
     if slot < 1 or slot > 8:
@@ -250,23 +250,23 @@ async def sync_single_slot(
             detail={"message": "slot must be in range 1..8", "slot": slot},
         )
 
-    synced_at = datetime.now().isoformat(timespec="seconds")
-    try:
-        item = await client.read_slot_state(slot=slot, synced_at=synced_at)
-    except AmpClientError as exc:
+    job = await amp_job_queue.enqueue_slot_sync(slot=slot)
+    settled = await _await_terminal_job(job.job_id, timeout_seconds=90.0)
+    if settled.status != "succeeded" or settled.result_slot is None:
         raise HTTPException(
             status_code=502,
             detail={
                 "message": "Failed to sync slot from amp",
-                "error": str(exc),
-                "midi_port": client.midi_port,
+                "error": settled.error or "queued slot sync failed",
+                "job_id": settled.job_id,
                 "slot": slot,
             },
-        ) from exc
+        )
 
+    item = settled.result_slot
     curated_by_hash = _load_curation_by_hash(db, [item.config_hash_sha256])
     return SlotSyncResponse(
-        synced_at=synced_at,
+        synced_at=item.synced_at,
         slot=SlotPatchSummaryResponse(**_slot_to_dict(item, curated_by_hash)),
     )
 
@@ -284,21 +284,20 @@ async def enqueue_quick_sync() -> QuickSyncEnqueueResponse:
 
 @router.get("/slots/quick", response_model=QuickSlotsStateResponse)
 async def quick_slots_state(
-    client: AmpClient = Depends(get_amp_client),
     db: Session = Depends(get_db),
 ) -> QuickSlotsStateResponse:
-    synced_at = datetime.now().isoformat(timespec="seconds")
-    try:
-        quick = await client.read_slots_names_quick(synced_at=synced_at)
-    except AmpClientError as exc:
+    job = await amp_job_queue.enqueue_quick_sync()
+    settled = await _await_terminal_job(job.job_id, timeout_seconds=120.0)
+    if settled.status != "succeeded" or settled.result_quick is None:
         raise HTTPException(
             status_code=502,
             detail={
                 "message": "Failed to read quick amp slot names",
-                "error": str(exc),
-                "midi_port": client.midi_port,
+                "error": settled.error or "queued quick sync failed",
+                "job_id": settled.job_id,
             },
-        ) from exc
+        )
+    quick = settled.result_quick
     candidates_by_name = _load_hash_candidates_by_patch_name(db, [slot.patch_name for slot in quick.slots])
     slots = [
         QuickSlotSummaryResponse(**_quick_slot_to_dict(slot, candidates_by_name))
@@ -434,10 +433,31 @@ def _job_elapsed_ms(job: object) -> int:
     return max(0, int(round((end_dt - start_dt).total_seconds() * 1000)))
 
 
+async def _await_terminal_job(job_id: str, timeout_seconds: float) -> object:
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout_seconds
+    while True:
+        job = await amp_job_queue.get_job(job_id)
+        if job is None:
+            raise HTTPException(
+                status_code=404,
+                detail={"message": "Queue job not found", "job_id": job_id},
+            )
+        if job.status in {"succeeded", "failed"}:
+            return job
+        if loop.time() >= deadline:
+            raise HTTPException(
+                status_code=504,
+                detail={"message": "Queue job timed out", "job_id": job_id},
+            )
+        await asyncio.sleep(0.2)
+
+
 def _queue_job_summary(job: object) -> dict:
     return {
         "job_id": getattr(job, "job_id"),
         "operation": getattr(job, "operation"),
+        "slot": getattr(job, "slot", None),
         "status": getattr(job, "status"),
         "created_at": getattr(job, "created_at"),
         "started_at": getattr(job, "started_at", None),
@@ -449,21 +469,20 @@ def _queue_job_summary(job: object) -> dict:
 
 @router.get("/full-dump", response_model=FullAmpDumpResponse)
 async def full_amp_dump(
-    client: AmpClient = Depends(get_amp_client),
     db: Session = Depends(get_db),
 ) -> FullAmpDumpResponse:
-    synced_at = datetime.now().isoformat(timespec="seconds")
-    try:
-        dump = await client.full_amp_dump(synced_at=synced_at)
-    except AmpClientError as exc:
+    job = await amp_job_queue.enqueue_full_dump()
+    settled = await _await_terminal_job(job.job_id, timeout_seconds=240.0)
+    if settled.status != "succeeded" or settled.result_dump is None:
         raise HTTPException(
             status_code=502,
             detail={
                 "message": "Failed to read full amp dump",
-                "error": str(exc),
-                "midi_port": client.midi_port,
+                "error": settled.error or "queued full dump failed",
+                "job_id": settled.job_id,
             },
-        ) from exc
+        )
+    dump = settled.result_dump
     curated_by_hash = _load_curation_by_hash(
         db,
         [str(item.payload.get("config_hash_sha256", "")) for item in dump.slots],

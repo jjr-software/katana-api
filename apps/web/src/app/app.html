@@ -10,14 +10,14 @@
     </p>
   </section>
   <div class="actions">
-    <button type="button" (click)="testAmpConnection()" [disabled]="isLoading()">
-      {{ isLoading() ? 'Working...' : 'Test Amp Connection' }}
+    <button type="button" (click)="testAmpConnection()">
+      Test Amp Connection
     </button>
-    <button type="button" (click)="quickSyncAmpSlots()" [disabled]="isLoading()">
-      {{ isLoading() ? 'Working...' : 'Quick Sync Names' }}
+    <button type="button" (click)="quickSyncAmpSlots()">
+      Quick Sync Names
     </button>
-    <button type="button" (click)="syncAmpSlots()" [disabled]="isLoading()">
-      {{ isLoading() ? 'Working...' : 'Sync Slots A:1..B:4' }}
+    <button type="button" (click)="syncAmpSlots()">
+      Sync Slots A:1..B:4
     </button>
   </div>
   <div class="sync-meta">
@@ -33,7 +33,13 @@
     <div class="queue-list">
       @for (job of queueJobs(); track job.job_id) {
         <article class="queue-item">
-          <p><strong>{{ operationLabel(job.operation) }}</strong> · <code>{{ job.status }}</code></p>
+          <p>
+            <strong>{{ operationLabel(job.operation) }}</strong>
+            @if (job.slot !== null) {
+              <span> (slot {{ job.slot }})</span>
+            }
+            · <code>{{ job.status }}</code>
+          </p>
           <p>
             elapsed: <code>{{ formatMs(job.elapsed_ms) }}</code> |
             created: <code>{{ job.created_at }}</code>
@@ -54,8 +60,8 @@
         <article class="card">
           <p class="slot">{{ slot.slot_label }}</p>
           <h3>{{ displayPatchName(slot) }}</h3>
-          <button type="button" (click)="syncAmpSlot(slot.slot)" [disabled]="isLoading()">
-            {{ isLoading() ? 'Working...' : 'Sync' }}
+          <button type="button" (click)="syncAmpSlot(slot.slot)">
+            Sync
           </button>
           <p>Last Sync: <code>{{ slot.synced_at || 'n/a' }}</code></p>
         </article>
@@ -70,8 +76,8 @@
         <article class="card">
           <p class="slot">{{ slot.slot_label }}</p>
           <h3>{{ displayPatchName(slot) }}</h3>
-          <button type="button" (click)="syncAmpSlot(slot.slot)" [disabled]="isLoading()">
-            {{ isLoading() ? 'Working...' : 'Sync' }}
+          <button type="button" (click)="syncAmpSlot(slot.slot)">
+            Sync
           </button>
           <p>Last Sync: <code>{{ slot.synced_at || 'n/a' }}</code></p>
         </article>

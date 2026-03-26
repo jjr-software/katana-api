@@ -503,3 +503,21 @@
   - removed `.slot-actions` styles from `apps/web/src/app/app.css`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Queue-Only Amp I/O + No Global UI Lock)
+- Enforced queue-backed amp communication across API amp-read/sync routes:
+  - `GET /api/v1/amp/test-connection` now executes via queue job.
+  - `GET /api/v1/amp/current-patch` now executes via queue job.
+  - `GET /api/v1/amp/slots` now executes via queue job (`full_sync_slots`).
+  - `POST /api/v1/amp/slots/{slot}/sync` now executes via queue job (`sync_slot`).
+  - `GET /api/v1/amp/slots/quick` now executes via queue job (`quick_sync_names`).
+  - `GET /api/v1/amp/full-dump` now executes via queue job (`full_dump`).
+- Expanded queue worker operations/results in:
+  - `apps/api/app/amp_queue.py`
+  - added operations: `test_connection`, `current_patch`, `sync_slot`, `full_dump`.
+- Updated queue state payload to include optional per-job `slot` metadata.
+- Web UI no longer globally disables all buttons while one request is active:
+  - removed global `[disabled]="isLoading()"` gating and shared loading toggles.
+  - queue monitor now shows slot context for slot-targeted jobs.
+- Containerized verification:
+  - `docker compose build api web` succeeded.

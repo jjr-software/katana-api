@@ -4,11 +4,26 @@ from datetime import datetime
 from typing import Literal
 from uuid import uuid4
 
-from app.katana import AmpClient, AmpClientError, QuickSlotsSnapshot, SlotsStateSnapshot
+from app.katana import (
+    AmpClient,
+    AmpClientError,
+    AmpConnectionResult,
+    FullAmpDumpSnapshot,
+    QuickSlotsSnapshot,
+    SlotPatchSummary,
+    SlotsStateSnapshot,
+)
 from app.settings import get_settings
 
 JobStatus = Literal["queued", "running", "succeeded", "failed"]
-JobOperation = Literal["full_sync_slots", "quick_sync_names"]
+JobOperation = Literal[
+    "test_connection",
+    "current_patch",
+    "sync_slot",
+    "full_dump",
+    "full_sync_slots",
+    "quick_sync_names",
+]
 
 
 @dataclass
@@ -17,9 +32,14 @@ class AmpQueueJob:
     operation: JobOperation
     status: JobStatus
     created_at: str
+    slot: int | None = None
     started_at: str | None = None
     finished_at: str | None = None
     error: str | None = None
+    result_connection: AmpConnectionResult | None = None
+    result_current_patch: dict | None = None
+    result_slot: SlotPatchSummary | None = None
+    result_dump: FullAmpDumpSnapshot | None = None
     result_slots: SlotsStateSnapshot | None = None
     result_quick: QuickSlotsSnapshot | None = None
 
@@ -53,12 +73,25 @@ class AmpJobQueue:
     async def enqueue_quick_sync(self) -> AmpQueueJob:
         return await self._enqueue("quick_sync_names")
 
-    async def _enqueue(self, operation: JobOperation) -> AmpQueueJob:
+    async def enqueue_slot_sync(self, slot: int) -> AmpQueueJob:
+        return await self._enqueue("sync_slot", slot=slot)
+
+    async def enqueue_test_connection(self) -> AmpQueueJob:
+        return await self._enqueue("test_connection")
+
+    async def enqueue_current_patch(self) -> AmpQueueJob:
+        return await self._enqueue("current_patch")
+
+    async def enqueue_full_dump(self) -> AmpQueueJob:
+        return await self._enqueue("full_dump")
+
+    async def _enqueue(self, operation: JobOperation, slot: int | None = None) -> AmpQueueJob:
         job = AmpQueueJob(
             job_id=str(uuid4()),
             operation=operation,
             status="queued",
             created_at=datetime.now().isoformat(timespec="seconds"),
+            slot=slot,
         )
         async with self._jobs_lock:
             self._jobs[job.job_id] = job
@@ -107,17 +140,68 @@ class AmpJobQueue:
         )
         synced_at = datetime.now().isoformat(timespec="seconds")
         try:
-            if job.operation == "full_sync_slots":
+            if job.operation == "test_connection":
+                connection_result = await asyncio.wait_for(
+                    client.test_connection(),
+                    timeout=max(5.0, settings.quick_sync_timeout_seconds),
+                )
+                current_patch_result = None
+                slot_result = None
+                dump_result = None
+                slots_result = None
+                quick_result = None
+            elif job.operation == "current_patch":
+                current_patch_result = await asyncio.wait_for(
+                    client.read_current_patch(),
+                    timeout=max(5.0, settings.quick_sync_timeout_seconds),
+                )
+                connection_result = None
+                slot_result = None
+                dump_result = None
+                slots_result = None
+                quick_result = None
+            elif job.operation == "sync_slot":
+                slot_target = job.slot
+                if slot_target is None:
+                    raise RuntimeError("sync_slot operation missing slot")
+                slot_result = await asyncio.wait_for(
+                    client.read_slot_state(slot=slot_target, synced_at=synced_at),
+                    timeout=max(5.0, settings.quick_sync_timeout_seconds),
+                )
+                connection_result = None
+                current_patch_result = None
+                dump_result = None
+                slots_result = None
+                quick_result = None
+            elif job.operation == "full_dump":
+                dump_result = await asyncio.wait_for(
+                    client.full_amp_dump(synced_at=synced_at),
+                    timeout=max(5.0, settings.full_sync_timeout_seconds),
+                )
+                connection_result = None
+                current_patch_result = None
+                slot_result = None
+                slots_result = None
+                quick_result = None
+            elif job.operation == "full_sync_slots":
                 slots_result = await asyncio.wait_for(
                     client.read_slots_state(synced_at=synced_at),
                     timeout=max(5.0, settings.full_sync_timeout_seconds),
                 )
+                connection_result = None
+                current_patch_result = None
+                slot_result = None
+                dump_result = None
                 quick_result = None
             elif job.operation == "quick_sync_names":
                 quick_result = await asyncio.wait_for(
                     client.read_slots_names_quick(synced_at=synced_at),
                     timeout=max(5.0, settings.quick_sync_timeout_seconds),
                 )
+                connection_result = None
+                current_patch_result = None
+                slot_result = None
+                dump_result = None
                 slots_result = None
             else:
                 raise RuntimeError(f"unknown operation: {job.operation}")
@@ -158,6 +242,10 @@ class AmpJobQueue:
             if done is None:
                 return
             done.status = "succeeded"
+            done.result_connection = connection_result
+            done.result_current_patch = current_patch_result.payload if current_patch_result is not None else None
+            done.result_slot = slot_result
+            done.result_dump = dump_result
             done.result_slots = slots_result
             done.result_quick = quick_result
             done.finished_at = datetime.now().isoformat(timespec="seconds")
