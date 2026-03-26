@@ -704,6 +704,18 @@
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
 
+## Session Update - 2026-03-26 (Live RMS Graph: Full-Width Bar Style)
+- Updated live RMS chart rendering from line sparkline to bar graph.
+- New behavior:
+  - chart expands to full available row width,
+  - displays little vertical bars for recent RMS points (last 96 points).
+- Files changed:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+  - `apps/web/src/app/app.css`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
+
 ## Session Update - 2026-03-26 (Queued Backup Feature + Nested Repo Flatten)
 - Added queued amp backup API endpoints:
   - `POST /api/v1/amp/backup` (enqueue full amp-state dump)

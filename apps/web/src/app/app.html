@@ -65,15 +65,15 @@
           </div>
           <div class="mt-2 d-flex align-items-center gap-2">
             <span class="small text-secondary">Live RMS Graph:</span>
-            <svg class="rms-graph" viewBox="0 0 220 64" preserveAspectRatio="none" aria-label="Live RMS graph">
-              <polyline
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                [attr.points]="rmsGraphPoints()"
-              />
+            <svg class="rms-graph" viewBox="0 0 1000 64" preserveAspectRatio="none" aria-label="Live RMS graph">
+              @for (bar of rmsGraphBars(); track $index) {
+                <rect
+                  [attr.x]="bar.x"
+                  [attr.y]="bar.y"
+                  [attr.width]="bar.width"
+                  [attr.height]="bar.height"
+                />
+              }
             </svg>
           </div>
         </div>

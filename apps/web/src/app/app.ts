@@ -647,6 +647,31 @@ export class App implements OnInit, OnDestroy {
       .join(' ');
   }
 
+  rmsGraphBars(): Array<{ x: number; y: number; width: number; height: number }> {
+    const allValues = this.liveRmsHistory();
+    if (allValues.length === 0) {
+      return [];
+    }
+    const values = allValues.slice(-96);
+    const graphWidth = 1000;
+    const graphHeight = 64;
+    const minDb = -90;
+    const maxDb = 0;
+    const step = graphWidth / values.length;
+    const barWidth = Math.max(1, step * 0.7);
+    return values.map((value, idx) => {
+      const y = this.rmsToGraphY(value, minDb, maxDb, graphHeight);
+      const x = (idx * step) + ((step - barWidth) / 2);
+      const height = Math.max(1, graphHeight - y);
+      return {
+        x,
+        y,
+        width: barWidth,
+        height,
+      };
+    });
+  }
+
   private pushLiveRmsPoint(value: number): void {
     this.liveRmsHistory.update((current) => {
       const next = [...current, value];

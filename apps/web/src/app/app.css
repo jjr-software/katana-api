@@ -24,12 +24,16 @@
 }
 
 .rms-graph {
-  width: 220px;
+  width: 100%;
   height: 64px;
   border: 1px solid #ced4da;
   border-radius: 4px;
   background: #f8f9fa;
   color: #0d6efd;
+}
+
+.rms-graph rect {
+  fill: #0d6efd;
 }
 
 pre {
