@@ -62,9 +62,7 @@
               {{ isLoading() ? 'Working...' : 'Sync' }}
             </button>
           </div>
-          <p>Hash: <code>{{ displayHash(slot) }}</code></p>
           <p>Last Sync: <code>{{ slot.synced_at || 'n/a' }}</code></p>
-          <p>Match: <code>{{ slot.inferred ? 'inferred' : (slot.match_count > 1 ? 'ambiguous' : 'unknown') }}</code></p>
         </article>
       }
     </div>
@@ -85,9 +83,7 @@
               {{ isLoading() ? 'Working...' : 'Sync' }}
             </button>
           </div>
-          <p>Hash: <code>{{ displayHash(slot) }}</code></p>
           <p>Last Sync: <code>{{ slot.synced_at || 'n/a' }}</code></p>
-          <p>Match: <code>{{ slot.inferred ? 'inferred' : (slot.match_count > 1 ? 'ambiguous' : 'unknown') }}</code></p>
         </article>
       }
     </div>

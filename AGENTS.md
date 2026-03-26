@@ -470,3 +470,14 @@
   - `apps/web/src/app/app.css`
 - Containerized verification run:
   - `docker compose build api web` succeeded.
+
+## Session Update - 2026-03-26 (Slot Card Simplification)
+- Removed per-slot card display fields from web UI:
+  - `Hash`
+  - `Match`
+- Kept per-slot controls and timing metadata:
+  - `Refresh`, `Sync`, `Last Sync`
+- File changed:
+  - `apps/web/src/app/app.html`
+- Containerized verification run:
+  - `docker compose build web` succeeded.
