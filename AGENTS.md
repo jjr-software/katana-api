@@ -1410,3 +1410,19 @@
   - `apps/web/src/app/app.html`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Editor Amp Volume Live-Apply Fix)
+- Fixed editor amp-field live-apply bug where changing `amp.volume` (and related amp fields) did not affect the amp.
+- Root cause:
+  - frontend updated semantic amp keys (for example `amp.volume`) but did not keep `amp.raw` in sync,
+  - backend live-apply writes `amp.raw`, so edited values were ignored on device.
+- Fix implemented:
+  - `setEditorAmpNumber(...)` now syncs corresponding index in `amp.raw`,
+  - added amp raw helpers to rebuild/sanitize the 10-byte amp raw array and map fields to raw indexes.
+- Verified with Playwright on `https://katana.ryzen.jjrsoftware.co.uk/`:
+  - flow: `A:1 -> Activate -> Editor -> Volume change`,
+  - captured live-apply POST payload now includes matching values for `patch.amp.volume` and `patch.amp.raw[1]`.
+- Files changed:
+  - `apps/web/src/app/app.ts`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

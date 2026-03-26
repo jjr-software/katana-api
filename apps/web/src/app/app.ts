@@ -1419,6 +1419,7 @@ export class App implements OnInit, OnDestroy {
     this.updateEditorPatch((draft) => {
       const amp = this.ensureObject(draft, 'amp');
       amp[field] = parsed;
+      this.syncAmpDerivedRawField(amp, field, parsed);
     });
   }
 
@@ -2138,6 +2139,55 @@ export class App implements OnInit, OnDestroy {
       return [];
     }
     return rawUnknown.map((item) => this.parseUnknownNumber(item));
+  }
+
+  private ensureAmpRaw(amp: Record<string, unknown>): number[] {
+    const rawUnknown = amp['raw'];
+    if (!Array.isArray(rawUnknown) || rawUnknown.length !== 10) {
+      const raw = Array.from({ length: 10 }, () => 0);
+      const fieldMap: Array<[string, number]> = [
+        ['gain', 0],
+        ['volume', 1],
+        ['bass', 2],
+        ['middle', 3],
+        ['treble', 4],
+        ['presence', 5],
+        ['poweramp_variation', 6],
+        ['amp_type', 7],
+        ['resonance', 8],
+        ['preamp_variation', 9],
+      ];
+      for (const [field, index] of fieldMap) {
+        const value = amp[field];
+        if (typeof value === 'number' && Number.isFinite(value)) {
+          raw[index] = Math.trunc(value);
+        }
+      }
+      return raw;
+    }
+    return rawUnknown.map((item) => this.parseUnknownNumber(item));
+  }
+
+  private syncAmpDerivedRawField(amp: Record<string, unknown>, field: string, value: number): void {
+    const rawIndexByField: Record<string, number> = {
+      gain: 0,
+      volume: 1,
+      bass: 2,
+      middle: 3,
+      treble: 4,
+      presence: 5,
+      poweramp_variation: 6,
+      amp_type: 7,
+      resonance: 8,
+      preamp_variation: 9,
+    };
+    const rawIndex = rawIndexByField[field];
+    if (rawIndex === undefined) {
+      return;
+    }
+    const raw = this.ensureAmpRaw(amp);
+    raw[rawIndex] = value;
+    amp['raw'] = raw;
   }
 
   private parseUnknownNumber(value: unknown): number {
