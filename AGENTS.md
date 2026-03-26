@@ -1426,3 +1426,13 @@
   - `apps/web/src/app/app.ts`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Show Hash Beside Patch Name On Cards)
+- Updated slot card titles to include hash immediately after patch name in brackets:
+  - format: `Patch Name (short_hash)`
+  - applies to both bank A and bank B card grids.
+- Uses existing short-hash formatter (`displayHash(...)`) and shows `n/a` when no hash is present.
+- Files changed:
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
