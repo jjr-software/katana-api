@@ -462,6 +462,7 @@ export class App implements OnInit, OnDestroy {
         return;
       }
       const sample = payload as AudioSampleResponse;
+      this.setSlotMeasuredRms(slot.slot, sample.rms_dbfs, sample.created_at);
       this.status.set(`RMS measured for ${slot.slot_label}`);
       this.responseJson.set(
         JSON.stringify(

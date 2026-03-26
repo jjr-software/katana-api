@@ -726,6 +726,15 @@
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
 
+## Session Update - 2026-03-26 (Fix: Per-Slot Measure Updates Card Value)
+- Fixed UI behavior where pressing per-slot `Measure` performed API call but did not update slot card RMS fields.
+- Change:
+  - per-slot measure handler now writes returned `rms_dbfs` + timestamp to that slot card (`5s RMS`/`RMS At` display fields).
+- File changed:
+  - `apps/web/src/app/app.ts`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
+
 ## Session Update - 2026-03-26 (Queued Backup Feature + Nested Repo Flatten)
 - Added queued amp backup API endpoints:
   - `POST /api/v1/amp/backup` (enqueue full amp-state dump)
