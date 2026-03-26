@@ -42,6 +42,11 @@ class SlotsStateResponse(BaseModel):
     slots: list[SlotPatchSummaryResponse]
 
 
+class SlotSyncResponse(BaseModel):
+    synced_at: str
+    slot: SlotPatchSummaryResponse
+
+
 class QuickSlotSummaryResponse(BaseModel):
     slot: int
     slot_label: str
@@ -230,6 +235,39 @@ async def enqueue_slots_sync() -> SlotsSyncEnqueueResponse:
         operation=job.operation,
         status=job.status,
         created_at=job.created_at,
+    )
+
+
+@router.post("/slots/{slot}/sync", response_model=SlotSyncResponse)
+async def sync_single_slot(
+    slot: int,
+    client: AmpClient = Depends(get_amp_client),
+    db: Session = Depends(get_db),
+) -> SlotSyncResponse:
+    if slot < 1 or slot > 8:
+        raise HTTPException(
+            status_code=400,
+            detail={"message": "slot must be in range 1..8", "slot": slot},
+        )
+
+    synced_at = datetime.now().isoformat(timespec="seconds")
+    try:
+        item = await client.read_slot_state(slot=slot, synced_at=synced_at)
+    except AmpClientError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "Failed to sync slot from amp",
+                "error": str(exc),
+                "midi_port": client.midi_port,
+                "slot": slot,
+            },
+        ) from exc
+
+    curated_by_hash = _load_curation_by_hash(db, [item.config_hash_sha256])
+    return SlotSyncResponse(
+        synced_at=synced_at,
+        slot=SlotPatchSummaryResponse(**_slot_to_dict(item, curated_by_hash)),
     )
 
 

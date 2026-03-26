@@ -34,6 +34,11 @@ interface SlotsStateResponse {
   slots: SlotPatchSummary[];
 }
 
+interface SlotSyncResponse {
+  synced_at: string;
+  slot: SlotPatchSummary;
+}
+
 interface QuickSlotsStateResponse {
   synced_at: string;
   total_sync_ms: number;
@@ -299,6 +304,50 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  async syncAmpSlot(slot: number): Promise<void> {
+    this.isLoading.set(true);
+    this.status.set(`Syncing slot ${slot}...`);
+    this.responseJson.set('');
+
+    try {
+      const response = await fetch(`/api/v1/amp/slots/${slot}/sync`, {
+        method: 'POST',
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as SlotSyncResponse | { detail: unknown };
+      if (!response.ok) {
+        this.status.set(`Slot ${slot} sync failed`);
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        this.updateBusyFromPayload(payload);
+        await this.refreshDeviceStatus();
+        return;
+      }
+
+      const synced = payload as SlotSyncResponse;
+      this.applySyncedSlot(synced.slot);
+      this.lastSyncedAt.set(synced.synced_at);
+      this.totalSyncMs.set(synced.slot.slot_sync_ms);
+      this.ampStateHash.set('');
+      this.status.set(`Slot ${slot} sync succeeded`);
+      await this.refreshDeviceStatus();
+    } catch (error: unknown) {
+      this.status.set(`Slot ${slot} sync failed`);
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Browser request failed',
+            error: String(error),
+          },
+          null,
+          2,
+        ),
+      );
+      await this.refreshDeviceStatus();
+    } finally {
+      this.isLoading.set(false);
+    }
+  }
+
   async quickSyncAmpSlots(): Promise<void> {
     this.isLoading.set(true);
     this.status.set('Quick sync queued...');
@@ -529,6 +578,26 @@ export class App implements OnInit, OnDestroy {
         match_count: quick.match_count,
       };
     });
+  }
+
+  private applySyncedSlot(slot: SlotPatchSummary): void {
+    this.slots.update((current) =>
+      current.map((card) => {
+        if (card.slot !== slot.slot) {
+          return card;
+        }
+        return {
+          slot: slot.slot,
+          slot_label: slot.slot_label,
+          patch_name: slot.patch_name,
+          config_hash_sha256: slot.config_hash_sha256,
+          synced_at: slot.synced_at,
+          slot_sync_ms: slot.slot_sync_ms,
+          inferred: false,
+          match_count: 1,
+        };
+      }),
+    );
   }
 
   formatMs(value: number): string {
