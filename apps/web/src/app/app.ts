@@ -1384,7 +1384,7 @@ export class App implements OnInit, OnDestroy {
     const type = this.readNumber(booster, 'type');
     const drive = this.readNumber(booster, 'drive');
     const volume = this.readNumber(booster, 'effect_level');
-    const parts: string[] = [on ? 'On' : 'Off'];
+    const parts: string[] = [];
     if (type !== null) {
       parts.push(this.effectTypeLabel('booster', type));
     }
@@ -1407,6 +1407,12 @@ export class App implements OnInit, OnDestroy {
 
   reverbSummary(slot: SlotCard): string {
     return this.stageSummary(slot, 'reverb');
+  }
+
+  isStageOn(slot: SlotCard, stageName: string): boolean {
+    const stages = this.readObject(slot.patch, 'stages');
+    const stage = this.readObject(stages, stageName);
+    return this.readBoolean(stage, 'on');
   }
 
   showRaw(slot: SlotCard): void {
@@ -1435,10 +1441,9 @@ export class App implements OnInit, OnDestroy {
     if (!stage) {
       return 'n/a';
     }
-    const on = this.readBoolean(stage, 'on');
     const type = this.readNumber(stage, 'type');
     const level = this.readNumber(stage, 'effect_level');
-    const parts: string[] = [on ? 'On' : 'Off'];
+    const parts: string[] = [];
     if (type !== null) {
       parts.push(this.effectTypeLabel(stageName, type));
     }

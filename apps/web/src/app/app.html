@@ -109,11 +109,11 @@
                   </div>
                   <p class="small mb-1 patch-summary"><strong>Amp:</strong> {{ ampSummary(slot) }}</p>
                   <p class="small mb-1 patch-summary"><strong>AMP Type:</strong> {{ ampTypeSummary(slot) }}</p>
-                  <p class="small mb-1 patch-summary"><strong>Booster:</strong> {{ boosterSummary(slot) }}</p>
-                  <p class="small mb-1 patch-summary"><strong>Mod:</strong> {{ modSummary(slot) }}</p>
-                  <p class="small mb-1 patch-summary"><strong>FX:</strong> {{ fxSummary(slot) }}</p>
-                  <p class="small mb-1 patch-summary"><strong>Delay:</strong> {{ delaySummary(slot) }}</p>
-                  <p class="small mb-2 patch-summary"><strong>Reverb:</strong> {{ reverbSummary(slot) }}</p>
+                  <p class="small mb-1 patch-summary"><strong [class.text-success]="isStageOn(slot, 'booster')" [class.text-danger]="!isStageOn(slot, 'booster')">Booster:</strong> {{ boosterSummary(slot) }}</p>
+                  <p class="small mb-1 patch-summary"><strong [class.text-success]="isStageOn(slot, 'mod')" [class.text-danger]="!isStageOn(slot, 'mod')">Mod:</strong> {{ modSummary(slot) }}</p>
+                  <p class="small mb-1 patch-summary"><strong [class.text-success]="isStageOn(slot, 'fx')" [class.text-danger]="!isStageOn(slot, 'fx')">FX:</strong> {{ fxSummary(slot) }}</p>
+                  <p class="small mb-1 patch-summary"><strong [class.text-success]="isStageOn(slot, 'delay')" [class.text-danger]="!isStageOn(slot, 'delay')">Delay:</strong> {{ delaySummary(slot) }}</p>
+                  <p class="small mb-2 patch-summary"><strong [class.text-success]="isStageOn(slot, 'reverb')" [class.text-danger]="!isStageOn(slot, 'reverb')">Reverb:</strong> {{ reverbSummary(slot) }}</p>
                   <p class="small mb-1 text-secondary">
                     10s Max RMS/Peak: <code>{{ formatDb(slot.measured_rms_dbfs) }} / {{ formatDb(slot.measured_peak_dbfs) }}</code>
                   </p>
@@ -152,11 +152,11 @@
                   </div>
                   <p class="small mb-1 patch-summary"><strong>Amp:</strong> {{ ampSummary(slot) }}</p>
                   <p class="small mb-1 patch-summary"><strong>AMP Type:</strong> {{ ampTypeSummary(slot) }}</p>
-                  <p class="small mb-1 patch-summary"><strong>Booster:</strong> {{ boosterSummary(slot) }}</p>
-                  <p class="small mb-1 patch-summary"><strong>Mod:</strong> {{ modSummary(slot) }}</p>
-                  <p class="small mb-1 patch-summary"><strong>FX:</strong> {{ fxSummary(slot) }}</p>
-                  <p class="small mb-1 patch-summary"><strong>Delay:</strong> {{ delaySummary(slot) }}</p>
-                  <p class="small mb-2 patch-summary"><strong>Reverb:</strong> {{ reverbSummary(slot) }}</p>
+                  <p class="small mb-1 patch-summary"><strong [class.text-success]="isStageOn(slot, 'booster')" [class.text-danger]="!isStageOn(slot, 'booster')">Booster:</strong> {{ boosterSummary(slot) }}</p>
+                  <p class="small mb-1 patch-summary"><strong [class.text-success]="isStageOn(slot, 'mod')" [class.text-danger]="!isStageOn(slot, 'mod')">Mod:</strong> {{ modSummary(slot) }}</p>
+                  <p class="small mb-1 patch-summary"><strong [class.text-success]="isStageOn(slot, 'fx')" [class.text-danger]="!isStageOn(slot, 'fx')">FX:</strong> {{ fxSummary(slot) }}</p>
+                  <p class="small mb-1 patch-summary"><strong [class.text-success]="isStageOn(slot, 'delay')" [class.text-danger]="!isStageOn(slot, 'delay')">Delay:</strong> {{ delaySummary(slot) }}</p>
+                  <p class="small mb-2 patch-summary"><strong [class.text-success]="isStageOn(slot, 'reverb')" [class.text-danger]="!isStageOn(slot, 'reverb')">Reverb:</strong> {{ reverbSummary(slot) }}</p>
                   <p class="small mb-1 text-secondary">
                     10s Max RMS/Peak: <code>{{ formatDb(slot.measured_rms_dbfs) }} / {{ formatDb(slot.measured_peak_dbfs) }}</code>
                   </p>

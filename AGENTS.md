@@ -1040,3 +1040,18 @@
   - `apps/web/src/app/app.ts`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Stage On/Off via Label Color)
+- Updated stage display on slot cards to remove textual `On/Off` prefixes from summaries.
+- Stage state is now represented by label color only:
+  - green label when stage `on=true`
+  - red label when stage `on=false`
+- Applied to stage labels:
+  - `Booster`, `Mod`, `FX`, `Delay`, `Reverb`
+- Added helper in web app for stage on/off state:
+  - `isStageOn(slot, stageName)`
+- Files changed:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
