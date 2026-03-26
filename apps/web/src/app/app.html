@@ -111,6 +111,9 @@
                     <span class="badge rounded-pill" [class.text-bg-success]="slot.is_saved" [class.text-bg-warning]="!slot.is_saved">
                       {{ slotDbStatusLabel(slot) }}
                     </span>
+                    <span class="badge rounded-pill" [class.text-bg-success]="isLiveOnAmp(slot)" [class.text-bg-secondary]="!isLiveOnAmp(slot)">
+                      {{ slotLiveStatusLabel(slot) }}
+                    </span>
                   </p>
                   <div class="d-flex flex-wrap gap-2 mb-2">
                     <button type="button" class="btn btn-sm btn-primary" (click)="readCurrentPatchIntoSlot(slot)" [disabled]="!canReadSlot(slot)">Select+Read</button>
@@ -156,6 +159,9 @@
                     </span>
                     <span class="badge rounded-pill" [class.text-bg-success]="slot.is_saved" [class.text-bg-warning]="!slot.is_saved">
                       {{ slotDbStatusLabel(slot) }}
+                    </span>
+                    <span class="badge rounded-pill" [class.text-bg-success]="isLiveOnAmp(slot)" [class.text-bg-secondary]="!isLiveOnAmp(slot)">
+                      {{ slotLiveStatusLabel(slot) }}
                     </span>
                   </p>
                   <div class="d-flex flex-wrap gap-2 mb-2">

@@ -1928,6 +1928,15 @@ export class App implements OnInit, OnDestroy {
     return slot.is_saved ? 'DB Saved' : 'DB Not Saved';
   }
 
+  isLiveOnAmp(slot: SlotCard): boolean {
+    const currentLiveHash = this.currentAmpPatchHash();
+    return Boolean(currentLiveHash) && slot.config_hash_sha256 === currentLiveHash;
+  }
+
+  slotLiveStatusLabel(slot: SlotCard): string {
+    return this.isLiveOnAmp(slot) ? 'Live on AMP' : 'Not Live';
+  }
+
   ampSummary(slot: SlotCard): string {
     const amp = this.readObject(this.readObject(slot.patch, 'amp'));
     if (!amp) {

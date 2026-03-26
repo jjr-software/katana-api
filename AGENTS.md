@@ -1300,3 +1300,15 @@
   - `apps/api/app/api/amp.py`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Three Patch-State Badges On Cards)
+- Slot cards now show all three requested state dimensions simultaneously:
+  - `Saved/Not Saved`: persisted-to-AMP memory state (`config_hash_sha256` vs `committed_hash_sha256`),
+  - `DB Saved/DB Not Saved`: patch persistence in local DB (`slot.is_saved`),
+  - `Live on AMP/Not Live`: whether the card hash matches the currently active live amp patch hash.
+- Added `Live on AMP` badge rendering to both Bank A and Bank B cards.
+- Files changed:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
