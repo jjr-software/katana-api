@@ -11,6 +11,8 @@ PATCH_WRITE_ADDR = (0x7F, 0x00, 0x01, 0x04)
 
 
 class AmidiTransport:
+    RQ1_MAX_CHUNK_SIZE = 225
+
     def __init__(self, port: str = "hw:1,0,0", timeout_sec: float = 2.0) -> None:
         self.port = port
         self.timeout_sec = float(timeout_sec)
@@ -52,13 +54,67 @@ class AmidiTransport:
         await self.send_dt1(PATCH_WRITE_ADDR, [0x00, slot_val])
 
     async def read_rq1(self, addr: tuple[int, int, int, int], size: int, timeout_sec: float | None = None) -> list[int]:
+        if size <= self.RQ1_MAX_CHUNK_SIZE:
+            return await self._read_rq1_chunk(addr, size, timeout_sec=timeout_sec)
+        out: list[int] = []
+        remaining = int(size)
+        offset = 0
+        while remaining > 0:
+            chunk_size = min(remaining, self.RQ1_MAX_CHUNK_SIZE)
+            chunk_addr = self._addr_add_7bit(addr, offset)
+            out.extend(await self._read_rq1_chunk(chunk_addr, chunk_size, timeout_sec=timeout_sec))
+            offset += chunk_size
+            remaining -= chunk_size
+        return out
+
+    async def _read_rq1_chunk(
+        self,
+        addr: tuple[int, int, int, int],
+        size: int,
+        timeout_sec: float | None = None,
+    ) -> list[int]:
         out = await self.query_hex(build_rq1(addr, size), timeout_sec=timeout_sec)
         frames = extract_sysex_frames(out)
+        start_addr = self._addr_to_int(addr)
+        assembled = [0] * size
+        seen = [False] * size
         for frame in frames:
             parsed = parse_dt1(frame)
             if parsed is None:
                 continue
             dt1_addr, data = parsed
-            if dt1_addr == addr:
-                return data[:size]
-        raise RuntimeError(f"No DT1 response for address {addr} in output: {out.strip()}")
+            offset = self._addr_to_int(dt1_addr) - start_addr
+            if offset < 0 or offset >= size:
+                continue
+            end = min(size, offset + len(data))
+            if end <= offset:
+                continue
+            for idx, value in enumerate(data[: end - offset], start=offset):
+                assembled[idx] = int(value)
+                seen[idx] = True
+        if all(seen):
+            return assembled
+        received = sum(1 for flag in seen if flag)
+        if received == 0:
+            raise RuntimeError(f"No DT1 response for address {addr} in output: {out.strip()}")
+        raise RuntimeError(f"Incomplete DT1 response for address {addr}: {received}/{size} bytes")
+
+    @staticmethod
+    def _addr_to_int(addr: tuple[int, int, int, int]) -> int:
+        return (int(addr[0]) << 24) | (int(addr[1]) << 16) | (int(addr[2]) << 8) | int(addr[3])
+
+    @staticmethod
+    def _addr_add_7bit(addr: tuple[int, int, int, int], offset: int) -> tuple[int, int, int, int]:
+        base = (
+            int(addr[0]) * (128**3)
+            + int(addr[1]) * (128**2)
+            + int(addr[2]) * 128
+            + int(addr[3])
+        )
+        total = base + int(offset)
+        return (
+            (total // (128**3)) % 128,
+            (total // (128**2)) % 128,
+            (total // 128) % 128,
+            total % 128,
+        )

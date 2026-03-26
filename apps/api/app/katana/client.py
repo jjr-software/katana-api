@@ -18,7 +18,9 @@ from app.katana.protocol import (
     ADDR_PATCH_EQ_PEQ_1,
     ADDR_PATCH_EQ_PEQ_2,
     ADDR_PATCH_FX_1,
+    ADDR_PATCH_FX_DETAIL_1,
     ADDR_PATCH_FX_4,
+    ADDR_PATCH_FX_DETAIL_4,
     ADDR_PATCH_NS,
     ADDR_PATCH_OTHER,
     ADDR_PATCH_PEDALFX,
@@ -120,6 +122,9 @@ _PORT_LOCKS: dict[str, asyncio.Lock] = {}
 
 
 class AmpClient:
+    FX_DETAIL_SIZE = 225
+    RQ1_MAX_CHUNK_SIZE = 225
+
     def __init__(self, midi_port: str, timeout_seconds: float, rq1_timeout_seconds: float) -> None:
         self._midi_port = midi_port
         self._timeout_seconds = timeout_seconds
@@ -278,8 +283,8 @@ class AmpClient:
         sw = await self._read_rq1(ADDR_PATCH_SW, 6)
 
         booster_variants = [await self._read_rq1(addr_add(ADDR_PATCH_BOOSTER_1, 0x200 * i), 8) for i in range(3)]
-        mod_variants = [await self._read_rq1(addr_add(ADDR_PATCH_FX_1, 0x200 * i), 1) for i in range(3)]
-        fx_variants = [await self._read_rq1(addr_add(ADDR_PATCH_FX_4, 0x200 * i), 1) for i in range(3)]
+        mod_variants = await self._read_fx_stage_variants(ADDR_PATCH_FX_1, ADDR_PATCH_FX_DETAIL_1)
+        fx_variants = await self._read_fx_stage_variants(ADDR_PATCH_FX_4, ADDR_PATCH_FX_DETAIL_4)
         delay_variants = [await self._read_rq1(addr_add(ADDR_PATCH_DELAY_1, 0x200 * i), 17) for i in range(3)]
         delay2_variants = [await self._read_rq1(addr_add(ADDR_PATCH_DELAY_4, 0x200 * i), 17) for i in range(3)]
         reverb_variants = [await self._read_rq1(addr_add(ADDR_PATCH_REVERB_1, 0x200 * i), 13) for i in range(3)]
@@ -487,18 +492,18 @@ class AmpClient:
                 size=8,
                 field_name="stages.booster.raw",
             )
-            await self._write_stage_variant(
+            await self._write_fx_stage_variant(
                 stages_obj.get("mod"),
                 color_index=color_data[1] if len(color_data) >= 2 else 0,
-                base_addr=ADDR_PATCH_FX_1,
-                size=1,
+                type_base_addr=ADDR_PATCH_FX_1,
+                detail_base_addr=ADDR_PATCH_FX_DETAIL_1,
                 field_name="stages.mod.raw",
             )
-            await self._write_stage_variant(
+            await self._write_fx_stage_variant(
                 stages_obj.get("fx"),
                 color_index=color_data[2] if len(color_data) >= 3 else 0,
-                base_addr=ADDR_PATCH_FX_4,
-                size=1,
+                type_base_addr=ADDR_PATCH_FX_4,
+                detail_base_addr=ADDR_PATCH_FX_DETAIL_4,
                 field_name="stages.fx.raw",
             )
             await self._write_stage_variant(
@@ -532,6 +537,54 @@ class AmpClient:
         data = self._to_int_list(raw, expected_size=size, field_name=field_name)
         addr = addr_add(base_addr, 0x200 * max(0, min(2, int(color_index))))
         await self._send_only(build_dt1(addr, data))
+
+    async def _read_fx_stage_variants(
+        self,
+        type_base_addr: tuple[int, int, int, int],
+        detail_base_addr: tuple[int, int, int, int],
+    ) -> list[list[int]]:
+        variants: list[list[int]] = []
+        for i in range(3):
+            type_data = await self._read_rq1(addr_add(type_base_addr, 0x200 * i), 1)
+            detail_data = await self._read_rq1(addr_add(detail_base_addr, 0x200 * i), self.FX_DETAIL_SIZE)
+            variants.append(type_data + detail_data)
+        return variants
+
+    async def _write_fx_stage_variant(
+        self,
+        stage_obj: Any,
+        color_index: int,
+        type_base_addr: tuple[int, int, int, int],
+        detail_base_addr: tuple[int, int, int, int],
+        field_name: str,
+    ) -> None:
+        if not isinstance(stage_obj, dict):
+            return
+        raw = stage_obj.get("raw")
+        if not isinstance(raw, list):
+            return
+        if len(raw) == 1:
+            type_data = self._to_int_list(raw, expected_size=1, field_name=field_name)
+            detail_data: list[int] | None = None
+        elif len(raw) == self.FX_DETAIL_SIZE + 1:
+            type_data = self._to_int_list(raw[:1], expected_size=1, field_name=f"{field_name}[0:1]")
+            detail_data = self._to_int_list(
+                raw[1:],
+                expected_size=self.FX_DETAIL_SIZE,
+                field_name=f"{field_name}[1:]",
+            )
+        else:
+            raise AmpClientError(
+                f"Invalid payload: {field_name} must have length 1 or {self.FX_DETAIL_SIZE + 1} "
+                f"(got {len(raw)})"
+            )
+
+        variant_offset = 0x200 * max(0, min(2, int(color_index)))
+        type_addr = addr_add(type_base_addr, variant_offset)
+        await self._send_only(build_dt1(type_addr, type_data))
+        if detail_data is not None:
+            detail_addr = addr_add(detail_base_addr, variant_offset)
+            await self._send_only(build_dt1(detail_addr, detail_data))
 
     @staticmethod
     def _to_int_list(value: Any, expected_size: int, field_name: str) -> list[int]:
@@ -611,19 +664,48 @@ class AmpClient:
         await self._send_only(build_dt1(PATCH_SELECT_ADDR, [0x00, slot_val]))
 
     async def _read_rq1(self, addr: tuple[int, int, int, int], size: int) -> list[int]:
+        if size <= self.RQ1_MAX_CHUNK_SIZE:
+            return await self._read_rq1_chunk(addr, size)
+        out: list[int] = []
+        remaining = int(size)
+        offset = 0
+        while remaining > 0:
+            chunk_size = min(remaining, self.RQ1_MAX_CHUNK_SIZE)
+            chunk_addr = self._addr_add_7bit(addr, offset)
+            out.extend(await self._read_rq1_chunk(chunk_addr, chunk_size))
+            offset += chunk_size
+            remaining -= chunk_size
+        return out
+
+    async def _read_rq1_chunk(self, addr: tuple[int, int, int, int], size: int) -> list[int]:
         output = await self._send_and_read(
             build_rq1(addr, size),
             timeout_seconds=self._rq1_timeout_seconds,
         )
         frames = extract_sysex_frames(output)
+        start_addr = self._addr_to_int(addr)
+        assembled = [0] * size
+        seen = [False] * size
         for frame in frames:
             parsed = parse_dt1(frame)
             if parsed is None:
                 continue
             dt1_addr, data = parsed
-            if dt1_addr == addr:
-                return data[:size]
-        raise AmpClientError(f"No DT1 response for address {addr}")
+            offset = self._addr_to_int(dt1_addr) - start_addr
+            if offset < 0 or offset >= size:
+                continue
+            end = min(size, offset + len(data))
+            if end <= offset:
+                continue
+            for idx, value in enumerate(data[: end - offset], start=offset):
+                assembled[idx] = int(value)
+                seen[idx] = True
+        if all(seen):
+            return assembled
+        received = sum(1 for flag in seen if flag)
+        if received == 0:
+            raise AmpClientError(f"No DT1 response for address {addr}")
+        raise AmpClientError(f"Incomplete DT1 response for address {addr}: {received}/{size} bytes")
 
     async def _send_export_command_multiple_preview_unmute(self) -> None:
         output = await self._send_and_read(
@@ -693,6 +775,26 @@ class AmpClient:
             else:
                 chars.append("?")
         return "".join(chars).rstrip()
+
+    @staticmethod
+    def _addr_to_int(addr: tuple[int, int, int, int]) -> int:
+        return (int(addr[0]) << 24) | (int(addr[1]) << 16) | (int(addr[2]) << 8) | int(addr[3])
+
+    @staticmethod
+    def _addr_add_7bit(addr: tuple[int, int, int, int], offset: int) -> tuple[int, int, int, int]:
+        base = (
+            int(addr[0]) * (128**3)
+            + int(addr[1]) * (128**2)
+            + int(addr[2]) * 128
+            + int(addr[3])
+        )
+        total = base + int(offset)
+        return (
+            (total // (128**3)) % 128,
+            (total // (128**2)) % 128,
+            (total // 128) % 128,
+            total % 128,
+        )
 
     @staticmethod
     def _config_hash(payload: dict[str, Any]) -> str:

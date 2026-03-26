@@ -1540,3 +1540,21 @@
   - `apps/web/src/app/app.html`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (MOD/FX Detail Block Expansion)
+- Root cause fixed for editor showing too few MOD/FX parameters:
+  - API was only reading/writing 1 byte (`type`) for MOD/FX.
+- Added protocol constants for MOD/FX detail blocks:
+  - `ADDR_PATCH_FX_DETAIL_1 = (0x20, 0x00, 0x1C, 0x00)`
+  - `ADDR_PATCH_FX_DETAIL_4 = (0x20, 0x00, 0x22, 0x00)`
+- API now reads MOD/FX payload as `raw = [type] + detail`, with device-observed detail length `225` bytes (`raw` length `226`).
+- API write path now splits MOD/FX writes correctly:
+  - type byte to `ADDR_PATCH_FX_*`,
+  - detail block to `ADDR_PATCH_FX_DETAIL_*`.
+- Added chunked RQ1 read support in API/Python transport for larger reads.
+- Pipeline reader updated to fetch expanded MOD/FX payload shape.
+- Verification:
+  - `POST /api/v1/amp/slots/1/sync` returns `mod_len=226`, `fx_len=226`.
+  - `POST /api/v1/amp/current-patch/live-apply` succeeds with the expanded payload.
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

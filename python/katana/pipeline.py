@@ -45,6 +45,8 @@ ADDR_PATCH_SW = (0x20, 0x00, 0x08, 0x00)
 ADDR_PATCH_BOOSTER_1 = (0x20, 0x00, 0x0A, 0x00)
 ADDR_PATCH_FX_1 = (0x20, 0x00, 0x10, 0x00)
 ADDR_PATCH_FX_4 = (0x20, 0x00, 0x16, 0x00)
+ADDR_PATCH_FX_DETAIL_1 = (0x20, 0x00, 0x1C, 0x00)
+ADDR_PATCH_FX_DETAIL_4 = (0x20, 0x00, 0x22, 0x00)
 ADDR_PATCH_DELAY_1 = (0x20, 0x00, 0x28, 0x00)
 ADDR_PATCH_DELAY_4 = (0x20, 0x00, 0x2E, 0x00)
 ADDR_PATCH_REVERB_1 = (0x20, 0x00, 0x34, 0x00)
@@ -59,6 +61,7 @@ ADDR_PATCH_EQ_GE10_1 = (0x20, 0x00, 0x54, 0x00)
 ADDR_PATCH_EQ_GE10_2 = (0x20, 0x00, 0x56, 0x00)
 ADDR_PATCH_NS = (0x20, 0x00, 0x58, 0x00)
 ADDR_PATCH_SENDRETURN = (0x20, 0x00, 0x5A, 0x00)
+FX_DETAIL_SIZE = 225
 
 
 async def _read_block(transport: AmidiTransport, addr: tuple[int, int, int, int], size: int) -> list[int]:
@@ -237,9 +240,17 @@ async def _inspect_pipeline_selected_slot(
         await _read_block(transport, _addr_add(ADDR_PATCH_BOOSTER_1, 0x200 * i), 8) for i in range(3)
     ]
     await _emit_progress(progress, _p("read mod variants"))
-    mod_variants = [await _read_block(transport, _addr_add(ADDR_PATCH_FX_1, 0x200 * i), 1) for i in range(3)]
+    mod_variants = [
+        (await _read_block(transport, _addr_add(ADDR_PATCH_FX_1, 0x200 * i), 1))
+        + (await _read_block(transport, _addr_add(ADDR_PATCH_FX_DETAIL_1, 0x200 * i), FX_DETAIL_SIZE))
+        for i in range(3)
+    ]
     await _emit_progress(progress, _p("read fx variants"))
-    fx_variants = [await _read_block(transport, _addr_add(ADDR_PATCH_FX_4, 0x200 * i), 1) for i in range(3)]
+    fx_variants = [
+        (await _read_block(transport, _addr_add(ADDR_PATCH_FX_4, 0x200 * i), 1))
+        + (await _read_block(transport, _addr_add(ADDR_PATCH_FX_DETAIL_4, 0x200 * i), FX_DETAIL_SIZE))
+        for i in range(3)
+    ]
     await _emit_progress(progress, _p("read delay variants"))
     delay_variants = [await _read_block(transport, _addr_add(ADDR_PATCH_DELAY_1, 0x200 * i), 17) for i in range(3)]
     await _emit_progress(progress, _p("read delay2 variants"))
