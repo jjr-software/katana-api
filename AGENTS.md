@@ -519,6 +519,19 @@
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
 
+## Session Update - 2026-03-26 (Load Amp State Naming + Full-Height Queue)
+- Renamed web UI wording from `Backup Amp State` to `Load Amp State` while keeping the same queued backend endpoints.
+- Updated user-facing status and job messages to use `Load amp state` language.
+- Increased left queue panel to use vertical space on desktop:
+  - queue panel now fills viewport height and scrolls internally.
+  - responsive behavior keeps auto-height on smaller screens.
+- Files changed:
+  - `apps/web/src/app/app.html`
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.css`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
+
 ## Session Update - 2026-03-26 (Queued Backup Feature + Nested Repo Flatten)
 - Added queued amp backup API endpoints:
   - `POST /api/v1/amp/backup` (enqueue full amp-state dump)

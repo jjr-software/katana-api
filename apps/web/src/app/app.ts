@@ -536,8 +536,8 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  async backupAmpState(): Promise<void> {
-    this.status.set('Backup queued...');
+  async loadAmpState(): Promise<void> {
+    this.status.set('Load amp state queued...');
     this.responseJson.set('');
 
     try {
@@ -547,7 +547,7 @@ export class App implements OnInit, OnDestroy {
       });
       const enqueuePayload = (await enqueueResponse.json()) as BackupEnqueueResponse | { detail: unknown };
       if (!enqueueResponse.ok) {
-        this.status.set('Backup failed');
+        this.status.set('Load amp state failed');
         this.responseJson.set(JSON.stringify(enqueuePayload, null, 2));
         return;
       }
@@ -555,11 +555,11 @@ export class App implements OnInit, OnDestroy {
       const queued = enqueuePayload as BackupEnqueueResponse;
       const job = await this.waitForBackupJob(queued.job_id);
       if (job.status !== 'succeeded' || job.result === null) {
-        this.status.set('Backup failed');
+        this.status.set('Load amp state failed');
         this.responseJson.set(
           JSON.stringify(
             {
-              message: 'Queued backup job failed',
+              message: 'Queued load amp state job failed',
               job_id: job.job_id,
               status: job.status,
               error: job.error,
@@ -575,11 +575,11 @@ export class App implements OnInit, OnDestroy {
       this.ampStateHash.set(job.result.amp_state_hash_sha256);
       this.lastSyncedAt.set(job.result.synced_at);
       this.totalSyncMs.set(job.result.total_sync_ms);
-      this.status.set('Backup stored');
+      this.status.set('Amp state loaded');
       this.responseJson.set(
         JSON.stringify(
           {
-            message: 'Backup JSON stored server-side',
+            message: 'Amp state loaded; JSON stored server-side',
             job_id: job.job_id,
             synced_at: job.result.synced_at,
             amp_state_hash_sha256: job.result.amp_state_hash_sha256,
@@ -590,7 +590,7 @@ export class App implements OnInit, OnDestroy {
         ),
       );
     } catch (error: unknown) {
-      this.status.set('Backup failed');
+      this.status.set('Load amp state failed');
       this.responseJson.set(
         JSON.stringify(
           {
@@ -636,18 +636,18 @@ export class App implements OnInit, OnDestroy {
       });
       const payload = (await response.json()) as BackupJobResponse | { detail: unknown };
       if (!response.ok) {
-        throw new Error(`Backup job poll failed: ${JSON.stringify(payload)}`);
+        throw new Error(`Load amp state job poll failed: ${JSON.stringify(payload)}`);
       }
       const job = payload as BackupJobResponse;
       if (job.status === 'succeeded' || job.status === 'failed') {
         return job;
       }
-      this.status.set(job.status === 'queued' ? 'Backup queued...' : 'Backup running...');
+      this.status.set(job.status === 'queued' ? 'Load amp state queued...' : 'Load amp state running...');
       await new Promise<void>((resolve) => {
         setTimeout(() => resolve(), 1000);
       });
     }
-    throw new Error(`Backup job timed out: ${jobId}`);
+    throw new Error(`Load amp state job timed out: ${jobId}`);
   }
 
   async refreshQueueState(): Promise<void> {
@@ -940,7 +940,7 @@ export class App implements OnInit, OnDestroy {
       return 'Sync Slot';
     }
     if (value === 'full_dump') {
-      return 'Full Dump';
+      return 'Load Amp State';
     }
     if (value === 'quick_sync_names') {
       return 'Quick Sync Names';
