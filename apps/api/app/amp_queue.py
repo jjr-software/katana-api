@@ -4,6 +4,9 @@ from datetime import datetime
 from typing import Literal
 from uuid import uuid4
 
+from sqlalchemy.exc import SQLAlchemyError
+
+from app.db import SessionLocal
 from app.katana import (
     AmpClient,
     AmpClientError,
@@ -13,6 +16,7 @@ from app.katana import (
     SlotPatchSummary,
     SlotsStateSnapshot,
 )
+from app.models import AmpSyncHistory
 from app.settings import get_settings
 
 JobStatus = Literal["queued", "running", "succeeded", "failed"]
@@ -217,6 +221,7 @@ class AmpJobQueue:
                     f"quick_sync_timeout_seconds={settings.quick_sync_timeout_seconds})"
                 )
                 failed.finished_at = datetime.now().isoformat(timespec="seconds")
+            await self._persist_sync_history_with_guard(failed)
             return
         except AmpClientError as exc:
             async with self._jobs_lock:
@@ -226,6 +231,7 @@ class AmpJobQueue:
                 failed.status = "failed"
                 failed.error = str(exc)
                 failed.finished_at = datetime.now().isoformat(timespec="seconds")
+            await self._persist_sync_history_with_guard(failed)
             return
         except Exception as exc:
             async with self._jobs_lock:
@@ -235,6 +241,7 @@ class AmpJobQueue:
                 failed.status = "failed"
                 failed.error = f"Unhandled queue error: {exc}"
                 failed.finished_at = datetime.now().isoformat(timespec="seconds")
+            await self._persist_sync_history_with_guard(failed)
             return
 
         async with self._jobs_lock:
@@ -249,6 +256,133 @@ class AmpJobQueue:
             done.result_slots = slots_result
             done.result_quick = quick_result
             done.finished_at = datetime.now().isoformat(timespec="seconds")
+        try:
+            await self._persist_sync_history_if_needed(done)
+        except Exception as exc:
+            async with self._jobs_lock:
+                failed = self._jobs.get(job_id)
+                if failed is None:
+                    return
+                failed.status = "failed"
+                failed.error = f"Sync history persistence failed: {exc}"
+                failed.finished_at = datetime.now().isoformat(timespec="seconds")
+
+    async def _persist_sync_history_if_needed(self, job: AmpQueueJob) -> None:
+        if not self._is_sync_operation(job.operation):
+            return
+        await asyncio.to_thread(self._persist_sync_history, job)
+
+    async def _persist_sync_history_with_guard(self, job: AmpQueueJob) -> None:
+        try:
+            await self._persist_sync_history_if_needed(job)
+        except Exception as exc:
+            async with self._jobs_lock:
+                failed = self._jobs.get(job.job_id)
+                if failed is None:
+                    return
+                message = f"Sync history persistence failed: {exc}"
+                failed.error = f"{failed.error}; {message}" if failed.error else message
+
+    @staticmethod
+    def _is_sync_operation(operation: JobOperation) -> bool:
+        return operation in {"sync_slot", "full_dump", "full_sync_slots", "quick_sync_names"}
+
+    @staticmethod
+    def _persist_sync_history(job: AmpQueueJob) -> None:
+        synced_at = None
+        amp_state_hash = None
+        total_sync_ms = None
+        slot_count = None
+        result_json: dict | None = None
+
+        if job.result_slot is not None:
+            synced_at = job.result_slot.synced_at
+            total_sync_ms = job.result_slot.slot_sync_ms
+            slot_count = 1
+            result_json = {
+                "slot": {
+                    "slot": job.result_slot.slot,
+                    "slot_label": job.result_slot.slot_label,
+                    "patch_name": job.result_slot.patch_name,
+                    "config_hash_sha256": job.result_slot.config_hash_sha256,
+                    "synced_at": job.result_slot.synced_at,
+                    "slot_sync_ms": job.result_slot.slot_sync_ms,
+                }
+            }
+        elif job.result_quick is not None:
+            synced_at = job.result_quick.synced_at
+            total_sync_ms = job.result_quick.total_sync_ms
+            slot_count = len(job.result_quick.slots)
+            result_json = {
+                "slots": [
+                    {
+                        "slot": item.slot,
+                        "slot_label": item.slot_label,
+                        "patch_name": item.patch_name,
+                        "synced_at": item.synced_at,
+                        "slot_sync_ms": item.slot_sync_ms,
+                    }
+                    for item in job.result_quick.slots
+                ]
+            }
+        elif job.result_slots is not None:
+            synced_at = job.result_slots.synced_at
+            amp_state_hash = job.result_slots.amp_state_hash_sha256
+            total_sync_ms = job.result_slots.total_sync_ms
+            slot_count = len(job.result_slots.slots)
+            result_json = {
+                "amp_state_hash_sha256": job.result_slots.amp_state_hash_sha256,
+                "slots": [
+                    {
+                        "slot": item.slot,
+                        "slot_label": item.slot_label,
+                        "patch_name": item.patch_name,
+                        "config_hash_sha256": item.config_hash_sha256,
+                        "synced_at": item.synced_at,
+                        "slot_sync_ms": item.slot_sync_ms,
+                    }
+                    for item in job.result_slots.slots
+                ],
+            }
+        elif job.result_dump is not None:
+            synced_at = job.result_dump.synced_at
+            amp_state_hash = job.result_dump.amp_state_hash_sha256
+            total_sync_ms = job.result_dump.total_sync_ms
+            slot_count = len(job.result_dump.slots)
+            result_json = {
+                "amp_state_hash_sha256": job.result_dump.amp_state_hash_sha256,
+                "slots": [
+                    {
+                        "slot": item.slot,
+                        "slot_label": item.slot_label,
+                        "synced_at": item.synced_at,
+                        "slot_sync_ms": item.slot_sync_ms,
+                        "payload": item.payload,
+                    }
+                    for item in job.result_dump.slots
+                ],
+            }
+
+        row = AmpSyncHistory(
+            job_id=job.job_id,
+            operation=job.operation,
+            status=job.status,
+            synced_at=synced_at,
+            amp_state_hash_sha256=amp_state_hash,
+            total_sync_ms=total_sync_ms,
+            slot_count=slot_count,
+            result_json=result_json,
+            error=job.error,
+        )
+        session = SessionLocal()
+        try:
+            session.add(row)
+            session.commit()
+        except SQLAlchemyError:
+            session.rollback()
+            raise
+        finally:
+            session.close()
 
 
 amp_job_queue = AmpJobQueue()

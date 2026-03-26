@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.amp_queue import amp_job_queue
 from app.deps import get_amp_client, get_db
 from app.katana import AmpClient, QuickSlotName, SlotDump, SlotPatchSummary
-from app.models import PatchConfig, PatchSet, PatchSetMember
+from app.models import AmpSyncHistory, PatchConfig, PatchSet, PatchSetMember
 
 router = APIRouter(prefix="/api/v1/amp", tags=["amp"])
 
@@ -164,6 +164,19 @@ class QueueStateResponse(BaseModel):
     queued_count: int
     running_job_id: str | None = None
     jobs: list[QueueJobSummaryResponse]
+
+
+class SyncHistoryItemResponse(BaseModel):
+    id: int
+    job_id: str
+    operation: str
+    status: str
+    synced_at: str | None = None
+    amp_state_hash_sha256: str | None = None
+    total_sync_ms: int | None = None
+    slot_count: int | None = None
+    error: str | None = None
+    created_at: str
 
 
 @router.get("/test-connection", response_model=AmpConnectionTestResponse)
@@ -340,6 +353,36 @@ async def queue_state() -> QueueStateResponse:
         running_job_id=running_job_id,
         jobs=[QueueJobSummaryResponse(**_queue_job_summary(job)) for job in jobs],
     )
+
+
+@router.get("/sync-history", response_model=list[SyncHistoryItemResponse])
+def sync_history(
+    limit: int = 50,
+    db: Session = Depends(get_db),
+) -> list[SyncHistoryItemResponse]:
+    bounded = max(1, min(limit, 200))
+    rows = list(
+        db.scalars(
+            select(AmpSyncHistory)
+            .order_by(AmpSyncHistory.id.desc())
+            .limit(bounded)
+        )
+    )
+    return [
+        SyncHistoryItemResponse(
+            id=item.id,
+            job_id=item.job_id,
+            operation=item.operation,
+            status=item.status,
+            synced_at=item.synced_at,
+            amp_state_hash_sha256=item.amp_state_hash_sha256,
+            total_sync_ms=item.total_sync_ms,
+            slot_count=item.slot_count,
+            error=item.error,
+            created_at=item.created_at.isoformat(timespec="seconds"),
+        )
+        for item in rows
+    ]
 
 
 @router.get("/slots/sync/{job_id}", response_model=SlotsSyncJobResponse)

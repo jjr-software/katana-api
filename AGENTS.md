@@ -519,6 +519,18 @@
 - Repository hygiene fix:
   - flattened `manual-extract/fresh/innoextract` from accidental gitlink into regular tracked files
 
+## Session Update - 2026-03-26 (Persistent Sync History)
+- Added durable sync history storage in API DB:
+  - new table: `amp_sync_history`
+  - records queued sync operations (`sync_slot`, `quick_sync_names`, `full_sync_slots`, `full_dump`) with status/timestamps/result metadata.
+- Added API endpoint:
+  - `GET /api/v1/amp/sync-history?limit=N`
+- Validation run:
+  - executed queued full-dump sync job and confirmed persisted row with:
+    - `operation=full_dump`
+    - `status=succeeded`
+    - `synced_at`, `created_at`, `amp_state_hash_sha256`, `slot_count=8`
+
 ## Session Update - 2026-03-26 (Queue-Only Amp I/O + No Global UI Lock)
 - Enforced queue-backed amp communication across API amp-read/sync routes:
   - `GET /api/v1/amp/test-connection` now executes via queue job.
