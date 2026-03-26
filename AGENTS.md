@@ -1184,3 +1184,19 @@
   - `apps/web/src/app/app.html`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Card Semantics Reset: Read/Write/Load)
+- Rewired card actions to explicit behavior:
+  - `READ`: pulls current active patch from amp into the selected card (no slot switching).
+  - `WRITE`: pushes selected card patch to amp current patch (live apply endpoint).
+  - `LOAD`: opens modal picker of patch configs from DB and loads selected config into selected card (card-local only, no amp write).
+- Added API endpoint to support `LOAD` modal:
+  - `GET /api/v1/patches/configs` (latest-first list).
+- Removed `in_sync/out_synced` badges and sync-border class usage from card UI.
+- Files changed:
+  - `apps/api/app/api/patches.py`
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+  - `apps/web/src/app/app.css`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

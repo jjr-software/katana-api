@@ -90,25 +90,19 @@
         <div class="row g-3">
           @for (slot of slotsForBank('A'); track slot.slot) {
             <div class="col-12 col-md-6 col-xl-3">
-              <article class="card h-100 patch-card" [class.sync-ok]="slot.in_sync" [class.sync-missing]="!slot.in_sync">
+              <article class="card h-100 patch-card">
                 <div class="card-body p-3">
                   <p class="small mb-1 text-primary fw-semibold">{{ slot.slot_label }}</p>
                   <h3 class="h6 mb-2 text-break">{{ displayPatchName(slot) }}</h3>
                   <p class="d-flex flex-wrap gap-2 mb-2">
-                    <span class="badge rounded-pill" [class.text-bg-success]="slot.in_sync" [class.text-bg-warning]="!slot.in_sync">
-                      {{ slotSyncInLabel(slot) }}
-                    </span>
-                    <span class="badge rounded-pill" [class.text-bg-success]="slot.out_synced" [class.text-bg-warning]="!slot.out_synced">
-                      {{ slotSyncOutLabel(slot) }}
-                    </span>
                     <span class="badge rounded-pill" [class.text-bg-success]="slot.is_saved" [class.text-bg-warning]="!slot.is_saved">
                       {{ slotSavedStatusLabel(slot) }}
                     </span>
                   </p>
                   <div class="d-flex flex-wrap gap-2 mb-2">
-                    <button type="button" class="btn btn-sm btn-primary" (click)="syncAmpSlot(slot.slot)" [disabled]="!canReadSlot(slot)">Read</button>
-                    <button type="button" class="btn btn-sm btn-outline-primary" (click)="loadSlotToAmp(slot)" [disabled]="!canLoadSlot(slot)">Load</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="saveSlotPatch(slot)" [disabled]="!canWriteSlot(slot)">Write</button>
+                    <button type="button" class="btn btn-sm btn-primary" (click)="readCurrentPatchIntoSlot(slot)" [disabled]="!canReadSlot(slot)">Read</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" (click)="openPatchConfigLoadModal(slot)" [disabled]="!canLoadSlot(slot)">Load</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="writeSlotToAmp(slot)" [disabled]="!canWriteSlot(slot)">Write</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openEditor(slot)" [disabled]="!canOpenEditor(slot)">Editor</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="showRaw(slot)" [disabled]="!canUseSlotActions(slot)">Raw</button>
                   </div>
@@ -138,25 +132,19 @@
         <div class="row g-3">
           @for (slot of slotsForBank('B'); track slot.slot) {
             <div class="col-12 col-md-6 col-xl-3">
-              <article class="card h-100 patch-card" [class.sync-ok]="slot.in_sync" [class.sync-missing]="!slot.in_sync">
+              <article class="card h-100 patch-card">
                 <div class="card-body p-3">
                   <p class="small mb-1 text-primary fw-semibold">{{ slot.slot_label }}</p>
                   <h3 class="h6 mb-2 text-break">{{ displayPatchName(slot) }}</h3>
                   <p class="d-flex flex-wrap gap-2 mb-2">
-                    <span class="badge rounded-pill" [class.text-bg-success]="slot.in_sync" [class.text-bg-warning]="!slot.in_sync">
-                      {{ slotSyncInLabel(slot) }}
-                    </span>
-                    <span class="badge rounded-pill" [class.text-bg-success]="slot.out_synced" [class.text-bg-warning]="!slot.out_synced">
-                      {{ slotSyncOutLabel(slot) }}
-                    </span>
                     <span class="badge rounded-pill" [class.text-bg-success]="slot.is_saved" [class.text-bg-warning]="!slot.is_saved">
                       {{ slotSavedStatusLabel(slot) }}
                     </span>
                   </p>
                   <div class="d-flex flex-wrap gap-2 mb-2">
-                    <button type="button" class="btn btn-sm btn-primary" (click)="syncAmpSlot(slot.slot)" [disabled]="!canReadSlot(slot)">Read</button>
-                    <button type="button" class="btn btn-sm btn-outline-primary" (click)="loadSlotToAmp(slot)" [disabled]="!canLoadSlot(slot)">Load</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="saveSlotPatch(slot)" [disabled]="!canWriteSlot(slot)">Write</button>
+                    <button type="button" class="btn btn-sm btn-primary" (click)="readCurrentPatchIntoSlot(slot)" [disabled]="!canReadSlot(slot)">Read</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" (click)="openPatchConfigLoadModal(slot)" [disabled]="!canLoadSlot(slot)">Load</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="writeSlotToAmp(slot)" [disabled]="!canWriteSlot(slot)">Write</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openEditor(slot)" [disabled]="!canOpenEditor(slot)">Editor</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="showRaw(slot)" [disabled]="!canUseSlotActions(slot)">Raw</button>
                   </div>
@@ -220,6 +208,32 @@
           }
           @if (patchSetSnapshots().length === 0) {
             <p class="small text-secondary mb-0">No recent full-sync snapshots found.</p>
+          }
+        </div>
+      </section>
+    </div>
+  }
+
+  @if (patchConfigModalOpen()) {
+    <div class="raw-modal-backdrop" (click)="closePatchConfigModal()">
+      <section class="raw-modal" role="dialog" aria-modal="true" aria-label="Load Patch Config" (click)="$event.stopPropagation()">
+        <header class="raw-modal-head">
+          <h3>Load Patch Config · {{ patchConfigTargetLabel() }}</h3>
+          <button type="button" class="btn btn-sm btn-light" (click)="closePatchConfigModal()">Close</button>
+        </header>
+        <div class="p-3 d-grid gap-2">
+          @for (cfg of patchConfigRows(); track cfg.hash_id) {
+            <article class="border rounded p-2 small bg-body-tertiary">
+              <p class="mb-1"><strong>{{ patchConfigName(cfg) }}</strong></p>
+              <p class="mb-2 text-secondary">
+                hash: <code>{{ shortHash(cfg.hash_id) }}</code> |
+                created: <code>{{ cfg.created_at }}</code>
+              </p>
+              <button type="button" class="btn btn-sm btn-primary" (click)="loadPatchConfigIntoTargetSlot(cfg)">Load</button>
+            </article>
+          }
+          @if (patchConfigRows().length === 0) {
+            <p class="small text-secondary mb-0">No patch configs found.</p>
           }
         </div>
       </section>

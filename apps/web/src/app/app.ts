@@ -199,6 +199,12 @@ interface ApplyCurrentPatchResponse {
   patch: Record<string, unknown>;
 }
 
+interface PatchConfigResponse {
+  hash_id: string;
+  snapshot: Record<string, unknown>;
+  created_at: string;
+}
+
 interface AudioSampleResponse {
   id: number;
   patch_hash: string | null;
@@ -337,6 +343,10 @@ export class App implements OnInit, OnDestroy {
   editorLiveApplyQueuedFingerprint: string | null = null;
   patchSetModalOpen = signal(false);
   patchSetSnapshots = signal<BackupSnapshotSummary[]>([]);
+  patchConfigModalOpen = signal(false);
+  patchConfigTargetSlot = signal<number | null>(null);
+  patchConfigTargetLabel = signal('');
+  patchConfigRows = signal<PatchConfigResponse[]>([]);
 
   ngOnInit(): void {
     void this.refreshQueueState();
@@ -428,12 +438,60 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  async loadSlotToAmp(slot: SlotCard): Promise<void> {
+  async readCurrentPatchIntoSlot(slot: SlotCard): Promise<void> {
+    this.status.set(`Reading current amp patch into ${slot.slot_label}...`);
+    this.responseJson.set('');
+    try {
+      const response = await fetch('/api/v1/amp/current-patch', {
+        method: 'GET',
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as CurrentPatchResponse | { detail?: unknown };
+      if (!response.ok) {
+        this.status.set(`Failed reading current amp patch`);
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      const current = payload as CurrentPatchResponse;
+      const readPatch = this.clonePatch(current.patch);
+      const readHash = this.readString(readPatch, 'config_hash_sha256') ?? '';
+      const readName = this.readString(readPatch, 'patch_name') ?? slot.patch_name;
+      this.slots.update((rows) =>
+        rows.map((card) => {
+          if (card.slot !== slot.slot) {
+            return card;
+          }
+          return {
+            ...card,
+            patch_name: readName || card.patch_name,
+            patch: this.clonePatch(readPatch),
+            config_hash_sha256: readHash,
+            is_saved: false,
+          };
+        }),
+      );
+      this.status.set(`Read current amp patch into ${slot.slot_label}`);
+    } catch (error: unknown) {
+      this.status.set(`Failed reading current amp patch`);
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Browser request failed',
+            error: String(error),
+          },
+          null,
+          2,
+        ),
+      );
+    }
+  }
+
+  async writeSlotToAmp(slot: SlotCard): Promise<void> {
     if (!slot.patch) {
       this.status.set(`No full patch payload loaded for ${slot.slot_label}. Read this slot first.`);
       return;
     }
-    this.status.set(`Loading ${slot.slot_label} to amp...`);
+    this.status.set(`Writing ${slot.slot_label} to amp...`);
     this.responseJson.set('');
     try {
       const response = await fetch('/api/v1/amp/current-patch/live-apply', {
@@ -444,7 +502,7 @@ export class App implements OnInit, OnDestroy {
       });
       const payload = (await response.json()) as ApplyCurrentPatchResponse | { detail?: unknown };
       if (!response.ok) {
-        this.status.set(`Failed loading ${slot.slot_label} to amp`);
+        this.status.set(`Failed writing ${slot.slot_label} to amp`);
         this.responseJson.set(JSON.stringify(payload, null, 2));
         return;
       }
@@ -462,17 +520,15 @@ export class App implements OnInit, OnDestroy {
             patch_name: appliedName || card.patch_name,
             patch: this.clonePatch(appliedPatch),
             config_hash_sha256: appliedHash,
-            in_sync: true,
-            out_synced: true,
             is_saved: card.is_saved && appliedHash === card.config_hash_sha256,
           };
         }),
       );
-      this.status.set(`Loaded ${slot.slot_label} to amp`);
+      this.status.set(`Wrote ${slot.slot_label} to amp`);
       this.responseJson.set(
         JSON.stringify(
           {
-            message: 'Patch loaded to amp',
+            message: 'Patch written to amp',
             slot: slot.slot_label,
             applied_at: applied.applied_at,
             hash_id: appliedHash || null,
@@ -482,7 +538,7 @@ export class App implements OnInit, OnDestroy {
         ),
       );
     } catch (error: unknown) {
-      this.status.set(`Failed loading ${slot.slot_label} to amp`);
+      this.status.set(`Failed writing ${slot.slot_label} to amp`);
       this.responseJson.set(
         JSON.stringify(
           {
@@ -496,73 +552,27 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  async saveSlotPatch(slot: SlotCard): Promise<void> {
-    if (!slot.patch || !slot.config_hash_sha256) {
-      this.status.set(`No full patch payload loaded for ${slot.slot_label}. Read this slot first.`);
-      return;
-    }
-
-    this.status.set(`Writing ${slot.slot_label} to library...`);
+  async openPatchConfigLoadModal(slot: SlotCard): Promise<void> {
+    this.status.set(`Loading patch configs for ${slot.slot_label}...`);
     this.responseJson.set('');
-
     try {
-      const lookupResponse = await fetch(`/api/v1/patches/configs/${slot.config_hash_sha256}`, {
+      const response = await fetch('/api/v1/patches/configs', {
         method: 'GET',
         cache: 'no-store',
       });
-      if (lookupResponse.ok) {
-        this.markSlotSaved(slot.slot);
-        this.status.set(`${slot.slot_label} already written to library`);
-        this.responseJson.set(
-          JSON.stringify(
-            {
-              message: 'Patch already written to library',
-              slot: slot.slot_label,
-              hash_id: slot.config_hash_sha256,
-            },
-            null,
-            2,
-          ),
-        );
-        return;
-      }
-
-      if (lookupResponse.status !== 404) {
-        const payload = (await lookupResponse.json()) as { detail?: unknown };
-        this.status.set(`Failed library lookup for ${slot.slot_label}`);
+      const payload = (await response.json()) as PatchConfigResponse[] | { detail?: unknown };
+      if (!response.ok) {
+        this.status.set('Failed loading patch configs');
         this.responseJson.set(JSON.stringify(payload, null, 2));
         return;
       }
-
-      const saveResponse = await fetch('/api/v1/patches/configs', {
-        method: 'POST',
-        cache: 'no-store',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ snapshot: slot.patch }),
-      });
-      const savePayload = (await saveResponse.json()) as { hash_id?: string; detail?: unknown };
-      if (!saveResponse.ok) {
-        this.status.set(`Failed saving ${slot.slot_label}`);
-        this.responseJson.set(JSON.stringify(savePayload, null, 2));
-        return;
-      }
-
-      const persistedHash = typeof savePayload.hash_id === 'string' ? savePayload.hash_id : slot.config_hash_sha256;
-      this.markSlotSaved(slot.slot, persistedHash);
-      this.status.set(`${slot.slot_label} written to library`);
-      this.responseJson.set(
-        JSON.stringify(
-          {
-            message: 'Patch written to library',
-            slot: slot.slot_label,
-            hash_id: persistedHash,
-          },
-          null,
-          2,
-        ),
-      );
+      this.patchConfigRows.set(payload as PatchConfigResponse[]);
+      this.patchConfigTargetSlot.set(slot.slot);
+      this.patchConfigTargetLabel.set(slot.slot_label);
+      this.patchConfigModalOpen.set(true);
+      this.status.set(`Select a patch config to load into ${slot.slot_label}`);
     } catch (error: unknown) {
-      this.status.set(`Failed saving ${slot.slot_label}`);
+      this.status.set(`Failed loading patch configs`);
       this.responseJson.set(
         JSON.stringify(
           {
@@ -574,6 +584,37 @@ export class App implements OnInit, OnDestroy {
         ),
       );
     }
+  }
+
+  closePatchConfigModal(): void {
+    this.patchConfigModalOpen.set(false);
+    this.patchConfigTargetSlot.set(null);
+    this.patchConfigTargetLabel.set('');
+  }
+
+  loadPatchConfigIntoTargetSlot(config: PatchConfigResponse): void {
+    const slotNumber = this.patchConfigTargetSlot();
+    if (slotNumber === null) {
+      return;
+    }
+    const snapshot = this.clonePatch(config.snapshot);
+    const patchName = this.readString(snapshot, 'patch_name') ?? '';
+    this.slots.update((rows) =>
+      rows.map((card) => {
+        if (card.slot !== slotNumber) {
+          return card;
+        }
+        return {
+          ...card,
+          patch_name: patchName || card.patch_name,
+          patch: snapshot,
+          config_hash_sha256: config.hash_id,
+          is_saved: true,
+        };
+      }),
+    );
+    this.status.set(`Loaded patch config ${this.shortHash(config.hash_id)} into ${this.patchConfigTargetLabel()}`);
+    this.closePatchConfigModal();
   }
 
   async measureActivePatch(): Promise<void> {
@@ -940,42 +981,27 @@ export class App implements OnInit, OnDestroy {
   }
 
   canUseSlotActions(slot: SlotCard): boolean {
-    return slot.in_sync && this.hasFullPatch(slot);
+    return this.hasFullPatch(slot);
   }
 
   canOpenEditor(slot: SlotCard): boolean {
     return this.hasFullPatch(slot);
   }
 
-  canReadSlot(slot: SlotCard): boolean {
-    return !(slot.in_sync && slot.is_saved);
+  canReadSlot(_slot: SlotCard): boolean {
+    return true;
   }
 
   canLoadSlot(slot: SlotCard): boolean {
     return this.hasFullPatch(slot);
   }
 
-  canSyncSlot(slot: SlotCard): boolean {
-    return this.canReadSlot(slot);
-  }
-
-  slotSyncInLabel(slot: SlotCard): string {
-    return slot.in_sync ? 'Sync-In OK' : 'Sync-In Missing';
-  }
-
-  slotSyncOutLabel(slot: SlotCard): string {
-    return slot.out_synced ? 'Sync-Out OK' : 'Sync-Out Pending';
-  }
-
   canWriteSlot(slot: SlotCard): boolean {
-    return this.canSaveSlot(slot);
+    return this.hasFullPatch(slot);
   }
 
   canSaveSlot(slot: SlotCard): boolean {
-    if (slot.in_sync && slot.is_saved) {
-      return false;
-    }
-    return this.canUseSlotActions(slot);
+    return this.hasFullPatch(slot);
   }
 
   measureActiveButtonLabel(): string {
@@ -1507,7 +1533,7 @@ export class App implements OnInit, OnDestroy {
       this.responseJson.set(
         JSON.stringify(
           {
-            message: 'Loaded full-sync data into cards (Saved + Not Synced)',
+            message: 'Loaded full-sync data into cards',
             snapshot_id: snapshot.id,
             synced_at: loaded.synced_at,
             amp_state_hash_sha256: loaded.amp_state_hash_sha256,
@@ -1612,6 +1638,11 @@ export class App implements OnInit, OnDestroy {
       return slot.patch_name;
     }
     return 'Unsynced';
+  }
+
+  patchConfigName(config: PatchConfigResponse): string {
+    const name = this.readString(config.snapshot, 'patch_name');
+    return name && name.trim().length > 0 ? name : 'Unnamed Patch';
   }
 
   private mergeDumpState(state: FullAmpDumpResponse): SlotCard[] {
@@ -1778,21 +1809,6 @@ export class App implements OnInit, OnDestroy {
     );
   }
 
-  private markSlotSaved(slotNumber: number, hashId?: string): void {
-    this.slots.update((current) =>
-      current.map((card) => {
-        if (card.slot !== slotNumber) {
-          return card;
-        }
-        return {
-          ...card,
-          is_saved: true,
-          config_hash_sha256: hashId ?? card.config_hash_sha256,
-        };
-      }),
-    );
-  }
-
   formatMs(value: number): string {
     return `${Math.max(0, Math.round(value))} ms`;
   }
@@ -1802,10 +1818,6 @@ export class App implements OnInit, OnDestroy {
       return 'n/a';
     }
     return `${value.toFixed(2)} dBFS`;
-  }
-
-  slotSyncStatusLabel(slot: SlotCard): string {
-    return slot.in_sync ? 'In Sync' : 'Not Synced';
   }
 
   slotSavedStatusLabel(slot: SlotCard): string {

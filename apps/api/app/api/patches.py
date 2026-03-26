@@ -52,6 +52,11 @@ def upsert_patch_config(payload: PatchConfigUpsert, db: Session = Depends(get_db
     return config
 
 
+@router.get("/configs", response_model=list[PatchConfigRead])
+def list_patch_configs(db: Session = Depends(get_db)) -> list[PatchConfig]:
+    return list(db.scalars(select(PatchConfig).order_by(PatchConfig.created_at.desc())))
+
+
 @router.get("/configs/{hash_id}", response_model=PatchConfigRead)
 def get_patch_config(hash_id: str, db: Session = Depends(get_db)) -> PatchConfig:
     config = db.get(PatchConfig, hash_id)
