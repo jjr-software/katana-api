@@ -1514,3 +1514,11 @@
   - `apps/web/src/app/app.ts`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Header Subtitle Removed)
+- Removed the header subtitle text:
+  - `A and B channels are shown as 4 cards each.`
+- Files changed:
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
