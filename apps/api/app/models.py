@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -62,3 +62,19 @@ class AmpSyncHistory(Base):
     result_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AudioSample(Base):
+    __tablename__ = "audio_samples"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    patch_hash: Mapped[str | None] = mapped_column(ForeignKey("patch_configs.hash_id", ondelete="SET NULL"), nullable=True, index=True)
+    slot: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source: Mapped[str] = mapped_column(String(255), nullable=False)
+    duration_sec: Mapped[int] = mapped_column(Integer, nullable=False)
+    rate: Mapped[int] = mapped_column(Integer, nullable=False)
+    channels: Mapped[int] = mapped_column(Integer, nullable=False)
+    rms_dbfs: Mapped[float] = mapped_column(Float, nullable=False)
+    peak_dbfs: Mapped[float] = mapped_column(Float, nullable=False)
+    sample_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)

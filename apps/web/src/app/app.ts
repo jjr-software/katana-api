@@ -171,6 +171,20 @@ interface BackupJobResponse {
   result: FullAmpDumpResponse | null;
 }
 
+interface AudioSampleResponse {
+  id: number;
+  patch_hash: string | null;
+  slot: number | null;
+  source: string;
+  duration_sec: number;
+  rate: number;
+  channels: number;
+  rms_dbfs: number;
+  peak_dbfs: number;
+  sample_count: number;
+  created_at: string;
+}
+
 interface QueueJobSummary {
   job_id: string;
   operation: string;
@@ -395,6 +409,58 @@ export class App implements OnInit, OnDestroy {
       );
     } catch (error: unknown) {
       this.status.set(`Failed saving ${slot.slot_label}`);
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Browser request failed',
+            error: String(error),
+          },
+          null,
+          2,
+        ),
+      );
+    }
+  }
+
+  async sampleSlotAudio(slot: SlotCard): Promise<void> {
+    this.status.set(`Sampling audio for ${slot.slot_label}...`);
+    this.responseJson.set('');
+    try {
+      const response = await fetch('/api/v1/audio/sample', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patch_hash: slot.config_hash_sha256 || null,
+          slot: slot.slot,
+          duration_sec: 2.0,
+        }),
+      });
+      const payload = (await response.json()) as AudioSampleResponse | { detail?: unknown };
+      if (!response.ok) {
+        this.status.set(`Sample failed for ${slot.slot_label}`);
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      const sample = payload as AudioSampleResponse;
+      this.status.set(`Sample captured for ${slot.slot_label}`);
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Audio sample captured',
+            slot: slot.slot_label,
+            patch_hash: sample.patch_hash,
+            rms_dbfs: sample.rms_dbfs,
+            peak_dbfs: sample.peak_dbfs,
+            sample_count: sample.sample_count,
+            captured_at: sample.created_at,
+          },
+          null,
+          2,
+        ),
+      );
+    } catch (error: unknown) {
+      this.status.set(`Sample failed for ${slot.slot_label}`);
       this.responseJson.set(
         JSON.stringify(
           {

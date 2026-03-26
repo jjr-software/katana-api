@@ -655,6 +655,21 @@
 - Rebuilt/restarted:
   - `docker compose up -d --build`
 
+## Session Update - 2026-03-26 (Web Audio Samples Feature)
+- Added backend audio sampling API:
+  - `POST /api/v1/audio/sample` captures short PipeWire sample and returns RMS/Peak dBFS metrics
+  - `GET /api/v1/audio/samples` lists recent captured samples
+- Added persistence:
+  - new table `audio_samples` (optional `patch_hash`/`slot` linkage + capture metrics + timestamp)
+  - Alembic revision: `20260326_0002_audio_samples`
+- Added frontend per-slot action:
+  - `Sample` button on slot cards posts sample request with slot/hash context
+  - response panel now shows captured metrics (`rms_dbfs`, `peak_dbfs`, sample count, timestamp)
+- Runtime dependencies:
+  - API container now installs `pipewire-bin` (for `pw-record`)
+- Validation:
+  - live API sample call succeeded and stored row id `1` with returned RMS/Peak dBFS.
+
 ## Session Update - 2026-03-26 (Queue-Only Amp I/O + No Global UI Lock)
 - Enforced queue-backed amp communication across API amp-read/sync routes:
   - `GET /api/v1/amp/test-connection` now executes via queue job.
