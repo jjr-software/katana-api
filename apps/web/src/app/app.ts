@@ -314,6 +314,9 @@ export class App implements OnInit, OnDestroy {
   ampStateHash = signal('');
   lastSyncedAt = signal('');
   totalSyncMs = signal(0);
+  selectedAmpSlot = signal<number | null>(null);
+  currentAmpPatchHash = signal('');
+  currentAmpCommitState = signal<'unknown' | 'committed' | 'uncommitted'>('unknown');
   queueJobs = signal<QueueJobSummary[]>([]);
   queueGeneratedAt = signal('');
   levelMarkerRmsDbfs = signal<number | null>(null);
@@ -475,6 +478,9 @@ export class App implements OnInit, OnDestroy {
           };
         }),
       );
+      if (this.selectedAmpSlot() !== null) {
+        await this.refreshCurrentCommitState();
+      }
       this.status.set(`Read current amp patch into ${slot.slot_label}`);
     } catch (error: unknown) {
       this.status.set(`Failed reading current amp patch`);
@@ -513,8 +519,10 @@ export class App implements OnInit, OnDestroy {
       }
       const written = payload as SlotWriteResponse;
       this.applySyncedSlot(written.slot);
+      this.selectedAmpSlot.set(slot.slot);
       this.lastSyncedAt.set(written.synced_at);
       this.totalSyncMs.set(written.slot.slot_sync_ms);
+      await this.refreshCurrentCommitState();
       this.status.set(`Wrote ${slot.slot_label} to amp memory`);
       this.responseJson.set(
         JSON.stringify(
@@ -530,6 +538,122 @@ export class App implements OnInit, OnDestroy {
       );
     } catch (error: unknown) {
       this.status.set(`Failed writing ${slot.slot_label} to amp memory`);
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Browser request failed',
+            error: String(error),
+          },
+          null,
+          2,
+        ),
+      );
+    }
+  }
+
+  async selectSlotOnAmp(slot: SlotCard): Promise<void> {
+    this.status.set(`Selecting ${slot.slot_label} on amp...`);
+    this.responseJson.set('');
+    try {
+      const response = await fetch(`/api/v1/amp/slots/${slot.slot}/sync`, {
+        method: 'POST',
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as SlotSyncResponse | { detail?: unknown };
+      if (!response.ok) {
+        this.status.set(`Failed selecting ${slot.slot_label}`);
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      const selected = payload as SlotSyncResponse;
+      this.applySyncedSlot(selected.slot);
+      this.selectedAmpSlot.set(slot.slot);
+      this.lastSyncedAt.set(selected.synced_at);
+      this.totalSyncMs.set(selected.slot.slot_sync_ms);
+      await this.refreshCurrentCommitState();
+      this.status.set(`Selected ${slot.slot_label} on amp`);
+    } catch (error: unknown) {
+      this.status.set(`Failed selecting ${slot.slot_label}`);
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Browser request failed',
+            error: String(error),
+          },
+          null,
+          2,
+        ),
+      );
+    }
+  }
+
+  async saveSlotToDb(slot: SlotCard): Promise<void> {
+    if (!slot.patch) {
+      this.status.set(`No patch payload loaded for ${slot.slot_label}. Read or Load first.`);
+      return;
+    }
+    this.status.set(`Saving ${slot.slot_label} to patch DB...`);
+    this.responseJson.set('');
+    try {
+      const existingHash = slot.config_hash_sha256;
+      if (existingHash) {
+        const lookupResponse = await fetch(`/api/v1/patches/configs/${existingHash}`, {
+          method: 'GET',
+          cache: 'no-store',
+        });
+        if (lookupResponse.ok) {
+          this.slots.update((rows) =>
+            rows.map((card) => (card.slot === slot.slot ? { ...card, is_saved: true } : card)),
+          );
+          this.status.set(`${slot.slot_label} already in patch DB`);
+          return;
+        }
+        if (lookupResponse.status !== 404) {
+          const payload = (await lookupResponse.json()) as { detail?: unknown };
+          this.status.set(`Failed checking patch DB for ${slot.slot_label}`);
+          this.responseJson.set(JSON.stringify(payload, null, 2));
+          return;
+        }
+      }
+
+      const saveResponse = await fetch('/api/v1/patches/configs', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ snapshot: slot.patch }),
+      });
+      const savePayload = (await saveResponse.json()) as PatchConfigResponse | { detail?: unknown };
+      if (!saveResponse.ok || !('hash_id' in savePayload)) {
+        this.status.set(`Failed saving ${slot.slot_label} to patch DB`);
+        this.responseJson.set(JSON.stringify(savePayload, null, 2));
+        return;
+      }
+      const saved = savePayload as PatchConfigResponse;
+      this.slots.update((rows) =>
+        rows.map((card) =>
+          card.slot === slot.slot
+            ? {
+                ...card,
+                config_hash_sha256: saved.hash_id,
+                is_saved: true,
+              }
+            : card,
+        ),
+      );
+      this.status.set(`Saved ${slot.slot_label} to patch DB`);
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Patch saved to DB',
+            slot: slot.slot_label,
+            hash_id: saved.hash_id,
+          },
+          null,
+          2,
+        ),
+      );
+    } catch (error: unknown) {
+      this.status.set(`Failed saving ${slot.slot_label} to patch DB`);
       this.responseJson.set(
         JSON.stringify(
           {
@@ -1636,6 +1760,25 @@ export class App implements OnInit, OnDestroy {
     return name && name.trim().length > 0 ? name : 'Unnamed Patch';
   }
 
+  selectedAmpSlotLabel(): string {
+    const slot = this.selectedAmpSlot();
+    if (slot === null) {
+      return 'n/a';
+    }
+    return slot <= 4 ? `A:${slot}` : `B:${slot - 4}`;
+  }
+
+  currentCommitStateLabel(): string {
+    const state = this.currentAmpCommitState();
+    if (state === 'committed') {
+      return 'Committed';
+    }
+    if (state === 'uncommitted') {
+      return 'Uncommitted';
+    }
+    return 'Unknown';
+  }
+
   private mergeDumpState(state: FullAmpDumpResponse): SlotCard[] {
     const currentBySlot = new Map<number, SlotCard>(this.slots().map((slot) => [slot.slot, slot]));
     const bySlot = new Map<number, FullDumpSlotResponse>(state.slots.map((slot) => [slot.slot, slot]));
@@ -2232,6 +2375,9 @@ export class App implements OnInit, OnDestroy {
           };
         }),
       );
+      if (this.selectedAmpSlot() !== null) {
+        await this.refreshCurrentCommitState();
+      }
     } catch (error: unknown) {
       this.editorLiveApplyError.set(String(error));
     } finally {
@@ -2268,6 +2414,38 @@ export class App implements OnInit, OnDestroy {
       return `{${parts.join(',')}}`;
     }
     return JSON.stringify(value);
+  }
+
+  private async refreshCurrentCommitState(): Promise<void> {
+    const selectedSlot = this.selectedAmpSlot();
+    if (selectedSlot === null) {
+      this.currentAmpPatchHash.set('');
+      this.currentAmpCommitState.set('unknown');
+      return;
+    }
+    try {
+      const response = await fetch('/api/v1/amp/current-patch', {
+        method: 'GET',
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as CurrentPatchResponse | { detail?: unknown };
+      if (!response.ok) {
+        this.currentAmpCommitState.set('unknown');
+        return;
+      }
+      const current = payload as CurrentPatchResponse;
+      const currentHash = this.readString(current.patch, 'config_hash_sha256') ?? '';
+      this.currentAmpPatchHash.set(currentHash);
+      const selectedCard = this.slots().find((card) => card.slot === selectedSlot) ?? null;
+      const selectedHash = selectedCard?.config_hash_sha256 ?? '';
+      if (!currentHash || !selectedHash) {
+        this.currentAmpCommitState.set('unknown');
+        return;
+      }
+      this.currentAmpCommitState.set(currentHash === selectedHash ? 'committed' : 'uncommitted');
+    } catch {
+      this.currentAmpCommitState.set('unknown');
+    }
   }
 
   private nv(value: number | null): string {

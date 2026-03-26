@@ -62,6 +62,13 @@
             <span>AMP State Hash: <code>{{ shortHash(ampStateHash()) }}</code></span>
             <span>Last Sync: <code>{{ lastSyncedAt() || 'n/a' }}</code></span>
             <span>Total Sync Time: <code>{{ formatMs(totalSyncMs()) }}</code></span>
+            <span>Selected Slot: <code>{{ selectedAmpSlotLabel() }}</code></span>
+            <span>
+              Commit State:
+              <code [class.text-success]="currentAmpCommitState() === 'committed'" [class.text-danger]="currentAmpCommitState() === 'uncommitted'">
+                {{ currentCommitStateLabel() }}
+              </code>
+            </span>
             <span>Level Marker RMS/Peak: <code>{{ formatDb(levelMarkerRmsDbfs()) }} / {{ formatDb(levelMarkerPeakDbfs()) }}</code></span>
             <span>Marker At: <code>{{ levelMarkerCapturedAt() || 'n/a' }}</code></span>
             <span>Live RMS/Peak: <code>{{ formatDb(liveRmsDbfs()) }} / {{ formatDb(livePeakDbfs()) }}</code></span>
@@ -101,8 +108,10 @@
                   </p>
                   <div class="d-flex flex-wrap gap-2 mb-2">
                     <button type="button" class="btn btn-sm btn-primary" (click)="readCurrentPatchIntoSlot(slot)" [disabled]="!canReadSlot(slot)">Read</button>
+                    <button type="button" class="btn btn-sm btn-outline-dark" (click)="selectSlotOnAmp(slot)">Select</button>
                     <button type="button" class="btn btn-sm btn-outline-primary" (click)="openPatchConfigLoadModal(slot)" [disabled]="!canLoadSlot(slot)">Load</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="writeSlotToAmp(slot)" [disabled]="!canWriteSlot(slot)">Write</button>
+                    <button type="button" class="btn btn-sm btn-outline-success" (click)="saveSlotToDb(slot)" [disabled]="!canUseSlotActions(slot)">Save DB</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openEditor(slot)" [disabled]="!canOpenEditor(slot)">Editor</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="showRaw(slot)" [disabled]="!canUseSlotActions(slot)">Raw</button>
                   </div>
@@ -143,8 +152,10 @@
                   </p>
                   <div class="d-flex flex-wrap gap-2 mb-2">
                     <button type="button" class="btn btn-sm btn-primary" (click)="readCurrentPatchIntoSlot(slot)" [disabled]="!canReadSlot(slot)">Read</button>
+                    <button type="button" class="btn btn-sm btn-outline-dark" (click)="selectSlotOnAmp(slot)">Select</button>
                     <button type="button" class="btn btn-sm btn-outline-primary" (click)="openPatchConfigLoadModal(slot)" [disabled]="!canLoadSlot(slot)">Load</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="writeSlotToAmp(slot)" [disabled]="!canWriteSlot(slot)">Write</button>
+                    <button type="button" class="btn btn-sm btn-outline-success" (click)="saveSlotToDb(slot)" [disabled]="!canUseSlotActions(slot)">Save DB</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openEditor(slot)" [disabled]="!canOpenEditor(slot)">Editor</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="showRaw(slot)" [disabled]="!canUseSlotActions(slot)">Raw</button>
                   </div>

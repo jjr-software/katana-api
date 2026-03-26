@@ -1229,3 +1229,21 @@
   - `apps/web/src/app/app.ts`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Save DB Restored + Select/Commit Status)
+- Restored card-side patch DB persistence action:
+  - added `Save DB` button per slot card.
+  - behavior: upsert/check against `/api/v1/patches/configs` and mark card saved with resulting hash.
+- Added per-card `Select` button:
+  - uses slot sync/select path to make amp select that slot patch.
+- Added selected patch commit visibility in header metadata:
+  - `Selected Slot` shows currently selected slot on amp (from UI actions).
+  - `Commit State` shows `Committed / Uncommitted / Unknown` by comparing:
+    - current amp patch hash (`GET /api/v1/amp/current-patch`)
+    - selected slot card hash.
+  - state refresh runs after `Select`, `Write`, and live editor apply.
+- Files changed:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
