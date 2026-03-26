@@ -690,6 +690,20 @@
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
 
+## Session Update - 2026-03-26 (Live RMS Sparkline Graph)
+- Added a small live RMS sparkline graph in the web header area.
+- Data source:
+  - reuses SSE live meter events (`/api/v1/audio/live/sse`).
+- Rendering:
+  - SVG polyline graph (`220x64`) using the last 120 RMS points.
+  - range normalized to `-90..0 dBFS`.
+- Files changed:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+  - `apps/web/src/app/app.css`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
+
 ## Session Update - 2026-03-26 (Queued Backup Feature + Nested Repo Flatten)
 - Added queued amp backup API endpoints:
   - `POST /api/v1/amp/backup` (enqueue full amp-state dump)

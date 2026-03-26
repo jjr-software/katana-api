@@ -266,6 +266,7 @@ export class App implements OnInit, OnDestroy {
   livePeakDbfs = signal<number | null>(null);
   liveMeterAt = signal('');
   liveMeterConnected = signal(false);
+  liveRmsHistory = signal<number[]>([]);
   isMeasuringSlotsRms = signal(false);
   queuePollHandle: ReturnType<typeof setInterval> | null = null;
   liveMeterSource: EventSource | null = null;
@@ -587,6 +588,7 @@ export class App implements OnInit, OnDestroy {
         const ts = String(payload['ts'] ?? '');
         if (Number.isFinite(rms)) {
           this.liveRmsDbfs.set(rms);
+          this.pushLiveRmsPoint(rms);
         }
         if (Number.isFinite(peak)) {
           this.livePeakDbfs.set(peak);
@@ -620,6 +622,45 @@ export class App implements OnInit, OnDestroy {
       this.liveMeterSource = null;
     }
     this.liveMeterConnected.set(false);
+  }
+
+  rmsGraphPoints(): string {
+    const values = this.liveRmsHistory();
+    if (values.length === 0) {
+      return '';
+    }
+    const width = 220;
+    const height = 64;
+    const minDb = -90;
+    const maxDb = 0;
+    if (values.length === 1) {
+      const y = this.rmsToGraphY(values[0], minDb, maxDb, height);
+      return `0,${y.toFixed(1)} ${width},${y.toFixed(1)}`;
+    }
+    const step = width / (values.length - 1);
+    return values
+      .map((value, idx) => {
+        const x = idx * step;
+        const y = this.rmsToGraphY(value, minDb, maxDb, height);
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      })
+      .join(' ');
+  }
+
+  private pushLiveRmsPoint(value: number): void {
+    this.liveRmsHistory.update((current) => {
+      const next = [...current, value];
+      if (next.length > 120) {
+        return next.slice(next.length - 120);
+      }
+      return next;
+    });
+  }
+
+  private rmsToGraphY(value: number, minDb: number, maxDb: number, height: number): number {
+    const clamped = Math.max(minDb, Math.min(maxDb, value));
+    const normalized = (clamped - minDb) / (maxDb - minDb);
+    return (1 - normalized) * height;
   }
 
   async measureAllSlotsRms(): Promise<void> {
