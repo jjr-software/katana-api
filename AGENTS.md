@@ -607,6 +607,15 @@
 - Validation:
   - queued `POST /api/v1/amp/backup` run completed with `status=succeeded`.
 
+## Session Update - 2026-03-26 (Backup No Longer Auto-Downloads In Browser)
+- Changed web backup action behavior:
+  - removed browser-side forced JSON file download
+  - backup now reports success as server-side stored result tied to queue `job_id`
+- Rationale:
+  - backup data is persisted in backend history storage; UI should not force local file download by default.
+- Rebuilt/restarted:
+  - `docker compose up -d --build`
+
 ## Session Update - 2026-03-26 (Queue-Only Amp I/O + No Global UI Lock)
 - Enforced queue-backed amp communication across API amp-read/sync routes:
   - `GET /api/v1/amp/test-connection` now executes via queue job.

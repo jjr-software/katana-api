@@ -443,12 +443,12 @@ export class App implements OnInit, OnDestroy {
         return;
       }
 
-      this.downloadBackupFile(job.result);
-      this.status.set('Backup succeeded');
+      this.status.set('Backup stored');
       this.responseJson.set(
         JSON.stringify(
           {
-            message: 'Backup JSON downloaded',
+            message: 'Backup JSON stored server-side',
+            job_id: job.job_id,
             synced_at: job.result.synced_at,
             amp_state_hash_sha256: job.result.amp_state_hash_sha256,
             total_sync_ms: job.result.total_sync_ms,
@@ -539,19 +539,6 @@ export class App implements OnInit, OnDestroy {
       });
     }
     throw new Error(`Backup job timed out: ${jobId}`);
-  }
-
-  private downloadBackupFile(backup: FullAmpDumpResponse): void {
-    const fileName = `amp-backup-${backup.synced_at.replace(/[:T]/g, '-').replace(/\..*$/, '')}.json`;
-    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-    const url = window.URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = fileName;
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-    window.URL.revokeObjectURL(url);
   }
 
   async refreshQueueState(): Promise<void> {
