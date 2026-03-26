@@ -249,6 +249,7 @@ interface SlotCard {
   slot_label: string;
   patch_name: string;
   config_hash_sha256: string;
+  committed_hash_sha256: string;
   patch: Record<string, unknown> | null;
   in_sync: boolean;
   is_saved: boolean;
@@ -286,6 +287,7 @@ function defaultSlotCards(): SlotCard[] {
       slot_label: `${bank}:${channel}`,
       patch_name: '',
       config_hash_sha256: '',
+      committed_hash_sha256: '',
       patch: null,
       in_sync: false,
       is_saved: false,
@@ -1795,6 +1797,7 @@ export class App implements OnInit, OnDestroy {
         slot_label: full.slot_label,
         patch_name: patchName ?? '',
         config_hash_sha256: hash ?? '',
+        committed_hash_sha256: hash ?? '',
         patch: full.patch,
         in_sync: full.in_sync,
         is_saved: full.is_saved,
@@ -1826,6 +1829,7 @@ export class App implements OnInit, OnDestroy {
         slot_label: full.slot_label,
         patch_name: patchName ?? '',
         config_hash_sha256: hash ?? '',
+        committed_hash_sha256: hash ?? '',
         patch: full.patch,
         in_sync: false,
         is_saved: true,
@@ -1855,6 +1859,7 @@ export class App implements OnInit, OnDestroy {
         slot_label: quick.slot_label,
         patch_name: quick.patch_name,
         config_hash_sha256: quick.inferred_hash_sha256 ?? '',
+        committed_hash_sha256: current?.committed_hash_sha256 ?? (quick.inferred_hash_sha256 ?? ''),
         patch: current?.patch ?? null,
         in_sync: quick.in_sync,
         is_saved: quick.is_saved,
@@ -1881,6 +1886,7 @@ export class App implements OnInit, OnDestroy {
           slot_label: slot.slot_label,
           patch_name: slot.patch_name,
           config_hash_sha256: slot.config_hash_sha256,
+          committed_hash_sha256: slot.config_hash_sha256,
           patch: slot.patch ?? null,
           in_sync: slot.in_sync,
           is_saved: slot.is_saved,
@@ -2437,7 +2443,7 @@ export class App implements OnInit, OnDestroy {
       const currentHash = this.readString(current.patch, 'config_hash_sha256') ?? '';
       this.currentAmpPatchHash.set(currentHash);
       const selectedCard = this.slots().find((card) => card.slot === selectedSlot) ?? null;
-      const selectedHash = selectedCard?.config_hash_sha256 ?? '';
+      const selectedHash = selectedCard?.committed_hash_sha256 ?? '';
       if (!currentHash || !selectedHash) {
         this.currentAmpCommitState.set('unknown');
         return;

@@ -1247,3 +1247,16 @@
   - `apps/web/src/app/app.html`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Commit-State Baseline Fix)
+- Fixed a commit-state logic hole from the previous pass:
+  - `Commit State` now compares current amp patch hash against a dedicated per-slot committed baseline hash (`committed_hash_sha256`), not the editable card hash.
+- Baseline update rules:
+  - updated on slot-memory-backed operations (`applySyncedSlot`, e.g. `Select`/slot sync and persisted `Write` readback),
+  - not updated by `Read` current patch, `Load` from DB, or local edits.
+- Outcome:
+  - prevents false `Committed` status after loading/reading temporary changes into cards.
+- File changed:
+  - `apps/web/src/app/app.ts`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
