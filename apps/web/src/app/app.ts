@@ -348,6 +348,8 @@ export class App implements OnInit, OnDestroy {
   editorLiveApplyEnabled = signal(true);
   editorLiveApplyPending = signal(false);
   editorLiveApplyError = signal('');
+  editorReadbackState = signal<'unknown' | 'match' | 'mismatch'>('unknown');
+  editorReadbackHash = signal('');
   editorLiveApplyHandle: ReturnType<typeof setTimeout> | null = null;
   editorLiveApplyInFlight = false;
   editorLiveApplyLastStartedAtMs = 0;
@@ -1351,6 +1353,8 @@ export class App implements OnInit, OnDestroy {
     this.editorLiveApplyInFlight = false;
     this.editorLiveApplyPending.set(false);
     this.editorLiveApplyError.set('');
+    this.editorReadbackState.set('unknown');
+    this.editorReadbackHash.set('');
     this.editorModalOpen.set(true);
   }
 
@@ -1358,6 +1362,8 @@ export class App implements OnInit, OnDestroy {
     this.editorModalOpen.set(false);
     this.editorLiveApplyPending.set(false);
     this.editorLiveApplyError.set('');
+    this.editorReadbackState.set('unknown');
+    this.editorReadbackHash.set('');
     if (this.editorLiveApplyHandle !== null) {
       clearTimeout(this.editorLiveApplyHandle);
       this.editorLiveApplyHandle = null;
@@ -1401,6 +1407,25 @@ export class App implements OnInit, OnDestroy {
       return this.shortHash(draftHash);
     }
     return 'n/a';
+  }
+
+  editorReadbackStateLabel(): string {
+    const state = this.editorReadbackState();
+    if (state === 'match') {
+      return 'match';
+    }
+    if (state === 'mismatch') {
+      return 'mismatch';
+    }
+    return 'unknown';
+  }
+
+  editorReadbackHashLabel(): string {
+    const hash = this.editorReadbackHash();
+    if (!hash) {
+      return 'n/a';
+    }
+    return this.shortHash(hash);
   }
 
   setEditorPatchName(value: string): void {
@@ -2296,6 +2321,7 @@ export class App implements OnInit, OnDestroy {
       return next;
     });
     this.editorLiveApplyError.set('');
+    this.editorReadbackState.set('unknown');
     const slotNumber = this.editorSlotNumber();
     if (slotNumber !== null) {
       this.slots.update((current) =>
@@ -2381,6 +2407,9 @@ export class App implements OnInit, OnDestroy {
       }
       const patchName = this.readString(draftSnapshot, 'patch_name') ?? '';
       const hash = this.readString(applied.patch, 'config_hash_sha256') ?? '';
+      const readbackFingerprint = this.patchFingerprint(this.clonePatch(applied.patch));
+      this.editorReadbackState.set(readbackFingerprint === stagedFingerprint ? 'match' : 'mismatch');
+      this.editorReadbackHash.set(hash);
       this.slots.update((current) =>
         current.map((card) => {
           if (card.slot !== slotNumber) {

@@ -1383,3 +1383,17 @@
   - `apps/web/src/app/app.ts`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Editor Readback State Without Overwrite)
+- Added non-destructive editor readback tracking after each live-apply:
+  - compares readback fingerprint vs staged request fingerprint,
+  - records `match` / `mismatch` / `unknown` state,
+  - shows readback hash separately in editor modal.
+- Important behavior:
+  - readback is used for state clarity only,
+  - local editor draft is not overwritten by readback payload.
+- Files changed:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
