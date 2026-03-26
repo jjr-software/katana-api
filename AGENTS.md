@@ -555,6 +555,24 @@
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
 
+## Session Update - 2026-03-26 (Bootstrap 5 Migration For Web Layout)
+- Migrated the web UI layout to Bootstrap 5 utilities/components to replace custom layout/css that was causing overflow/jank.
+- Key changes:
+  - app shell rebuilt with Bootstrap grid (`row`/`col-*`) and cards/buttons/badges,
+  - queue panel integrated as Bootstrap card with sticky behavior on `xl+`,
+  - queue hidden below `xl`,
+  - patch cards now use responsive Bootstrap columns (`col-12`, `col-md-6`, `col-xxl-4`),
+  - reduced app-specific CSS to narrow overrides only (sync border colors, queue scroll area, modal styling),
+  - renamed custom modal classes to avoid Bootstrap `.modal` class conflicts.
+- Added Bootstrap stylesheet via CDN import in global styles:
+  - `@import url("https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css");`
+- Files changed:
+  - `apps/web/src/app/app.html`
+  - `apps/web/src/app/app.css`
+  - `apps/web/src/styles.css`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
+
 ## Session Update - 2026-03-26 (Queued Backup Feature + Nested Repo Flatten)
 - Added queued amp backup API endpoints:
   - `POST /api/v1/amp/backup` (enqueue full amp-state dump)
