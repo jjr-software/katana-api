@@ -262,8 +262,13 @@ export class App implements OnInit, OnDestroy {
   levelMarkerRmsDbfs = signal<number | null>(null);
   levelMarkerPeakDbfs = signal<number | null>(null);
   levelMarkerCapturedAt = signal('');
+  liveRmsDbfs = signal<number | null>(null);
+  livePeakDbfs = signal<number | null>(null);
+  liveMeterAt = signal('');
+  liveMeterConnected = signal(false);
   isMeasuringSlotsRms = signal(false);
   queuePollHandle: ReturnType<typeof setInterval> | null = null;
+  liveMeterSource: EventSource | null = null;
   rawModalOpen = signal(false);
   rawModalTitle = signal('');
   rawModalJson = signal('');
@@ -281,6 +286,7 @@ export class App implements OnInit, OnDestroy {
       clearInterval(this.queuePollHandle);
       this.queuePollHandle = null;
     }
+    this.stopLiveMeter();
   }
 
   async testAmpConnection(): Promise<void> {
@@ -558,6 +564,62 @@ export class App implements OnInit, OnDestroy {
     } catch {
       // marker display is optional; keep current UI state
     }
+  }
+
+  startLiveMeter(): void {
+    this.stopLiveMeter();
+    this.status.set('Starting live audio meter feed...');
+    const source = new EventSource('/api/v1/audio/live/sse?window_sec=0.5');
+    source.onmessage = (event: MessageEvent<string>) => {
+      try {
+        const payload = JSON.parse(event.data) as Record<string, unknown>;
+        const eventType = String(payload['type'] ?? '');
+        if (eventType === 'connected') {
+          this.liveMeterConnected.set(true);
+          this.status.set('Live audio meter connected');
+          return;
+        }
+        if (eventType !== 'audio_metrics') {
+          return;
+        }
+        const rms = Number(payload['rms_dbfs']);
+        const peak = Number(payload['peak_dbfs']);
+        const ts = String(payload['ts'] ?? '');
+        if (Number.isFinite(rms)) {
+          this.liveRmsDbfs.set(rms);
+        }
+        if (Number.isFinite(peak)) {
+          this.livePeakDbfs.set(peak);
+        }
+        this.liveMeterAt.set(ts);
+      } catch (error: unknown) {
+        this.status.set('Live audio meter parse failed');
+        this.responseJson.set(
+          JSON.stringify(
+            {
+              message: 'Failed to parse live audio meter event',
+              error: String(error),
+            },
+            null,
+            2,
+          ),
+        );
+      }
+    };
+    source.onerror = () => {
+      this.liveMeterConnected.set(false);
+      this.status.set('Live audio meter disconnected');
+      this.stopLiveMeter();
+    };
+    this.liveMeterSource = source;
+  }
+
+  stopLiveMeter(): void {
+    if (this.liveMeterSource !== null) {
+      this.liveMeterSource.close();
+      this.liveMeterSource = null;
+    }
+    this.liveMeterConnected.set(false);
   }
 
   async measureAllSlotsRms(): Promise<void> {

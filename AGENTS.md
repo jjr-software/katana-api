@@ -671,6 +671,25 @@
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
 
+## Session Update - 2026-03-26 (Live Audio dBFS Feed via SSE)
+- Added live server push feed for audio measurement metrics:
+  - `GET /api/v1/audio/live/sse`
+  - emits `text/event-stream` JSON events:
+    - `connected`
+    - repeated `audio_metrics` payloads with RMS/Peak dBFS and timestamp
+- Added web live meter controls:
+  - `Start Live Meter`
+  - `Stop Live Meter`
+  - header now shows live RMS/Peak and last event timestamp.
+- Implementation note:
+  - frontend uses `EventSource` to consume SSE feed and updates signals in real time.
+- Files changed:
+  - `apps/api/app/api/audio.py`
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
+
 ## Session Update - 2026-03-26 (Queued Backup Feature + Nested Repo Flatten)
 - Added queued amp backup API endpoints:
   - `POST /api/v1/amp/backup` (enqueue full amp-state dump)

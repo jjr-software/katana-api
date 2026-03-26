@@ -47,6 +47,12 @@
             <button type="button" class="btn btn-outline-dark btn-sm" (click)="measureAllSlotsRms()" [disabled]="isMeasuringSlotsRms()">
               Measure 5s RMS (All Slots)
             </button>
+            <button type="button" class="btn btn-outline-info btn-sm" (click)="startLiveMeter()" [disabled]="liveMeterConnected()">
+              Start Live Meter
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="stopLiveMeter()" [disabled]="!liveMeterConnected()">
+              Stop Live Meter
+            </button>
           </div>
           <div class="d-flex flex-wrap gap-3 small text-secondary">
             <span>AMP State Hash: <code>{{ shortHash(ampStateHash()) }}</code></span>
@@ -54,6 +60,8 @@
             <span>Total Sync Time: <code>{{ formatMs(totalSyncMs()) }}</code></span>
             <span>Level Marker RMS/Peak: <code>{{ formatDb(levelMarkerRmsDbfs()) }} / {{ formatDb(levelMarkerPeakDbfs()) }}</code></span>
             <span>Marker At: <code>{{ levelMarkerCapturedAt() || 'n/a' }}</code></span>
+            <span>Live RMS/Peak: <code>{{ formatDb(liveRmsDbfs()) }} / {{ formatDb(livePeakDbfs()) }}</code></span>
+            <span>Live At: <code>{{ liveMeterAt() || 'n/a' }}</code></span>
           </div>
         </div>
       </div>

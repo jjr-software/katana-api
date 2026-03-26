@@ -1,7 +1,13 @@
+import asyncio
+import json
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
+from starlette.requests import Request
+from starlette.responses import StreamingResponse
 
 from app.audio_capture import capture_audio_metrics
 from app.deps import get_db
@@ -121,6 +127,10 @@ class AudioLevelMarkerCaptureRequest(BaseModel):
     channels: int = Field(default=2, ge=1, le=8)
 
 
+def _sse_event(payload: dict) -> str:
+    return f"data: {json.dumps(payload, separators=(',', ':'))}\n\n"
+
+
 @router.post("/marker/capture", response_model=AudioSampleResponse)
 async def capture_audio_level_marker(
     payload: AudioLevelMarkerCaptureRequest,
@@ -190,4 +200,59 @@ def get_audio_level_marker(db: Session = Depends(get_db)) -> AudioSampleResponse
         sample_count=row.sample_count,
         is_level_marker=row.is_level_marker,
         created_at=row.created_at.isoformat(timespec="seconds"),
+    )
+
+
+@router.get("/live/sse")
+async def stream_live_audio_measurement_sse(
+    request: Request,
+    source: str = "alsa_input.usb-Roland_KATANA3-01.analog-surround-40",
+    window_sec: float = 0.5,
+    rate: int = 48_000,
+    channels: int = 2,
+) -> StreamingResponse:
+    bounded_window = max(0.2, min(window_sec, 5.0))
+    bounded_rate = max(8_000, min(rate, 192_000))
+    bounded_channels = max(1, min(channels, 8))
+
+    async def event_stream() -> object:
+        yield _sse_event(
+            {
+                "type": "connected",
+                "source": source,
+                "window_sec": bounded_window,
+                "rate": bounded_rate,
+                "channels": bounded_channels,
+                "ts": datetime.now().isoformat(timespec="seconds"),
+            }
+        )
+        while True:
+            if await request.is_disconnected():
+                return
+            sample = await capture_audio_metrics(
+                source=source,
+                duration_sec=bounded_window,
+                rate=bounded_rate,
+                channels=bounded_channels,
+            )
+            yield _sse_event(
+                {
+                    "type": "audio_metrics",
+                    "rms_dbfs": sample.rms_dbfs,
+                    "peak_dbfs": sample.peak_dbfs,
+                    "sample_count": sample.sample_count,
+                    "duration_sec": sample.duration_sec,
+                    "source": sample.source,
+                    "ts": datetime.now().isoformat(timespec="seconds"),
+                }
+            )
+            await asyncio.sleep(0.05)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
     )
