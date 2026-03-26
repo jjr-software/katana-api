@@ -597,6 +597,18 @@
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
 
+## Session Update - 2026-03-26 (Docs Consolidated To Single Forward Plan)
+- Retired overlapping docs and consolidated planning into one authoritative implementation document:
+  - added `docs/forward-implementation.md`
+  - removed:
+    - `docs/hash-first-patch-platform-design.md`
+    - `docs/webapp-implementation-plan.md`
+- New doc includes:
+  - hash-first invariants,
+  - done vs partial vs pending status,
+  - phased forward roadmap,
+  - immediate next sprint checklist.
+
 ## Session Update - 2026-03-26 (Queued Backup Feature + Nested Repo Flatten)
 - Added queued amp backup API endpoints:
   - `POST /api/v1/amp/backup` (enqueue full amp-state dump)
