@@ -1345,6 +1345,19 @@ export class App implements OnInit, OnDestroy {
       return;
     }
     const draft = this.clonePatch(slot.patch);
+    const draftAmp = this.readObject(draft, 'amp');
+    if (draftAmp) {
+      this.syncAmpDerivedFields(draftAmp);
+    }
+    const draftStages = this.readObject(draft, 'stages');
+    if (draftStages) {
+      for (const stageName of ['booster', 'mod', 'fx', 'delay', 'reverb'] as const) {
+        const stage = this.readObject(draftStages, stageName);
+        if (stage) {
+          this.syncStageDerivedFields(stageName, stage);
+        }
+      }
+    }
     this.editorSlotNumber.set(slot.slot);
     this.editorSlotLabel.set(slot.slot_label);
     this.editorPatchDraft.set(draft);
@@ -1419,7 +1432,34 @@ export class App implements OnInit, OnDestroy {
 
   editorAmpNumber(field: string): number | null {
     const amp = this.readObject(this.editorPatchDraft(), 'amp');
-    return this.readNumber(amp, field);
+    const fromDraft = this.readAmpField(amp, field);
+    if (fromDraft !== null) {
+      return fromDraft;
+    }
+    const slotNumber = this.editorSlotNumber();
+    if (slotNumber === null) {
+      return null;
+    }
+    const slot = this.slots().find((item) => item.slot === slotNumber);
+    const slotAmp = this.readObject(this.readObject(slot?.patch, 'amp'));
+    return this.readAmpField(slotAmp, field);
+  }
+
+  editorAmpRawValue(rawIndex: number): number {
+    const fromDraft = this.readEditorAmpRawIndex(rawIndex);
+    if (fromDraft !== null) {
+      return fromDraft;
+    }
+    const slotNumber = this.editorSlotNumber();
+    if (slotNumber !== null) {
+      const slot = this.slots().find((item) => item.slot === slotNumber);
+      const slotAmp = this.readObject(this.readObject(slot?.patch, 'amp'));
+      const raw = this.readAmpRaw(slotAmp);
+      if (raw !== null && rawIndex >= 0 && rawIndex < raw.length) {
+        return raw[rawIndex];
+      }
+    }
+    return 0;
   }
 
   setEditorAmpNumber(field: string, value: string): void {
@@ -1452,7 +1492,15 @@ export class App implements OnInit, OnDestroy {
   editorStageType(stageName: StageName): number | null {
     const stages = this.readObject(this.editorPatchDraft(), 'stages');
     const stage = this.readObject(stages, stageName);
-    return this.readNumber(stage, 'type');
+    const type = this.readNumber(stage, 'type');
+    if (type !== null) {
+      return type;
+    }
+    const raw = this.ensureNumericRaw(stage ?? {});
+    if (raw.length > 0) {
+      return raw[0];
+    }
+    return null;
   }
 
   setEditorStageType(stageName: StageName, value: string): void {
@@ -1993,12 +2041,12 @@ export class App implements OnInit, OnDestroy {
     if (!amp) {
       return 'n/a';
     }
-    const gain = this.readNumber(amp, 'gain');
-    const volume = this.readNumber(amp, 'volume');
-    const bass = this.readNumber(amp, 'bass');
-    const middle = this.readNumber(amp, 'middle');
-    const treble = this.readNumber(amp, 'treble');
-    const presence = this.readNumber(amp, 'presence');
+    const gain = this.readAmpField(amp, 'gain');
+    const volume = this.readAmpField(amp, 'volume');
+    const bass = this.readAmpField(amp, 'bass');
+    const middle = this.readAmpField(amp, 'middle');
+    const treble = this.readAmpField(amp, 'treble');
+    const presence = this.readAmpField(amp, 'presence');
     return `G ${this.nv(gain)} | V ${this.nv(volume)} | B/M/T/P ${this.nv(bass)}/${this.nv(middle)}/${this.nv(treble)}/${this.nv(presence)}`;
   }
 
@@ -2007,14 +2055,14 @@ export class App implements OnInit, OnDestroy {
     if (!amp) {
       return 'n/a';
     }
-    const ampType = this.readNumber(amp, 'amp_type');
+    const ampType = this.readAmpField(amp, 'amp_type');
     if (ampType === null) {
       return 'n/a';
     }
     const ampTypeIndex = Math.trunc(ampType);
     const ampTypeName =
       ampTypeIndex >= 0 && ampTypeIndex < AMP_TYPE_NAMES.length ? AMP_TYPE_NAMES[ampTypeIndex] : `Unknown (${ampTypeIndex})`;
-    const preampVariation = this.readNumber(amp, 'preamp_variation');
+    const preampVariation = this.readAmpField(amp, 'preamp_variation');
     const variationLabel = preampVariation === null ? 'n/a' : (Math.trunc(preampVariation) === 1 ? 'On' : 'Off');
     return `${ampTypeName} | Variation ${variationLabel}`;
   }
@@ -2196,6 +2244,24 @@ export class App implements OnInit, OnDestroy {
     amp['raw'] = raw;
   }
 
+  private syncAmpDerivedFields(amp: Record<string, unknown>): void {
+    const raw = this.ensureAmpRaw(amp);
+    if (raw.length < 10) {
+      return;
+    }
+    amp['gain'] = raw[0];
+    amp['volume'] = raw[1];
+    amp['bass'] = raw[2];
+    amp['middle'] = raw[3];
+    amp['treble'] = raw[4];
+    amp['presence'] = raw[5];
+    amp['poweramp_variation'] = raw[6];
+    amp['amp_type'] = raw[7];
+    amp['resonance'] = raw[8];
+    amp['preamp_variation'] = raw[9];
+    amp['raw'] = raw;
+  }
+
   private parseUnknownNumber(value: unknown): number {
     if (typeof value === 'number' && Number.isFinite(value)) {
       return Math.trunc(value);
@@ -2305,6 +2371,57 @@ export class App implements OnInit, OnDestroy {
       return value;
     }
     return null;
+  }
+
+  private readAmpField(amp: Record<string, unknown> | null, field: string): number | null {
+    const direct = this.readNumber(amp, field);
+    if (direct !== null) {
+      return direct;
+    }
+    if (!amp) {
+      return null;
+    }
+    const rawIndexByField: Record<string, number> = {
+      gain: 0,
+      volume: 1,
+      bass: 2,
+      middle: 3,
+      treble: 4,
+      presence: 5,
+      poweramp_variation: 6,
+      amp_type: 7,
+      resonance: 8,
+      preamp_variation: 9,
+    };
+    const rawIndex = rawIndexByField[field];
+    if (rawIndex === undefined) {
+      return null;
+    }
+    const raw = amp['raw'];
+    if (!Array.isArray(raw) || rawIndex >= raw.length) {
+      return null;
+    }
+    return this.parseUnknownNumber(raw[rawIndex]);
+  }
+
+  private readEditorAmpRawIndex(rawIndex: number): number | null {
+    const amp = this.readObject(this.editorPatchDraft(), 'amp');
+    const raw = this.readAmpRaw(amp);
+    if (raw === null || rawIndex < 0 || rawIndex >= raw.length) {
+      return null;
+    }
+    return raw[rawIndex];
+  }
+
+  private readAmpRaw(amp: Record<string, unknown> | null): number[] | null {
+    if (!amp) {
+      return null;
+    }
+    const raw = amp['raw'];
+    if (!Array.isArray(raw)) {
+      return null;
+    }
+    return raw.map((item) => this.parseUnknownNumber(item));
   }
 
   private readBoolean(source: Record<string, unknown> | null, key: string): boolean {

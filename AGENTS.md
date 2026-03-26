@@ -1522,3 +1522,21 @@
   - `apps/web/src/app/app.html`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Editor Field Binding Reliability Fix)
+- Fixed editor preload/display so Amp and stage controls reflect active source-of-truth raw bytes.
+- Changes:
+  - on editor open, normalize amp and stage derived fields from raw payload,
+  - amp type/variation select bindings now read from `amp.raw[7]` / `amp.raw[9]`,
+  - stage type select options use explicit selected-state binding against current stage type.
+- Outcome:
+  - editor no longer defaults to Acoustic/blank when card shows different active amp type,
+  - active booster type now displays correctly on editor open.
+- Verified with Playwright:
+  - card: `AMP Type: Clean | Variation Off`
+  - editor: `Type=Clean`, `Variation=Off`, `Booster Type=Distortion` (matching active payload).
+- Files changed:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

@@ -377,17 +377,17 @@
               <div class="row g-2">
                 <div class="col-6 col-md-4">
                   <label class="form-label small mb-1">Type</label>
-                  <select class="form-select form-select-sm" [value]="editorAmpNumber('amp_type') ?? 0" (change)="setEditorAmpNumber('amp_type', $any($event.target).value)">
+                  <select class="form-select form-select-sm" (change)="setEditorAmpNumber('amp_type', $any($event.target).value)">
                     @for (opt of editorAmpTypeOptions(); track opt.value) {
-                      <option [value]="opt.value">{{ opt.label }}</option>
+                      <option [value]="opt.value" [selected]="editorAmpRawValue(7) === opt.value">{{ opt.label }}</option>
                     }
                   </select>
                 </div>
                 <div class="col-6 col-md-4">
                   <label class="form-label small mb-1">Variation</label>
-                  <select class="form-select form-select-sm" [value]="editorAmpNumber('preamp_variation') ?? 0" (change)="setEditorAmpNumber('preamp_variation', $any($event.target).value)">
-                    <option [value]="0">Off</option>
-                    <option [value]="1">On</option>
+                  <select class="form-select form-select-sm" (change)="setEditorAmpNumber('preamp_variation', $any($event.target).value)">
+                    <option [value]="0" [selected]="editorAmpRawValue(9) === 0">Off</option>
+                    <option [value]="1" [selected]="editorAmpRawValue(9) === 1">On</option>
                   </select>
                 </div>
               </div>
@@ -416,9 +416,9 @@
                 <div class="row g-2">
                   <div class="col-12 col-md-6">
                     <label class="form-label small mb-1">Type</label>
-                    <select class="form-select form-select-sm" [value]="editorStageType($any(stageName)) ?? 0" (change)="setEditorStageType($any(stageName), $any($event.target).value)">
+                    <select class="form-select form-select-sm" (change)="setEditorStageType($any(stageName), $any($event.target).value)">
                       @for (opt of stageTypeOptions($any(stageName)); track opt.value) {
-                        <option [value]="opt.value">{{ opt.label }}</option>
+                        <option [value]="opt.value" [selected]="editorStageType($any(stageName)) === opt.value">{{ opt.label }}</option>
                       }
                     </select>
                   </div>
