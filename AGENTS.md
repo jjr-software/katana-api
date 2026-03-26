@@ -752,6 +752,23 @@
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
 
+## Session Update - 2026-03-26 (Measure Converted To Single Active-Patch Action)
+- Updated measurement UX to match active patch workflow:
+  - removed per-slot `Measure` buttons from patch cards,
+  - added single global `Measure Active Patch` button in header.
+- New flow:
+  1. reads active patch from amp (`GET /api/v1/amp/current-patch`),
+  2. runs frontend 10-second max capture via live SSE metrics feed,
+  3. matches active patch hash to loaded card hash and updates that card’s `10s Max RMS/Peak`.
+- Button behavior:
+  - shows countdown while running (`Measure Active (Ns)`),
+  - disabled during active run.
+- Files changed:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
+
 ## Session Update - 2026-03-26 (Queued Backup Feature + Nested Repo Flatten)
 - Added queued amp backup API endpoints:
   - `POST /api/v1/amp/backup` (enqueue full amp-state dump)

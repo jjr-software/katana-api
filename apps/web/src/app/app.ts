@@ -172,6 +172,11 @@ interface BackupJobResponse {
   result: FullAmpDumpResponse | null;
 }
 
+interface CurrentPatchResponse {
+  created_at: string;
+  patch: Record<string, unknown>;
+}
+
 interface AudioSampleResponse {
   id: number;
   patch_hash: string | null;
@@ -271,7 +276,7 @@ export class App implements OnInit, OnDestroy {
   liveMeterConnected = signal(false);
   liveRmsHistory = signal<number[]>([]);
   isMeasuringSlotsRms = signal(false);
-  activeMeasureSlot = signal<number | null>(null);
+  isMeasuringActivePatch = signal(false);
   measureCountdownSec = signal(0);
   queuePollHandle: ReturnType<typeof setInterval> | null = null;
   liveMeterSource: EventSource | null = null;
@@ -445,23 +450,32 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  async measureSlotRms(slot: SlotCard): Promise<void> {
-    if (this.activeMeasureSlot() !== null) {
+  async measureActivePatch(): Promise<void> {
+    if (this.isMeasuringActivePatch()) {
       return;
     }
     const durationSec = 10;
-    this.activeMeasureSlot.set(slot.slot);
+    this.isMeasuringActivePatch.set(true);
     this.measureCountdownSec.set(durationSec);
     this.responseJson.set('');
     let countdownHandle: ReturnType<typeof setInterval> | null = null;
     let source: EventSource | null = null;
     try {
-      this.status.set(`Preparing ${slot.slot_label} for 10s max-level measurement...`);
-      const synced = await this.syncSlotForMeasurement(slot.slot);
-      this.applySyncedSlot(synced.slot);
-      this.lastSyncedAt.set(synced.synced_at);
-      this.totalSyncMs.set(synced.slot.slot_sync_ms);
-      this.ampStateHash.set('');
+      this.status.set('Reading active patch from amp...');
+      const currentPatchResponse = await fetch('/api/v1/amp/current-patch', {
+        method: 'GET',
+        cache: 'no-store',
+      });
+      const currentPatchPayload = (await currentPatchResponse.json()) as CurrentPatchResponse | { detail?: unknown };
+      if (!currentPatchResponse.ok) {
+        throw new Error(`active patch read failed: ${JSON.stringify(currentPatchPayload)}`);
+      }
+      const currentPatch = currentPatchPayload as CurrentPatchResponse;
+      const activeHash = this.readString(currentPatch.patch, 'config_hash_sha256');
+      const activeName = this.readString(currentPatch.patch, 'patch_name') ?? 'Active Patch';
+      if (!activeHash) {
+        throw new Error('active patch payload missing config_hash_sha256');
+      }
 
       let maxRms = Number.NEGATIVE_INFINITY;
       let maxPeak = Number.NEGATIVE_INFINITY;
@@ -494,7 +508,7 @@ export class App implements OnInit, OnDestroy {
         const remaining = durationSec - Math.floor((Date.now() - startedAt) / 1000);
         this.measureCountdownSec.set(Math.max(0, remaining));
       }, 200);
-      this.status.set(`Measuring ${slot.slot_label} max levels for ${durationSec}s...`);
+      this.status.set(`Measuring active patch (${activeName}) max levels for ${durationSec}s...`);
       await new Promise<void>((resolve) => {
         setTimeout(() => resolve(), durationSec * 1000);
       });
@@ -503,28 +517,34 @@ export class App implements OnInit, OnDestroy {
         throw new Error('No live audio metric samples captured during 10-second window');
       }
 
-      this.setSlotMeasuredRms(slot.slot, maxRms, maxPeak, lastTs || new Date().toISOString());
-      this.status.set(`Max-level measurement complete for ${slot.slot_label}`);
+      const measuredAt = lastTs || new Date().toISOString();
+      const matchedSlot = this.slots().find((item) => item.config_hash_sha256 === activeHash);
+      if (matchedSlot) {
+        this.setSlotMeasuredRms(matchedSlot.slot, maxRms, maxPeak, measuredAt);
+      }
+      this.status.set(`Max-level measurement complete for active patch (${activeName})`);
       this.responseJson.set(
         JSON.stringify(
           {
-            message: '10-second max-level measurement captured',
-            slot: slot.slot_label,
+            message: '10-second max-level measurement captured for active patch',
+            active_patch_name: activeName,
+            active_patch_hash: activeHash,
+            matched_slot: matchedSlot?.slot_label ?? null,
             max_rms_dbfs: maxRms,
             max_peak_dbfs: maxPeak,
             events: samples,
-            captured_at: lastTs || null,
+            captured_at: measuredAt,
           },
           null,
           2,
         ),
       );
     } catch (error: unknown) {
-      this.status.set(`Measure failed for ${slot.slot_label}`);
+      this.status.set('Measure active patch failed');
       this.responseJson.set(
         JSON.stringify(
           {
-            message: 'Measure failed',
+            message: 'Measure active patch failed',
             error: String(error),
           },
           null,
@@ -539,7 +559,7 @@ export class App implements OnInit, OnDestroy {
         source.close();
       }
       this.measureCountdownSec.set(0);
-      this.activeMeasureSlot.set(null);
+      this.isMeasuringActivePatch.set(false);
     }
   }
 
@@ -808,15 +828,11 @@ export class App implements OnInit, OnDestroy {
     return this.canUseSlotActions(slot);
   }
 
-  canMeasureSlot(slot: SlotCard): boolean {
-    return this.canUseSlotActions(slot) && this.activeMeasureSlot() === null;
-  }
-
-  measureButtonLabel(slot: SlotCard): string {
-    if (this.activeMeasureSlot() === slot.slot) {
-      return `Measuring (${this.measureCountdownSec()}s)`;
+  measureActiveButtonLabel(): string {
+    if (this.isMeasuringActivePatch()) {
+      return `Measure Active (${this.measureCountdownSec()}s)`;
     }
-    return 'Measure';
+    return 'Measure Active Patch';
   }
 
   async quickSyncAmpSlots(): Promise<void> {
