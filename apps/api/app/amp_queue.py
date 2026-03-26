@@ -107,13 +107,32 @@ class AmpJobQueue:
         synced_at = datetime.now().isoformat(timespec="seconds")
         try:
             if job.operation == "full_sync_slots":
-                slots_result = await client.read_slots_state(synced_at=synced_at)
+                slots_result = await asyncio.wait_for(
+                    client.read_slots_state(synced_at=synced_at),
+                    timeout=max(5.0, settings.full_sync_timeout_seconds),
+                )
                 quick_result = None
             elif job.operation == "quick_sync_names":
-                quick_result = await client.read_slots_names_quick(synced_at=synced_at)
+                quick_result = await asyncio.wait_for(
+                    client.read_slots_names_quick(synced_at=synced_at),
+                    timeout=max(5.0, settings.quick_sync_timeout_seconds),
+                )
                 slots_result = None
             else:
                 raise RuntimeError(f"unknown operation: {job.operation}")
+        except asyncio.TimeoutError:
+            async with self._jobs_lock:
+                failed = self._jobs.get(job_id)
+                if failed is None:
+                    return
+                failed.status = "failed"
+                failed.error = (
+                    f"Queue job timed out: operation={job.operation} "
+                    f"(full_sync_timeout_seconds={settings.full_sync_timeout_seconds}, "
+                    f"quick_sync_timeout_seconds={settings.quick_sync_timeout_seconds})"
+                )
+                failed.finished_at = datetime.now().isoformat(timespec="seconds")
+            return
         except AmpClientError as exc:
             async with self._jobs_lock:
                 failed = self._jobs.get(job_id)

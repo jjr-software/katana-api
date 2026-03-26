@@ -365,7 +365,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   private async waitForSyncJob(jobId: string): Promise<SlotsSyncJobResponse> {
-    const maxPolls = 900;
+    const maxPolls = 150;
     for (let i = 0; i < maxPolls; i += 1) {
       const response = await fetch(`/api/v1/amp/slots/sync/${jobId}`, {
         method: 'GET',
@@ -388,7 +388,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   private async waitForQuickSyncJob(jobId: string): Promise<QuickSyncJobResponse> {
-    const maxPolls = 900;
+    const maxPolls = 75;
     for (let i = 0; i < maxPolls; i += 1) {
       const response = await fetch(`/api/v1/amp/slots/quick/sync/${jobId}`, {
         method: 'GET',
