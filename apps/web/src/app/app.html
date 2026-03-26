@@ -19,6 +19,9 @@
     <button type="button" (click)="syncAmpSlots()">
       Sync Slots A:1..B:4
     </button>
+    <button type="button" (click)="backupAmpState()">
+      Backup Amp State
+    </button>
   </div>
   <div class="sync-meta">
     <span>AMP State Hash: <code>{{ shortHash(ampStateHash()) }}</code></span>

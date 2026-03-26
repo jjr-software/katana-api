@@ -83,6 +83,41 @@ interface QuickSyncJobResponse {
   result: QuickSlotsStateResponse | null;
 }
 
+interface FullDumpSlotResponse {
+  slot: number;
+  slot_label: string;
+  synced_at: string;
+  slot_sync_ms: number;
+  patch: Record<string, unknown>;
+  curated: Record<string, unknown>[];
+}
+
+interface FullAmpDumpResponse {
+  synced_at: string;
+  amp_state_hash_sha256: string;
+  total_sync_ms: number;
+  slots: FullDumpSlotResponse[];
+}
+
+interface BackupEnqueueResponse {
+  job_id: string;
+  operation: string;
+  status: string;
+  created_at: string;
+}
+
+interface BackupJobResponse {
+  job_id: string;
+  operation: string;
+  status: 'queued' | 'running' | 'succeeded' | 'failed';
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  elapsed_ms: number;
+  error: string | null;
+  result: FullAmpDumpResponse | null;
+}
+
 interface DeviceStatusResponse {
   midi_port: string;
   busy: boolean;
@@ -398,6 +433,70 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  async backupAmpState(): Promise<void> {
+    this.status.set('Backup queued...');
+    this.responseJson.set('');
+
+    try {
+      const enqueueResponse = await fetch('/api/v1/amp/backup', {
+        method: 'POST',
+        cache: 'no-store',
+      });
+      const enqueuePayload = (await enqueueResponse.json()) as BackupEnqueueResponse | { detail: unknown };
+      if (!enqueueResponse.ok) {
+        this.status.set('Backup failed');
+        this.responseJson.set(JSON.stringify(enqueuePayload, null, 2));
+        return;
+      }
+
+      const queued = enqueuePayload as BackupEnqueueResponse;
+      const job = await this.waitForBackupJob(queued.job_id);
+      if (job.status !== 'succeeded' || job.result === null) {
+        this.status.set('Backup failed');
+        this.responseJson.set(
+          JSON.stringify(
+            {
+              message: 'Queued backup job failed',
+              job_id: job.job_id,
+              status: job.status,
+              error: job.error,
+            },
+            null,
+            2,
+          ),
+        );
+        return;
+      }
+
+      this.downloadBackupFile(job.result);
+      this.status.set('Backup succeeded');
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Backup JSON downloaded',
+            synced_at: job.result.synced_at,
+            amp_state_hash_sha256: job.result.amp_state_hash_sha256,
+            total_sync_ms: job.result.total_sync_ms,
+          },
+          null,
+          2,
+        ),
+      );
+    } catch (error: unknown) {
+      this.status.set('Backup failed');
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Browser request failed',
+            error: String(error),
+          },
+          null,
+          2,
+        ),
+      );
+    }
+  }
+
   private async waitForSyncJob(jobId: string): Promise<SlotsSyncJobResponse> {
     const maxPolls = 150;
     for (let i = 0; i < maxPolls; i += 1) {
@@ -442,6 +541,42 @@ export class App implements OnInit, OnDestroy {
       });
     }
     throw new Error(`Quick sync job timed out: ${jobId}`);
+  }
+
+  private async waitForBackupJob(jobId: string): Promise<BackupJobResponse> {
+    const maxPolls = 300;
+    for (let i = 0; i < maxPolls; i += 1) {
+      const response = await fetch(`/api/v1/amp/backup/${jobId}`, {
+        method: 'GET',
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as BackupJobResponse | { detail: unknown };
+      if (!response.ok) {
+        throw new Error(`Backup job poll failed: ${JSON.stringify(payload)}`);
+      }
+      const job = payload as BackupJobResponse;
+      if (job.status === 'succeeded' || job.status === 'failed') {
+        return job;
+      }
+      this.status.set(job.status === 'queued' ? 'Backup queued...' : 'Backup running...');
+      await new Promise<void>((resolve) => {
+        setTimeout(() => resolve(), 1000);
+      });
+    }
+    throw new Error(`Backup job timed out: ${jobId}`);
+  }
+
+  private downloadBackupFile(backup: FullAmpDumpResponse): void {
+    const fileName = `amp-backup-${backup.synced_at.replace(/[:T]/g, '-').replace(/\..*$/, '')}.json`;
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    window.URL.revokeObjectURL(url);
   }
 
   async refreshDeviceStatus(): Promise<void> {

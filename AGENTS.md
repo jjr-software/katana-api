@@ -506,6 +506,19 @@
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
 
+## Session Update - 2026-03-26 (Queued Backup Feature + Nested Repo Flatten)
+- Added queued amp backup API endpoints:
+  - `POST /api/v1/amp/backup` (enqueue full amp-state dump)
+  - `GET /api/v1/amp/backup/{job_id}` (poll queued backup job/result)
+- Added web backup action:
+  - new `Backup Amp State` button in toolbar
+  - enqueues backup, polls queue status, downloads resulting JSON on success
+- Validation:
+  - rebuilt/restarted via `docker compose up -d --build`
+  - verified backup queue flow returns `succeeded` and full slot payload
+- Repository hygiene fix:
+  - flattened `manual-extract/fresh/innoextract` from accidental gitlink into regular tracked files
+
 ## Session Update - 2026-03-26 (Queue-Only Amp I/O + No Global UI Lock)
 - Enforced queue-backed amp communication across API amp-read/sync routes:
   - `GET /api/v1/amp/test-connection` now executes via queue job.

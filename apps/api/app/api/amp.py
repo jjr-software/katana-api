@@ -128,6 +128,25 @@ class QuickSyncJobResponse(BaseModel):
     result: QuickSlotsStateResponse | None = None
 
 
+class BackupEnqueueResponse(BaseModel):
+    job_id: str
+    operation: str
+    status: str
+    created_at: str
+
+
+class BackupJobResponse(BaseModel):
+    job_id: str
+    operation: str
+    status: str
+    created_at: str
+    started_at: str | None = None
+    finished_at: str | None = None
+    elapsed_ms: int
+    error: str | None = None
+    result: FullAmpDumpResponse | None = None
+
+
 class QueueJobSummaryResponse(BaseModel):
     job_id: str
     operation: str
@@ -380,6 +399,52 @@ async def get_quick_sync_job(job_id: str, db: Session = Depends(get_db)) -> Quic
         )
 
     return QuickSyncJobResponse(
+        job_id=job.job_id,
+        operation=job.operation,
+        status=job.status,
+        created_at=job.created_at,
+        started_at=job.started_at,
+        finished_at=job.finished_at,
+        elapsed_ms=_job_elapsed_ms(job),
+        error=job.error,
+        result=result,
+    )
+
+
+@router.post("/backup", response_model=BackupEnqueueResponse)
+async def enqueue_backup() -> BackupEnqueueResponse:
+    job = await amp_job_queue.enqueue_full_dump()
+    return BackupEnqueueResponse(
+        job_id=job.job_id,
+        operation=job.operation,
+        status=job.status,
+        created_at=job.created_at,
+    )
+
+
+@router.get("/backup/{job_id}", response_model=BackupJobResponse)
+async def get_backup_job(job_id: str, db: Session = Depends(get_db)) -> BackupJobResponse:
+    job = await amp_job_queue.get_job(job_id)
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"message": "Backup job not found", "job_id": job_id},
+        )
+
+    result: FullAmpDumpResponse | None = None
+    if job.result_dump is not None:
+        curated_by_hash = _load_curation_by_hash(
+            db,
+            [str(item.payload.get("config_hash_sha256", "")) for item in job.result_dump.slots],
+        )
+        result = FullAmpDumpResponse(
+            synced_at=job.result_dump.synced_at,
+            amp_state_hash_sha256=job.result_dump.amp_state_hash_sha256,
+            total_sync_ms=job.result_dump.total_sync_ms,
+            slots=[FullDumpSlotResponse(**_slot_dump_to_dict(item, curated_by_hash)) for item in job.result_dump.slots],
+        )
+
+    return BackupJobResponse(
         job_id=job.job_id,
         operation=job.operation,
         status=job.status,
