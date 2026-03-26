@@ -532,6 +532,18 @@
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
 
+## Session Update - 2026-03-26 (Unsynced Slot Action Gating Tightened)
+- Tightened slot action enablement in web UI:
+  - `Save`, `Sample`, and `Raw` now require both:
+    - a full patch payload loaded, and
+    - slot state `in_sync = true`.
+- Outcome:
+  - unsynced slots keep `Sync` as the only usable action path.
+- File changed:
+  - `apps/web/src/app/app.ts`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
+
 ## Session Update - 2026-03-26 (Queued Backup Feature + Nested Repo Flatten)
 - Added queued amp backup API endpoints:
   - `POST /api/v1/amp/backup` (enqueue full amp-state dump)

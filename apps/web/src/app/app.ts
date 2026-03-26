@@ -476,7 +476,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   canUseSlotActions(slot: SlotCard): boolean {
-    return this.hasFullPatch(slot);
+    return slot.in_sync && this.hasFullPatch(slot);
   }
 
   async quickSyncAmpSlots(): Promise<void> {
