@@ -1288,3 +1288,15 @@
   - `apps/web/src/app/app.ts`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Queue Monitor Retention Cap)
+- Stopped queue monitor from growing unbounded in memory:
+  - added in-memory queue job retention cap in `AmpJobQueue` (`max 120` jobs),
+  - pruning removes oldest terminal jobs (`succeeded`/`failed`) when above cap.
+- Reduced queue API response window:
+  - `/api/v1/amp/queue` now returns latest `25` jobs (was 50).
+- Files changed:
+  - `apps/api/app/amp_queue.py`
+  - `apps/api/app/api/amp.py`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

@@ -439,7 +439,7 @@ async def quick_slots_state(
 
 @router.get("/queue", response_model=QueueStateResponse)
 async def queue_state() -> QueueStateResponse:
-    jobs = await amp_job_queue.list_jobs(limit=50)
+    jobs = await amp_job_queue.list_jobs(limit=25)
     running_job_id = await amp_job_queue.get_running_job_id()
     queued_count = len([job for job in jobs if job.status == "queued"])
     return QueueStateResponse(

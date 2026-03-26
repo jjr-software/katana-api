@@ -56,6 +56,7 @@ class AmpJobQueue:
     def __init__(self) -> None:
         self._queue: asyncio.Queue[str] = asyncio.Queue()
         self._jobs: dict[str, AmpQueueJob] = {}
+        self._max_job_history = 120
         self._worker_task: asyncio.Task[None] | None = None
         self._jobs_lock = asyncio.Lock()
 
@@ -110,6 +111,7 @@ class AmpJobQueue:
         )
         async with self._jobs_lock:
             self._jobs[job.job_id] = job
+            self._prune_jobs_locked()
         await self._queue.put(job.job_id)
         return job
 
@@ -302,6 +304,7 @@ class AmpJobQueue:
             done.result_slots = slots_result
             done.result_quick = quick_result
             done.finished_at = datetime.now().isoformat(timespec="seconds")
+            self._prune_jobs_locked()
         try:
             await self._persist_sync_history_if_needed(done)
         except Exception as exc:
@@ -332,6 +335,23 @@ class AmpJobQueue:
     @staticmethod
     def _is_sync_operation(operation: JobOperation) -> bool:
         return operation in {"sync_slot", "write_slot", "full_dump", "full_sync_slots", "quick_sync_names"}
+
+    def _prune_jobs_locked(self) -> None:
+        if len(self._jobs) <= self._max_job_history:
+            return
+        overflow = len(self._jobs) - self._max_job_history
+        if overflow <= 0:
+            return
+        removable = sorted(
+            (
+                job
+                for job in self._jobs.values()
+                if job.status in {"succeeded", "failed"}
+            ),
+            key=lambda item: item.created_at,
+        )
+        for job in removable[:overflow]:
+            self._jobs.pop(job.job_id, None)
 
     @staticmethod
     def _persist_sync_history(job: AmpQueueJob) -> None:
