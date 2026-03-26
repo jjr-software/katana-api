@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 from hashlib import sha256
 from dataclasses import dataclass
 from typing import Any
@@ -59,12 +60,14 @@ class SlotPatchSummary:
     patch_name: str
     config_hash_sha256: str
     synced_at: str
+    slot_sync_ms: int
 
 
 @dataclass(frozen=True)
 class SlotsStateSnapshot:
     synced_at: str
     amp_state_hash_sha256: str
+    total_sync_ms: int
     slots: list[SlotPatchSummary]
 
 
@@ -98,10 +101,12 @@ class AmpClient:
         return CurrentPatchSnapshot(payload=await self._read_selected_patch_payload())
 
     async def read_slots_state(self, synced_at: str) -> SlotsStateSnapshot:
+        started = time.perf_counter()
         await self._send_only(EDITOR_MODE_ON)
         slots: list[SlotPatchSummary] = []
         slot_hash_parts: list[str] = []
         for slot in range(1, 9):
+            slot_started = time.perf_counter()
             await self._select_patch(slot)
             payload = await self._read_selected_patch_payload()
             slot_hash = str(payload["config_hash_sha256"])
@@ -113,12 +118,14 @@ class AmpClient:
                     patch_name=str(payload.get("patch_name", "")),
                     config_hash_sha256=slot_hash,
                     synced_at=synced_at,
+                    slot_sync_ms=int(round((time.perf_counter() - slot_started) * 1000)),
                 )
             )
         amp_state_hash = sha256("|".join(slot_hash_parts).encode("utf-8")).hexdigest()
         return SlotsStateSnapshot(
             synced_at=synced_at,
             amp_state_hash_sha256=amp_state_hash,
+            total_sync_ms=int(round((time.perf_counter() - started) * 1000)),
             slots=slots,
         )
 

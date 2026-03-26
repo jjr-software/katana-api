@@ -13,11 +13,13 @@ interface SlotPatchSummary {
   patch_name: string;
   config_hash_sha256: string;
   synced_at: string;
+  slot_sync_ms: number;
 }
 
 interface SlotsStateResponse {
   synced_at: string;
   amp_state_hash_sha256: string;
+  total_sync_ms: number;
   slots: SlotPatchSummary[];
 }
 
@@ -34,6 +36,7 @@ export class App {
   slots = signal<SlotPatchSummary[]>([]);
   ampStateHash = signal('');
   lastSyncedAt = signal('');
+  totalSyncMs = signal(0);
 
   async testAmpConnection(): Promise<void> {
     this.isLoading.set(true);
@@ -88,6 +91,7 @@ export class App {
         this.slots.set([]);
         this.ampStateHash.set('');
         this.lastSyncedAt.set('');
+        this.totalSyncMs.set(0);
         this.responseJson.set(JSON.stringify(payload, null, 2));
         return;
       }
@@ -97,12 +101,14 @@ export class App {
       this.slots.set(state.slots);
       this.ampStateHash.set(state.amp_state_hash_sha256);
       this.lastSyncedAt.set(state.synced_at);
+      this.totalSyncMs.set(state.total_sync_ms);
       this.responseJson.set('');
     } catch (error: unknown) {
       this.status.set('Amp sync failed');
       this.slots.set([]);
       this.ampStateHash.set('');
       this.lastSyncedAt.set('');
+      this.totalSyncMs.set(0);
       this.responseJson.set(
         JSON.stringify(
           {
@@ -124,5 +130,9 @@ export class App {
 
   shortHash(hash: string): string {
     return hash.slice(0, 12);
+  }
+
+  formatMs(value: number): string {
+    return `${Math.max(0, Math.round(value))} ms`;
   }
 }

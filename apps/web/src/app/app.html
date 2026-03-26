@@ -12,6 +12,7 @@
   <div class="sync-meta">
     <span>AMP State Hash: <code>{{ shortHash(ampStateHash()) }}</code></span>
     <span>Last Sync: <code>{{ lastSyncedAt() || 'n/a' }}</code></span>
+    <span>Total Sync Time: <code>{{ formatMs(totalSyncMs()) }}</code></span>
   </div>
   <p class="status">{{ status() }}</p>
 
@@ -24,6 +25,7 @@
           <h3>{{ slot.patch_name || 'Unnamed Patch' }}</h3>
           <p>Hash: <code>{{ shortHash(slot.config_hash_sha256) }}</code></p>
           <p>Last Sync: <code>{{ slot.synced_at }}</code></p>
+          <p>Slot Read: <code>{{ formatMs(slot.slot_sync_ms) }}</code></p>
         </article>
       }
     </div>
@@ -38,6 +40,7 @@
           <h3>{{ slot.patch_name || 'Unnamed Patch' }}</h3>
           <p>Hash: <code>{{ shortHash(slot.config_hash_sha256) }}</code></p>
           <p>Last Sync: <code>{{ slot.synced_at }}</code></p>
+          <p>Slot Read: <code>{{ formatMs(slot.slot_sync_ms) }}</code></p>
         </article>
       }
     </div>

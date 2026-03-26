@@ -27,11 +27,13 @@ class SlotPatchSummaryResponse(BaseModel):
     patch_name: str
     config_hash_sha256: str
     synced_at: str
+    slot_sync_ms: int
 
 
 class SlotsStateResponse(BaseModel):
     synced_at: str
     amp_state_hash_sha256: str
+    total_sync_ms: int
     slots: list[SlotPatchSummaryResponse]
 
 
@@ -95,6 +97,7 @@ async def slots_state(client: AmpClient = Depends(get_amp_client)) -> SlotsState
     return SlotsStateResponse(
         synced_at=state.synced_at,
         amp_state_hash_sha256=state.amp_state_hash_sha256,
+        total_sync_ms=state.total_sync_ms,
         slots=[SlotPatchSummaryResponse(**_slot_to_dict(slot)) for slot in state.slots],
     )
 
@@ -106,4 +109,5 @@ def _slot_to_dict(slot: SlotPatchSummary) -> dict:
         "patch_name": slot.patch_name,
         "config_hash_sha256": slot.config_hash_sha256,
         "synced_at": slot.synced_at,
+        "slot_sync_ms": slot.slot_sync_ms,
     }
