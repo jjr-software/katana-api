@@ -544,6 +544,17 @@
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
 
+## Session Update - 2026-03-26 (Small-Screen Queue Hide + Single-Card Flow)
+- Updated responsive web layout for small screens (`max-width: 980px`):
+  - hide left queue column entirely,
+  - switch slot cards container to flex-wrap flow with one card per row (`flex: 1 1 100%`).
+- Outcome:
+  - mobile/smaller displays now prioritize the patch cards in a vertical one-at-a-time flow.
+- File changed:
+  - `apps/web/src/app/app.css`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
+
 ## Session Update - 2026-03-26 (Queued Backup Feature + Nested Repo Flatten)
 - Added queued amp backup API endpoints:
   - `POST /api/v1/amp/backup` (enqueue full amp-state dump)

@@ -261,20 +261,16 @@ pre {
   }
 
   .queue-column {
-    position: static;
-  }
-
-  .queue-panel {
-    height: auto;
+    display: none;
   }
 
   .cards {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.7rem;
   }
-}
 
-@media (max-width: 640px) {
-  .cards {
-    grid-template-columns: 1fr;
+  .card {
+    flex: 1 1 100%;
   }
 }
