@@ -1343,3 +1343,14 @@
   - `apps/web/src/app/app.html`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Editor Modal Action Label Cleanup)
+- Replaced ambiguous editor footer actions:
+  - `Apply Local` -> `Update Card Only`
+  - `Save Draft` -> `Save to DB`
+- Updated corresponding method names and status/response wording to match explicit DB terminology.
+- Files changed:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

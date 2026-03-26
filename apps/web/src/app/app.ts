@@ -1571,7 +1571,7 @@ export class App implements OnInit, OnDestroy {
     });
   }
 
-  applyEditorDraftToSlot(): void {
+  updateEditorCardOnly(): void {
     const slotNumber = this.editorSlotNumber();
     const draft = this.editorPatchDraft();
     if (slotNumber === null || draft === null) {
@@ -1595,17 +1595,17 @@ export class App implements OnInit, OnDestroy {
         };
       }),
     );
-    this.status.set(`Applied editor draft to ${this.editorSlotLabel()} (local only)`);
+    this.status.set(`Updated ${this.editorSlotLabel()} card only (no amp write)`);
     this.closeEditorModal();
   }
 
-  async saveEditorDraftToLibrary(): Promise<void> {
+  async saveEditorPatchToDb(): Promise<void> {
     const slotNumber = this.editorSlotNumber();
     const draft = this.editorPatchDraft();
     if (slotNumber === null || draft === null) {
       return;
     }
-    this.status.set(`Saving editor draft for ${this.editorSlotLabel()}...`);
+    this.status.set(`Saving ${this.editorSlotLabel()} editor patch to DB...`);
     this.responseJson.set('');
     try {
       const saveResponse = await fetch('/api/v1/patches/configs', {
@@ -1616,7 +1616,7 @@ export class App implements OnInit, OnDestroy {
       });
       const savePayload = (await saveResponse.json()) as { hash_id?: string; detail?: unknown };
       if (!saveResponse.ok || typeof savePayload.hash_id !== 'string') {
-        this.status.set('Failed saving editor draft');
+        this.status.set('Failed saving editor patch to DB');
         this.responseJson.set(JSON.stringify(savePayload, null, 2));
         return;
       }
@@ -1639,11 +1639,11 @@ export class App implements OnInit, OnDestroy {
           };
         }),
       );
-      this.status.set(`Editor draft saved for ${this.editorSlotLabel()}`);
+      this.status.set(`Saved ${this.editorSlotLabel()} editor patch to DB`);
       this.responseJson.set(
         JSON.stringify(
           {
-            message: 'Editor draft saved to library',
+            message: 'Editor patch saved to DB',
             slot: this.editorSlotLabel(),
             hash_id: hashId,
           },
@@ -1653,7 +1653,7 @@ export class App implements OnInit, OnDestroy {
       );
       this.closeEditorModal();
     } catch (error: unknown) {
-      this.status.set('Failed saving editor draft');
+      this.status.set('Failed saving editor patch to DB');
       this.responseJson.set(
         JSON.stringify(
           {
