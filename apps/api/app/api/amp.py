@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -495,13 +496,14 @@ async def enqueue_backup() -> BackupEnqueueResponse:
     )
 
 
-@router.get("/backup/{job_id}", response_model=BackupJobResponse)
-async def get_backup_job(job_id: str, db: Session = Depends(get_db)) -> BackupJobResponse:
-    job = await amp_job_queue.get_job(job_id)
+@router.get("/backup/{job_id:uuid}", response_model=BackupJobResponse)
+async def get_backup_job(job_id: UUID, db: Session = Depends(get_db)) -> BackupJobResponse:
+    job_id_str = str(job_id)
+    job = await amp_job_queue.get_job(job_id_str)
     if job is None:
         raise HTTPException(
             status_code=404,
-            detail={"message": "Backup job not found", "job_id": job_id},
+            detail={"message": "Backup job not found", "job_id": job_id_str},
         )
 
     result: FullAmpDumpResponse | None = None

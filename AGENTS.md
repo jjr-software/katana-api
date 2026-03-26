@@ -1007,3 +1007,15 @@
   - `apps/api/app/api/amp.py`
   - `apps/web/src/app/app.ts`
   - `apps/web/src/app/app.html`
+
+## Session Update - 2026-03-26 (Patch-Set Load 404 Fix)
+- Fixed API route collision that caused `Load Patch Set` to fail with:
+  - `Failed loading recent full-sync data`
+- Root cause:
+  - dynamic route `GET /api/v1/amp/backup/{job_id}` captured `/api/v1/amp/backup/snapshots`.
+- Fix:
+  - constrained backup job route to UUID path parameter:
+    - `GET /api/v1/amp/backup/{job_id:uuid}`
+- Validation:
+  - `GET /api/v1/amp/backup/snapshots?limit=3` returns snapshot list.
+  - `POST /api/v1/amp/backup/snapshots/{id}/load` returns 8 slots with `in_sync=false` and `is_saved=true`.
