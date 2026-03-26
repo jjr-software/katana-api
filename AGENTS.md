@@ -616,6 +616,17 @@
 - Rebuilt/restarted:
   - `docker compose up -d --build`
 
+## Session Update - 2026-03-26 (Pedal Type Names In UI)
+- Replaced numeric stage type display (`Type N`) with human-readable effect names in slot cards.
+- Applied mappings for:
+  - booster types
+  - mod/fx types
+  - delay types
+  - reverb types
+- Unmapped values now display as `Unknown (N)` only when name table has no entry.
+- Rebuilt/restarted:
+  - `docker compose up -d --build`
+
 ## Session Update - 2026-03-26 (Queue-Only Amp I/O + No Global UI Lock)
 - Enforced queue-backed amp communication across API amp-read/sync routes:
   - `GET /api/v1/amp/test-connection` now executes via queue job.

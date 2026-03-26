@@ -1,5 +1,21 @@
 import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 
+const BOOSTER_TYPE_NAMES = [
+  'MID BOOST', 'CLEAN BOOST', 'TREBLE BOOST', 'CRUNCH OD', 'NATURAL OD', 'WARM OD', 'FAT DS',
+  'METAL DS', 'OCT FUZZ', 'BLUES DRIVE', 'OVERDRIVE', 'T-SCREAM', 'TURBO OD', 'DISTORTION',
+  'RAT', 'GUV DS', 'DST+', 'METAL ZONE', "'60S FUZZ", 'MUFF FUZZ', 'HM-2', 'METAL CORE', 'CENTA OD',
+];
+
+const FX_TYPE_NAMES = [
+  'T.WAH', 'AUTO WAH', 'PEDAL WAH', 'COMP', 'LIMITER', 'GEQ', 'PEQ', 'GUITAR SIM', 'SLOW GEAR',
+  'WAVE SYNTH', 'OCTAVE', 'PITCH SHIFT', 'HARMONIST', 'AC.PROCESS', 'PHASER', 'FLANGER', 'TREMOLO',
+  'ROTARY', 'UNI-V', 'SLICER', 'VIBRATO', 'RING MOD', 'HUMANIZER', 'CHORUS', 'AC.GTR SIM',
+  'PHASER 90E', 'FLNGR 117E', 'WAH 95E', 'DC-30', 'HEAVY OCT', 'PEDAL BEND',
+];
+
+const DELAY_TYPE_NAMES = ['DIGITAL', 'PAN', 'STEREO', 'ANALOG', 'TAPE ECHO', 'REVERSE', 'MODULATE', 'SDE-3000'];
+const REVERB_TYPE_NAMES = ['PLATE', 'ROOM', 'HALL', 'SPRING', 'MODULATE'];
+
 interface AmpConnectionTestResponse {
   ok: boolean;
   midi_port: string;
@@ -726,12 +742,30 @@ export class App implements OnInit, OnDestroy {
     const level = this.readNumber(stage, 'effect_level');
     const parts: string[] = [on ? 'On' : 'Off'];
     if (type !== null) {
-      parts.push(`Type ${type}`);
+      parts.push(this.effectTypeLabel(stageName, type));
     }
     if (level !== null) {
       parts.push(`Lvl ${level}`);
     }
     return parts.join(' | ');
+  }
+
+  private effectTypeLabel(stageName: string, type: number): string {
+    const index = Math.max(0, Math.trunc(type));
+    let table: string[] = [];
+    if (stageName === 'booster') {
+      table = BOOSTER_TYPE_NAMES;
+    } else if (stageName === 'mod' || stageName === 'fx') {
+      table = FX_TYPE_NAMES;
+    } else if (stageName === 'delay') {
+      table = DELAY_TYPE_NAMES;
+    } else if (stageName === 'reverb') {
+      table = REVERB_TYPE_NAMES;
+    }
+    if (index >= 0 && index < table.length) {
+      return table[index];
+    }
+    return `Unknown (${index})`;
   }
 
   private readObject(value: unknown, key?: string): Record<string, unknown> | null {
