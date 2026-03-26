@@ -573,6 +573,17 @@
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
 
+## Session Update - 2026-03-26 (Queue Narrower + 4-Wide Patch Grid)
+- Adjusted Bootstrap column widths on desktop (`xl+`):
+  - queue column narrowed from `col-xl-3` to `col-xl-2`,
+  - main patch area widened from `col-xl-9` to `col-xl-10`.
+- Forced patch cards to render 4 per row at desktop widths:
+  - card columns changed to `col-xl-3`.
+- File changed:
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
+
 ## Session Update - 2026-03-26 (Queued Backup Feature + Nested Repo Flatten)
 - Added queued amp backup API endpoints:
   - `POST /api/v1/amp/backup` (enqueue full amp-state dump)
