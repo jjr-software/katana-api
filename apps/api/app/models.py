@@ -77,4 +77,5 @@ class AudioSample(Base):
     rms_dbfs: Mapped[float] = mapped_column(Float, nullable=False)
     peak_dbfs: Mapped[float] = mapped_column(Float, nullable=False)
     sample_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    is_level_marker: Mapped[bool] = mapped_column(nullable=False, default=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)

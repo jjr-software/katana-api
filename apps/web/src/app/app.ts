@@ -182,6 +182,7 @@ interface AudioSampleResponse {
   rms_dbfs: number;
   peak_dbfs: number;
   sample_count: number;
+  is_level_marker: boolean;
   created_at: string;
 }
 
@@ -254,6 +255,9 @@ export class App implements OnInit, OnDestroy {
   totalSyncMs = signal(0);
   queueJobs = signal<QueueJobSummary[]>([]);
   queueGeneratedAt = signal('');
+  levelMarkerRmsDbfs = signal<number | null>(null);
+  levelMarkerPeakDbfs = signal<number | null>(null);
+  levelMarkerCapturedAt = signal('');
   queuePollHandle: ReturnType<typeof setInterval> | null = null;
   rawModalOpen = signal(false);
   rawModalTitle = signal('');
@@ -261,6 +265,7 @@ export class App implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     void this.refreshQueueState();
+    void this.loadAudioLevelMarker();
     this.queuePollHandle = setInterval(() => {
       void this.refreshQueueState();
     }, 1000);
@@ -472,6 +477,81 @@ export class App implements OnInit, OnDestroy {
           2,
         ),
       );
+    }
+  }
+
+  async captureAudioLevelMarker(): Promise<void> {
+    this.status.set('Capturing audio level marker...');
+    this.responseJson.set('');
+    try {
+      const response = await fetch('/api/v1/audio/marker/capture', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          duration_sec: 2.0,
+        }),
+      });
+      const payload = (await response.json()) as AudioSampleResponse | { detail?: unknown };
+      if (!response.ok) {
+        this.status.set('Audio level marker capture failed');
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      const marker = payload as AudioSampleResponse;
+      this.levelMarkerRmsDbfs.set(marker.rms_dbfs);
+      this.levelMarkerPeakDbfs.set(marker.peak_dbfs);
+      this.levelMarkerCapturedAt.set(marker.created_at);
+      this.status.set('Audio level marker captured');
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Audio level marker captured',
+            rms_dbfs: marker.rms_dbfs,
+            peak_dbfs: marker.peak_dbfs,
+            captured_at: marker.created_at,
+          },
+          null,
+          2,
+        ),
+      );
+    } catch (error: unknown) {
+      this.status.set('Audio level marker capture failed');
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Browser request failed',
+            error: String(error),
+          },
+          null,
+          2,
+        ),
+      );
+    }
+  }
+
+  async loadAudioLevelMarker(): Promise<void> {
+    try {
+      const response = await fetch('/api/v1/audio/marker', {
+        method: 'GET',
+        cache: 'no-store',
+      });
+      if (response.status === 404) {
+        this.levelMarkerRmsDbfs.set(null);
+        this.levelMarkerPeakDbfs.set(null);
+        this.levelMarkerCapturedAt.set('');
+        return;
+      }
+      const payload = (await response.json()) as AudioSampleResponse | { detail?: unknown };
+      if (!response.ok) {
+        return;
+      }
+      const marker = payload as AudioSampleResponse;
+      this.levelMarkerRmsDbfs.set(marker.rms_dbfs);
+      this.levelMarkerPeakDbfs.set(marker.peak_dbfs);
+      this.levelMarkerCapturedAt.set(marker.created_at);
+    } catch {
+      // marker display is optional; keep current UI state
     }
   }
 
@@ -788,6 +868,13 @@ export class App implements OnInit, OnDestroy {
 
   formatMs(value: number): string {
     return `${Math.max(0, Math.round(value))} ms`;
+  }
+
+  formatDb(value: number | null): string {
+    if (value === null || !Number.isFinite(value)) {
+      return 'n/a';
+    }
+    return `${value.toFixed(2)} dBFS`;
   }
 
   slotSyncStatusLabel(slot: SlotCard): string {

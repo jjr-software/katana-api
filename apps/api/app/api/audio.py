@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.audio_capture import capture_audio_metrics
@@ -30,6 +30,7 @@ class AudioSampleResponse(BaseModel):
     rms_dbfs: float
     peak_dbfs: float
     sample_count: int
+    is_level_marker: bool = False
     created_at: str
 
 
@@ -64,6 +65,7 @@ async def create_audio_sample(
         rms_dbfs=sample.rms_dbfs,
         peak_dbfs=sample.peak_dbfs,
         sample_count=sample.sample_count,
+        is_level_marker=False,
     )
     db.add(row)
     db.commit()
@@ -79,6 +81,7 @@ async def create_audio_sample(
         rms_dbfs=row.rms_dbfs,
         peak_dbfs=row.peak_dbfs,
         sample_count=row.sample_count,
+        is_level_marker=row.is_level_marker,
         created_at=row.created_at.isoformat(timespec="seconds"),
     )
 
@@ -104,7 +107,87 @@ def list_audio_samples(
                 rms_dbfs=row.rms_dbfs,
                 peak_dbfs=row.peak_dbfs,
                 sample_count=row.sample_count,
+                is_level_marker=row.is_level_marker,
                 created_at=row.created_at.isoformat(timespec="seconds"),
             )
         )
     return out
+
+
+class AudioLevelMarkerCaptureRequest(BaseModel):
+    source: str = Field(default="alsa_input.usb-Roland_KATANA3-01.analog-surround-40", min_length=1, max_length=255)
+    duration_sec: float = Field(default=2.0, gt=0.2, le=30.0)
+    rate: int = Field(default=48_000, ge=8_000, le=192_000)
+    channels: int = Field(default=2, ge=1, le=8)
+
+
+@router.post("/marker/capture", response_model=AudioSampleResponse)
+async def capture_audio_level_marker(
+    payload: AudioLevelMarkerCaptureRequest,
+    db: Session = Depends(get_db),
+) -> AudioSampleResponse:
+    sample = await capture_audio_metrics(
+        source=payload.source,
+        duration_sec=payload.duration_sec,
+        rate=payload.rate,
+        channels=payload.channels,
+    )
+    db.execute(update(AudioSample).where(AudioSample.is_level_marker.is_(True)).values(is_level_marker=False))
+    row = AudioSample(
+        patch_hash=None,
+        slot=None,
+        source=sample.source,
+        duration_sec=int(round(sample.duration_sec)),
+        rate=sample.rate,
+        channels=sample.channels,
+        rms_dbfs=sample.rms_dbfs,
+        peak_dbfs=sample.peak_dbfs,
+        sample_count=sample.sample_count,
+        is_level_marker=True,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return AudioSampleResponse(
+        id=row.id,
+        patch_hash=row.patch_hash,
+        slot=row.slot,
+        source=row.source,
+        duration_sec=row.duration_sec,
+        rate=row.rate,
+        channels=row.channels,
+        rms_dbfs=row.rms_dbfs,
+        peak_dbfs=row.peak_dbfs,
+        sample_count=row.sample_count,
+        is_level_marker=row.is_level_marker,
+        created_at=row.created_at.isoformat(timespec="seconds"),
+    )
+
+
+@router.get("/marker", response_model=AudioSampleResponse)
+def get_audio_level_marker(db: Session = Depends(get_db)) -> AudioSampleResponse:
+    row = db.scalar(
+        select(AudioSample)
+        .where(AudioSample.is_level_marker.is_(True))
+        .order_by(AudioSample.id.desc())
+        .limit(1)
+    )
+    if row is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"message": "Audio level marker not set"},
+        )
+    return AudioSampleResponse(
+        id=row.id,
+        patch_hash=row.patch_hash,
+        slot=row.slot,
+        source=row.source,
+        duration_sec=row.duration_sec,
+        rate=row.rate,
+        channels=row.channels,
+        rms_dbfs=row.rms_dbfs,
+        peak_dbfs=row.peak_dbfs,
+        sample_count=row.sample_count,
+        is_level_marker=row.is_level_marker,
+        created_at=row.created_at.isoformat(timespec="seconds"),
+    )

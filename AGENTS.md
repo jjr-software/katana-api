@@ -611,6 +611,32 @@
 - Follow-up clarification added:
   - explicitly states `patch_set_slot_assignments` is a junction table between `patch_sets` and `patch_configs` with `slot` and unique `(patch_set_id, slot)`.
 
+## Session Update - 2026-03-26 (Audio Level Marker Feature)
+- Added first-class audio level marker support.
+- Backend:
+  - `audio_samples` now includes `is_level_marker` flag.
+  - New Alembic migration:
+    - `apps/api/alembic/versions/20260326_0003_audio_level_marker.py`
+  - New API endpoints:
+    - `POST /api/v1/audio/marker/capture` (captures audio sample and marks it as the active level marker)
+    - `GET /api/v1/audio/marker` (returns latest active marker)
+  - Marker capture clears previous marker flags before setting the new one.
+- Frontend:
+  - Added `Set Level Marker` action button in header.
+  - Added marker display in sync metadata area:
+    - RMS/Peak marker values
+    - marker capture timestamp
+  - On app init, UI loads existing marker if present.
+- Files changed:
+  - `apps/api/app/models.py`
+  - `apps/api/app/api/audio.py`
+  - `apps/api/alembic/versions/20260326_0003_audio_level_marker.py`
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Runtime updates:
+  - `docker compose up -d --build`
+  - `docker compose exec -T api alembic upgrade head`
+
 ## Session Update - 2026-03-26 (Queued Backup Feature + Nested Repo Flatten)
 - Added queued amp backup API endpoints:
   - `POST /api/v1/amp/backup` (enqueue full amp-state dump)
