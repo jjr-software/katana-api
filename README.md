@@ -11,6 +11,7 @@ The `tauri/` folder is retained as a reverse-engineering source/reference for ex
 
 Primary planning doc:
 - `docs/webapp-implementation-plan.md`
+- `docs/hash-first-patch-platform-design.md`
 
 Phase 1 scaffold paths:
 - `apps/api`
