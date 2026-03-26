@@ -531,6 +531,19 @@
     - `status=succeeded`
     - `synced_at`, `created_at`, `amp_state_hash_sha256`, `slot_count=8`
 
+## Session Update - 2026-03-26 (Alembic Squash + DB Reset)
+- Collapsed Alembic history into a single base revision:
+  - removed prior chain: `20260325_0001`, `20260326_0002`, `20260326_0003`
+  - added new base: `20260326_0001_base_schema.py`
+- Base migration now creates full current schema in one pass:
+  - `patches`, `patch_configs`, `patch_sets`, `patch_set_members`, `amp_sync_history`
+- Reset runtime DB to apply only new base migration:
+  - ran `docker compose down -v`
+  - ran `docker compose up -d --build`
+- Verified migration state:
+  - `alembic current` => `20260326_0001 (head)`
+  - `alembic history` => `<base> -> 20260326_0001 (head)`
+
 ## Session Update - 2026-03-26 (Queue-Only Amp I/O + No Global UI Lock)
 - Enforced queue-backed amp communication across API amp-read/sync routes:
   - `GET /api/v1/amp/test-connection` now executes via queue job.
