@@ -1200,3 +1200,11 @@
   - `apps/web/src/app/app.css`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-26 (Load Button Always Enabled)
+- Updated card action gating so `Load` is always available.
+- `Load` no longer depends on an existing card patch payload.
+- File changed:
+  - `apps/web/src/app/app.ts`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

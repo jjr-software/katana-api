@@ -992,8 +992,8 @@ export class App implements OnInit, OnDestroy {
     return true;
   }
 
-  canLoadSlot(slot: SlotCard): boolean {
-    return this.hasFullPatch(slot);
+  canLoadSlot(_slot: SlotCard): boolean {
+    return true;
   }
 
   canWriteSlot(slot: SlotCard): boolean {
