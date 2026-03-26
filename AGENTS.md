@@ -627,6 +627,14 @@
 - Rebuilt/restarted:
   - `docker compose up -d --build`
 
+## Session Update - 2026-03-26 (Expanded To Full Pedal Names)
+- Expanded stage type name tables to more descriptive full names (instead of shorthand labels):
+  - examples: `Tube Screamer`, `ProCo RAT`, `Boss Metal Zone`, `MXR Distortion+`
+  - delay/reverb labels now include full category names (for example `Digital Delay`, `Plate Reverb`)
+- Unknown values remain explicit as `Unknown (N)` when not in table.
+- Rebuilt/restarted:
+  - `docker compose up -d --build`
+
 ## Session Update - 2026-03-26 (Queue-Only Amp I/O + No Global UI Lock)
 - Enforced queue-backed amp communication across API amp-read/sync routes:
   - `GET /api/v1/amp/test-connection` now executes via queue job.

@@ -1,20 +1,76 @@
 import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 
 const BOOSTER_TYPE_NAMES = [
-  'MID BOOST', 'CLEAN BOOST', 'TREBLE BOOST', 'CRUNCH OD', 'NATURAL OD', 'WARM OD', 'FAT DS',
-  'METAL DS', 'OCT FUZZ', 'BLUES DRIVE', 'OVERDRIVE', 'T-SCREAM', 'TURBO OD', 'DISTORTION',
-  'RAT', 'GUV DS', 'DST+', 'METAL ZONE', "'60S FUZZ", 'MUFF FUZZ', 'HM-2', 'METAL CORE', 'CENTA OD',
+  'Mid Boost',
+  'Clean Boost',
+  'Treble Boost',
+  'Crunch Overdrive',
+  'Natural Overdrive',
+  'Warm Overdrive',
+  'Fat Distortion',
+  'Metal Distortion',
+  'Octave Fuzz',
+  'Blues Drive',
+  'Overdrive',
+  'Tube Screamer',
+  'Turbo Overdrive',
+  'Distortion',
+  'ProCo RAT',
+  "Marshall Guv'nor Distortion",
+  'MXR Distortion+',
+  'Boss Metal Zone',
+  "1960s Fuzz",
+  'Electro-Harmonix Big Muff Fuzz',
+  'Boss HM-2 Heavy Metal',
+  'Boss Metal Core',
+  'Centaur Overdrive',
 ];
 
 const FX_TYPE_NAMES = [
-  'T.WAH', 'AUTO WAH', 'PEDAL WAH', 'COMP', 'LIMITER', 'GEQ', 'PEQ', 'GUITAR SIM', 'SLOW GEAR',
-  'WAVE SYNTH', 'OCTAVE', 'PITCH SHIFT', 'HARMONIST', 'AC.PROCESS', 'PHASER', 'FLANGER', 'TREMOLO',
-  'ROTARY', 'UNI-V', 'SLICER', 'VIBRATO', 'RING MOD', 'HUMANIZER', 'CHORUS', 'AC.GTR SIM',
-  'PHASER 90E', 'FLNGR 117E', 'WAH 95E', 'DC-30', 'HEAVY OCT', 'PEDAL BEND',
+  'Touch Wah',
+  'Auto Wah',
+  'Pedal Wah',
+  'Compressor',
+  'Limiter',
+  'Graphic EQ',
+  'Parametric EQ',
+  'Guitar Simulator',
+  'Slow Gear',
+  'Wave Synth',
+  'Octave',
+  'Pitch Shifter',
+  'Harmonist',
+  'Acoustic Processor',
+  'Phaser',
+  'Flanger',
+  'Tremolo',
+  'Rotary Speaker',
+  'Uni-Vibe',
+  'Slicer',
+  'Vibrato',
+  'Ring Modulator',
+  'Humanizer',
+  'Chorus',
+  'Acoustic Guitar Simulator',
+  'MXR Phase 90',
+  'MXR Flanger 117',
+  'Cry Baby Wah 95',
+  'Boss DC-30',
+  'Heavy Octave',
+  'Pedal Bend',
 ];
 
-const DELAY_TYPE_NAMES = ['DIGITAL', 'PAN', 'STEREO', 'ANALOG', 'TAPE ECHO', 'REVERSE', 'MODULATE', 'SDE-3000'];
-const REVERB_TYPE_NAMES = ['PLATE', 'ROOM', 'HALL', 'SPRING', 'MODULATE'];
+const DELAY_TYPE_NAMES = [
+  'Digital Delay',
+  'Pan Delay',
+  'Stereo Delay',
+  'Analog Delay',
+  'Tape Echo',
+  'Reverse Delay',
+  'Modulate Delay',
+  'Roland SDE-3000 Delay',
+];
+const REVERB_TYPE_NAMES = ['Plate Reverb', 'Room Reverb', 'Hall Reverb', 'Spring Reverb', 'Modulate Reverb'];
 
 interface AmpConnectionTestResponse {
   ok: boolean;
