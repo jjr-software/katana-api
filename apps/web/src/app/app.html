@@ -43,6 +43,7 @@
             <button type="button" class="btn btn-primary btn-sm" (click)="testAmpConnection()">Test Amp Connection</button>
             <button type="button" class="btn btn-outline-primary btn-sm" (click)="quickSyncAmpSlots()">Quick Sync Names</button>
             <button type="button" class="btn btn-success btn-sm" (click)="loadAmpState()">Load Amp State</button>
+            <button type="button" class="btn btn-outline-success btn-sm" (click)="openPatchSetLoader()">Load Patch Set</button>
             <button type="button" class="btn btn-outline-success btn-sm" (click)="captureAudioLevelMarker()">Set Level Marker</button>
             <button type="button" class="btn btn-outline-primary btn-sm" (click)="measureActivePatch()" [disabled]="isMeasuringActivePatch()">
               {{ measureActiveButtonLabel() }}
@@ -184,6 +185,33 @@
           <button type="button" class="btn btn-sm btn-light" (click)="closeRawModal()">Close</button>
         </header>
         <pre class="raw-modal-json">{{ rawModalJson() }}</pre>
+      </section>
+    </div>
+  }
+
+  @if (patchSetModalOpen()) {
+    <div class="raw-modal-backdrop" (click)="closePatchSetModal()">
+      <section class="raw-modal" role="dialog" aria-modal="true" aria-label="Load Patch Set Snapshot" (click)="$event.stopPropagation()">
+        <header class="raw-modal-head">
+          <h3>Load Patch Set Snapshot</h3>
+          <button type="button" class="btn btn-sm btn-light" (click)="closePatchSetModal()">Close</button>
+        </header>
+        <div class="p-3 d-grid gap-2">
+          @for (snapshot of patchSetSnapshots(); track snapshot.id) {
+            <article class="border rounded p-2 small bg-body-tertiary">
+              <p class="mb-1"><strong>{{ snapshot.label }}</strong></p>
+              <p class="mb-2 text-secondary">
+                synced: <code>{{ snapshot.synced_at }}</code> |
+                slots: <code>{{ snapshot.slot_count }}</code> |
+                time: <code>{{ formatMs(snapshot.total_sync_ms) }}</code>
+              </p>
+              <button type="button" class="btn btn-sm btn-primary" (click)="loadPatchSetSnapshot(snapshot)">Load</button>
+            </article>
+          }
+          @if (patchSetSnapshots().length === 0) {
+            <p class="small text-secondary mb-0">No recent full-sync snapshots found.</p>
+          }
+        </div>
       </section>
     </div>
   }

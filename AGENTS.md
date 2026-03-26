@@ -990,3 +990,20 @@
   - `docker compose up -d --build`
 - Playwright re-check:
   - `Quick Sync Names` now succeeds and updates slot names.
+
+## Session Update - 2026-03-26 (Patch-Set Load From Recent Full Sync Data)
+- Added API endpoints to list and load recent successful full-dump snapshots from sync history data:
+  - `GET /api/v1/amp/backup/snapshots?limit=20`
+  - `POST /api/v1/amp/backup/snapshots/{snapshot_id}/load`
+- Source of truth is `amp_sync_history` rows (`operation=full_dump`, `status=succeeded`, with `result_json.slots[].payload`).
+- Load behavior intentionally marks all returned slots as:
+  - `is_saved = true`
+  - `in_sync = false`
+  - so UI reads `Saved` + `Not Synced` after loading data-only snapshots.
+- Added web UI action:
+  - header button `Load Patch Set`
+  - modal listing recent full-sync snapshots (label/synced-at/slot-count/sync-ms) with per-item `Load`.
+- Files changed:
+  - `apps/api/app/api/amp.py`
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`

@@ -154,6 +154,20 @@ class BackupJobResponse(BaseModel):
     result: FullAmpDumpResponse | None = None
 
 
+class BackupSnapshotSummaryResponse(BaseModel):
+    id: int
+    label: str
+    synced_at: str
+    amp_state_hash_sha256: str
+    total_sync_ms: int
+    slot_count: int
+    created_at: str
+
+
+class BackupSnapshotListResponse(BaseModel):
+    snapshots: list[BackupSnapshotSummaryResponse]
+
+
 class QueueJobSummaryResponse(BaseModel):
     job_id: str
     operation: str
@@ -518,6 +532,91 @@ async def get_backup_job(job_id: str, db: Session = Depends(get_db)) -> BackupJo
     )
 
 
+@router.get("/backup/snapshots", response_model=BackupSnapshotListResponse)
+def list_backup_snapshots(
+    limit: int = 20,
+    db: Session = Depends(get_db),
+) -> BackupSnapshotListResponse:
+    bounded = max(1, min(limit, 100))
+    rows = list(
+        db.scalars(
+            select(AmpSyncHistory)
+            .where(
+                AmpSyncHistory.operation == "full_dump",
+                AmpSyncHistory.status == "succeeded",
+                AmpSyncHistory.result_json.is_not(None),
+            )
+            .order_by(AmpSyncHistory.id.desc())
+            .limit(bounded)
+        )
+    )
+    snapshots = [BackupSnapshotSummaryResponse(**_backup_snapshot_summary(item)) for item in rows]
+    return BackupSnapshotListResponse(snapshots=snapshots)
+
+
+@router.post("/backup/snapshots/{snapshot_id:int}/load", response_model=FullAmpDumpResponse)
+def load_backup_snapshot(
+    snapshot_id: int,
+    db: Session = Depends(get_db),
+) -> FullAmpDumpResponse:
+    row = db.get(AmpSyncHistory, snapshot_id)
+    if row is None or row.operation != "full_dump":
+        raise HTTPException(
+            status_code=404,
+            detail={"message": "Backup snapshot not found", "snapshot_id": snapshot_id},
+        )
+    if row.status != "succeeded":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Backup snapshot is not in succeeded state",
+                "snapshot_id": snapshot_id,
+                "status": row.status,
+            },
+        )
+    if not isinstance(row.result_json, dict):
+        raise HTTPException(
+            status_code=500,
+            detail={"message": "Backup snapshot payload is missing", "snapshot_id": snapshot_id},
+        )
+    raw_slots = row.result_json.get("slots")
+    if not isinstance(raw_slots, list):
+        raise HTTPException(
+            status_code=500,
+            detail={"message": "Backup snapshot payload slots are missing", "snapshot_id": snapshot_id},
+        )
+    slot_rows = _parse_backup_snapshot_slots(snapshot_id=snapshot_id, raw_slots=raw_slots)
+    hash_ids = [str(item["payload"].get("config_hash_sha256", "")) for item in slot_rows]
+    curated_by_hash = _load_curation_by_hash(db, hash_ids)
+    slots = [FullDumpSlotResponse(**_slot_dump_snapshot_to_dict(item, curated_by_hash)) for item in slot_rows]
+    if len(slots) != 8:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "Backup snapshot does not contain all 8 slots",
+                "snapshot_id": snapshot_id,
+                "slot_count": len(slots),
+            },
+        )
+    synced_at = row.synced_at or ""
+    amp_state_hash = row.amp_state_hash_sha256 or ""
+    if not synced_at or not amp_state_hash:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "Backup snapshot metadata is incomplete",
+                "snapshot_id": snapshot_id,
+            },
+        )
+    total_sync_ms = int(row.total_sync_ms or sum(int(item["slot_sync_ms"]) for item in slot_rows))
+    return FullAmpDumpResponse(
+        synced_at=synced_at,
+        amp_state_hash_sha256=amp_state_hash,
+        total_sync_ms=total_sync_ms,
+        slots=slots,
+    )
+
+
 def _quick_slot_to_dict(slot: QuickSlotName, candidates_by_name: dict[str, list[str]]) -> dict:
     normalized = _normalize_patch_name(slot.patch_name)
     candidates = candidates_by_name.get(normalized, [])
@@ -638,6 +737,99 @@ def _slot_dump_to_dict(slot: SlotDump, curated_by_hash: dict[str, list[dict]], s
         "synced_at": slot.synced_at,
         "slot_sync_ms": slot.slot_sync_ms,
         "patch": slot.payload,
+        "curated": curated_by_hash.get(hash_id, []),
+    }
+
+
+def _backup_snapshot_summary(item: AmpSyncHistory) -> dict:
+    if item.synced_at is None or item.amp_state_hash_sha256 is None:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "Backup snapshot metadata is incomplete",
+                "snapshot_id": item.id,
+            },
+        )
+    slot_count = int(item.slot_count or 0)
+    if slot_count <= 0:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "Backup snapshot slot count is invalid",
+                "snapshot_id": item.id,
+            },
+        )
+    created_at = item.created_at.isoformat(timespec="seconds")
+    return {
+        "id": item.id,
+        "label": f"{item.synced_at} · {item.amp_state_hash_sha256[:12]}",
+        "synced_at": item.synced_at,
+        "amp_state_hash_sha256": item.amp_state_hash_sha256,
+        "total_sync_ms": int(item.total_sync_ms or 0),
+        "slot_count": slot_count,
+        "created_at": created_at,
+    }
+
+
+def _parse_backup_snapshot_slots(snapshot_id: int, raw_slots: list[object]) -> list[dict]:
+    parsed: list[dict] = []
+    for index, raw in enumerate(raw_slots):
+        if not isinstance(raw, dict):
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "message": "Backup snapshot slot payload is malformed",
+                    "snapshot_id": snapshot_id,
+                    "index": index,
+                },
+            )
+        payload = raw.get("payload")
+        if not isinstance(payload, dict):
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "message": "Backup snapshot slot patch payload is missing",
+                    "snapshot_id": snapshot_id,
+                    "index": index,
+                },
+            )
+        try:
+            slot = int(raw["slot"])
+            slot_label = str(raw["slot_label"])
+            synced_at = str(raw["synced_at"])
+            slot_sync_ms = int(raw["slot_sync_ms"])
+        except (KeyError, TypeError, ValueError):
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "message": "Backup snapshot slot metadata is malformed",
+                    "snapshot_id": snapshot_id,
+                    "index": index,
+                },
+            ) from None
+        parsed.append(
+            {
+                "slot": slot,
+                "slot_label": slot_label,
+                "synced_at": synced_at,
+                "slot_sync_ms": slot_sync_ms,
+                "payload": payload,
+            }
+        )
+    parsed.sort(key=lambda item: int(item["slot"]))
+    return parsed
+
+
+def _slot_dump_snapshot_to_dict(slot_row: dict, curated_by_hash: dict[str, list[dict]]) -> dict:
+    hash_id = str(slot_row["payload"].get("config_hash_sha256", ""))
+    return {
+        "slot": int(slot_row["slot"]),
+        "slot_label": str(slot_row["slot_label"]),
+        "in_sync": False,
+        "is_saved": True,
+        "synced_at": str(slot_row["synced_at"]),
+        "slot_sync_ms": int(slot_row["slot_sync_ms"]),
+        "patch": slot_row["payload"],
         "curated": curated_by_hash.get(hash_id, []),
     }
 

@@ -172,6 +172,20 @@ interface BackupJobResponse {
   result: FullAmpDumpResponse | null;
 }
 
+interface BackupSnapshotSummary {
+  id: number;
+  label: string;
+  synced_at: string;
+  amp_state_hash_sha256: string;
+  total_sync_ms: number;
+  slot_count: number;
+  created_at: string;
+}
+
+interface BackupSnapshotListResponse {
+  snapshots: BackupSnapshotSummary[];
+}
+
 interface CurrentPatchResponse {
   created_at: string;
   patch: Record<string, unknown>;
@@ -283,6 +297,8 @@ export class App implements OnInit, OnDestroy {
   rawModalOpen = signal(false);
   rawModalTitle = signal('');
   rawModalJson = signal('');
+  patchSetModalOpen = signal(false);
+  patchSetSnapshots = signal<BackupSnapshotSummary[]>([]);
 
   ngOnInit(): void {
     void this.refreshQueueState();
@@ -960,6 +976,95 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  async openPatchSetLoader(): Promise<void> {
+    this.status.set('Loading recent full-sync data...');
+    this.responseJson.set('');
+    try {
+      const response = await fetch('/api/v1/amp/backup/snapshots?limit=20', {
+        method: 'GET',
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as BackupSnapshotListResponse | { detail?: unknown };
+      if (!response.ok) {
+        this.status.set('Failed loading recent full-sync data');
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      const result = payload as BackupSnapshotListResponse;
+      this.patchSetSnapshots.set(result.snapshots);
+      this.patchSetModalOpen.set(true);
+      if (result.snapshots.length === 0) {
+        this.status.set('No recent full-sync data found');
+      } else {
+        this.status.set('Select a full-sync snapshot to load into cards');
+      }
+    } catch (error: unknown) {
+      this.status.set('Failed loading recent full-sync data');
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Browser request failed',
+            error: String(error),
+          },
+          null,
+          2,
+        ),
+      );
+    }
+  }
+
+  closePatchSetModal(): void {
+    this.patchSetModalOpen.set(false);
+  }
+
+  async loadPatchSetSnapshot(snapshot: BackupSnapshotSummary): Promise<void> {
+    this.status.set(`Loading snapshot ${snapshot.label}...`);
+    this.responseJson.set('');
+    try {
+      const response = await fetch(`/api/v1/amp/backup/snapshots/${snapshot.id}/load`, {
+        method: 'POST',
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as FullAmpDumpResponse | { detail?: unknown };
+      if (!response.ok) {
+        this.status.set('Failed loading snapshot');
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      const loaded = payload as FullAmpDumpResponse;
+      this.slots.set(this.mergeSnapshotState(loaded));
+      this.ampStateHash.set(loaded.amp_state_hash_sha256);
+      this.lastSyncedAt.set(loaded.synced_at);
+      this.totalSyncMs.set(loaded.total_sync_ms);
+      this.patchSetModalOpen.set(false);
+      this.status.set(`Loaded snapshot ${snapshot.label}`);
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Loaded full-sync data into cards (Saved + Not Synced)',
+            snapshot_id: snapshot.id,
+            synced_at: loaded.synced_at,
+            amp_state_hash_sha256: loaded.amp_state_hash_sha256,
+          },
+          null,
+          2,
+        ),
+      );
+    } catch (error: unknown) {
+      this.status.set('Failed loading snapshot');
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Browser request failed',
+            error: String(error),
+          },
+          null,
+          2,
+        ),
+      );
+    }
+  }
+
   private async waitForQuickSyncJob(jobId: string): Promise<QuickSyncJobResponse> {
     const maxPolls = 75;
     for (let i = 0; i < maxPolls; i += 1) {
@@ -1062,6 +1167,36 @@ export class App implements OnInit, OnDestroy {
         patch: full.patch,
         in_sync: full.in_sync,
         is_saved: full.is_saved,
+        synced_at: full.synced_at,
+        slot_sync_ms: full.slot_sync_ms,
+        inferred: false,
+        match_count: 1,
+        measured_rms_dbfs: current?.measured_rms_dbfs ?? null,
+        measured_peak_dbfs: current?.measured_peak_dbfs ?? null,
+        measured_at: current?.measured_at ?? '',
+      };
+    });
+  }
+
+  private mergeSnapshotState(state: FullAmpDumpResponse): SlotCard[] {
+    const currentBySlot = new Map<number, SlotCard>(this.slots().map((slot) => [slot.slot, slot]));
+    const bySlot = new Map<number, FullDumpSlotResponse>(state.slots.map((slot) => [slot.slot, slot]));
+    return defaultSlotCards().map((base) => {
+      const full = bySlot.get(base.slot);
+      if (!full) {
+        return base;
+      }
+      const current = currentBySlot.get(base.slot);
+      const patchName = this.readString(full.patch, 'patch_name');
+      const hash = this.readString(full.patch, 'config_hash_sha256');
+      return {
+        slot: full.slot,
+        slot_label: full.slot_label,
+        patch_name: patchName ?? '',
+        config_hash_sha256: hash ?? '',
+        patch: full.patch,
+        in_sync: false,
+        is_saved: true,
         synced_at: full.synced_at,
         slot_sync_ms: full.slot_sync_ms,
         inferred: false,
