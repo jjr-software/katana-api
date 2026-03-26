@@ -103,6 +103,7 @@ class AmpJobQueue:
         client = AmpClient(
             midi_port=settings.katana_midi_port,
             timeout_seconds=settings.amidi_timeout_seconds,
+            rq1_timeout_seconds=settings.amidi_rq1_timeout_seconds,
         )
         synced_at = datetime.now().isoformat(timespec="seconds")
         try:

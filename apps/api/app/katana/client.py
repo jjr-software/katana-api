@@ -116,9 +116,10 @@ _PORT_LOCKS: dict[str, asyncio.Lock] = {}
 
 
 class AmpClient:
-    def __init__(self, midi_port: str, timeout_seconds: float) -> None:
+    def __init__(self, midi_port: str, timeout_seconds: float, rq1_timeout_seconds: float) -> None:
         self._midi_port = midi_port
         self._timeout_seconds = timeout_seconds
+        self._rq1_timeout_seconds = rq1_timeout_seconds
 
     @property
     def midi_port(self) -> str:
@@ -469,7 +470,7 @@ class AmpClient:
     async def _read_rq1(self, addr: tuple[int, int, int, int], size: int) -> list[int]:
         output = await self._send_and_read(
             build_rq1(addr, size),
-            timeout_seconds=self._timeout_seconds,
+            timeout_seconds=self._rq1_timeout_seconds,
         )
         frames = extract_sysex_frames(output)
         for frame in frames:

@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     midi_device_dir: str = "/dev/snd"
     katana_midi_port: str = "hw:1,0,0"
     amidi_timeout_seconds: float = 2.0
+    amidi_rq1_timeout_seconds: float = 0.12
     full_sync_timeout_seconds: float = 120.0
     quick_sync_timeout_seconds: float = 45.0
 
