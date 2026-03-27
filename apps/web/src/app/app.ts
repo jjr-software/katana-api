@@ -1364,9 +1364,9 @@ export class App implements OnInit, OnDestroy {
 
   measureActiveButtonLabel(): string {
     if (this.isMeasuringActivePatch()) {
-      return `Measure Active (${this.measureCountdownSec()}s)`;
+      return `Measure (${this.measureCountdownSec()}s)`;
     }
-    return 'Measure Active Patch';
+    return 'Measure';
   }
 
   async quickSyncAmpSlots(): Promise<void> {
