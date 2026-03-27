@@ -7,6 +7,7 @@ from app.hashing import snapshot_hash
 from app.models import Patch, PatchConfig, PatchSet, PatchSetMember
 from app.schemas import (
     PatchConfigRead,
+    PatchConfigMeasurementUpdate,
     PatchConfigUpsert,
     PatchCreate,
     PatchRead,
@@ -44,7 +45,14 @@ def create_patch(payload: PatchCreate, db: Session = Depends(get_db)) -> Patch:
 @router.post("/configs", response_model=PatchConfigRead)
 def upsert_patch_config(payload: PatchConfigUpsert, db: Session = Depends(get_db)) -> PatchConfig:
     hash_id = _snapshot_hash(payload.snapshot)
-    config = _upsert_patch_config(db, hash_id, payload.snapshot)
+    config = _upsert_patch_config(
+        db,
+        hash_id,
+        payload.snapshot,
+        measured_rms_dbfs=payload.measured_rms_dbfs,
+        measured_peak_dbfs=payload.measured_peak_dbfs,
+        measured_at=payload.measured_at,
+    )
     db.commit()
     db.refresh(config)
     return config
@@ -60,6 +68,23 @@ def get_patch_config(hash_id: str, db: Session = Depends(get_db)) -> PatchConfig
     config = db.get(PatchConfig, hash_id)
     if config is None:
         raise HTTPException(status_code=404, detail={"message": "Patch config not found", "hash_id": hash_id})
+    return config
+
+
+@router.patch("/configs/{hash_id}/measurements", response_model=PatchConfigRead)
+def update_patch_config_measurements(
+    hash_id: str,
+    payload: PatchConfigMeasurementUpdate,
+    db: Session = Depends(get_db),
+) -> PatchConfig:
+    config = db.get(PatchConfig, hash_id)
+    if config is None:
+        raise HTTPException(status_code=404, detail={"message": "Patch config not found", "hash_id": hash_id})
+    config.measured_rms_dbfs = payload.measured_rms_dbfs
+    config.measured_peak_dbfs = payload.measured_peak_dbfs
+    config.measured_at = payload.measured_at
+    db.commit()
+    db.refresh(config)
     return config
 
 
@@ -127,12 +152,25 @@ def upsert_patch_set_member(
     return row
 
 
-def _upsert_patch_config(db: Session, hash_id: str, snapshot: dict) -> PatchConfig:
+def _upsert_patch_config(
+    db: Session,
+    hash_id: str,
+    snapshot: dict,
+    *,
+    measured_rms_dbfs: float | None = None,
+    measured_peak_dbfs: float | None = None,
+    measured_at=None,
+) -> PatchConfig:
     config = db.get(PatchConfig, hash_id)
-    if config is not None:
-        return config
-    config = PatchConfig(hash_id=hash_id, snapshot=snapshot)
-    db.add(config)
+    if config is None:
+        config = PatchConfig(hash_id=hash_id, snapshot=snapshot)
+        db.add(config)
+    if measured_rms_dbfs is not None:
+        config.measured_rms_dbfs = measured_rms_dbfs
+    if measured_peak_dbfs is not None:
+        config.measured_peak_dbfs = measured_peak_dbfs
+    if measured_at is not None:
+        config.measured_at = measured_at
     return config
 
 

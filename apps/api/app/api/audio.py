@@ -76,6 +76,20 @@ async def create_audio_measurement(
     db.add(row)
     db.commit()
     db.refresh(row)
+    if payload.patch_hash:
+        config = db.get(PatchConfig, payload.patch_hash)
+        if config is None:
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "message": "Patch config disappeared before measurement metadata update",
+                    "patch_hash": payload.patch_hash,
+                },
+            )
+        config.measured_rms_dbfs = row.rms_dbfs
+        config.measured_peak_dbfs = row.peak_dbfs
+        config.measured_at = row.created_at
+        db.commit()
     return AudioSampleResponse(
         id=row.id,
         patch_hash=row.patch_hash,

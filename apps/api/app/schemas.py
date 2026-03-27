@@ -24,11 +24,23 @@ class PatchRead(BaseModel):
 
 class PatchConfigUpsert(BaseModel):
     snapshot: dict
+    measured_rms_dbfs: float | None = None
+    measured_peak_dbfs: float | None = None
+    measured_at: datetime | None = None
+
+
+class PatchConfigMeasurementUpdate(BaseModel):
+    measured_rms_dbfs: float
+    measured_peak_dbfs: float
+    measured_at: datetime | None = None
 
 
 class PatchConfigRead(BaseModel):
     hash_id: str
     snapshot: dict
+    measured_rms_dbfs: float | None = None
+    measured_peak_dbfs: float | None = None
+    measured_at: datetime | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

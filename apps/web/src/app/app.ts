@@ -99,6 +99,9 @@ interface SlotPatchSummary {
   patch: Record<string, unknown> | null;
   in_sync: boolean;
   is_saved: boolean;
+  measured_rms_dbfs: number | null;
+  measured_peak_dbfs: number | null;
+  measured_at: string | null;
   synced_at: string;
   slot_sync_ms: number;
 }
@@ -112,6 +115,9 @@ interface QuickSlotSummary {
   match_count: number;
   in_sync: boolean;
   is_saved: boolean;
+  measured_rms_dbfs: number | null;
+  measured_peak_dbfs: number | null;
+  measured_at: string | null;
   synced_at: string;
   slot_sync_ms: number;
 }
@@ -163,6 +169,9 @@ interface FullDumpSlotResponse {
   slot_label: string;
   in_sync: boolean;
   is_saved: boolean;
+  measured_rms_dbfs: number | null;
+  measured_peak_dbfs: number | null;
+  measured_at: string | null;
   synced_at: string;
   slot_sync_ms: number;
   patch: Record<string, unknown>;
@@ -230,6 +239,9 @@ interface ApplyCurrentPatchResponse {
 interface PatchConfigResponse {
   hash_id: string;
   snapshot: Record<string, unknown>;
+  measured_rms_dbfs: number | null;
+  measured_peak_dbfs: number | null;
+  measured_at: string | null;
   created_at: string;
 }
 
@@ -364,6 +376,7 @@ export class App implements OnInit, OnDestroy {
   isMeasuringActivePatch = signal(false);
   measureCountdownSec = signal(0);
   queuePollHandle: ReturnType<typeof setInterval> | null = null;
+  activeSlotPollHandle: ReturnType<typeof setInterval> | null = null;
   liveMeterSource: EventSource | null = null;
   rawModalOpen = signal(false);
   rawModalTitle = signal('');
@@ -393,6 +406,7 @@ export class App implements OnInit, OnDestroy {
   patchConfigTargetSlot = signal<number | null>(null);
   patchConfigTargetLabel = signal('');
   patchConfigRows = signal<PatchConfigResponse[]>([]);
+  private activeSlotPollInFlight = false;
 
   ngOnInit(): void {
     void this.refreshQueueState();
@@ -401,12 +415,19 @@ export class App implements OnInit, OnDestroy {
     this.queuePollHandle = setInterval(() => {
       void this.refreshQueueState();
     }, 1000);
+    this.activeSlotPollHandle = setInterval(() => {
+      void this.refreshActiveSlot();
+    }, 1500);
   }
 
   ngOnDestroy(): void {
     if (this.queuePollHandle !== null) {
       clearInterval(this.queuePollHandle);
       this.queuePollHandle = null;
+    }
+    if (this.activeSlotPollHandle !== null) {
+      clearInterval(this.activeSlotPollHandle);
+      this.activeSlotPollHandle = null;
     }
     this.stopLiveMeter();
     if (this.editorLiveApplyHandle !== null) {
@@ -726,32 +747,16 @@ export class App implements OnInit, OnDestroy {
     this.status.set(`Saving ${slot.slot_label} to patch DB...`);
     this.responseJson.set('');
     try {
-      const existingHash = slot.config_hash_sha256;
-      if (existingHash) {
-        const lookupResponse = await fetch(`/api/v1/patches/configs/${existingHash}`, {
-          method: 'GET',
-          cache: 'no-store',
-        });
-        if (lookupResponse.ok) {
-          this.slots.update((rows) =>
-            rows.map((card) => (card.slot === slot.slot ? { ...card, is_saved: true } : card)),
-          );
-          this.status.set(`${slot.slot_label} already in patch DB`);
-          return;
-        }
-        if (lookupResponse.status !== 404) {
-          const payload = (await lookupResponse.json()) as { detail?: unknown };
-          this.status.set(`Failed checking patch DB for ${slot.slot_label}`);
-          this.responseJson.set(JSON.stringify(payload, null, 2));
-          return;
-        }
-      }
-
       const saveResponse = await fetch('/api/v1/patches/configs', {
         method: 'POST',
         cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ snapshot: slot.patch }),
+        body: JSON.stringify({
+          snapshot: slot.patch,
+          measured_rms_dbfs: slot.measured_rms_dbfs,
+          measured_peak_dbfs: slot.measured_peak_dbfs,
+          measured_at: slot.measured_at || null,
+        }),
       });
       const savePayload = (await saveResponse.json()) as PatchConfigResponse | { detail?: unknown };
       if (!saveResponse.ok || !('hash_id' in savePayload)) {
@@ -767,6 +772,9 @@ export class App implements OnInit, OnDestroy {
                 ...card,
                 config_hash_sha256: saved.hash_id,
                 is_saved: true,
+                measured_rms_dbfs: saved.measured_rms_dbfs,
+                measured_peak_dbfs: saved.measured_peak_dbfs,
+                measured_at: saved.measured_at || '',
               }
             : card,
         ),
@@ -856,6 +864,9 @@ export class App implements OnInit, OnDestroy {
           patch: snapshot,
           config_hash_sha256: config.hash_id,
           is_saved: true,
+          measured_rms_dbfs: config.measured_rms_dbfs,
+          measured_peak_dbfs: config.measured_peak_dbfs,
+          measured_at: config.measured_at || '',
         };
       }),
     );
@@ -934,6 +945,9 @@ export class App implements OnInit, OnDestroy {
       const matchedSlot = this.slots().find((item) => item.config_hash_sha256 === activeHash);
       if (matchedSlot) {
         this.setSlotMeasuredRms(matchedSlot.slot, maxRms, maxPeak, measuredAt);
+      }
+      if (matchedSlot?.is_saved) {
+        await this.persistPatchMeasurement(activeHash, maxRms, maxPeak, measuredAt);
       }
       this.status.set(`Max-level measurement complete for active patch (${activeName})`);
       this.responseJson.set(
@@ -1937,9 +1951,9 @@ export class App implements OnInit, OnDestroy {
         inferred: false,
         match_count: 1,
         out_synced: true,
-        measured_rms_dbfs: current?.measured_rms_dbfs ?? null,
-        measured_peak_dbfs: current?.measured_peak_dbfs ?? null,
-        measured_at: current?.measured_at ?? '',
+        measured_rms_dbfs: full.measured_rms_dbfs ?? current?.measured_rms_dbfs ?? null,
+        measured_peak_dbfs: full.measured_peak_dbfs ?? current?.measured_peak_dbfs ?? null,
+        measured_at: full.measured_at ?? current?.measured_at ?? '',
       };
     });
   }
@@ -1969,9 +1983,9 @@ export class App implements OnInit, OnDestroy {
         inferred: false,
         match_count: 1,
         out_synced: false,
-        measured_rms_dbfs: current?.measured_rms_dbfs ?? null,
-        measured_peak_dbfs: current?.measured_peak_dbfs ?? null,
-        measured_at: current?.measured_at ?? '',
+        measured_rms_dbfs: full.measured_rms_dbfs ?? current?.measured_rms_dbfs ?? null,
+        measured_peak_dbfs: full.measured_peak_dbfs ?? current?.measured_peak_dbfs ?? null,
+        measured_at: full.measured_at ?? current?.measured_at ?? '',
       };
     });
   }
@@ -1999,9 +2013,9 @@ export class App implements OnInit, OnDestroy {
         inferred: quick.inferred_hash_sha256 !== null,
         match_count: quick.match_count,
         out_synced: current?.out_synced ?? false,
-        measured_rms_dbfs: current?.measured_rms_dbfs ?? null,
-        measured_peak_dbfs: current?.measured_peak_dbfs ?? null,
-        measured_at: current?.measured_at ?? '',
+        measured_rms_dbfs: quick.measured_rms_dbfs ?? current?.measured_rms_dbfs ?? null,
+        measured_peak_dbfs: quick.measured_peak_dbfs ?? current?.measured_peak_dbfs ?? null,
+        measured_at: quick.measured_at ?? current?.measured_at ?? '',
       };
     });
   }
@@ -2026,9 +2040,9 @@ export class App implements OnInit, OnDestroy {
           inferred: false,
           match_count: 1,
           out_synced: true,
-          measured_rms_dbfs: card.measured_rms_dbfs,
-          measured_peak_dbfs: card.measured_peak_dbfs,
-          measured_at: card.measured_at,
+          measured_rms_dbfs: slot.measured_rms_dbfs ?? card.measured_rms_dbfs,
+          measured_peak_dbfs: slot.measured_peak_dbfs ?? card.measured_peak_dbfs,
+          measured_at: slot.measured_at ?? card.measured_at,
         };
       }),
     );
@@ -2078,6 +2092,28 @@ export class App implements OnInit, OnDestroy {
         };
       }),
     );
+  }
+
+  private async persistPatchMeasurement(
+    patchHash: string,
+    rmsDbfs: number,
+    peakDbfs: number,
+    measuredAt: string,
+  ): Promise<void> {
+    const response = await fetch(`/api/v1/patches/configs/${patchHash}/measurements`, {
+      method: 'PATCH',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        measured_rms_dbfs: rmsDbfs,
+        measured_peak_dbfs: peakDbfs,
+        measured_at: measuredAt,
+      }),
+    });
+    const payload = (await response.json()) as PatchConfigResponse | { detail?: unknown };
+    if (!response.ok) {
+      throw new Error(`patch measurement save failed: ${JSON.stringify(payload)}`);
+    }
   }
 
   formatMs(value: number): string {
@@ -2888,6 +2924,10 @@ export class App implements OnInit, OnDestroy {
   }
 
   private async refreshActiveSlot(): Promise<void> {
+    if (this.activeSlotPollInFlight) {
+      return;
+    }
+    this.activeSlotPollInFlight = true;
     try {
       const response = await fetch('/api/v1/amp/current-slot', {
         method: 'GET',
@@ -2898,11 +2938,30 @@ export class App implements OnInit, OnDestroy {
         return;
       }
       const active = payload as ActiveSlotResponse;
+      const previousSlot = this.selectedAmpSlot();
+      if (previousSlot !== null && active.slot !== previousSlot) {
+        this.currentAmpPatchHash.set('');
+        this.currentAmpCommitState.set('unknown');
+      }
       this.selectedAmpSlot.set(active.slot);
       this.selectedAmpSlotText.set(active.slot_label || 'n/a');
+      if (active.slot !== null && active.patch_name) {
+        this.slots.update((rows) =>
+          rows.map((card) =>
+            card.slot === active.slot
+              ? {
+                  ...card,
+                  patch_name: active.patch_name,
+                }
+              : card,
+          ),
+        );
+      }
       await this.refreshCurrentCommitState();
     } catch {
       // Active-slot probe is informational; leave current UI state unchanged on failure.
+    } finally {
+      this.activeSlotPollInFlight = false;
     }
   }
 

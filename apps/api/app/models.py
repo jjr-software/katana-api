@@ -24,6 +24,9 @@ class PatchConfig(Base):
 
     hash_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     snapshot: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    measured_rms_dbfs: Mapped[float | None] = mapped_column(Float, nullable=True)
+    measured_peak_dbfs: Mapped[float | None] = mapped_column(Float, nullable=True)
+    measured_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

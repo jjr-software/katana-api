@@ -52,6 +52,9 @@ class SlotPatchSummaryResponse(BaseModel):
     patch: dict | None = None
     in_sync: bool
     is_saved: bool
+    measured_rms_dbfs: float | None = None
+    measured_peak_dbfs: float | None = None
+    measured_at: str | None = None
     synced_at: str
     slot_sync_ms: int
     curated: list[dict]
@@ -94,6 +97,9 @@ class QuickSlotSummaryResponse(BaseModel):
     match_count: int
     in_sync: bool
     is_saved: bool
+    measured_rms_dbfs: float | None = None
+    measured_peak_dbfs: float | None = None
+    measured_at: str | None = None
     synced_at: str
     slot_sync_ms: int
 
@@ -109,6 +115,9 @@ class FullDumpSlotResponse(BaseModel):
     slot_label: str
     in_sync: bool
     is_saved: bool
+    measured_rms_dbfs: float | None = None
+    measured_peak_dbfs: float | None = None
+    measured_at: str | None = None
     synced_at: str
     slot_sync_ms: int
     patch: dict
@@ -338,13 +347,18 @@ async def slots_state(
         )
 
     state = settled.result_slots
-    curated_by_hash = _load_curation_by_hash(db, [slot.config_hash_sha256 for slot in state.slots])
-    saved_hashes = _load_saved_hashes(db, [slot.config_hash_sha256 for slot in state.slots])
+    hash_ids = [slot.config_hash_sha256 for slot in state.slots]
+    curated_by_hash = _load_curation_by_hash(db, hash_ids)
+    saved_hashes = _load_saved_hashes(db, hash_ids)
+    measurements_by_hash = _load_measurements_by_hash(db, hash_ids)
     return SlotsStateResponse(
         synced_at=state.synced_at,
         amp_state_hash_sha256=state.amp_state_hash_sha256,
         total_sync_ms=state.total_sync_ms,
-        slots=[SlotPatchSummaryResponse(**_slot_to_dict(slot, curated_by_hash, saved_hashes)) for slot in state.slots],
+        slots=[
+            SlotPatchSummaryResponse(**_slot_to_dict(slot, curated_by_hash, saved_hashes, measurements_by_hash))
+            for slot in state.slots
+        ],
     )
 
 
@@ -384,11 +398,13 @@ async def sync_single_slot(
         )
 
     item = settled.result_slot
-    curated_by_hash = _load_curation_by_hash(db, [item.config_hash_sha256])
-    saved_hashes = _load_saved_hashes(db, [item.config_hash_sha256])
+    hash_ids = [item.config_hash_sha256]
+    curated_by_hash = _load_curation_by_hash(db, hash_ids)
+    saved_hashes = _load_saved_hashes(db, hash_ids)
+    measurements_by_hash = _load_measurements_by_hash(db, hash_ids)
     return SlotSyncResponse(
         synced_at=item.synced_at,
-        slot=SlotPatchSummaryResponse(**_slot_to_dict(item, curated_by_hash, saved_hashes)),
+        slot=SlotPatchSummaryResponse(**_slot_to_dict(item, curated_by_hash, saved_hashes, measurements_by_hash)),
     )
 
 
@@ -415,11 +431,13 @@ async def readback_single_slot(
 ) -> SlotSyncResponse:
     synced_at = datetime.now().isoformat(timespec="seconds")
     item = await client.read_current_slot_state(slot=slot, synced_at=synced_at)
-    curated_by_hash = _load_curation_by_hash(db, [item.config_hash_sha256])
-    saved_hashes = _load_saved_hashes(db, [item.config_hash_sha256])
+    hash_ids = [item.config_hash_sha256]
+    curated_by_hash = _load_curation_by_hash(db, hash_ids)
+    saved_hashes = _load_saved_hashes(db, hash_ids)
+    measurements_by_hash = _load_measurements_by_hash(db, hash_ids)
     return SlotSyncResponse(
         synced_at=synced_at,
-        slot=SlotPatchSummaryResponse(**_slot_to_dict(item, curated_by_hash, saved_hashes)),
+        slot=SlotPatchSummaryResponse(**_slot_to_dict(item, curated_by_hash, saved_hashes, measurements_by_hash)),
     )
 
 
@@ -449,11 +467,13 @@ async def write_single_slot(
         )
 
     item = settled.result_slot
-    curated_by_hash = _load_curation_by_hash(db, [item.config_hash_sha256])
-    saved_hashes = _load_saved_hashes(db, [item.config_hash_sha256])
+    hash_ids = [item.config_hash_sha256]
+    curated_by_hash = _load_curation_by_hash(db, hash_ids)
+    saved_hashes = _load_saved_hashes(db, hash_ids)
+    measurements_by_hash = _load_measurements_by_hash(db, hash_ids)
     return SlotWriteResponse(
         synced_at=item.synced_at,
-        slot=SlotPatchSummaryResponse(**_slot_to_dict(item, curated_by_hash, saved_hashes)),
+        slot=SlotPatchSummaryResponse(**_slot_to_dict(item, curated_by_hash, saved_hashes, measurements_by_hash)),
     )
 
 
@@ -485,8 +505,14 @@ async def quick_slots_state(
         )
     quick = settled.result_quick
     candidates_by_name = _load_hash_candidates_by_patch_name(db, [slot.patch_name for slot in quick.slots])
+    inferred_hashes = [
+        hashes[0]
+        for hashes in candidates_by_name.values()
+        if len(hashes) == 1
+    ]
+    measurements_by_hash = _load_measurements_by_hash(db, inferred_hashes)
     slots = [
-        QuickSlotSummaryResponse(**_quick_slot_to_dict(slot, candidates_by_name))
+        QuickSlotSummaryResponse(**_quick_slot_to_dict(slot, candidates_by_name, measurements_by_hash))
         for slot in quick.slots
     ]
     return QuickSlotsStateResponse(
@@ -550,20 +576,22 @@ async def get_slots_sync_job(job_id: str, db: Session = Depends(get_db)) -> Slot
 
     result: SlotsStateResponse | None = None
     if job.result_slots is not None:
+        hash_ids = [slot.config_hash_sha256 for slot in job.result_slots.slots]
         curated_by_hash = _load_curation_by_hash(
             db,
-            [slot.config_hash_sha256 for slot in job.result_slots.slots],
+            hash_ids,
         )
         saved_hashes = _load_saved_hashes(
             db,
-            [slot.config_hash_sha256 for slot in job.result_slots.slots],
+            hash_ids,
         )
+        measurements_by_hash = _load_measurements_by_hash(db, hash_ids)
         result = SlotsStateResponse(
             synced_at=job.result_slots.synced_at,
             amp_state_hash_sha256=job.result_slots.amp_state_hash_sha256,
             total_sync_ms=job.result_slots.total_sync_ms,
             slots=[
-                SlotPatchSummaryResponse(**_slot_to_dict(slot, curated_by_hash, saved_hashes))
+                SlotPatchSummaryResponse(**_slot_to_dict(slot, curated_by_hash, saved_hashes, measurements_by_hash))
                 for slot in job.result_slots.slots
             ],
         )
@@ -596,10 +624,19 @@ async def get_quick_sync_job(job_id: str, db: Session = Depends(get_db)) -> Quic
             db,
             [slot.patch_name for slot in job.result_quick.slots],
         )
+        inferred_hashes = [
+            hashes[0]
+            for hashes in candidates_by_name.values()
+            if len(hashes) == 1
+        ]
+        measurements_by_hash = _load_measurements_by_hash(db, inferred_hashes)
         result = QuickSlotsStateResponse(
             synced_at=job.result_quick.synced_at,
             total_sync_ms=job.result_quick.total_sync_ms,
-            slots=[QuickSlotSummaryResponse(**_quick_slot_to_dict(slot, candidates_by_name)) for slot in job.result_quick.slots],
+            slots=[
+                QuickSlotSummaryResponse(**_quick_slot_to_dict(slot, candidates_by_name, measurements_by_hash))
+                for slot in job.result_quick.slots
+            ],
         )
 
     return QuickSyncJobResponse(
@@ -644,11 +681,15 @@ async def get_backup_job(job_id: UUID, db: Session = Depends(get_db)) -> BackupJ
             hash_ids,
         )
         saved_hashes = _load_saved_hashes(db, hash_ids)
+        measurements_by_hash = _load_measurements_by_hash(db, hash_ids)
         result = FullAmpDumpResponse(
             synced_at=job.result_dump.synced_at,
             amp_state_hash_sha256=job.result_dump.amp_state_hash_sha256,
             total_sync_ms=job.result_dump.total_sync_ms,
-            slots=[FullDumpSlotResponse(**_slot_dump_to_dict(item, curated_by_hash, saved_hashes)) for item in job.result_dump.slots],
+            slots=[
+                FullDumpSlotResponse(**_slot_dump_to_dict(item, curated_by_hash, saved_hashes, measurements_by_hash))
+                for item in job.result_dump.slots
+            ],
         )
 
     return BackupJobResponse(
@@ -720,7 +761,11 @@ def load_backup_snapshot(
     slot_rows = _parse_backup_snapshot_slots(snapshot_id=snapshot_id, raw_slots=raw_slots)
     hash_ids = [str(item["payload"].get("config_hash_sha256", "")) for item in slot_rows]
     curated_by_hash = _load_curation_by_hash(db, hash_ids)
-    slots = [FullDumpSlotResponse(**_slot_dump_snapshot_to_dict(item, curated_by_hash)) for item in slot_rows]
+    measurements_by_hash = _load_measurements_by_hash(db, hash_ids)
+    slots = [
+        FullDumpSlotResponse(**_slot_dump_snapshot_to_dict(item, curated_by_hash, measurements_by_hash))
+        for item in slot_rows
+    ]
     if len(slots) != 8:
         raise HTTPException(
             status_code=500,
@@ -749,10 +794,15 @@ def load_backup_snapshot(
     )
 
 
-def _quick_slot_to_dict(slot: QuickSlotName, candidates_by_name: dict[str, list[str]]) -> dict:
+def _quick_slot_to_dict(
+    slot: QuickSlotName,
+    candidates_by_name: dict[str, list[str]],
+    measurements_by_hash: dict[str, dict[str, object | None]],
+) -> dict:
     normalized = _normalize_patch_name(slot.patch_name)
     candidates = candidates_by_name.get(normalized, [])
     inferred_hash = candidates[0] if len(candidates) == 1 else None
+    measurement = measurements_by_hash.get(inferred_hash or "", {})
     return {
         "slot": slot.slot,
         "slot_label": slot.slot_label,
@@ -762,12 +812,21 @@ def _quick_slot_to_dict(slot: QuickSlotName, candidates_by_name: dict[str, list[
         "match_count": len(candidates),
         "in_sync": inferred_hash is not None,
         "is_saved": len(candidates) > 0,
+        "measured_rms_dbfs": measurement.get("measured_rms_dbfs"),
+        "measured_peak_dbfs": measurement.get("measured_peak_dbfs"),
+        "measured_at": measurement.get("measured_at"),
         "synced_at": slot.synced_at,
         "slot_sync_ms": slot.slot_sync_ms,
     }
 
 
-def _slot_to_dict(slot: SlotPatchSummary, curated_by_hash: dict[str, list[dict]], saved_hashes: set[str]) -> dict:
+def _slot_to_dict(
+    slot: SlotPatchSummary,
+    curated_by_hash: dict[str, list[dict]],
+    saved_hashes: set[str],
+    measurements_by_hash: dict[str, dict[str, object | None]],
+) -> dict:
+    measurement = measurements_by_hash.get(slot.config_hash_sha256, {})
     return {
         "slot": slot.slot,
         "slot_label": slot.slot_label,
@@ -776,6 +835,9 @@ def _slot_to_dict(slot: SlotPatchSummary, curated_by_hash: dict[str, list[dict]]
         "patch": slot.payload,
         "in_sync": True,
         "is_saved": slot.config_hash_sha256 in saved_hashes,
+        "measured_rms_dbfs": measurement.get("measured_rms_dbfs"),
+        "measured_peak_dbfs": measurement.get("measured_peak_dbfs"),
+        "measured_at": measurement.get("measured_at"),
         "synced_at": slot.synced_at,
         "slot_sync_ms": slot.slot_sync_ms,
         "curated": curated_by_hash.get(slot.config_hash_sha256, []),
@@ -851,21 +913,34 @@ async def full_amp_dump(
         hash_ids,
     )
     saved_hashes = _load_saved_hashes(db, hash_ids)
+    measurements_by_hash = _load_measurements_by_hash(db, hash_ids)
     return FullAmpDumpResponse(
         synced_at=dump.synced_at,
         amp_state_hash_sha256=dump.amp_state_hash_sha256,
         total_sync_ms=dump.total_sync_ms,
-        slots=[FullDumpSlotResponse(**_slot_dump_to_dict(item, curated_by_hash, saved_hashes)) for item in dump.slots],
+        slots=[
+            FullDumpSlotResponse(**_slot_dump_to_dict(item, curated_by_hash, saved_hashes, measurements_by_hash))
+            for item in dump.slots
+        ],
     )
 
 
-def _slot_dump_to_dict(slot: SlotDump, curated_by_hash: dict[str, list[dict]], saved_hashes: set[str]) -> dict:
+def _slot_dump_to_dict(
+    slot: SlotDump,
+    curated_by_hash: dict[str, list[dict]],
+    saved_hashes: set[str],
+    measurements_by_hash: dict[str, dict[str, object | None]],
+) -> dict:
     hash_id = str(slot.payload.get("config_hash_sha256", ""))
+    measurement = measurements_by_hash.get(hash_id, {})
     return {
         "slot": slot.slot,
         "slot_label": slot.slot_label,
         "in_sync": True,
         "is_saved": bool(hash_id and hash_id in saved_hashes),
+        "measured_rms_dbfs": measurement.get("measured_rms_dbfs"),
+        "measured_peak_dbfs": measurement.get("measured_peak_dbfs"),
+        "measured_at": measurement.get("measured_at"),
         "synced_at": slot.synced_at,
         "slot_sync_ms": slot.slot_sync_ms,
         "patch": slot.payload,
@@ -952,13 +1027,21 @@ def _parse_backup_snapshot_slots(snapshot_id: int, raw_slots: list[object]) -> l
     return parsed
 
 
-def _slot_dump_snapshot_to_dict(slot_row: dict, curated_by_hash: dict[str, list[dict]]) -> dict:
+def _slot_dump_snapshot_to_dict(
+    slot_row: dict,
+    curated_by_hash: dict[str, list[dict]],
+    measurements_by_hash: dict[str, dict[str, object | None]],
+) -> dict:
     hash_id = str(slot_row["payload"].get("config_hash_sha256", ""))
+    measurement = measurements_by_hash.get(hash_id, {})
     return {
         "slot": int(slot_row["slot"]),
         "slot_label": str(slot_row["slot_label"]),
         "in_sync": False,
         "is_saved": True,
+        "measured_rms_dbfs": measurement.get("measured_rms_dbfs"),
+        "measured_peak_dbfs": measurement.get("measured_peak_dbfs"),
+        "measured_at": measurement.get("measured_at"),
         "synced_at": str(slot_row["synced_at"]),
         "slot_sync_ms": int(slot_row["slot_sync_ms"]),
         "patch": slot_row["payload"],
@@ -1003,6 +1086,28 @@ def _load_saved_hashes(db: Session, hash_ids: list[str]) -> set[str]:
         select(PatchConfig.hash_id).where(PatchConfig.hash_id.in_(clean_hashes))
     ).all()
     return {str(hash_id) for (hash_id,) in rows}
+
+
+def _load_measurements_by_hash(db: Session, hash_ids: list[str]) -> dict[str, dict[str, object | None]]:
+    clean_hashes = [item for item in hash_ids if item]
+    if not clean_hashes:
+        return {}
+    rows = db.execute(
+        select(
+            PatchConfig.hash_id,
+            PatchConfig.measured_rms_dbfs,
+            PatchConfig.measured_peak_dbfs,
+            PatchConfig.measured_at,
+        ).where(PatchConfig.hash_id.in_(clean_hashes))
+    ).all()
+    out: dict[str, dict[str, object | None]] = {}
+    for hash_id, rms, peak, measured_at in rows:
+        out[str(hash_id)] = {
+            "measured_rms_dbfs": rms,
+            "measured_peak_dbfs": peak,
+            "measured_at": measured_at.isoformat(timespec="seconds") if measured_at is not None else None,
+        }
+    return out
 
 
 def _load_hash_candidates_by_patch_name(db: Session, patch_names: list[str]) -> dict[str, list[str]]:
