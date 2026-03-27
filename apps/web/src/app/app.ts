@@ -334,7 +334,6 @@ interface RawValueField {
 interface EqGe10BandField {
   id: string;
   label: string;
-  rawValue: number;
   offsetValue: number;
   percent: number;
 }
@@ -348,9 +347,6 @@ interface StageParam {
   id: string;
   key: string;
   label: string;
-  rawIndexStart: number;
-  rawIndexEnd: number;
-  encoding: ParamEncoding;
   value: number;
   min: number;
   max: number;
@@ -419,9 +415,6 @@ export class App implements OnInit, OnDestroy {
   queuePollHandle: ReturnType<typeof setInterval> | null = null;
   activeSlotPollHandle: ReturnType<typeof setInterval> | null = null;
   liveMeterSource: EventSource | null = null;
-  rawModalOpen = signal(false);
-  rawModalTitle = signal('');
-  rawModalJson = signal('');
   patchSamplesModalOpen = signal(false);
   patchSamplesModalTitle = signal('');
   patchSamplesRows = signal<AudioSampleResponse[]>([]);
@@ -2158,7 +2151,6 @@ export class App implements OnInit, OnDestroy {
       return {
         id: `${eqName}-ge10-band-${index}`,
         label: EQ_GE10_BAND_LABELS[index] ?? field.label,
-        rawValue: field.value,
         offsetValue,
         percent,
       };
@@ -2297,22 +2289,6 @@ export class App implements OnInit, OnDestroy {
     });
   }
 
-  editorPedalFxComRawFields(): RawValueField[] {
-    return this.editorNestedRawFields(['stages', 'pedalfx'], 'raw_com', 'pedalfx-raw-com');
-  }
-
-  setEditorPedalFxComRawValue(index: number, value: string): void {
-    this.setEditorNestedRawValue(['stages', 'pedalfx'], 'raw_com', index, value);
-  }
-
-  editorPedalFxRawFields(): RawValueField[] {
-    return this.editorNestedRawFields(['stages', 'pedalfx'], 'raw', 'pedalfx-raw');
-  }
-
-  setEditorPedalFxRawValue(index: number, value: string): void {
-    this.setEditorNestedRawValue(['stages', 'pedalfx'], 'raw', index, value);
-  }
-
   editorStageOn(stageName: StageName): boolean {
     const stages = this.readObject(this.editorPatchDraft(), 'stages');
     const stage = this.readObject(stages, stageName);
@@ -2417,15 +2393,6 @@ export class App implements OnInit, OnDestroy {
     return this.effectTypeLabel(stageName, type);
   }
 
-  editorStageRawLength(stageName: StageName): number {
-    const stages = this.readObject(this.editorPatchDraft(), 'stages');
-    const stage = this.readObject(stages, stageName);
-    if (!stage) {
-      return 0;
-    }
-    return this.ensureNumericRaw(stage).length;
-  }
-
   editorStageParams(stageName: StageName): StageParam[] {
     const stages = this.readObject(this.editorPatchDraft(), 'stages');
     const stage = this.readObject(stages, stageName);
@@ -2442,14 +2409,10 @@ export class App implements OnInit, OnDestroy {
       if (decoded === null) {
         continue;
       }
-      const [rawIndexStart, rawIndexEnd] = this.stageParamRawSpan(stageName, schema);
       params.push({
         id: `${stageName}-${schema.key}`,
         key: schema.key,
         label: schema.label,
-        rawIndexStart,
-        rawIndexEnd,
-        encoding: schema.size,
         value: decoded,
         min: schema.min,
         max: schema.max,
@@ -2470,13 +2433,6 @@ export class App implements OnInit, OnDestroy {
       return `No schema mapped for ${this.effectTypeLabel(stageName, type)} (${type})`;
     }
     return null;
-  }
-
-  editorStageParamRangeLabel(param: StageParam): string {
-    if (param.rawIndexStart === param.rawIndexEnd) {
-      return `${param.rawIndexStart}`;
-    }
-    return `${param.rawIndexStart}-${param.rawIndexEnd}`;
   }
 
   setEditorStageParam(stageName: StageName, paramKey: string, value: string): void {
@@ -3169,26 +3125,6 @@ export class App implements OnInit, OnDestroy {
     return this.readBoolean(eq, 'on');
   }
 
-  showRaw(slot: SlotCard): void {
-    if (!slot.patch) {
-      this.status.set(`No raw patch payload loaded for ${slot.slot_label}. Run full sync or slot sync first.`);
-      return;
-    }
-    this.rawModalTitle.set(`${slot.slot_label} · ${slot.patch_name || 'Unnamed Patch'}`);
-    this.rawModalJson.set(JSON.stringify(slot.patch, null, 2));
-    this.rawModalOpen.set(true);
-  }
-
-  closeRawModal(): void {
-    this.rawModalOpen.set(false);
-  }
-
-  onRawModalBackdropClick(event: MouseEvent): void {
-    if (event.target === event.currentTarget) {
-      this.closeRawModal();
-    }
-  }
-
   private stageSummary(slot: SlotCard, stageName: string): string {
     const stages = this.readObject(slot.patch, 'stages');
     const stage = this.readObject(stages, stageName);
@@ -3527,12 +3463,6 @@ export class App implements OnInit, OnDestroy {
       return 2;
     }
     return 1;
-  }
-
-  private stageParamRawSpan(stageName: StageName, schema: StageParamSchema): [number, number] {
-    const start = this.stageParamArrayIndex(stageName, schema);
-    const width = this.stageParamWidth(schema.size);
-    return [start, start + width - 1];
   }
 
   private readStageParamValue(stageName: StageName, raw: number[], schema: StageParamSchema): number | null {

@@ -164,7 +164,6 @@
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openAskAiModal(slot)" [disabled]="!canAskAi(slot)">Ask AI</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openAiLevelModal(slot)" [disabled]="!canAskAiLevel(slot)">AI Level</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openPatchSamplesModal(slot)" [disabled]="!canShowPatchSamples(slot)">Samples</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="showRaw(slot)" [disabled]="!canUseSlotActions(slot)">Raw</button>
                   </div>
                   <p class="small mb-1 patch-summary"><strong>Amp:</strong> {{ ampSummary(slot) }}</p>
                   <p class="small mb-1 patch-summary"><strong>AMP Type:</strong> {{ ampTypeSummary(slot) }}</p>
@@ -251,7 +250,6 @@
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openAskAiModal(slot)" [disabled]="!canAskAi(slot)">Ask AI</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openAiLevelModal(slot)" [disabled]="!canAskAiLevel(slot)">AI Level</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openPatchSamplesModal(slot)" [disabled]="!canShowPatchSamples(slot)">Samples</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="showRaw(slot)" [disabled]="!canUseSlotActions(slot)">Raw</button>
                   </div>
                   <p class="small mb-1 patch-summary"><strong>Amp:</strong> {{ ampSummary(slot) }}</p>
                   <p class="small mb-1 patch-summary"><strong>AMP Type:</strong> {{ ampTypeSummary(slot) }}</p>
@@ -320,18 +318,6 @@
 
   @if (responseJson()) {
     <pre class="card p-3 mt-3 mb-0">{{ responseJson() }}</pre>
-  }
-
-  @if (rawModalOpen()) {
-    <div class="raw-modal-backdrop" (click)="onRawModalBackdropClick($event)">
-      <section class="raw-modal" role="dialog" aria-modal="true" aria-label="Raw Patch JSON">
-        <header class="raw-modal-head">
-          <h3>{{ rawModalTitle() }}</h3>
-          <button type="button" class="btn btn-sm btn-light" (click)="closeRawModal()">Close</button>
-        </header>
-        <pre class="raw-modal-json">{{ rawModalJson() }}</pre>
-      </section>
-    </div>
   }
 
   @if (patchSamplesModalOpen()) {
@@ -695,7 +681,7 @@
                   </label>
                 </div>
                 <p class="small text-secondary mb-2">
-                  Schema: <code>{{ editorStageTypeLabel($any(stageName)) }}</code> · raw length <code>{{ editorStageRawLength($any(stageName)) }}</code>
+                  Schema: <code>{{ editorStageTypeLabel($any(stageName)) }}</code>
                 </p>
                 <div class="row g-2">
                   <div class="col-12 col-md-6">
@@ -713,7 +699,7 @@
                 <div class="row g-2 mt-1">
                   @for (param of editorStageParams($any(stageName)); track param.id) {
                     <div class="col-12 col-md-6">
-                      <label class="form-label small mb-1">{{ param.label }} <span class="text-secondary">[#{{ editorStageParamRangeLabel(param) }} · {{ param.min }}..{{ param.max }}]</span></label>
+                      <label class="form-label small mb-1">{{ param.label }} <span class="text-secondary">[{{ param.min }}..{{ param.max }}]</span></label>
                       <div class="editor-range-field">
                         <input
                           type="range"
@@ -765,19 +751,6 @@
                     </select>
                   </div>
                 </div>
-                @if (editorEqIsParametric($any(eqName))) {
-                  <div class="mt-2">
-                    <p class="small text-secondary mb-1">PEQ Raw</p>
-                    <div class="row g-2">
-                      @for (field of editorEqRawFields($any(eqName), 'peq_raw'); track field.id) {
-                        <div class="col-4 col-md-2">
-                          <label class="form-label small mb-1">{{ field.label }}</label>
-                          <input type="number" min="0" max="127" class="form-control form-control-sm" [value]="field.value" (input)="setEditorEqRawValue($any(eqName), 'peq_raw', $index, $any($event.target).value)" />
-                        </div>
-                      }
-                    </div>
-                  </div>
-                }
                 @if (editorEqIsGe10($any(eqName))) {
                   <div class="mt-2">
                     <p class="small text-secondary mb-2">GE-10 Spectrum</p>
@@ -860,28 +833,6 @@
               <div class="row g-2">
                 <div class="col-6 col-md-4"><label class="form-label small mb-1">Position</label><input type="number" min="0" max="127" class="form-control form-control-sm" [value]="editorPedalFxNumber('position') ?? 0" (input)="setEditorPedalFxNumber('position', $any($event.target).value)" /></div>
                 <div class="col-6 col-md-4"><label class="form-label small mb-1">Type</label><input type="number" min="0" max="127" class="form-control form-control-sm" [value]="editorPedalFxNumber('type') ?? 0" (input)="setEditorPedalFxNumber('type', $any($event.target).value)" /></div>
-              </div>
-              <div class="mt-2">
-                <p class="small text-secondary mb-1">COM Raw</p>
-                <div class="row g-2">
-                  @for (field of editorPedalFxComRawFields(); track field.id) {
-                    <div class="col-4 col-md-2">
-                      <label class="form-label small mb-1">{{ field.label }}</label>
-                      <input type="number" min="0" max="127" class="form-control form-control-sm" [value]="field.value" (input)="setEditorPedalFxComRawValue($index, $any($event.target).value)" />
-                    </div>
-                  }
-                </div>
-              </div>
-              <div class="mt-2">
-                <p class="small text-secondary mb-1">Raw</p>
-                <div class="row g-2">
-                  @for (field of editorPedalFxRawFields(); track field.id) {
-                    <div class="col-4 col-md-2">
-                      <label class="form-label small mb-1">{{ field.label }}</label>
-                      <input type="number" min="0" max="127" class="form-control form-control-sm" [value]="field.value" (input)="setEditorPedalFxRawValue($index, $any($event.target).value)" />
-                    </div>
-                  }
-                </div>
               </div>
             </article>
           </div>

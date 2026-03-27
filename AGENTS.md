@@ -1612,3 +1612,14 @@
   - `GE-10` now shows only GE-10 spectrum controls.
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-27 (Raw-Value UI Removed)
+- Removed raw-value exposure from web UI in:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Changes:
+  - removed per-slot `Raw` action and raw patch modal,
+  - removed raw-length and raw-index display from editor stage controls,
+  - removed raw editing sections for EQ and Pedal FX.
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
