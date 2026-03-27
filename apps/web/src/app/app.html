@@ -533,6 +533,24 @@
         </header>
         @if (editorPatchDraft(); as draft) {
           <div class="p-3 d-grid gap-3 editor-modal-body">
+            <article class="border rounded p-2 bg-body editor-sticky-meter">
+              <p class="small mb-1 text-secondary">
+                Current RMS: <code>{{ formatDb(liveRmsDbfs()) }}</code>
+              </p>
+              <div class="d-flex align-items-center gap-2">
+                <span class="small text-secondary">Live RMS Graph:</span>
+                <svg class="rms-graph" viewBox="0 0 1000 64" preserveAspectRatio="none" aria-label="Live RMS graph">
+                  @for (bar of rmsGraphBars(); track $index) {
+                    <rect
+                      [attr.x]="bar.x"
+                      [attr.y]="bar.y"
+                      [attr.width]="bar.width"
+                      [attr.height]="bar.height"
+                    />
+                  }
+                </svg>
+              </div>
+            </article>
             <article class="border rounded p-2">
               <div class="form-check form-switch mb-2">
                 <input class="form-check-input" type="checkbox" [checked]="editorLiveApplyEnabled()" [disabled]="!editorLiveApplyAvailable()" (change)="setEditorLiveApplyEnabled($any($event.target).checked)" id="liveApplySwitch" />

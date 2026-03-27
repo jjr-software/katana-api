@@ -1623,3 +1623,14 @@
   - removed raw editing sections for EQ and Pedal FX.
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-27 (Sticky Live RMS Graph In Editor)
+- Added live output meter block to patch editor modal in:
+  - `apps/web/src/app/app.html`
+  - `apps/web/src/app/app.css`
+- Changes:
+  - editor now shows current live RMS value,
+  - editor reuses the existing live RMS graph styling/data from the main page,
+  - meter block is sticky at the top of the editor scroll area.
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

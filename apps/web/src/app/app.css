@@ -96,6 +96,13 @@ pre {
   width: min(1080px, 100%);
 }
 
+.editor-sticky-meter {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+}
+
 .ai-modal {
   width: min(980px, 100%);
 }
