@@ -95,6 +95,43 @@
         </div>
       </div>
 
+      <div class="card mb-3">
+        <div class="card-body py-2">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2 class="h6 text-uppercase text-secondary mb-0">Recent Samples</h2>
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="loadRecentAudioSamples()">Refresh Samples</button>
+          </div>
+          @if (recentSamples().length === 0) {
+            <p class="small text-secondary mb-0">No recorded samples yet.</p>
+          } @else {
+            <div class="samples-list">
+              @for (sample of recentSamples(); track sample.id) {
+                <article class="border rounded p-2 small bg-body-tertiary">
+                  <p class="mb-1">
+                    <strong>{{ sample.patch_name || sample.slot_label || ('Sample #' + sample.id) }}</strong>
+                    <span class="text-secondary ms-2">
+                      @if (sample.slot_label) {
+                        slot <code>{{ sample.slot_label }}</code> ·
+                      }
+                      recorded <code>{{ sample.created_at }}</code>
+                    </span>
+                  </p>
+                  <p class="mb-2 text-secondary">
+                    RMS/Peak <code>{{ formatDb(sample.rms_dbfs) }} / {{ formatDb(sample.peak_dbfs) }}</code> ·
+                    duration <code>{{ sample.duration_sec }}s</code>
+                  </p>
+                  @if (sample.playback_url) {
+                    <audio class="sample-player" controls preload="none" [src]="sample.playback_url"></audio>
+                  } @else {
+                    <p class="mb-0 text-secondary">No stored audio for this sample.</p>
+                  }
+                </article>
+              }
+            </div>
+          }
+        </div>
+      </div>
+
       <p class="small mb-3">{{ status() }}</p>
 
       <section class="mb-4">

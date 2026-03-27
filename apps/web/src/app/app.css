@@ -11,6 +11,15 @@
   gap: 0.5rem;
 }
 
+.samples-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.sample-player {
+  width: 100%;
+}
+
 .patch-summary {
   overflow-wrap: anywhere;
 }

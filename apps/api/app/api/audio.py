@@ -7,9 +7,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 from starlette.requests import Request
-from starlette.responses import StreamingResponse
+from starlette.responses import Response, StreamingResponse
 
-from app.audio_capture import capture_audio_metrics
+from app.audio_capture import capture_audio_metrics, capture_audio_sample
 from app.deps import get_db
 from app.models import AudioSample, PatchConfig
 
@@ -28,7 +28,9 @@ class AudioSampleCreateRequest(BaseModel):
 class AudioSampleResponse(BaseModel):
     id: int
     patch_hash: str | None = None
+    patch_name: str | None = None
     slot: int | None = None
+    slot_label: str | None = None
     source: str
     duration_sec: int
     rate: int
@@ -36,6 +38,8 @@ class AudioSampleResponse(BaseModel):
     rms_dbfs: float
     peak_dbfs: float
     sample_count: int
+    has_audio: bool
+    playback_url: str | None = None
     is_level_marker: bool = False
     created_at: str
 
@@ -55,7 +59,7 @@ async def create_audio_measurement(
                     "patch_hash": payload.patch_hash,
                 },
             )
-    sample = await capture_audio_metrics(
+    sample = await capture_audio_sample(
         source=payload.source,
         duration_sec=payload.duration_sec,
         rate=payload.rate,
@@ -64,13 +68,14 @@ async def create_audio_measurement(
     row = AudioSample(
         patch_hash=payload.patch_hash,
         slot=payload.slot,
-        source=sample.source,
-        duration_sec=int(round(sample.duration_sec)),
-        rate=sample.rate,
-        channels=sample.channels,
-        rms_dbfs=sample.rms_dbfs,
-        peak_dbfs=sample.peak_dbfs,
-        sample_count=sample.sample_count,
+        source=sample.metrics.source,
+        duration_sec=int(round(sample.metrics.duration_sec)),
+        rate=sample.metrics.rate,
+        channels=sample.metrics.channels,
+        rms_dbfs=sample.metrics.rms_dbfs,
+        peak_dbfs=sample.metrics.peak_dbfs,
+        sample_count=sample.metrics.sample_count,
+        audio_wav=sample.wav_bytes,
         is_level_marker=False,
     )
     db.add(row)
@@ -90,20 +95,7 @@ async def create_audio_measurement(
         config.measured_peak_dbfs = row.peak_dbfs
         config.measured_at = row.created_at
         db.commit()
-    return AudioSampleResponse(
-        id=row.id,
-        patch_hash=row.patch_hash,
-        slot=row.slot,
-        source=row.source,
-        duration_sec=row.duration_sec,
-        rate=row.rate,
-        channels=row.channels,
-        rms_dbfs=row.rms_dbfs,
-        peak_dbfs=row.peak_dbfs,
-        sample_count=row.sample_count,
-        is_level_marker=row.is_level_marker,
-        created_at=row.created_at.isoformat(timespec="seconds"),
-    )
+    return _audio_sample_response(row, db)
 
 
 @router.get("/measures", response_model=list[AudioSampleResponse])
@@ -113,25 +105,7 @@ def list_audio_measurements(
 ) -> list[AudioSampleResponse]:
     bounded = max(1, min(limit, 200))
     rows = list(db.scalars(select(AudioSample).order_by(AudioSample.id.desc()).limit(bounded)))
-    out: list[AudioSampleResponse] = []
-    for row in rows:
-        out.append(
-            AudioSampleResponse(
-                id=row.id,
-                patch_hash=row.patch_hash,
-                slot=row.slot,
-                source=row.source,
-                duration_sec=row.duration_sec,
-                rate=row.rate,
-                channels=row.channels,
-                rms_dbfs=row.rms_dbfs,
-                peak_dbfs=row.peak_dbfs,
-                sample_count=row.sample_count,
-                is_level_marker=row.is_level_marker,
-                created_at=row.created_at.isoformat(timespec="seconds"),
-            )
-        )
-    return out
+    return [_audio_sample_response(row, db) for row in rows]
 
 
 class AudioLevelMarkerCaptureRequest(BaseModel):
@@ -145,12 +119,45 @@ def _sse_event(payload: dict) -> str:
     return f"data: {json.dumps(payload, separators=(',', ':'))}\n\n"
 
 
+def _audio_sample_response(row: AudioSample, db: Session) -> AudioSampleResponse:
+    patch_name: str | None = None
+    if row.patch_hash:
+        config = db.get(PatchConfig, row.patch_hash)
+        if config is not None:
+            patch_name_raw = config.snapshot.get("patch_name")
+            if isinstance(patch_name_raw, str) and patch_name_raw.strip():
+                patch_name = patch_name_raw.strip()
+    slot_label: str | None = None
+    if row.slot is not None and 1 <= row.slot <= 8:
+        bank = "A" if row.slot <= 4 else "B"
+        channel = row.slot if row.slot <= 4 else row.slot - 4
+        slot_label = f"{bank}:{channel}"
+    return AudioSampleResponse(
+        id=row.id,
+        patch_hash=row.patch_hash,
+        patch_name=patch_name,
+        slot=row.slot,
+        slot_label=slot_label,
+        source=row.source,
+        duration_sec=row.duration_sec,
+        rate=row.rate,
+        channels=row.channels,
+        rms_dbfs=row.rms_dbfs,
+        peak_dbfs=row.peak_dbfs,
+        sample_count=row.sample_count,
+        has_audio=row.audio_wav is not None,
+        playback_url=f"/api/v1/audio/measures/{row.id}/wav" if row.audio_wav is not None else None,
+        is_level_marker=row.is_level_marker,
+        created_at=row.created_at.isoformat(timespec="seconds"),
+    )
+
+
 @router.post("/marker/capture", response_model=AudioSampleResponse)
 async def capture_audio_level_marker(
     payload: AudioLevelMarkerCaptureRequest,
     db: Session = Depends(get_db),
 ) -> AudioSampleResponse:
-    sample = await capture_audio_metrics(
+    sample = await capture_audio_sample(
         source=payload.source,
         duration_sec=payload.duration_sec,
         rate=payload.rate,
@@ -160,32 +167,20 @@ async def capture_audio_level_marker(
     row = AudioSample(
         patch_hash=None,
         slot=None,
-        source=sample.source,
-        duration_sec=int(round(sample.duration_sec)),
-        rate=sample.rate,
-        channels=sample.channels,
-        rms_dbfs=sample.rms_dbfs,
-        peak_dbfs=sample.peak_dbfs,
-        sample_count=sample.sample_count,
+        source=sample.metrics.source,
+        duration_sec=int(round(sample.metrics.duration_sec)),
+        rate=sample.metrics.rate,
+        channels=sample.metrics.channels,
+        rms_dbfs=sample.metrics.rms_dbfs,
+        peak_dbfs=sample.metrics.peak_dbfs,
+        sample_count=sample.metrics.sample_count,
+        audio_wav=sample.wav_bytes,
         is_level_marker=True,
     )
     db.add(row)
     db.commit()
     db.refresh(row)
-    return AudioSampleResponse(
-        id=row.id,
-        patch_hash=row.patch_hash,
-        slot=row.slot,
-        source=row.source,
-        duration_sec=row.duration_sec,
-        rate=row.rate,
-        channels=row.channels,
-        rms_dbfs=row.rms_dbfs,
-        peak_dbfs=row.peak_dbfs,
-        sample_count=row.sample_count,
-        is_level_marker=row.is_level_marker,
-        created_at=row.created_at.isoformat(timespec="seconds"),
-    )
+    return _audio_sample_response(row, db)
 
 
 @router.get("/marker", response_model=AudioSampleResponse)
@@ -201,19 +196,23 @@ def get_audio_level_marker(db: Session = Depends(get_db)) -> AudioSampleResponse
             status_code=404,
             detail={"message": "Audio level marker not set"},
         )
-    return AudioSampleResponse(
-        id=row.id,
-        patch_hash=row.patch_hash,
-        slot=row.slot,
-        source=row.source,
-        duration_sec=row.duration_sec,
-        rate=row.rate,
-        channels=row.channels,
-        rms_dbfs=row.rms_dbfs,
-        peak_dbfs=row.peak_dbfs,
-        sample_count=row.sample_count,
-        is_level_marker=row.is_level_marker,
-        created_at=row.created_at.isoformat(timespec="seconds"),
+    return _audio_sample_response(row, db)
+
+
+@router.get("/measures/{sample_id:int}/wav")
+def get_audio_measurement_wav(
+    sample_id: int,
+    db: Session = Depends(get_db),
+) -> Response:
+    row = db.get(AudioSample, sample_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail={"message": "Audio sample not found", "sample_id": sample_id})
+    if row.audio_wav is None:
+        raise HTTPException(status_code=404, detail={"message": "Audio sample has no stored audio", "sample_id": sample_id})
+    return Response(
+        content=row.audio_wav,
+        media_type="audio/wav",
+        headers={"Content-Disposition": f'inline; filename="audio-sample-{sample_id}.wav"'},
     )
 
 

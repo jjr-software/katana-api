@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -80,5 +80,6 @@ class AudioSample(Base):
     rms_dbfs: Mapped[float] = mapped_column(Float, nullable=False)
     peak_dbfs: Mapped[float] = mapped_column(Float, nullable=False)
     sample_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    audio_wav: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     is_level_marker: Mapped[bool] = mapped_column(nullable=False, default=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)

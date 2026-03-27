@@ -248,7 +248,9 @@ interface PatchConfigResponse {
 interface AudioSampleResponse {
   id: number;
   patch_hash: string | null;
+  patch_name: string | null;
   slot: number | null;
+  slot_label: string | null;
   source: string;
   duration_sec: number;
   rate: number;
@@ -256,6 +258,8 @@ interface AudioSampleResponse {
   rms_dbfs: number;
   peak_dbfs: number;
   sample_count: number;
+  has_audio: boolean;
+  playback_url: string | null;
   is_level_marker: boolean;
   created_at: string;
 }
@@ -372,6 +376,7 @@ export class App implements OnInit, OnDestroy {
   liveMeterAt = signal('');
   liveMeterConnected = signal(false);
   liveRmsHistory = signal<number[]>([]);
+  recentSamples = signal<AudioSampleResponse[]>([]);
   isMeasuringSlotsRms = signal(false);
   isMeasuringActivePatch = signal(false);
   measureCountdownSec = signal(0);
@@ -407,16 +412,11 @@ export class App implements OnInit, OnDestroy {
   patchConfigTargetLabel = signal('');
   patchConfigRows = signal<PatchConfigResponse[]>([]);
   private activeSlotPollInFlight = false;
-  private activeMeasureHash = '';
-  private activeMeasureName = '';
-  private activeMeasureMaxRms = Number.NEGATIVE_INFINITY;
-  private activeMeasureMaxPeak = Number.NEGATIVE_INFINITY;
-  private activeMeasureSamples = 0;
-  private activeMeasureLastTs = '';
 
   ngOnInit(): void {
     void this.refreshQueueState();
     void this.loadAudioLevelMarker();
+    void this.loadRecentAudioSamples();
     void this.refreshActiveSlot();
     this.startLiveMeter();
     this.queuePollHandle = setInterval(() => {
@@ -891,10 +891,6 @@ export class App implements OnInit, OnDestroy {
     this.responseJson.set('');
     let countdownHandle: ReturnType<typeof setInterval> | null = null;
     try {
-      if (!this.liveMeterSource || !this.liveMeterConnected()) {
-        this.startLiveMeter();
-        await this.waitForLiveMeterConnection(3000);
-      }
       this.status.set('Reading active patch from amp...');
       const currentPatchResponse = await fetch('/api/v1/amp/current-patch', {
         method: 'GET',
@@ -907,50 +903,48 @@ export class App implements OnInit, OnDestroy {
       const currentPatch = currentPatchPayload as CurrentPatchResponse;
       const activeHash = this.readString(currentPatch.patch, 'config_hash_sha256');
       const activeName = this.readString(currentPatch.patch, 'patch_name') ?? 'Active Patch';
-      if (!activeHash) {
-        throw new Error('active patch payload missing config_hash_sha256');
-      }
-      this.activeMeasureHash = activeHash;
-      this.activeMeasureName = activeName;
-      this.activeMeasureMaxRms = Number.NEGATIVE_INFINITY;
-      this.activeMeasureMaxPeak = Number.NEGATIVE_INFINITY;
-      this.activeMeasureSamples = 0;
-      this.activeMeasureLastTs = '';
+      const selectedSlot = this.selectedAmpSlot();
 
       const startedAt = Date.now();
       countdownHandle = setInterval(() => {
         const remaining = durationSec - Math.floor((Date.now() - startedAt) / 1000);
         this.measureCountdownSec.set(Math.max(0, remaining));
       }, 200);
-      this.status.set(`Measuring active patch (${activeName}) max levels for ${durationSec}s...`);
-      await new Promise<void>((resolve) => {
-        setTimeout(() => resolve(), durationSec * 1000);
+      this.status.set(`Recording sample for active patch (${activeName}) for ${durationSec}s...`);
+      const response = await fetch('/api/v1/audio/measure', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patch_hash: activeHash || null,
+          slot: selectedSlot,
+          duration_sec: durationSec,
+        }),
       });
-
-      if (this.activeMeasureSamples <= 0 || !Number.isFinite(this.activeMeasureMaxRms) || !Number.isFinite(this.activeMeasureMaxPeak)) {
-        throw new Error('No live audio metric samples captured during 10-second window');
+      const payload = (await response.json()) as AudioSampleResponse | { detail?: unknown };
+      if (!response.ok) {
+        throw new Error(`active patch sample failed: ${JSON.stringify(payload)}`);
       }
-
-      const measuredAt = this.activeMeasureLastTs || new Date().toISOString();
-      const matchedSlot = this.slots().find((item) => item.config_hash_sha256 === this.activeMeasureHash);
+      const sample = payload as AudioSampleResponse;
+      const measuredAt = sample.created_at;
+      const matchedSlot = this.slots().find((item) => item.config_hash_sha256 === sample.patch_hash);
       if (matchedSlot) {
-        this.setSlotMeasuredRms(matchedSlot.slot, this.activeMeasureMaxRms, this.activeMeasureMaxPeak, measuredAt);
+        this.setSlotMeasuredRms(matchedSlot.slot, sample.rms_dbfs, sample.peak_dbfs, measuredAt);
       }
-      if (matchedSlot?.is_saved) {
-        await this.persistPatchMeasurement(this.activeMeasureHash, this.activeMeasureMaxRms, this.activeMeasureMaxPeak, measuredAt);
-      }
-      this.status.set(`Max-level measurement complete for active patch (${this.activeMeasureName})`);
+      await this.loadRecentAudioSamples();
+      this.status.set(`Recorded sample for active patch (${activeName})`);
       this.responseJson.set(
         JSON.stringify(
           {
-            message: '10-second max-level measurement captured for active patch',
-            active_patch_name: this.activeMeasureName,
-            active_patch_hash: this.activeMeasureHash,
+            message: 'Recorded sample for active patch',
+            sample_id: sample.id,
+            active_patch_name: activeName,
+            active_patch_hash: sample.patch_hash,
             matched_slot: matchedSlot?.slot_label ?? null,
-            max_rms_dbfs: this.activeMeasureMaxRms,
-            max_peak_dbfs: this.activeMeasureMaxPeak,
-            events: this.activeMeasureSamples,
+            rms_dbfs: sample.rms_dbfs,
+            peak_dbfs: sample.peak_dbfs,
             captured_at: measuredAt,
+            playback_url: sample.playback_url,
           },
           null,
           2,
@@ -974,12 +968,6 @@ export class App implements OnInit, OnDestroy {
       }
       this.measureCountdownSec.set(0);
       this.isMeasuringActivePatch.set(false);
-      this.activeMeasureHash = '';
-      this.activeMeasureName = '';
-      this.activeMeasureMaxRms = Number.NEGATIVE_INFINITY;
-      this.activeMeasureMaxPeak = Number.NEGATIVE_INFINITY;
-      this.activeMeasureSamples = 0;
-      this.activeMeasureLastTs = '';
     }
   }
 
@@ -1058,6 +1046,22 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  async loadRecentAudioSamples(): Promise<void> {
+    try {
+      const response = await fetch('/api/v1/audio/measures?limit=12', {
+        method: 'GET',
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as AudioSampleResponse[] | { detail?: unknown };
+      if (!response.ok) {
+        return;
+      }
+      this.recentSamples.set((payload as AudioSampleResponse[]).filter((item) => !item.is_level_marker));
+    } catch {
+      // samples panel is informational; keep current UI state
+    }
+  }
+
   startLiveMeter(): void {
     this.stopLiveMeter();
     this.status.set('Starting live audio meter feed...');
@@ -1080,21 +1084,11 @@ export class App implements OnInit, OnDestroy {
         if (Number.isFinite(rms)) {
           this.liveRmsDbfs.set(rms);
           this.pushLiveRmsPoint(rms);
-          if (this.isMeasuringActivePatch()) {
-            this.activeMeasureMaxRms = Math.max(this.activeMeasureMaxRms, rms);
-          }
         }
         if (Number.isFinite(peak)) {
           this.livePeakDbfs.set(peak);
-          if (this.isMeasuringActivePatch()) {
-            this.activeMeasureMaxPeak = Math.max(this.activeMeasureMaxPeak, peak);
-          }
         }
         this.liveMeterAt.set(ts);
-        if (this.isMeasuringActivePatch()) {
-          this.activeMeasureSamples += 1;
-          this.activeMeasureLastTs = ts;
-        }
       } catch (error: unknown) {
         this.status.set('Live audio meter parse failed');
         this.responseJson.set(
@@ -1136,18 +1130,6 @@ export class App implements OnInit, OnDestroy {
 
   liveMeterButtonLabel(): string {
     return this.liveMeterConnected() ? 'Stop Live Meter' : 'Start Live Meter';
-  }
-
-  private async waitForLiveMeterConnection(timeoutMs: number): Promise<void> {
-    const startedAt = Date.now();
-    while (!this.liveMeterConnected()) {
-      if (Date.now() - startedAt >= timeoutMs) {
-        throw new Error('Live audio meter did not connect in time');
-      }
-      await new Promise<void>((resolve) => {
-        setTimeout(() => resolve(), 100);
-      });
-    }
   }
 
   rmsGraphPoints(): string {
@@ -1240,6 +1222,7 @@ export class App implements OnInit, OnDestroy {
           captured_at: sample.created_at,
         });
       }
+      await this.loadRecentAudioSamples();
       this.status.set('Completed 5-second RMS measurement across all slots');
       this.responseJson.set(
         JSON.stringify(
