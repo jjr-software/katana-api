@@ -1193,7 +1193,7 @@ export class App implements OnInit, OnDestroy {
     this.aiModalPatch.set(this.clonePatch(slot.patch));
     this.aiModalCurrentMeasuredRms.set(slot.measured_rms_dbfs);
     this.aiModalTargetRms.set(slot.measured_rms_dbfs !== null ? slot.measured_rms_dbfs.toFixed(2) : '');
-    this.aiModalPrompt.set('Suggest exactly one concrete control change for this patch. Return one field path and one numeric value only.');
+    this.aiModalPrompt.set('Suggest the most useful concrete improvements for this patch. Focus on tone, EQ, gain structure, and clarity.');
     this.aiModalAdvice.set(null);
     this.aiModalError.set('');
     this.aiModalOpen.set(true);

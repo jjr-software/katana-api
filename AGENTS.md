@@ -1589,3 +1589,13 @@
   - auto-level/apply UI now consumes and displays one change only.
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-27 (AI Advice Uses Structured Output)
+- Tightened OpenAI request contract in:
+  - `apps/api/app/api/ai.py`
+- Changes:
+  - Responses API request now uses `text.format` with strict `json_schema`,
+  - backend still validates returned field path/value shape and rejects unsupported syntax,
+  - refusal blocks are detected explicitly and surfaced as API errors.
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

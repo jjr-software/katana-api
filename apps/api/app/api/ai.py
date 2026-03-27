@@ -12,6 +12,36 @@ from app.settings import Settings, get_settings
 
 router = APIRouter(prefix="/api/v1/ai", tags=["ai"])
 
+PATCH_ADVICE_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["summary", "suggested_change"],
+    "properties": {
+        "summary": {
+            "type": "string",
+        },
+        "suggested_change": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["field", "current_value", "suggested_value", "rationale"],
+            "properties": {
+                "field": {
+                    "type": "string",
+                },
+                "current_value": {
+                    "anyOf": [{"type": "integer"}, {"type": "number"}],
+                },
+                "suggested_value": {
+                    "anyOf": [{"type": "integer"}, {"type": "number"}],
+                },
+                "rationale": {
+                    "type": "string",
+                },
+            },
+        },
+    },
+}
+
 SYSTEM_PROMPT = """You are a BOSS Katana Gen 3 patch advisor.
 
 You are advising on a single Katana patch snapshot from a web editor. The patch JSON is authoritative.
@@ -140,6 +170,30 @@ def _materialize_proposed_patch(source_patch: dict, change: PatchAdviceChange) -
     return proposed
 
 
+def _extract_refusal_text(payload: dict) -> str | None:
+    output = payload.get("output")
+    if not isinstance(output, list):
+        return None
+    refusals: list[str] = []
+    for item in output:
+        if not isinstance(item, dict):
+            continue
+        content = item.get("content")
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") != "refusal":
+                continue
+            text = block.get("refusal")
+            if isinstance(text, str) and text.strip():
+                refusals.append(text.strip())
+    if refusals:
+        return "\n".join(refusals)
+    return None
+
+
 def _extract_response_text(payload: dict) -> str:
     output_text = payload.get("output_text")
     if isinstance(output_text, str) and output_text.strip():
@@ -196,6 +250,12 @@ def _call_openai_patch_advisor(settings: Settings, request_payload: PatchAdviceR
         },
         "text": {
             "verbosity": "low",
+            "format": {
+                "type": "json_schema",
+                "name": "katana_patch_advice",
+                "strict": True,
+                "schema": PATCH_ADVICE_SCHEMA,
+            },
         },
     }
     req = urllib_request.Request(
@@ -229,6 +289,15 @@ def _call_openai_patch_advisor(settings: Settings, request_payload: PatchAdviceR
             },
         ) from exc
     payload = json.loads(raw)
+    refusal_text = _extract_refusal_text(payload)
+    if refusal_text is not None:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "OpenAI refused patch advice request",
+                "refusal": refusal_text,
+            },
+        )
     advice_json = _extract_response_text(payload)
     try:
         advice_payload = json.loads(advice_json)
