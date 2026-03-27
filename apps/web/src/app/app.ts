@@ -372,6 +372,7 @@ export class App implements OnInit, OnDestroy {
   editorSlotNumber = signal<number | null>(null);
   editorSlotLabel = signal('');
   editorPatchDraft = signal<Record<string, unknown> | null>(null);
+  editorTargetIsActive = signal(false);
   editorBaseFingerprint = signal('');
   editorBaseConfigHash = signal('');
   editorLiveApplyEnabled = signal(true);
@@ -1230,7 +1231,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   canOpenEditor(slot: SlotCard): boolean {
-    return this.hasFullPatch(slot) && this.isActiveSlot(slot);
+    return this.hasFullPatch(slot);
   }
 
   canActivateSlot(slot: SlotCard): boolean {
@@ -1451,12 +1452,14 @@ export class App implements OnInit, OnDestroy {
     }
     this.editorSlotNumber.set(slot.slot);
     this.editorSlotLabel.set(slot.slot_label);
+    this.editorTargetIsActive.set(this.isActiveSlot(slot));
     this.editorPatchDraft.set(draft);
     this.editorBaseFingerprint.set(this.patchFingerprint(draft));
     this.editorBaseConfigHash.set(slot.config_hash_sha256);
     this.editorLiveApplyLastAppliedFingerprint = this.patchFingerprint(draft);
     this.editorLiveApplyQueuedFingerprint = null;
     this.editorLiveApplyInFlight = false;
+    this.editorLiveApplyEnabled.set(this.isActiveSlot(slot));
     this.editorLiveApplyPending.set(false);
     this.editorLiveApplyError.set('');
     this.editorLiveApplyReadbackAt.set('');
@@ -1475,8 +1478,13 @@ export class App implements OnInit, OnDestroy {
     this.stopEditorLiveApplyCountdown();
     this.editorLiveApplyInFlight = false;
     this.editorLiveApplyQueuedFingerprint = null;
+    this.editorTargetIsActive.set(false);
     this.editorBaseFingerprint.set('');
     this.editorBaseConfigHash.set('');
+  }
+
+  editorLiveApplyAvailable(): boolean {
+    return this.editorTargetIsActive();
   }
 
   setEditorLiveApplyEnabled(enabled: boolean): void {
@@ -2101,7 +2109,10 @@ export class App implements OnInit, OnDestroy {
   ampCommittedState(slot: SlotCard): TriState {
     const currentHash = slot.config_hash_sha256;
     const committedHash = slot.committed_hash_sha256;
-    if (!currentHash || !committedHash) {
+    if (!currentHash) {
+      return slot.patch && committedHash ? 'false' : 'unknown';
+    }
+    if (!committedHash) {
       return 'unknown';
     }
     return currentHash === committedHash ? 'true' : 'false';
@@ -2120,7 +2131,7 @@ export class App implements OnInit, OnDestroy {
 
   dbState(slot: SlotCard): TriState {
     if (!slot.config_hash_sha256) {
-      return 'unknown';
+      return slot.patch ? 'false' : 'unknown';
     }
     return slot.is_saved ? 'true' : 'false';
   }
@@ -2131,7 +2142,7 @@ export class App implements OnInit, OnDestroy {
 
   ampStagedState(slot: SlotCard): TriState {
     if (!slot.config_hash_sha256) {
-      return 'unknown';
+      return slot.patch ? 'false' : 'unknown';
     }
     const currentLiveHash = this.currentAmpPatchHash();
     if (!currentLiveHash) {
@@ -2643,21 +2654,34 @@ export class App implements OnInit, OnDestroy {
       const next = this.clonePatch(current);
       mutator(next);
       next['config_hash_sha256'] = '';
+      const slotNumber = this.editorSlotNumber();
+      if (slotNumber !== null) {
+        this.slots.update((cards) =>
+          cards.map((card) => {
+            if (card.slot !== slotNumber) {
+              return card;
+            }
+            return {
+              ...card,
+              patch_name: this.readString(next, 'patch_name') ?? card.patch_name,
+              config_hash_sha256: '',
+              patch: this.clonePatch(next),
+              in_sync: false,
+              out_synced: false,
+              is_saved: false,
+            };
+          }),
+        );
+      }
       return next;
     });
     this.editorLiveApplyError.set('');
     this.editorLiveApplyReadbackAt.set('');
-    const slotNumber = this.editorSlotNumber();
-    if (slotNumber !== null) {
-      this.slots.update((current) =>
-        current.map((card) => (card.slot === slotNumber ? { ...card, out_synced: false, in_sync: false } : card)),
-      );
-    }
     this.scheduleEditorLiveApply();
   }
 
   private scheduleEditorLiveApply(): void {
-    if (!this.editorModalOpen() || !this.editorLiveApplyEnabled()) {
+    if (!this.editorModalOpen() || !this.editorLiveApplyEnabled() || !this.editorLiveApplyAvailable()) {
       return;
     }
     const draftFingerprint = this.editorDraftFingerprint();
@@ -2683,7 +2707,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   private async flushEditorLiveApplyQueue(): Promise<void> {
-    if (!this.editorModalOpen() || !this.editorLiveApplyEnabled()) {
+    if (!this.editorModalOpen() || !this.editorLiveApplyEnabled() || !this.editorLiveApplyAvailable()) {
       return;
     }
     if (this.editorLiveApplyInFlight) {
@@ -2699,7 +2723,7 @@ export class App implements OnInit, OnDestroy {
   private async applyEditorPatchLive(expectedFingerprint: string): Promise<void> {
     const draft = this.editorPatchDraft();
     const slotNumber = this.editorSlotNumber();
-    if (!this.editorLiveApplyEnabled() || draft === null || slotNumber === null || this.editorLiveApplyInFlight) {
+    if (!this.editorLiveApplyEnabled() || !this.editorLiveApplyAvailable() || draft === null || slotNumber === null || this.editorLiveApplyInFlight) {
       return;
     }
     const currentFingerprint = this.patchFingerprint(draft);
