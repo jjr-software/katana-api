@@ -87,6 +87,7 @@ const LIVE_RMS_WINDOW_POINTS = 96;
 const EDITOR_LIVE_APPLY_DEBOUNCE_MS = 2000;
 const EDITOR_LIVE_APPLY_MIN_GAP_MS = 120;
 const AUTO_LEVEL_TOLERANCE_DB = 0.4;
+const AUTO_LEVEL_MEASURE_SEC = 2.0;
 
 interface AmpConnectionTestResponse {
   ok: boolean;
@@ -1380,8 +1381,8 @@ export class App implements OnInit, OnDestroy {
       for (let iteration = 1; iteration <= maxIterations; iteration += 1) {
         this.autoLevelIteration.set(iteration);
         this.autoLevelState.set('measuring');
-        this.pushAutoLevelLog(`Iteration ${iteration}: measuring 10s Max RMS...`);
-        const sample = await this.captureActivePatchMeasurement(slot.slot, 10.0);
+        this.pushAutoLevelLog(`Iteration ${iteration}: measuring ${AUTO_LEVEL_MEASURE_SEC.toFixed(0)}s window...`);
+        const sample = await this.captureActivePatchMeasurement(slot.slot, AUTO_LEVEL_MEASURE_SEC);
         this.autoLevelCurrentRms.set(sample.rms_dbfs);
         this.pushAutoLevelLog(`Iteration ${iteration}: measured ${sample.rms_dbfs.toFixed(2)} dBFS.`);
         if (sample.rms_dbfs <= targetRms + AUTO_LEVEL_TOLERANCE_DB) {

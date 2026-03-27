@@ -474,7 +474,7 @@
               </div>
             </div>
             <p class="small text-secondary mb-0">
-              This waits for live playing, measures the active patch, asks AI for quieter proposals, applies them live, and fails hard if it cannot get under the target in time.
+              This waits for live playing, then works in short 2-second measurement windows while you play, asking AI for quieter proposals and applying them live until it reaches the target or fails.
             </p>
             <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
               <p class="small mb-0">Iteration <code>{{ autoLevelIteration() }}</code></p>
