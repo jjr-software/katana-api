@@ -9,7 +9,13 @@ from sqlalchemy.orm import Session
 from starlette.requests import Request
 from starlette.responses import Response, StreamingResponse
 
-from app.audio_capture import PipeWireLiveMeter, capture_audio_metrics, capture_audio_sample
+from app.audio_capture import (
+    KATANA_CAPTURE_CHANNELS,
+    KATANA_CAPTURE_RATE,
+    KATANA_USB_SOURCE,
+    PipeWireLiveMeter,
+    capture_audio_sample,
+)
 from app.deps import get_db
 from app.models import AudioSample, PatchConfig
 
@@ -19,10 +25,10 @@ router = APIRouter(prefix="/api/v1/audio", tags=["audio"])
 class AudioSampleCreateRequest(BaseModel):
     patch_hash: str | None = Field(default=None, min_length=64, max_length=64)
     slot: int | None = Field(default=None, ge=1, le=8)
-    source: str = Field(default="alsa_input.usb-Roland_KATANA3-01.analog-surround-40", min_length=1, max_length=255)
+    source: str = Field(default=KATANA_USB_SOURCE, min_length=1, max_length=255)
     duration_sec: float = Field(default=2.0, gt=0.2, le=30.0)
-    rate: int = Field(default=48_000, ge=8_000, le=192_000)
-    channels: int = Field(default=2, ge=1, le=8)
+    rate: int = Field(default=KATANA_CAPTURE_RATE, ge=8_000, le=192_000)
+    channels: int = Field(default=KATANA_CAPTURE_CHANNELS, ge=1, le=2)
 
 
 class AudioSampleResponse(BaseModel):
@@ -113,10 +119,10 @@ def list_audio_measurements(
 
 
 class AudioLevelMarkerCaptureRequest(BaseModel):
-    source: str = Field(default="alsa_input.usb-Roland_KATANA3-01.analog-surround-40", min_length=1, max_length=255)
+    source: str = Field(default=KATANA_USB_SOURCE, min_length=1, max_length=255)
     duration_sec: float = Field(default=2.0, gt=0.2, le=30.0)
-    rate: int = Field(default=48_000, ge=8_000, le=192_000)
-    channels: int = Field(default=2, ge=1, le=8)
+    rate: int = Field(default=KATANA_CAPTURE_RATE, ge=8_000, le=192_000)
+    channels: int = Field(default=KATANA_CAPTURE_CHANNELS, ge=1, le=2)
 
 
 def _sse_event(payload: dict) -> str:
@@ -223,14 +229,14 @@ def get_audio_measurement_wav(
 @router.get("/live/sse")
 async def stream_live_audio_measurement_sse(
     request: Request,
-    source: str = "alsa_input.usb-Roland_KATANA3-01.analog-surround-40",
+    source: str = KATANA_USB_SOURCE,
     window_sec: float = 0.5,
-    rate: int = 48_000,
-    channels: int = 2,
+    rate: int = KATANA_CAPTURE_RATE,
+    channels: int = KATANA_CAPTURE_CHANNELS,
 ) -> StreamingResponse:
     bounded_window = max(0.2, min(window_sec, 5.0))
     bounded_rate = max(8_000, min(rate, 192_000))
-    bounded_channels = max(1, min(channels, 8))
+    bounded_channels = max(1, min(channels, 2))
     meter = PipeWireLiveMeter(
         source=source,
         rate=bounded_rate,

@@ -5,6 +5,10 @@ import struct
 import wave
 from dataclasses import dataclass
 
+KATANA_USB_SOURCE = "alsa_input.usb-Roland_KATANA3-01.analog-surround-40"
+KATANA_CAPTURE_RATE = 48_000
+KATANA_CAPTURE_CHANNELS = 1
+
 
 @dataclass(frozen=True)
 class AudioSampleMetrics:
@@ -89,6 +93,35 @@ def _encode_wav_bytes(samples: list[float], rate: int, channels: int) -> bytes:
         return buffer.getvalue()
 
 
+def _channel_map_for_count(channels: int) -> str:
+    if channels == 1:
+        return "FL"
+    if channels == 2:
+        return "FL,FR"
+    raise RuntimeError("Katana capture supports only 1 or 2 channels")
+
+
+def _pw_record_args(source: str, rate: int, channels: int) -> list[str]:
+    if channels <= 0:
+        raise RuntimeError("channels must be > 0")
+    return [
+        "pw-record",
+        "--target",
+        source,
+        "--rate",
+        str(rate),
+        "--channels",
+        str(channels),
+        "--channel-map",
+        _channel_map_for_count(channels),
+        "--format",
+        "f32",
+        "--latency",
+        "256",
+        "-",
+    ]
+
+
 async def capture_audio_sample(
     source: str,
     duration_sec: float,
@@ -100,18 +133,7 @@ async def capture_audio_sample(
     proc = await asyncio.create_subprocess_exec(
         "timeout",
         f"{duration_sec:.3f}",
-        "pw-record",
-        "--target",
-        source,
-        "--rate",
-        str(rate),
-        "--channels",
-        str(channels),
-        "--format",
-        "f32",
-        "--latency",
-        "256",
-        "-",
+        *_pw_record_args(source=source, rate=rate, channels=channels),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
@@ -179,18 +201,7 @@ class PipeWireLiveMeter:
         self._proc = await asyncio.create_subprocess_exec(
             "timeout",
             "365d",
-            "pw-record",
-            "--target",
-            self.source,
-            "--rate",
-            str(self.rate),
-            "--channels",
-            str(self.channels),
-            "--format",
-            "f32",
-            "--latency",
-            "256",
-            "-",
+            *_pw_record_args(source=self.source, rate=self.rate, channels=self.channels),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
