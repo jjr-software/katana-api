@@ -494,7 +494,7 @@ export class App implements OnInit, OnDestroy {
       this.selectedAmpSlot.set(slot.slot);
       this.status.set(`Activated ${slot.slot_label} on amp (${this.formatMs(activated.activate_ms)}). Reading patch state back...`);
 
-      const syncResponse = await fetch(`/api/v1/amp/slots/${slot.slot}/sync`, {
+      const syncResponse = await fetch(`/api/v1/amp/slots/${slot.slot}/readback`, {
         method: 'POST',
         cache: 'no-store',
       });

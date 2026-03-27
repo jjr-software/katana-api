@@ -386,6 +386,22 @@ async def activate_single_slot(
     )
 
 
+@router.post("/slots/{slot:int}/readback", response_model=SlotSyncResponse)
+async def readback_single_slot(
+    slot: int,
+    db: Session = Depends(get_db),
+    client: AmpClient = Depends(get_amp_client),
+) -> SlotSyncResponse:
+    synced_at = datetime.now().isoformat(timespec="seconds")
+    item = await client.read_current_slot_state(slot=slot, synced_at=synced_at)
+    curated_by_hash = _load_curation_by_hash(db, [item.config_hash_sha256])
+    saved_hashes = _load_saved_hashes(db, [item.config_hash_sha256])
+    return SlotSyncResponse(
+        synced_at=synced_at,
+        slot=SlotPatchSummaryResponse(**_slot_to_dict(item, curated_by_hash, saved_hashes)),
+    )
+
+
 @router.post("/slots/{slot:int}/write", response_model=SlotWriteResponse)
 async def write_single_slot(
     slot: int,

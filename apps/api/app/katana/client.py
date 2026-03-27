@@ -212,6 +212,26 @@ class AmpClient:
             await self._select_patch(slot)
             return int(round((time.perf_counter() - started) * 1000))
 
+    async def read_current_slot_state(self, slot: int, synced_at: str, settle_seconds: float = 0.15) -> SlotPatchSummary:
+        if slot < 1 or slot > 8:
+            raise AmpClientError(f"slot out of range: {slot} (expected 1..8)")
+
+        async with self._port_lock():
+            started = time.perf_counter()
+            await self._send_only(EDITOR_MODE_ON)
+            if settle_seconds > 0:
+                await asyncio.sleep(settle_seconds)
+            payload = await self._read_selected_patch_payload()
+            return SlotPatchSummary(
+                slot=slot,
+                slot_label=slot_label(slot),
+                patch_name=str(payload.get("patch_name", "")),
+                config_hash_sha256=str(payload["config_hash_sha256"]),
+                payload=payload,
+                synced_at=synced_at,
+                slot_sync_ms=int(round((time.perf_counter() - started) * 1000)),
+            )
+
     async def write_slot_state(self, slot: int, patch_payload: dict[str, Any], synced_at: str) -> SlotPatchSummary:
         if slot < 1 or slot > 8:
             raise AmpClientError(f"slot out of range: {slot} (expected 1..8)")
