@@ -479,6 +479,31 @@
             </article>
 
             <article class="border rounded p-2">
+              <h4 class="h6 mb-2">Routing</h4>
+              <div class="row g-2">
+                <div class="col-6 col-md-4"><label class="form-label small mb-1">Chain Pattern</label><input type="number" min="0" max="127" class="form-control form-control-sm" [value]="editorRoutingNumber('chain_pattern') ?? 0" (input)="setEditorRoutingNumber('chain_pattern', $any($event.target).value)" /></div>
+                <div class="col-6 col-md-4"><label class="form-label small mb-1">Cab Resonance</label><input type="number" min="0" max="127" class="form-control form-control-sm" [value]="editorRoutingNumber('cabinet_resonance') ?? 0" (input)="setEditorRoutingNumber('cabinet_resonance', $any($event.target).value)" /></div>
+                <div class="col-6 col-md-4"><label class="form-label small mb-1">Master Key</label><input type="number" min="0" max="127" class="form-control form-control-sm" [value]="editorRoutingNumber('master_key') ?? 0" (input)="setEditorRoutingNumber('master_key', $any($event.target).value)" /></div>
+              </div>
+            </article>
+
+            <article class="border rounded p-2">
+              <h4 class="h6 mb-2">Colors</h4>
+              <div class="row g-2">
+                @for (stageName of ['booster', 'mod', 'fx', 'delay', 'reverb']; track stageName) {
+                  <div class="col-6 col-md-4">
+                    <label class="form-label small mb-1 text-capitalize">{{ stageName }}</label>
+                    <select class="form-select form-select-sm" (change)="setEditorColorIndex($any(stageName), $any($event.target).value)">
+                      @for (opt of editorColorOptions(); track opt.value) {
+                        <option [value]="opt.value" [selected]="editorColorIndex($any(stageName)) === opt.value">{{ opt.label }}</option>
+                      }
+                    </select>
+                  </div>
+                }
+              </div>
+            </article>
+
+            <article class="border rounded p-2">
               <h4 class="h6 mb-2">Amp</h4>
               <div class="row g-2">
                 <div class="col-6 col-md-4">
@@ -504,6 +529,16 @@
                 <div class="col-6 col-md-4"><label class="form-label small mb-1">Middle</label><input type="number" min="0" max="100" class="form-control form-control-sm" [value]="editorAmpNumber('middle') ?? 0" (input)="setEditorAmpNumber('middle', $any($event.target).value)" /></div>
                 <div class="col-6 col-md-4"><label class="form-label small mb-1">Treble</label><input type="number" min="0" max="100" class="form-control form-control-sm" [value]="editorAmpNumber('treble') ?? 0" (input)="setEditorAmpNumber('treble', $any($event.target).value)" /></div>
                 <div class="col-6 col-md-4"><label class="form-label small mb-1">Presence</label><input type="number" min="0" max="100" class="form-control form-control-sm" [value]="editorAmpNumber('presence') ?? 0" (input)="setEditorAmpNumber('presence', $any($event.target).value)" /></div>
+              </div>
+            </article>
+
+            <article class="border rounded p-2">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <h4 class="h6 mb-0">Delay Extras</h4>
+                <label class="form-check-label small d-flex align-items-center gap-1">
+                  <input class="form-check-input m-0" type="checkbox" [checked]="editorDelay2On()" (change)="setEditorDelay2On($any($event.target).checked)" />
+                  <span>Delay2 Enabled</span>
+                </label>
               </div>
             </article>
 
@@ -549,6 +584,137 @@
                 </div>
               </article>
             }
+
+            @for (eqName of ['eq1', 'eq2']; track eqName) {
+              <article class="border rounded p-2">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <h4 class="h6 mb-0 text-uppercase" [class.text-success]="editorEqOn($any(eqName))" [class.text-danger]="!editorEqOn($any(eqName))">{{ eqName }}</h4>
+                  <label class="form-check-label small d-flex align-items-center gap-1">
+                    <input class="form-check-input m-0" type="checkbox" [checked]="editorEqOn($any(eqName))" (change)="setEditorEqOn($any(eqName), $any($event.target).checked)" />
+                    <span>Enabled</span>
+                  </label>
+                </div>
+                <div class="row g-2">
+                  <div class="col-6 col-md-4">
+                    <label class="form-label small mb-1">Type</label>
+                    <select class="form-select form-select-sm" (change)="setEditorEqNumber($any(eqName), 'type', $any($event.target).value)">
+                      @for (opt of editorEqTypeOptions(); track opt.value) {
+                        <option [value]="opt.value" [selected]="editorEqNumber($any(eqName), 'type') === opt.value">{{ opt.label }}</option>
+                      }
+                    </select>
+                  </div>
+                  <div class="col-6 col-md-4">
+                    <label class="form-label small mb-1">Position</label>
+                    <select class="form-select form-select-sm" (change)="setEditorEqNumber($any(eqName), 'position', $any($event.target).value)">
+                      @for (opt of editorEqPositionOptions(); track opt.value) {
+                        <option [value]="opt.value" [selected]="editorEqNumber($any(eqName), 'position') === opt.value">{{ opt.label }}</option>
+                      }
+                    </select>
+                  </div>
+                </div>
+                <div class="mt-2">
+                  <p class="small text-secondary mb-1">PEQ Raw</p>
+                  <div class="row g-2">
+                    @for (field of editorEqRawFields($any(eqName), 'peq_raw'); track field.id) {
+                      <div class="col-4 col-md-2">
+                        <label class="form-label small mb-1">{{ field.label }}</label>
+                        <input type="number" min="0" max="127" class="form-control form-control-sm" [value]="field.value" (input)="setEditorEqRawValue($any(eqName), 'peq_raw', $index, $any($event.target).value)" />
+                      </div>
+                    }
+                  </div>
+                </div>
+                <div class="mt-2">
+                  <p class="small text-secondary mb-1">GE-10 Raw</p>
+                  <div class="row g-2">
+                    @for (field of editorEqRawFields($any(eqName), 'ge10_raw'); track field.id) {
+                      <div class="col-4 col-md-2">
+                        <label class="form-label small mb-1">{{ field.label }}</label>
+                        <input type="number" min="0" max="127" class="form-control form-control-sm" [value]="field.value" (input)="setEditorEqRawValue($any(eqName), 'ge10_raw', $index, $any($event.target).value)" />
+                      </div>
+                    }
+                  </div>
+                </div>
+              </article>
+            }
+
+            <article class="border rounded p-2">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <h4 class="h6 mb-0">NS</h4>
+                <label class="form-check-label small d-flex align-items-center gap-1">
+                  <input class="form-check-input m-0" type="checkbox" [checked]="editorNsOn()" (change)="setEditorNsOn($any($event.target).checked)" />
+                  <span>Enabled</span>
+                </label>
+              </div>
+              <div class="row g-2">
+                <div class="col-6 col-md-4"><label class="form-label small mb-1">Threshold</label><input type="number" min="0" max="127" class="form-control form-control-sm" [value]="editorNsNumber('threshold') ?? 0" (input)="setEditorNsNumber('threshold', $any($event.target).value)" /></div>
+                <div class="col-6 col-md-4"><label class="form-label small mb-1">Release</label><input type="number" min="0" max="127" class="form-control form-control-sm" [value]="editorNsNumber('release') ?? 0" (input)="setEditorNsNumber('release', $any($event.target).value)" /></div>
+              </div>
+            </article>
+
+            <article class="border rounded p-2">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <h4 class="h6 mb-0">Send / Return</h4>
+                <label class="form-check-label small d-flex align-items-center gap-1">
+                  <input class="form-check-input m-0" type="checkbox" [checked]="editorSendReturnOn()" (change)="setEditorSendReturnOn($any($event.target).checked)" />
+                  <span>Enabled</span>
+                </label>
+              </div>
+              <div class="row g-2">
+                <div class="col-6 col-md-3"><label class="form-label small mb-1">Position</label><input type="number" min="0" max="127" class="form-control form-control-sm" [value]="editorSendReturnNumber('position') ?? 0" (input)="setEditorSendReturnNumber('position', $any($event.target).value)" /></div>
+                <div class="col-6 col-md-3"><label class="form-label small mb-1">Mode</label><input type="number" min="0" max="127" class="form-control form-control-sm" [value]="editorSendReturnNumber('mode') ?? 0" (input)="setEditorSendReturnNumber('mode', $any($event.target).value)" /></div>
+                <div class="col-6 col-md-3"><label class="form-label small mb-1">Send Level</label><input type="number" min="0" max="127" class="form-control form-control-sm" [value]="editorSendReturnNumber('send_level') ?? 0" (input)="setEditorSendReturnNumber('send_level', $any($event.target).value)" /></div>
+                <div class="col-6 col-md-3"><label class="form-label small mb-1">Return Level</label><input type="number" min="0" max="127" class="form-control form-control-sm" [value]="editorSendReturnNumber('return_level') ?? 0" (input)="setEditorSendReturnNumber('return_level', $any($event.target).value)" /></div>
+              </div>
+            </article>
+
+            <article class="border rounded p-2">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <h4 class="h6 mb-0">Solo</h4>
+                <label class="form-check-label small d-flex align-items-center gap-1">
+                  <input class="form-check-input m-0" type="checkbox" [checked]="editorSoloOn()" (change)="setEditorSoloOn($any($event.target).checked)" />
+                  <span>Enabled</span>
+                </label>
+              </div>
+              <div class="row g-2">
+                <div class="col-6 col-md-4"><label class="form-label small mb-1">Level</label><input type="number" min="0" max="127" class="form-control form-control-sm" [value]="editorSoloLevel() ?? 0" (input)="setEditorSoloLevel($any($event.target).value)" /></div>
+              </div>
+            </article>
+
+            <article class="border rounded p-2">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <h4 class="h6 mb-0">Pedal FX</h4>
+                <label class="form-check-label small d-flex align-items-center gap-1">
+                  <input class="form-check-input m-0" type="checkbox" [checked]="editorPedalFxOn()" (change)="setEditorPedalFxOn($any($event.target).checked)" />
+                  <span>Enabled</span>
+                </label>
+              </div>
+              <div class="row g-2">
+                <div class="col-6 col-md-4"><label class="form-label small mb-1">Position</label><input type="number" min="0" max="127" class="form-control form-control-sm" [value]="editorPedalFxNumber('position') ?? 0" (input)="setEditorPedalFxNumber('position', $any($event.target).value)" /></div>
+                <div class="col-6 col-md-4"><label class="form-label small mb-1">Type</label><input type="number" min="0" max="127" class="form-control form-control-sm" [value]="editorPedalFxNumber('type') ?? 0" (input)="setEditorPedalFxNumber('type', $any($event.target).value)" /></div>
+              </div>
+              <div class="mt-2">
+                <p class="small text-secondary mb-1">COM Raw</p>
+                <div class="row g-2">
+                  @for (field of editorPedalFxComRawFields(); track field.id) {
+                    <div class="col-4 col-md-2">
+                      <label class="form-label small mb-1">{{ field.label }}</label>
+                      <input type="number" min="0" max="127" class="form-control form-control-sm" [value]="field.value" (input)="setEditorPedalFxComRawValue($index, $any($event.target).value)" />
+                    </div>
+                  }
+                </div>
+              </div>
+              <div class="mt-2">
+                <p class="small text-secondary mb-1">Raw</p>
+                <div class="row g-2">
+                  @for (field of editorPedalFxRawFields(); track field.id) {
+                    <div class="col-4 col-md-2">
+                      <label class="form-label small mb-1">{{ field.label }}</label>
+                      <input type="number" min="0" max="127" class="form-control form-control-sm" [value]="field.value" (input)="setEditorPedalFxRawValue($index, $any($event.target).value)" />
+                    </div>
+                  }
+                </div>
+              </div>
+            </article>
           </div>
           <footer class="p-3 pt-2 border-top d-flex gap-2 justify-content-end">
             <button type="button" class="btn btn-sm btn-outline-secondary" (click)="closeEditorModal()">Close</button>

@@ -305,6 +305,14 @@ interface SlotCard {
 }
 
 type StageName = 'booster' | 'mod' | 'fx' | 'delay' | 'reverb';
+type ColorStageName = 'booster' | 'mod' | 'fx' | 'delay' | 'reverb';
+type EqStageName = 'eq1' | 'eq2';
+
+interface RawValueField {
+  id: string;
+  label: string;
+  value: number;
+}
 
 interface TypeOption {
   value: number;
@@ -1680,6 +1688,246 @@ export class App implements OnInit, OnDestroy {
     return AMP_TYPE_NAMES.map((label, index) => ({ value: index, label }));
   }
 
+  editorRoutingNumber(field: 'chain_pattern' | 'cabinet_resonance' | 'master_key'): number | null {
+    const routing = this.readObject(this.editorPatchDraft(), 'routing');
+    return this.readNumber(routing, field);
+  }
+
+  setEditorRoutingNumber(field: 'chain_pattern' | 'cabinet_resonance' | 'master_key', value: string): void {
+    const parsed = this.parseInteger(value);
+    this.updateEditorPatch((draft) => {
+      const routing = this.ensureObject(draft, 'routing');
+      routing[field] = parsed;
+    });
+  }
+
+  editorColorIndex(stageName: ColorStageName): number {
+    const colors = this.readObject(this.editorPatchDraft(), 'colors');
+    const stage = this.readObject(colors, stageName);
+    const index = this.readNumber(stage, 'index');
+    return index ?? 0;
+  }
+
+  setEditorColorIndex(stageName: ColorStageName, value: string): void {
+    const parsed = this.clampInteger(this.parseInteger(value), 0, 2);
+    this.updateEditorPatch((draft) => {
+      const colors = this.ensureObject(draft, 'colors');
+      const stage = this.ensureObject(colors, stageName);
+      stage['index'] = parsed;
+      stage['name'] = this.colorName(parsed);
+    });
+  }
+
+  editorColorOptions(): TypeOption[] {
+    return [
+      { value: 0, label: 'Green' },
+      { value: 1, label: 'Red' },
+      { value: 2, label: 'Yellow' },
+    ];
+  }
+
+  editorDelay2On(): boolean {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const delay = this.readObject(stages, 'delay');
+    return this.readBoolean(delay, 'delay2_on');
+  }
+
+  setEditorDelay2On(checked: boolean): void {
+    this.updateEditorPatch((draft) => {
+      const stages = this.ensureObject(draft, 'stages');
+      const delay = this.ensureObject(stages, 'delay');
+      delay['delay2_on'] = checked;
+    });
+  }
+
+  editorEqNumber(eqName: EqStageName, field: 'position' | 'type'): number | null {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const eq = this.readObject(stages, eqName);
+    return this.readNumber(eq, field);
+  }
+
+  setEditorEqNumber(eqName: EqStageName, field: 'position' | 'type', value: string): void {
+    const parsed = this.parseInteger(value);
+    this.updateEditorPatch((draft) => {
+      const stages = this.ensureObject(draft, 'stages');
+      const eq = this.ensureObject(stages, eqName);
+      eq[field] = parsed;
+    });
+  }
+
+  editorEqOn(eqName: EqStageName): boolean {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const eq = this.readObject(stages, eqName);
+    return this.readBoolean(eq, 'on');
+  }
+
+  setEditorEqOn(eqName: EqStageName, checked: boolean): void {
+    this.updateEditorPatch((draft) => {
+      const stages = this.ensureObject(draft, 'stages');
+      const eq = this.ensureObject(stages, eqName);
+      eq['on'] = checked;
+    });
+  }
+
+  editorEqTypeOptions(): TypeOption[] {
+    return EQ_TYPE_NAMES.map((label, index) => ({ value: index, label }));
+  }
+
+  editorEqPositionOptions(): TypeOption[] {
+    return EQ_POSITION_NAMES.map((label, index) => ({ value: index, label }));
+  }
+
+  editorEqRawFields(eqName: EqStageName, rawKey: 'peq_raw' | 'ge10_raw'): RawValueField[] {
+    return this.editorNestedRawFields(['stages', eqName], rawKey, `${eqName}-${rawKey}`);
+  }
+
+  setEditorEqRawValue(eqName: EqStageName, rawKey: 'peq_raw' | 'ge10_raw', index: number, value: string): void {
+    this.setEditorNestedRawValue(['stages', eqName], rawKey, index, value);
+  }
+
+  editorNsOn(): boolean {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const ns = this.readObject(stages, 'ns');
+    return this.readBoolean(ns, 'on');
+  }
+
+  setEditorNsOn(checked: boolean): void {
+    this.updateEditorPatch((draft) => {
+      const stages = this.ensureObject(draft, 'stages');
+      const ns = this.ensureObject(stages, 'ns');
+      ns['on'] = checked;
+      this.syncBooleanRawField(ns, 'raw', 0, checked);
+    });
+  }
+
+  editorNsNumber(field: 'threshold' | 'release'): number | null {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const ns = this.readObject(stages, 'ns');
+    return this.readNumber(ns, field);
+  }
+
+  setEditorNsNumber(field: 'threshold' | 'release', value: string): void {
+    const parsed = this.parseInteger(value);
+    const rawIndex = field === 'threshold' ? 1 : 2;
+    this.updateEditorPatch((draft) => {
+      const stages = this.ensureObject(draft, 'stages');
+      const ns = this.ensureObject(stages, 'ns');
+      ns[field] = parsed;
+      this.syncNumericRawField(ns, 'raw', rawIndex, parsed);
+    });
+  }
+
+  editorSendReturnOn(): boolean {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const block = this.readObject(stages, 'send_return');
+    return this.readBoolean(block, 'on');
+  }
+
+  setEditorSendReturnOn(checked: boolean): void {
+    this.updateEditorPatch((draft) => {
+      const stages = this.ensureObject(draft, 'stages');
+      const block = this.ensureObject(stages, 'send_return');
+      block['on'] = checked;
+      this.syncBooleanRawField(block, 'raw', 0, checked);
+    });
+  }
+
+  editorSendReturnNumber(field: 'position' | 'mode' | 'send_level' | 'return_level'): number | null {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const block = this.readObject(stages, 'send_return');
+    return this.readNumber(block, field);
+  }
+
+  setEditorSendReturnNumber(field: 'position' | 'mode' | 'send_level' | 'return_level', value: string): void {
+    const parsed = this.parseInteger(value);
+    const rawIndexByField = { position: 1, mode: 2, send_level: 3, return_level: 4 } as const;
+    this.updateEditorPatch((draft) => {
+      const stages = this.ensureObject(draft, 'stages');
+      const block = this.ensureObject(stages, 'send_return');
+      block[field] = parsed;
+      this.syncNumericRawField(block, 'raw', rawIndexByField[field], parsed);
+    });
+  }
+
+  editorSoloOn(): boolean {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const block = this.readObject(stages, 'solo');
+    return this.readBoolean(block, 'on');
+  }
+
+  setEditorSoloOn(checked: boolean): void {
+    this.updateEditorPatch((draft) => {
+      const stages = this.ensureObject(draft, 'stages');
+      const block = this.ensureObject(stages, 'solo');
+      block['on'] = checked;
+      this.syncBooleanRawField(block, 'raw', 0, checked);
+    });
+  }
+
+  editorSoloLevel(): number | null {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const block = this.readObject(stages, 'solo');
+    return this.readNumber(block, 'effect_level');
+  }
+
+  setEditorSoloLevel(value: string): void {
+    const parsed = this.parseInteger(value);
+    this.updateEditorPatch((draft) => {
+      const stages = this.ensureObject(draft, 'stages');
+      const block = this.ensureObject(stages, 'solo');
+      block['effect_level'] = parsed;
+      this.syncNumericRawField(block, 'raw', 1, parsed);
+    });
+  }
+
+  editorPedalFxOn(): boolean {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const block = this.readObject(stages, 'pedalfx');
+    return this.readBoolean(block, 'on');
+  }
+
+  setEditorPedalFxOn(checked: boolean): void {
+    this.updateEditorPatch((draft) => {
+      const stages = this.ensureObject(draft, 'stages');
+      const block = this.ensureObject(stages, 'pedalfx');
+      block['on'] = checked;
+      this.syncBooleanRawField(block, 'raw_com', 1, checked);
+    });
+  }
+
+  editorPedalFxNumber(field: 'position' | 'type'): number | null {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const block = this.readObject(stages, 'pedalfx');
+    return this.readNumber(block, field);
+  }
+
+  setEditorPedalFxNumber(field: 'position' | 'type', value: string): void {
+    const parsed = this.parseInteger(value);
+    const rawIndexByField = { position: 0, type: 2 } as const;
+    this.updateEditorPatch((draft) => {
+      const stages = this.ensureObject(draft, 'stages');
+      const block = this.ensureObject(stages, 'pedalfx');
+      block[field] = parsed;
+      this.syncNumericRawField(block, 'raw_com', rawIndexByField[field], parsed);
+    });
+  }
+
+  editorPedalFxComRawFields(): RawValueField[] {
+    return this.editorNestedRawFields(['stages', 'pedalfx'], 'raw_com', 'pedalfx-raw-com');
+  }
+
+  setEditorPedalFxComRawValue(index: number, value: string): void {
+    this.setEditorNestedRawValue(['stages', 'pedalfx'], 'raw_com', index, value);
+  }
+
+  editorPedalFxRawFields(): RawValueField[] {
+    return this.editorNestedRawFields(['stages', 'pedalfx'], 'raw', 'pedalfx-raw');
+  }
+
+  setEditorPedalFxRawValue(index: number, value: string): void {
+    this.setEditorNestedRawValue(['stages', 'pedalfx'], 'raw', index, value);
+  }
+
   editorStageOn(stageName: StageName): boolean {
     const stages = this.readObject(this.editorPatchDraft(), 'stages');
     const stage = this.readObject(stages, stageName);
@@ -2480,6 +2728,19 @@ export class App implements OnInit, OnDestroy {
     return `Unknown (${index})`;
   }
 
+  private colorName(index: number): string {
+    if (index === 0) {
+      return 'green';
+    }
+    if (index === 1) {
+      return 'red';
+    }
+    if (index === 2) {
+      return 'yellow';
+    }
+    return `unknown(${index})`;
+  }
+
   private readObject(value: unknown, key?: string): Record<string, unknown> | null {
     let candidate: unknown = value;
     if (key !== undefined) {
@@ -2508,6 +2769,16 @@ export class App implements OnInit, OnDestroy {
     const rawUnknown = stage['raw'];
     if (!Array.isArray(rawUnknown)) {
       return [];
+    }
+    return rawUnknown.map((item) => this.parseUnknownNumber(item));
+  }
+
+  private ensureRawArray(target: Record<string, unknown>, key: string, length: number): number[] {
+    const rawUnknown = target[key];
+    if (!Array.isArray(rawUnknown) || rawUnknown.length !== length) {
+      const created = Array.from({ length }, () => 0);
+      target[key] = created;
+      return created;
     }
     return rawUnknown.map((item) => this.parseUnknownNumber(item));
   }
@@ -2643,6 +2914,68 @@ export class App implements OnInit, OnDestroy {
     if (raw.length > 0) {
       stage['type'] = raw[0];
     }
+  }
+
+  private editorNestedRawFields(path: string[], rawKey: string, idPrefix: string): RawValueField[] {
+    const obj = this.readNestedObject(this.editorPatchDraft(), path);
+    if (!obj) {
+      return [];
+    }
+    const raw = obj[rawKey];
+    if (!Array.isArray(raw)) {
+      return [];
+    }
+    return raw.map((item, index) => ({
+      id: `${idPrefix}-${index}`,
+      label: `#${index}`,
+      value: this.parseUnknownNumber(item),
+    }));
+  }
+
+  private setEditorNestedRawValue(path: string[], rawKey: string, index: number, value: string): void {
+    const parsed = this.clampInteger(this.parseInteger(value), 0, 127);
+    this.updateEditorPatch((draft) => {
+      const obj = this.ensureNestedObject(draft, path);
+      const rawUnknown = obj[rawKey];
+      if (!Array.isArray(rawUnknown)) {
+        return;
+      }
+      const raw = rawUnknown.map((item) => this.parseUnknownNumber(item));
+      if (index < 0 || index >= raw.length) {
+        return;
+      }
+      raw[index] = parsed;
+      obj[rawKey] = raw;
+    });
+  }
+
+  private readNestedObject(source: Record<string, unknown> | null, path: string[]): Record<string, unknown> | null {
+    let current: Record<string, unknown> | null = source;
+    for (const key of path) {
+      current = this.readObject(current, key);
+      if (!current) {
+        return null;
+      }
+    }
+    return current;
+  }
+
+  private ensureNestedObject(parent: Record<string, unknown>, path: string[]): Record<string, unknown> {
+    let current = parent;
+    for (const key of path) {
+      current = this.ensureObject(current, key);
+    }
+    return current;
+  }
+
+  private syncNumericRawField(target: Record<string, unknown>, rawKey: string, index: number, value: number): void {
+    const raw = this.ensureRawArray(target, rawKey, Math.max(index + 1, Array.isArray(target[rawKey]) ? (target[rawKey] as unknown[]).length : index + 1));
+    raw[index] = value;
+    target[rawKey] = raw;
+  }
+
+  private syncBooleanRawField(target: Record<string, unknown>, rawKey: string, index: number, checked: boolean): void {
+    this.syncNumericRawField(target, rawKey, index, checked ? 1 : 0);
   }
 
   private stageParamSchema(stageName: StageName): readonly StageParamSchema[] {
