@@ -2989,7 +2989,7 @@ export class App implements OnInit, OnDestroy {
     return `${remaining.toFixed(1)}s`;
   }
 
-  editorLiveApplyHasReadback(): boolean {
+  editorLiveApplyHasApplied(): boolean {
     return this.editorLiveApplyReadbackAt() !== '' && !this.editorIsModified();
   }
 

@@ -436,8 +436,8 @@
                   <code class="text-warning">applying state...</code>
                 } @else if (editorLiveApplyError()) {
                   <code class="text-danger">error</code>
-                } @else if (editorLiveApplyHasReadback()) {
-                  <code class="text-info">read state back</code>
+                } @else if (editorLiveApplyHasApplied()) {
+                  <code class="text-info">applied</code>
                 } @else if (editorLiveApplyEnabled() && editorLiveApplyCountdownSec() !== null) {
                   <code class="text-warning">grace {{ editorLiveApplyGraceLabel() }}</code>
                 } @else if (editorLiveApplyEnabled()) {
@@ -446,9 +446,9 @@
                   <code>disabled</code>
                 }
               </p>
-              @if (editorLiveApplyHasReadback()) {
+              @if (editorLiveApplyHasApplied()) {
                 <p class="small mb-0 text-secondary">
-                  Readback At: <code>{{ editorLiveApplyReadbackAt() }}</code>
+                  Applied At: <code>{{ editorLiveApplyReadbackAt() }}</code>
                 </p>
               }
               <p class="small mb-0 text-secondary">

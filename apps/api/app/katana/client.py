@@ -184,7 +184,9 @@ class AmpClient:
         async with self._port_lock():
             await self._send_only(EDITOR_MODE_ON)
             await self._apply_selected_patch_payload(patch_payload)
-            return CurrentPatchSnapshot(payload=await self._read_selected_patch_payload())
+            payload = self._clone_patch_payload(patch_payload)
+            payload["config_hash_sha256"] = self._config_hash(payload)
+            return CurrentPatchSnapshot(payload=payload)
 
     async def read_slots_state(self, synced_at: str) -> SlotsStateSnapshot:
         dump = await self.full_amp_dump(synced_at=synced_at)
@@ -859,6 +861,12 @@ class AmpClient:
     @staticmethod
     def _config_hash(payload: dict[str, Any]) -> str:
         return snapshot_hash(payload)
+
+    @staticmethod
+    def _clone_patch_payload(payload: dict[str, Any]) -> dict[str, Any]:
+        import json
+
+        return json.loads(json.dumps(payload))
 
     @staticmethod
     def is_busy_error(detail: str) -> bool:
