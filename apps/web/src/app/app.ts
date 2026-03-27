@@ -2128,6 +2128,20 @@ export class App implements OnInit, OnDestroy {
     return EQ_POSITION_NAMES.map((label, index) => ({ value: index, label }));
   }
 
+  editorEqType(eqName: EqStageName): number | null {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const eq = this.readObject(stages, eqName);
+    return this.readNumber(eq, 'type');
+  }
+
+  editorEqIsParametric(eqName: EqStageName): boolean {
+    return this.editorEqType(eqName) !== 1;
+  }
+
+  editorEqIsGe10(eqName: EqStageName): boolean {
+    return this.editorEqType(eqName) === 1;
+  }
+
   editorEqRawFields(eqName: EqStageName, rawKey: 'peq_raw' | 'ge10_raw'): RawValueField[] {
     return this.editorNestedRawFields(['stages', eqName], rawKey, `${eqName}-${rawKey}`);
   }

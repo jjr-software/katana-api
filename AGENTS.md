@@ -1599,3 +1599,16 @@
   - refusal blocks are detected explicitly and surfaced as API errors.
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-27 (EQ Editor Type Gating Fix)
+- Fixed EQ editor rendering in:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Root cause:
+  - the editor always rendered both `PEQ Raw` and `GE-10 Spectrum` sections regardless of the selected EQ type.
+- Changes:
+  - added explicit editor helpers for current EQ type,
+  - `Parametric EQ` now shows only PEQ controls,
+  - `GE-10` now shows only GE-10 spectrum controls.
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
