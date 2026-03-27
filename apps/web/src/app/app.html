@@ -129,14 +129,16 @@
                     >
                       {{ slotDbStatusLabel(slot) }}
                     </span>
-                    <span
-                      class="badge rounded-pill"
-                      [class.text-bg-success]="ampStagedState(slot) === 'true'"
-                      [class.text-bg-danger]="ampStagedState(slot) === 'false'"
-                      [class.text-bg-secondary]="ampStagedState(slot) === 'unknown'"
-                    >
-                      {{ slotLiveStatusLabel(slot) }}
-                    </span>
+                    @if (isActiveSlot(slot)) {
+                      <span
+                        class="badge rounded-pill"
+                        [class.text-bg-success]="ampStagedState(slot) === 'true'"
+                        [class.text-bg-danger]="ampStagedState(slot) === 'false'"
+                        [class.text-bg-secondary]="ampStagedState(slot) === 'unknown'"
+                      >
+                        {{ slotLiveStatusLabel(slot) }}
+                      </span>
+                    }
                   </p>
                   <div class="d-flex flex-wrap gap-2 mb-2">
                     @if (canActivateSlot(slot)) {
@@ -213,14 +215,16 @@
                     >
                       {{ slotDbStatusLabel(slot) }}
                     </span>
-                    <span
-                      class="badge rounded-pill"
-                      [class.text-bg-success]="ampStagedState(slot) === 'true'"
-                      [class.text-bg-danger]="ampStagedState(slot) === 'false'"
-                      [class.text-bg-secondary]="ampStagedState(slot) === 'unknown'"
-                    >
-                      {{ slotLiveStatusLabel(slot) }}
-                    </span>
+                    @if (isActiveSlot(slot)) {
+                      <span
+                        class="badge rounded-pill"
+                        [class.text-bg-success]="ampStagedState(slot) === 'true'"
+                        [class.text-bg-danger]="ampStagedState(slot) === 'false'"
+                        [class.text-bg-secondary]="ampStagedState(slot) === 'unknown'"
+                      >
+                        {{ slotLiveStatusLabel(slot) }}
+                      </span>
+                    }
                   </p>
                   <div class="d-flex flex-wrap gap-2 mb-2">
                     @if (canActivateSlot(slot)) {
