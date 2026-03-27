@@ -23,6 +23,13 @@ class AudioCaptureResult:
     wav_bytes: bytes
 
 
+@dataclass(frozen=True)
+class LiveAudioMetrics:
+    rms_dbfs: float
+    peak_dbfs: float
+    sample_count: int
+
+
 def _linear_to_dbfs(value: float) -> float:
     if value <= 1e-12:
         return -120.0
@@ -39,6 +46,25 @@ def _decode_f32le_samples(raw: bytes) -> list[float]:
         if math.isfinite(v):
             out.append(max(-1.0, min(1.0, float(v))))
     return out
+
+
+def analyze_f32le_metrics(raw: bytes) -> LiveAudioMetrics | None:
+    samples = _decode_f32le_samples(raw)
+    if not samples:
+        return None
+    s2 = 0.0
+    peak = 0.0
+    for value in samples:
+        amp = abs(value)
+        s2 += value * value
+        if amp > peak:
+            peak = amp
+    rms = math.sqrt(s2 / len(samples))
+    return LiveAudioMetrics(
+        rms_dbfs=round(_linear_to_dbfs(rms), 3),
+        peak_dbfs=round(_linear_to_dbfs(peak), 3),
+        sample_count=len(samples),
+    )
 
 
 def _encode_wav_bytes(samples: list[float], rate: int, channels: int) -> bytes:
@@ -103,18 +129,13 @@ async def capture_audio_sample(
     samples = _decode_f32le_samples(stdout_bytes)
     if not samples:
         raise RuntimeError("no audio samples captured")
-    s2 = 0.0
-    peak = 0.0
-    for v in samples:
-        a = abs(v)
-        if a > peak:
-            peak = a
-        s2 += v * v
-    rms = math.sqrt(s2 / len(samples))
+    analyzed = analyze_f32le_metrics(stdout_bytes)
+    if analyzed is None:
+        raise RuntimeError("no audio samples captured")
     metrics = AudioSampleMetrics(
-        rms_dbfs=round(_linear_to_dbfs(rms), 3),
-        peak_dbfs=round(_linear_to_dbfs(peak), 3),
-        sample_count=len(samples),
+        rms_dbfs=analyzed.rms_dbfs,
+        peak_dbfs=analyzed.peak_dbfs,
+        sample_count=analyzed.sample_count,
         source=source,
         duration_sec=float(duration_sec),
         rate=int(rate),
@@ -139,3 +160,69 @@ async def capture_audio_metrics(
         channels=channels,
     )
     return captured.metrics
+
+
+class PipeWireLiveMeter:
+    def __init__(self, source: str, rate: int, channels: int, window_sec: float) -> None:
+        self.source = source
+        self.rate = int(rate)
+        self.channels = int(channels)
+        self.window_sec = float(window_sec)
+        self._proc: asyncio.subprocess.Process | None = None
+        self._bytes_per_window = int(self.rate * self.channels * self.window_sec * 4)
+
+    async def start(self) -> None:
+        if self._bytes_per_window <= 0:
+            raise RuntimeError("window size must produce >0 bytes")
+        if self._proc is not None and self._proc.returncode is None:
+            return
+        self._proc = await asyncio.create_subprocess_exec(
+            "timeout",
+            "365d",
+            "pw-record",
+            "--target",
+            self.source,
+            "--rate",
+            str(self.rate),
+            "--channels",
+            str(self.channels),
+            "--format",
+            "f32",
+            "--latency",
+            "256",
+            "-",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        if self._proc.stdout is None:
+            raise RuntimeError("failed to start persistent pw-record stream")
+
+    async def close(self) -> None:
+        if self._proc is None:
+            return
+        if self._proc.returncode is None:
+            self._proc.terminate()
+            try:
+                await asyncio.wait_for(self._proc.wait(), timeout=1.5)
+            except asyncio.TimeoutError:
+                self._proc.kill()
+                await self._proc.wait()
+        self._proc = None
+
+    async def _read_exact(self, total: int) -> bytes:
+        if self._proc is None or self._proc.stdout is None:
+            raise RuntimeError("live meter is not started")
+        buf = bytearray()
+        while len(buf) < total:
+            chunk = await self._proc.stdout.read(total - len(buf))
+            if not chunk:
+                break
+            buf.extend(chunk)
+        return bytes(buf)
+
+    async def read_window(self) -> LiveAudioMetrics:
+        raw = await self._read_exact(self._bytes_per_window)
+        analyzed = analyze_f32le_metrics(raw)
+        if analyzed is None:
+            raise RuntimeError("no audio samples captured from persistent stream")
+        return analyzed

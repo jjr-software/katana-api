@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from starlette.requests import Request
 from starlette.responses import Response, StreamingResponse
 
-from app.audio_capture import capture_audio_metrics, capture_audio_sample
+from app.audio_capture import PipeWireLiveMeter, capture_audio_metrics, capture_audio_sample
 from app.deps import get_db
 from app.models import AudioSample, PatchConfig
 
@@ -227,39 +227,43 @@ async def stream_live_audio_measurement_sse(
     bounded_window = max(0.2, min(window_sec, 5.0))
     bounded_rate = max(8_000, min(rate, 192_000))
     bounded_channels = max(1, min(channels, 8))
+    meter = PipeWireLiveMeter(
+        source=source,
+        rate=bounded_rate,
+        channels=bounded_channels,
+        window_sec=bounded_window,
+    )
 
     async def event_stream() -> object:
-        yield _sse_event(
-            {
-                "type": "connected",
-                "source": source,
-                "window_sec": bounded_window,
-                "rate": bounded_rate,
-                "channels": bounded_channels,
-                "ts": datetime.now().isoformat(timespec="seconds"),
-            }
-        )
-        while True:
-            if await request.is_disconnected():
-                return
-            sample = await capture_audio_metrics(
-                source=source,
-                duration_sec=bounded_window,
-                rate=bounded_rate,
-                channels=bounded_channels,
-            )
+        await meter.start()
+        try:
             yield _sse_event(
                 {
-                    "type": "audio_metrics",
-                    "rms_dbfs": sample.rms_dbfs,
-                    "peak_dbfs": sample.peak_dbfs,
-                    "sample_count": sample.sample_count,
-                    "duration_sec": sample.duration_sec,
-                    "source": sample.source,
+                    "type": "connected",
+                    "source": source,
+                    "window_sec": bounded_window,
+                    "rate": bounded_rate,
+                    "channels": bounded_channels,
                     "ts": datetime.now().isoformat(timespec="seconds"),
                 }
             )
-            await asyncio.sleep(0.05)
+            while True:
+                if await request.is_disconnected():
+                    return
+                sample = await meter.read_window()
+                yield _sse_event(
+                    {
+                        "type": "audio_metrics",
+                        "rms_dbfs": sample.rms_dbfs,
+                        "peak_dbfs": sample.peak_dbfs,
+                        "sample_count": sample.sample_count,
+                        "duration_sec": bounded_window,
+                        "source": source,
+                        "ts": datetime.now().isoformat(timespec="seconds"),
+                    }
+                )
+        finally:
+            await meter.close()
 
     return StreamingResponse(
         event_stream(),
