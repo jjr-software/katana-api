@@ -168,6 +168,9 @@
                   <p class="small mb-1 patch-summary"><strong [class.text-success]="isStageOn(slot, 'mod')" [class.text-danger]="!isStageOn(slot, 'mod')">Mod:</strong> {{ modSummary(slot) }}</p>
                   <p class="small mb-1 patch-summary"><strong [class.text-success]="isStageOn(slot, 'fx')" [class.text-danger]="!isStageOn(slot, 'fx')">FX:</strong> {{ fxSummary(slot) }}</p>
                   <p class="small mb-1 patch-summary"><strong [class.text-success]="isStageOn(slot, 'delay')" [class.text-danger]="!isStageOn(slot, 'delay')">Delay:</strong> {{ delaySummary(slot) }}</p>
+                  <p class="small mb-1 patch-summary"><strong [class.text-success]="isNoiseSuppressorOn(slot)" [class.text-danger]="!isNoiseSuppressorOn(slot)">NS:</strong> {{ nsSummary(slot) }}</p>
+                  <p class="small mb-1 patch-summary"><strong [class.text-success]="isEqOn(slot, 'eq1')" [class.text-danger]="!isEqOn(slot, 'eq1')">EQ1:</strong> {{ eqSummary(slot, 'eq1') }}</p>
+                  <p class="small mb-1 patch-summary"><strong [class.text-success]="isEqOn(slot, 'eq2')" [class.text-danger]="!isEqOn(slot, 'eq2')">EQ2:</strong> {{ eqSummary(slot, 'eq2') }}</p>
                   <p class="small mb-2 patch-summary"><strong [class.text-success]="isStageOn(slot, 'reverb')" [class.text-danger]="!isStageOn(slot, 'reverb')">Reverb:</strong> {{ reverbSummary(slot) }}</p>
                   <p class="small mb-1 text-secondary">
                     10s Max RMS/Peak: <code>{{ formatDb(slot.measured_rms_dbfs) }} / {{ formatDb(slot.measured_peak_dbfs) }}</code>
@@ -248,6 +251,9 @@
                   <p class="small mb-1 patch-summary"><strong [class.text-success]="isStageOn(slot, 'mod')" [class.text-danger]="!isStageOn(slot, 'mod')">Mod:</strong> {{ modSummary(slot) }}</p>
                   <p class="small mb-1 patch-summary"><strong [class.text-success]="isStageOn(slot, 'fx')" [class.text-danger]="!isStageOn(slot, 'fx')">FX:</strong> {{ fxSummary(slot) }}</p>
                   <p class="small mb-1 patch-summary"><strong [class.text-success]="isStageOn(slot, 'delay')" [class.text-danger]="!isStageOn(slot, 'delay')">Delay:</strong> {{ delaySummary(slot) }}</p>
+                  <p class="small mb-1 patch-summary"><strong [class.text-success]="isNoiseSuppressorOn(slot)" [class.text-danger]="!isNoiseSuppressorOn(slot)">NS:</strong> {{ nsSummary(slot) }}</p>
+                  <p class="small mb-1 patch-summary"><strong [class.text-success]="isEqOn(slot, 'eq1')" [class.text-danger]="!isEqOn(slot, 'eq1')">EQ1:</strong> {{ eqSummary(slot, 'eq1') }}</p>
+                  <p class="small mb-1 patch-summary"><strong [class.text-success]="isEqOn(slot, 'eq2')" [class.text-danger]="!isEqOn(slot, 'eq2')">EQ2:</strong> {{ eqSummary(slot, 'eq2') }}</p>
                   <p class="small mb-2 patch-summary"><strong [class.text-success]="isStageOn(slot, 'reverb')" [class.text-danger]="!isStageOn(slot, 'reverb')">Reverb:</strong> {{ reverbSummary(slot) }}</p>
                   <p class="small mb-1 text-secondary">
                     10s Max RMS/Peak: <code>{{ formatDb(slot.measured_rms_dbfs) }} / {{ formatDb(slot.measured_peak_dbfs) }}</code>

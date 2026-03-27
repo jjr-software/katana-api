@@ -80,6 +80,8 @@ const DELAY_TYPE_NAMES = [
 ];
 const AMP_TYPE_NAMES = ['Acoustic', 'Clean', 'Crunch', 'Lead', 'Brown'];
 const REVERB_TYPE_NAMES = ['Plate Reverb', 'Room Reverb', 'Hall Reverb', 'Spring Reverb', 'Modulate Reverb'];
+const EQ_TYPE_NAMES = ['Parametric EQ', 'GE-10'];
+const EQ_POSITION_NAMES = ['Input', 'Post Amp'];
 const LIVE_RMS_WINDOW_POINTS = 96;
 const EDITOR_LIVE_APPLY_DEBOUNCE_MS = 2000;
 const EDITOR_LIVE_APPLY_MIN_GAP_MS = 120;
@@ -2359,10 +2361,51 @@ export class App implements OnInit, OnDestroy {
     return this.stageSummary(slot, 'reverb');
   }
 
+  nsSummary(slot: SlotCard): string {
+    const stages = this.readObject(slot.patch, 'stages');
+    const ns = this.readObject(stages, 'ns');
+    if (!ns) {
+      return 'n/a';
+    }
+    const threshold = this.readNumber(ns, 'threshold');
+    const release = this.readNumber(ns, 'release');
+    return `Thr ${this.nv(threshold)} | Rel ${this.nv(release)}`;
+  }
+
+  eqSummary(slot: SlotCard, eqName: 'eq1' | 'eq2'): string {
+    const stages = this.readObject(slot.patch, 'stages');
+    const eq = this.readObject(stages, eqName);
+    if (!eq) {
+      return 'n/a';
+    }
+    const parts: string[] = [];
+    const type = this.readNumber(eq, 'type');
+    const position = this.readNumber(eq, 'position');
+    if (type !== null) {
+      parts.push(this.eqTypeLabel(type));
+    }
+    if (position !== null) {
+      parts.push(this.eqPositionLabel(position));
+    }
+    return parts.length > 0 ? parts.join(' | ') : 'n/a';
+  }
+
   isStageOn(slot: SlotCard, stageName: string): boolean {
     const stages = this.readObject(slot.patch, 'stages');
     const stage = this.readObject(stages, stageName);
     return this.readBoolean(stage, 'on');
+  }
+
+  isNoiseSuppressorOn(slot: SlotCard): boolean {
+    const stages = this.readObject(slot.patch, 'stages');
+    const ns = this.readObject(stages, 'ns');
+    return this.readBoolean(ns, 'on');
+  }
+
+  isEqOn(slot: SlotCard, eqName: 'eq1' | 'eq2'): boolean {
+    const stages = this.readObject(slot.patch, 'stages');
+    const eq = this.readObject(stages, eqName);
+    return this.readBoolean(eq, 'on');
   }
 
   showRaw(slot: SlotCard): void {
@@ -2417,6 +2460,22 @@ export class App implements OnInit, OnDestroy {
     }
     if (index >= 0 && index < table.length) {
       return table[index];
+    }
+    return `Unknown (${index})`;
+  }
+
+  private eqTypeLabel(type: number): string {
+    const index = Math.max(0, Math.trunc(type));
+    if (index >= 0 && index < EQ_TYPE_NAMES.length) {
+      return EQ_TYPE_NAMES[index];
+    }
+    return `Unknown (${index})`;
+  }
+
+  private eqPositionLabel(position: number): string {
+    const index = Math.max(0, Math.trunc(position));
+    if (index >= 0 && index < EQ_POSITION_NAMES.length) {
+      return EQ_POSITION_NAMES[index];
     }
     return `Unknown (${index})`;
   }
