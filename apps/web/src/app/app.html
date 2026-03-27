@@ -429,28 +429,21 @@
                       }
                     </select>
                   </div>
-                  <div class="col-6 col-md-3">
-                    <label class="form-label small mb-1">Level</label>
-                    <input type="number" min="0" max="100" class="form-control form-control-sm" [value]="editorStageLevel($any(stageName)) ?? 0" (input)="setEditorStageLevel($any(stageName), $any($event.target).value)" />
-                  </div>
-                  @if (stageName === 'booster') {
-                    <div class="col-6 col-md-3">
-                      <label class="form-label small mb-1">Gain</label>
-                      <input type="number" min="0" max="100" class="form-control form-control-sm" [value]="editorBoosterDrive() ?? 0" (input)="setEditorBoosterDrive($any($event.target).value)" />
-                    </div>
-                  }
                 </div>
+                @if (editorStageSchemaWarning($any(stageName)); as warning) {
+                  <div class="small text-danger mt-2">{{ warning }}</div>
+                }
                 <div class="row g-2 mt-1">
                   @for (param of editorStageParams($any(stageName)); track param.id) {
                     <div class="col-6 col-md-3">
-                      <label class="form-label small mb-1">{{ param.label }} <span class="text-secondary">[#{{ param.rawIndex }}]</span></label>
+                      <label class="form-label small mb-1">{{ param.label }} <span class="text-secondary">[#{{ editorStageParamRangeLabel(param) }} · {{ param.min }}..{{ param.max }}]</span></label>
                       <input
                         type="number"
-                        min="0"
-                        max="127"
+                        [min]="param.min"
+                        [max]="param.max"
                         class="form-control form-control-sm"
                         [value]="param.value"
-                        (input)="setEditorStageParam($any(stageName), param.rawIndex, $any($event.target).value)"
+                        (input)="setEditorStageParam($any(stageName), param.key, $any($event.target).value)"
                       />
                     </div>
                   }

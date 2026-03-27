@@ -1,4 +1,12 @@
 import { Component, OnDestroy, OnInit, signal } from '@angular/core';
+import {
+  BOOSTER_PARAM_SCHEMA,
+  DELAY_PARAM_SCHEMA,
+  FX_PARAM_SCHEMAS_BY_TYPE,
+  type ParamEncoding,
+  REVERB_PARAM_SCHEMA,
+  type StageParamSchema,
+} from './pedal-schemas';
 
 const BOOSTER_TYPE_NAMES = [
   'Mid Boost',
@@ -272,9 +280,14 @@ interface TypeOption {
 
 interface StageParam {
   id: string;
+  key: string;
   label: string;
-  rawIndex: number;
+  rawIndexStart: number;
+  rawIndexEnd: number;
+  encoding: ParamEncoding;
   value: number;
+  min: number;
+  max: number;
 }
 
 type TriState = 'true' | 'false' | 'unknown';
@@ -1601,29 +1614,63 @@ export class App implements OnInit, OnDestroy {
     if (raw.length <= 1) {
       return [];
     }
-    const labels = this.stageParamLabels(stageName, raw.length);
     const params: StageParam[] = [];
-    for (let idx = 1; idx < raw.length; idx += 1) {
+    for (const schema of this.stageParamSchema(stageName)) {
+      const decoded = this.readStageParamValue(stageName, raw, schema);
+      if (decoded === null) {
+        continue;
+      }
+      const [rawIndexStart, rawIndexEnd] = this.stageParamRawSpan(stageName, schema);
       params.push({
-        id: `${stageName}-${idx}`,
-        label: labels[idx] ?? `P${idx}`,
-        rawIndex: idx,
-        value: raw[idx],
+        id: `${stageName}-${schema.key}`,
+        key: schema.key,
+        label: schema.label,
+        rawIndexStart,
+        rawIndexEnd,
+        encoding: schema.size,
+        value: decoded,
+        min: schema.min,
+        max: schema.max,
       });
     }
     return params;
   }
 
-  setEditorStageParam(stageName: StageName, rawIndex: number, value: string): void {
-    const parsed = this.parseInteger(value);
+  editorStageSchemaWarning(stageName: StageName): string | null {
+    if (stageName !== 'mod' && stageName !== 'fx') {
+      return null;
+    }
+    const type = this.editorStageType(stageName);
+    if (type === null) {
+      return 'No pedal type selected';
+    }
+    if (type < 0 || type >= FX_PARAM_SCHEMAS_BY_TYPE.length) {
+      return `No schema mapped for ${this.effectTypeLabel(stageName, type)} (${type})`;
+    }
+    return null;
+  }
+
+  editorStageParamRangeLabel(param: StageParam): string {
+    if (param.rawIndexStart === param.rawIndexEnd) {
+      return `${param.rawIndexStart}`;
+    }
+    return `${param.rawIndexStart}-${param.rawIndexEnd}`;
+  }
+
+  setEditorStageParam(stageName: StageName, paramKey: string, value: string): void {
+    const schema = this.findStageParamSchema(stageName, paramKey);
+    if (!schema) {
+      return;
+    }
+    const parsed = this.clampInteger(this.parseInteger(value), schema.min, schema.max);
     this.updateEditorPatch((draft) => {
       const stages = this.ensureObject(draft, 'stages');
       const stage = this.ensureObject(stages, stageName);
       const raw = this.ensureNumericRaw(stage);
-      if (rawIndex >= raw.length) {
+      const updated = this.writeStageParamValue(stageName, raw, schema, parsed);
+      if (!updated) {
         return;
       }
-      raw[rawIndex] = parsed;
       stage['raw'] = raw;
       this.syncStageDerivedFields(stageName, stage);
     });
@@ -2331,38 +2378,88 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  private stageParamLabels(stageName: StageName, rawLength: number): string[] {
-    const labels: string[] = Array.from({ length: rawLength }, (_, index) => `P${index}`);
-    labels[0] = 'Type';
+  private stageParamSchema(stageName: StageName): readonly StageParamSchema[] {
     if (stageName === 'booster') {
-      if (rawLength > 1) labels[1] = 'Drive';
-      if (rawLength > 2) labels[2] = 'Bottom';
-      if (rawLength > 3) labels[3] = 'Tone';
-      if (rawLength > 4) labels[4] = 'Solo SW';
-      if (rawLength > 5) labels[5] = 'Solo Level';
-      if (rawLength > 6) labels[6] = 'Effect Level';
-      if (rawLength > 7) labels[7] = 'Direct Mix';
-      return labels;
+      return BOOSTER_PARAM_SCHEMA.filter((schema) => schema.key !== 'type');
     }
     if (stageName === 'delay') {
-      if (rawLength > 1) labels[1] = 'Time LSB';
-      if (rawLength > 2) labels[2] = 'Time';
-      if (rawLength > 3) labels[3] = 'Time';
-      if (rawLength > 4) labels[4] = 'Time MSB';
-      if (rawLength > 5) labels[5] = 'Feedback';
-      if (rawLength > 6) labels[6] = 'High Cut';
-      if (rawLength > 7) labels[7] = 'Effect Level';
-      if (rawLength > 8) labels[8] = 'Direct Level';
-      return labels;
+      return DELAY_PARAM_SCHEMA.filter((schema) => schema.key !== 'type');
     }
     if (stageName === 'reverb') {
-      if (rawLength > 1) labels[1] = 'Layer Mode';
-      if (rawLength > 2) labels[2] = 'Time';
-      if (rawLength > 10) labels[10] = 'Effect Level';
-      if (rawLength > 11) labels[11] = 'Direct Level';
-      return labels;
+      return REVERB_PARAM_SCHEMA.filter((schema) => schema.key !== 'type');
     }
-    return labels;
+    const type = this.editorStageType(stageName);
+    if (type === null || type < 0 || type >= FX_PARAM_SCHEMAS_BY_TYPE.length) {
+      return [];
+    }
+    return FX_PARAM_SCHEMAS_BY_TYPE[type];
+  }
+
+  private findStageParamSchema(stageName: StageName, paramKey: string): StageParamSchema | null {
+    return this.stageParamSchema(stageName).find((schema) => schema.key === paramKey) ?? null;
+  }
+
+  private stageParamArrayIndex(stageName: StageName, schema: StageParamSchema): number {
+    if (stageName === 'mod' || stageName === 'fx') {
+      return schema.rawIndex;
+    }
+    return schema.rawIndex - 1;
+  }
+
+  private stageParamWidth(encoding: ParamEncoding): number {
+    if (encoding === 'int4x4') {
+      return 4;
+    }
+    if (encoding === 'int2x4') {
+      return 2;
+    }
+    return 1;
+  }
+
+  private stageParamRawSpan(stageName: StageName, schema: StageParamSchema): [number, number] {
+    const start = this.stageParamArrayIndex(stageName, schema);
+    const width = this.stageParamWidth(schema.size);
+    return [start, start + width - 1];
+  }
+
+  private readStageParamValue(stageName: StageName, raw: number[], schema: StageParamSchema): number | null {
+    const start = this.stageParamArrayIndex(stageName, schema);
+    const width = this.stageParamWidth(schema.size);
+    if (start < 0 || start + width > raw.length) {
+      return null;
+    }
+    let encoded = 0;
+    if (schema.size === 'int1x7') {
+      encoded = raw[start];
+    } else if (schema.size === 'int2x4') {
+      encoded = (raw[start] << 4) | raw[start + 1];
+    } else {
+      encoded = (raw[start] << 12) | (raw[start + 1] << 8) | (raw[start + 2] << 4) | raw[start + 3];
+    }
+    return encoded - schema.offset;
+  }
+
+  private writeStageParamValue(stageName: StageName, raw: number[], schema: StageParamSchema, value: number): boolean {
+    const start = this.stageParamArrayIndex(stageName, schema);
+    const width = this.stageParamWidth(schema.size);
+    if (start < 0 || start + width > raw.length) {
+      return false;
+    }
+    const encoded = value + schema.offset;
+    if (schema.size === 'int1x7') {
+      raw[start] = encoded;
+      return true;
+    }
+    if (schema.size === 'int2x4') {
+      raw[start] = (encoded >> 4) & 0x0f;
+      raw[start + 1] = encoded & 0x0f;
+      return true;
+    }
+    raw[start] = (encoded >> 12) & 0x0f;
+    raw[start + 1] = (encoded >> 8) & 0x0f;
+    raw[start + 2] = (encoded >> 4) & 0x0f;
+    raw[start + 3] = encoded & 0x0f;
+    return true;
   }
 
   private readNumber(source: Record<string, unknown> | null, key: string): number | null {
@@ -2455,6 +2552,10 @@ export class App implements OnInit, OnDestroy {
       return 0;
     }
     return parsed;
+  }
+
+  private clampInteger(value: number, min: number, max: number): number {
+    return Math.max(min, Math.min(max, value));
   }
 
   private clonePatch(patch: Record<string, unknown>): Record<string, unknown> {
