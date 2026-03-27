@@ -412,6 +412,7 @@ export class App implements OnInit, OnDestroy {
     void this.refreshQueueState();
     void this.loadAudioLevelMarker();
     void this.refreshActiveSlot();
+    this.startLiveMeter();
     this.queuePollHandle = setInterval(() => {
       void this.refreshQueueState();
     }, 1000);
@@ -1114,12 +1115,25 @@ export class App implements OnInit, OnDestroy {
     this.liveMeterSource = source;
   }
 
+  toggleLiveMeter(): void {
+    if (this.liveMeterConnected()) {
+      this.stopLiveMeter();
+      this.status.set('Live audio meter stopped');
+      return;
+    }
+    this.startLiveMeter();
+  }
+
   stopLiveMeter(): void {
     if (this.liveMeterSource !== null) {
       this.liveMeterSource.close();
       this.liveMeterSource = null;
     }
     this.liveMeterConnected.set(false);
+  }
+
+  liveMeterButtonLabel(): string {
+    return this.liveMeterConnected() ? 'Stop Live Meter' : 'Start Live Meter';
   }
 
   rmsGraphPoints(): string {
