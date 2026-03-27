@@ -652,12 +652,24 @@
                   </div>
                 </div>
                 <div class="mt-2">
-                  <p class="small text-secondary mb-1">GE-10 Raw</p>
-                  <div class="row g-2">
-                    @for (field of editorEqRawFields($any(eqName), 'ge10_raw'); track field.id) {
-                      <div class="col-4 col-md-2">
-                        <label class="form-label small mb-1">{{ field.label }}</label>
-                        <input type="number" min="0" max="127" class="form-control form-control-sm" [value]="field.value" (input)="setEditorEqRawValue($any(eqName), 'ge10_raw', $index, $any($event.target).value)" />
+                  <p class="small text-secondary mb-2">GE-10 Spectrum</p>
+                  <div class="eq-spectrum">
+                    @for (band of editorEqGe10Bands($any(eqName)); track band.id) {
+                      <div class="eq-spectrum-band">
+                        <div class="eq-spectrum-meter">
+                          <div class="eq-spectrum-zero"></div>
+                          <div class="eq-spectrum-fill" [style.height.%]="band.percent"></div>
+                        </div>
+                        <div class="eq-spectrum-value">{{ band.offsetValue >= 0 ? '+' : '' }}{{ band.offsetValue }}</div>
+                        <input
+                          type="range"
+                          min="-24"
+                          max="24"
+                          class="form-range editor-range-slider"
+                          [value]="band.offsetValue"
+                          (input)="setEditorEqGe10BandValue($any(eqName), $index, $any($event.target).value)"
+                        />
+                        <div class="eq-spectrum-label">{{ band.label }}</div>
                       </div>
                     }
                   </div>

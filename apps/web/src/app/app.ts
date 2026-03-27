@@ -82,6 +82,7 @@ const AMP_TYPE_NAMES = ['Acoustic', 'Clean', 'Crunch', 'Lead', 'Brown'];
 const REVERB_TYPE_NAMES = ['Plate Reverb', 'Room Reverb', 'Hall Reverb', 'Spring Reverb', 'Modulate Reverb'];
 const EQ_TYPE_NAMES = ['Parametric EQ', 'GE-10'];
 const EQ_POSITION_NAMES = ['Input', 'Post Amp'];
+const EQ_GE10_BAND_LABELS = ['31', '62', '125', '250', '500', '1k', '2k', '4k', '8k', '16k', 'Level'];
 const LIVE_RMS_WINDOW_POINTS = 96;
 const EDITOR_LIVE_APPLY_DEBOUNCE_MS = 2000;
 const EDITOR_LIVE_APPLY_MIN_GAP_MS = 120;
@@ -312,6 +313,14 @@ interface RawValueField {
   id: string;
   label: string;
   value: number;
+}
+
+interface EqGe10BandField {
+  id: string;
+  label: string;
+  rawValue: number;
+  offsetValue: number;
+  percent: number;
 }
 
 interface TypeOption {
@@ -1783,6 +1792,26 @@ export class App implements OnInit, OnDestroy {
 
   setEditorEqRawValue(eqName: EqStageName, rawKey: 'peq_raw' | 'ge10_raw', index: number, value: string): void {
     this.setEditorNestedRawValue(['stages', eqName], rawKey, index, value);
+  }
+
+  editorEqGe10Bands(eqName: EqStageName): EqGe10BandField[] {
+    const fields = this.editorEqRawFields(eqName, 'ge10_raw');
+    return fields.slice(0, EQ_GE10_BAND_LABELS.length).map((field, index) => {
+      const offsetValue = field.value - 24;
+      const percent = Math.max(0, Math.min(100, ((offsetValue + 24) / 48) * 100));
+      return {
+        id: `${eqName}-ge10-band-${index}`,
+        label: EQ_GE10_BAND_LABELS[index] ?? field.label,
+        rawValue: field.value,
+        offsetValue,
+        percent,
+      };
+    });
+  }
+
+  setEditorEqGe10BandValue(eqName: EqStageName, index: number, value: string): void {
+    const offset = this.clampInteger(this.parseInteger(value), -24, 24);
+    this.setEditorEqRawValue(eqName, 'ge10_raw', index, `${offset + 24}`);
   }
 
   editorNsOn(): boolean {
