@@ -348,6 +348,7 @@ export class App implements OnInit, OnDestroy {
   editorLiveApplyEnabled = signal(true);
   editorLiveApplyPending = signal(false);
   editorLiveApplyError = signal('');
+  editorLiveApplyReadbackAt = signal('');
   editorLiveApplyCountdownSec = signal<number | null>(null);
   editorLiveApplyHandle: ReturnType<typeof setTimeout> | null = null;
   editorLiveApplyCountdownHandle: ReturnType<typeof setInterval> | null = null;
@@ -1368,6 +1369,7 @@ export class App implements OnInit, OnDestroy {
     this.editorLiveApplyInFlight = false;
     this.editorLiveApplyPending.set(false);
     this.editorLiveApplyError.set('');
+    this.editorLiveApplyReadbackAt.set('');
     this.editorModalOpen.set(true);
   }
 
@@ -1375,6 +1377,7 @@ export class App implements OnInit, OnDestroy {
     this.editorModalOpen.set(false);
     this.editorLiveApplyPending.set(false);
     this.editorLiveApplyError.set('');
+    this.editorLiveApplyReadbackAt.set('');
     if (this.editorLiveApplyHandle !== null) {
       clearTimeout(this.editorLiveApplyHandle);
       this.editorLiveApplyHandle = null;
@@ -2469,6 +2472,7 @@ export class App implements OnInit, OnDestroy {
       return next;
     });
     this.editorLiveApplyError.set('');
+    this.editorLiveApplyReadbackAt.set('');
     const slotNumber = this.editorSlotNumber();
     if (slotNumber !== null) {
       this.slots.update((current) =>
@@ -2537,6 +2541,7 @@ export class App implements OnInit, OnDestroy {
     this.editorLiveApplyLastStartedAtMs = Date.now();
     this.stopEditorLiveApplyCountdown();
     this.editorLiveApplyPending.set(true);
+    this.editorLiveApplyReadbackAt.set('');
     try {
       const response = await fetch('/api/v1/amp/current-patch/live-apply', {
         method: 'POST',
@@ -2575,6 +2580,7 @@ export class App implements OnInit, OnDestroy {
       );
       this.currentAmpPatchHash.set(hash);
       this.currentAmpCommitState.set('uncommitted');
+      this.editorLiveApplyReadbackAt.set(applied.applied_at);
     } catch (error: unknown) {
       this.editorLiveApplyError.set(String(error));
     } finally {
@@ -2600,6 +2606,10 @@ export class App implements OnInit, OnDestroy {
       return '';
     }
     return `${remaining.toFixed(1)}s`;
+  }
+
+  editorLiveApplyHasReadback(): boolean {
+    return this.editorLiveApplyReadbackAt() !== '' && !this.editorIsModified();
   }
 
   private patchFingerprint(patch: Record<string, unknown>): string {
