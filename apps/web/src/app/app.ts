@@ -1180,7 +1180,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   canAskAiLevel(slot: SlotCard): boolean {
-    return slot.patch !== null && slot.measured_rms_dbfs !== null && this.isActiveSlot(slot);
+    return slot.patch !== null && this.isActiveSlot(slot);
   }
 
   async openAskAiModal(slot: SlotCard): Promise<void> {
@@ -1199,16 +1199,11 @@ export class App implements OnInit, OnDestroy {
     this.aiModalAdvice.set(null);
     this.aiModalError.set('');
     this.aiModalOpen.set(true);
-    await this.requestAiPatchAdvice();
   }
 
   openAiLevelModal(slot: SlotCard): void {
     if (!slot.patch) {
       this.status.set(`No full patch payload loaded for ${slot.slot_label}. Sync this slot first.`);
-      return;
-    }
-    if (slot.measured_rms_dbfs === null) {
-      this.status.set(`No 10s Max RMS recorded for ${slot.slot_label}. Measure it first.`);
       return;
     }
     if (!this.isActiveSlot(slot)) {
@@ -1218,13 +1213,15 @@ export class App implements OnInit, OnDestroy {
     this.autoLevelSlotNumber.set(slot.slot);
     this.autoLevelSlotLabel.set(slot.slot_label);
     this.autoLevelPatchName.set(slot.patch_name || 'Unnamed Patch');
-    this.autoLevelTargetRms.set(slot.measured_rms_dbfs.toFixed(2));
+    this.autoLevelTargetRms.set(slot.measured_rms_dbfs !== null ? slot.measured_rms_dbfs.toFixed(2) : '');
     this.autoLevelCurrentRms.set(slot.measured_rms_dbfs);
     this.autoLevelIteration.set(0);
     this.autoLevelState.set('idle');
     this.autoLevelRunning.set(false);
     this.autoLevelLogs.set([
-      `${slot.slot_label}: current 10s Max RMS is ${slot.measured_rms_dbfs.toFixed(2)} dBFS.`,
+      slot.measured_rms_dbfs !== null
+        ? `${slot.slot_label}: current 10s Max RMS is ${slot.measured_rms_dbfs.toFixed(2)} dBFS.`
+        : `${slot.slot_label}: no stored 10s Max RMS yet. The run will measure from the live amp first.`,
       'Set a target RMS and start the AI auto-level run.',
     ]);
     this.autoLevelModalOpen.set(true);
