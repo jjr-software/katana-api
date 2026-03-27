@@ -134,7 +134,7 @@
                       <button type="button" class="btn btn-sm btn-primary" (click)="activateSlot(slot)">Activate</button>
                     }
                     @if (canReadActiveSlot(slot)) {
-                      <button type="button" class="btn btn-sm btn-outline-primary" (click)="activateSlot(slot)">Read AMP</button>
+                      <button type="button" class="btn btn-sm btn-outline-primary" (click)="readActiveAmpSlot(slot)">Read AMP</button>
                     }
                     <button type="button" class="btn btn-sm btn-outline-primary" (click)="openPatchConfigLoadModal(slot)" [disabled]="!canLoadSlot(slot)">Load</button>
                     @if (canStageSlot(slot)) {
@@ -210,7 +210,7 @@
                       <button type="button" class="btn btn-sm btn-primary" (click)="activateSlot(slot)">Activate</button>
                     }
                     @if (canReadActiveSlot(slot)) {
-                      <button type="button" class="btn btn-sm btn-outline-primary" (click)="activateSlot(slot)">Read AMP</button>
+                      <button type="button" class="btn btn-sm btn-outline-primary" (click)="readActiveAmpSlot(slot)">Read AMP</button>
                     }
                     <button type="button" class="btn btn-sm btn-outline-primary" (click)="openPatchConfigLoadModal(slot)" [disabled]="!canLoadSlot(slot)">Load</button>
                     @if (canStageSlot(slot)) {

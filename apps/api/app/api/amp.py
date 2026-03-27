@@ -27,6 +27,14 @@ class CurrentPatchResponse(BaseModel):
     patch: dict
 
 
+class ActiveSlotResponse(BaseModel):
+    patch_number: int
+    slot: int | None = None
+    slot_label: str
+    patch_name: str
+    read_at: str
+
+
 class ApplyCurrentPatchRequest(BaseModel):
     patch: dict
 
@@ -278,6 +286,19 @@ async def current_patch() -> CurrentPatchResponse:
     return CurrentPatchResponse(
         created_at=datetime.now().isoformat(timespec="seconds"),
         patch=settled.result_current_patch,
+    )
+
+
+@router.get("/current-slot", response_model=ActiveSlotResponse)
+async def current_slot(client: AmpClient = Depends(get_amp_client)) -> ActiveSlotResponse:
+    read_at = datetime.now().isoformat(timespec="seconds")
+    active = await client.read_active_slot()
+    return ActiveSlotResponse(
+        patch_number=active.patch_number,
+        slot=active.slot,
+        slot_label=active.slot_label,
+        patch_name=active.patch_name,
+        read_at=read_at,
     )
 
 

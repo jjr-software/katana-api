@@ -214,6 +214,14 @@ interface CurrentPatchResponse {
   patch: Record<string, unknown>;
 }
 
+interface ActiveSlotResponse {
+  patch_number: number;
+  slot: number | null;
+  slot_label: string;
+  patch_name: string;
+  read_at: string;
+}
+
 interface ApplyCurrentPatchResponse {
   applied_at: string;
   patch: Record<string, unknown>;
@@ -339,6 +347,7 @@ export class App implements OnInit, OnDestroy {
   lastSyncedAt = signal('');
   totalSyncMs = signal(0);
   selectedAmpSlot = signal<number | null>(null);
+  selectedAmpSlotText = signal('n/a');
   currentAmpPatchHash = signal('');
   currentAmpCommitState = signal<'unknown' | 'committed' | 'uncommitted'>('unknown');
   queueJobs = signal<QueueJobSummary[]>([]);
@@ -387,7 +396,7 @@ export class App implements OnInit, OnDestroy {
   ngOnInit(): void {
     void this.refreshQueueState();
     void this.loadAudioLevelMarker();
-    void this.refreshCurrentCommitState();
+    void this.refreshActiveSlot();
     this.queuePollHandle = setInterval(() => {
       void this.refreshQueueState();
     }, 1000);
@@ -492,6 +501,7 @@ export class App implements OnInit, OnDestroy {
       }
       const activated = activatePayload as SlotActivateResponse;
       this.selectedAmpSlot.set(slot.slot);
+      this.selectedAmpSlotText.set(slot.slot_label);
       this.status.set(`Activated ${slot.slot_label} on amp (${this.formatMs(activated.activate_ms)}). Reading patch state back...`);
 
       const syncResponse = await fetch(`/api/v1/amp/slots/${slot.slot}/readback`, {
@@ -524,6 +534,44 @@ export class App implements OnInit, OnDestroy {
       this.status.set(`Activated ${slot.slot_label}; patch state read back (${this.formatMs(synced.slot.slot_sync_ms)})`);
     } catch (error: unknown) {
       this.status.set(`Failed activating ${slot.slot_label}`);
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Browser request failed',
+            error: String(error),
+          },
+          null,
+          2,
+        ),
+      );
+    }
+  }
+
+  async readActiveAmpSlot(slot: SlotCard): Promise<void> {
+    this.status.set(`Reading active patch state for ${slot.slot_label}...`);
+    this.responseJson.set('');
+    try {
+      const response = await fetch(`/api/v1/amp/slots/${slot.slot}/readback`, {
+        method: 'POST',
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as SlotSyncResponse | { detail?: unknown };
+      if (!response.ok) {
+        this.status.set(`Active patch read failed for ${slot.slot_label}`);
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      const synced = payload as SlotSyncResponse;
+      this.applySyncedSlot(synced.slot);
+      this.selectedAmpSlot.set(slot.slot);
+      this.selectedAmpSlotText.set(slot.slot_label);
+      this.lastSyncedAt.set(synced.synced_at);
+      this.totalSyncMs.set(synced.slot.slot_sync_ms);
+      this.currentAmpPatchHash.set(synced.slot.config_hash_sha256 || '');
+      await this.refreshCurrentCommitState();
+      this.status.set(`Read active patch state for ${slot.slot_label} (${this.formatMs(synced.slot.slot_sync_ms)})`);
+    } catch (error: unknown) {
+      this.status.set(`Active patch read failed for ${slot.slot_label}`);
       this.responseJson.set(
         JSON.stringify(
           {
@@ -1842,11 +1890,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   selectedAmpSlotLabel(): string {
-    const slot = this.selectedAmpSlot();
-    if (slot === null) {
-      return 'n/a';
-    }
-    return slot <= 4 ? `A:${slot}` : `B:${slot - 4}`;
+    return this.selectedAmpSlotText();
   }
 
   currentCommitStateLabel(): string {
@@ -2816,6 +2860,25 @@ export class App implements OnInit, OnDestroy {
       this.currentAmpCommitState.set(currentHash === selectedHash ? 'committed' : 'uncommitted');
     } catch {
       this.currentAmpCommitState.set('unknown');
+    }
+  }
+
+  private async refreshActiveSlot(): Promise<void> {
+    try {
+      const response = await fetch('/api/v1/amp/current-slot', {
+        method: 'GET',
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as ActiveSlotResponse | { detail?: unknown };
+      if (!response.ok) {
+        return;
+      }
+      const active = payload as ActiveSlotResponse;
+      this.selectedAmpSlot.set(active.slot);
+      this.selectedAmpSlotText.set(active.slot_label || 'n/a');
+      await this.refreshCurrentCommitState();
+    } catch {
+      // Active-slot probe is informational; leave current UI state unchanged on failure.
     }
   }
 

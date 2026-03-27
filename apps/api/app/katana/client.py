@@ -9,6 +9,7 @@ from app.katana.protocol import (
     ADDR_PATCH_BOOSTER_1,
     ADDR_PATCH_COLOR,
     ADDR_PATCH_COM,
+    CURRENT_PATCH_NUMBER_ADDR,
     ADDR_PATCH_DELAY_1,
     ADDR_PATCH_DELAY_4,
     ADDR_PATCH_EQ_EACH_1,
@@ -56,6 +57,14 @@ class AmpConnectionResult:
 @dataclass(frozen=True)
 class CurrentPatchSnapshot:
     payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ActiveSlotSnapshot:
+    patch_number: int
+    slot: int | None
+    slot_label: str
+    patch_name: str
 
 
 @dataclass(frozen=True)
@@ -155,6 +164,21 @@ class AmpClient:
         async with self._port_lock():
             await self._send_only(EDITOR_MODE_ON)
             return CurrentPatchSnapshot(payload=await self._read_selected_patch_payload())
+
+    async def read_active_slot(self) -> ActiveSlotSnapshot:
+        async with self._port_lock():
+            await self._send_only(EDITOR_MODE_ON)
+            patch_number_raw = await self._read_rq1(CURRENT_PATCH_NUMBER_ADDR, 2)
+            patch_name_raw = await self._read_rq1(ADDR_PATCH_COM, 16)
+            patch_number = self._decode_int2x7(patch_number_raw)
+            slot = patch_number if 1 <= patch_number <= 8 else None
+            slot_name = slot_label(slot) if slot is not None else ("PANEL" if patch_number == 0 else f"RAW:{patch_number}")
+            return ActiveSlotSnapshot(
+                patch_number=patch_number,
+                slot=slot,
+                slot_label=slot_name,
+                patch_name=self._decode_patch_name(patch_name_raw),
+            )
 
     async def apply_current_patch(self, patch_payload: dict[str, Any]) -> CurrentPatchSnapshot:
         async with self._port_lock():
@@ -736,6 +760,12 @@ class AmpClient:
         if received == 0:
             raise AmpClientError(f"No DT1 response for address {addr}")
         raise AmpClientError(f"Incomplete DT1 response for address {addr}: {received}/{size} bytes")
+
+    @staticmethod
+    def _decode_int2x7(raw: list[int]) -> int:
+        if len(raw) != 2:
+            raise AmpClientError(f"Expected 2 bytes for INTEGER2x7 value (got {len(raw)})")
+        return (int(raw[0]) << 7) | int(raw[1])
 
     async def _send_export_command_multiple_preview_unmute(self) -> None:
         output = await self._send_and_read(
