@@ -566,9 +566,7 @@ export class App implements OnInit, OnDestroy {
       this.lastSyncedAt.set(synced.synced_at);
       this.totalSyncMs.set(synced.slot.slot_sync_ms);
       this.currentAmpPatchHash.set(synced.slot.config_hash_sha256 || '');
-      if (this.selectedAmpSlot() !== null) {
-        await this.refreshCurrentCommitState();
-      }
+      this.refreshCurrentCommitStateFromKnownState();
       this.status.set(`Activated ${slot.slot_label}; patch state read back (${this.formatMs(synced.slot.slot_sync_ms)})`);
     } catch (error: unknown) {
       this.status.set(`Failed activating ${slot.slot_label}`);
@@ -606,7 +604,7 @@ export class App implements OnInit, OnDestroy {
       this.lastSyncedAt.set(synced.synced_at);
       this.totalSyncMs.set(synced.slot.slot_sync_ms);
       this.currentAmpPatchHash.set(synced.slot.config_hash_sha256 || '');
-      await this.refreshCurrentCommitState();
+      this.refreshCurrentCommitStateFromKnownState();
       this.status.set(`Read active patch state for ${slot.slot_label} (${this.formatMs(synced.slot.slot_sync_ms)})`);
     } catch (error: unknown) {
       this.status.set(`Active patch read failed for ${slot.slot_label}`);
@@ -726,7 +724,7 @@ export class App implements OnInit, OnDestroy {
       this.lastSyncedAt.set(committed.synced_at);
       this.totalSyncMs.set(committed.slot.slot_sync_ms);
       this.currentAmpPatchHash.set(committed.slot.config_hash_sha256 || '');
-      await this.refreshCurrentCommitState();
+      this.refreshCurrentCommitStateFromKnownState();
       this.status.set(`Committed ${slot.slot_label} to amp memory`);
       this.responseJson.set(
         JSON.stringify(
@@ -2982,35 +2980,20 @@ export class App implements OnInit, OnDestroy {
     return JSON.stringify(value);
   }
 
-  private async refreshCurrentCommitState(): Promise<void> {
+  private refreshCurrentCommitStateFromKnownState(): void {
     const selectedSlot = this.selectedAmpSlot();
-    try {
-      const response = await fetch('/api/v1/amp/current-patch', {
-        method: 'GET',
-        cache: 'no-store',
-      });
-      const payload = (await response.json()) as CurrentPatchResponse | { detail?: unknown };
-      if (!response.ok) {
-        this.currentAmpCommitState.set('unknown');
-        return;
-      }
-      const current = payload as CurrentPatchResponse;
-      const currentHash = this.readString(current.patch, 'config_hash_sha256') ?? '';
-      this.currentAmpPatchHash.set(currentHash);
-      if (selectedSlot === null) {
-        this.currentAmpCommitState.set('unknown');
-        return;
-      }
-      const selectedCard = this.slots().find((card) => card.slot === selectedSlot) ?? null;
-      const selectedHash = selectedCard?.committed_hash_sha256 ?? '';
-      if (!currentHash || !selectedHash) {
-        this.currentAmpCommitState.set('unknown');
-        return;
-      }
-      this.currentAmpCommitState.set(currentHash === selectedHash ? 'committed' : 'uncommitted');
-    } catch {
+    const currentHash = this.currentAmpPatchHash();
+    if (selectedSlot === null) {
       this.currentAmpCommitState.set('unknown');
+      return;
     }
+    const selectedCard = this.slots().find((card) => card.slot === selectedSlot) ?? null;
+    const selectedHash = selectedCard?.committed_hash_sha256 ?? '';
+    if (!currentHash || !selectedHash) {
+      this.currentAmpCommitState.set('unknown');
+      return;
+    }
+    this.currentAmpCommitState.set(currentHash === selectedHash ? 'committed' : 'uncommitted');
   }
 
   private async refreshActiveSlot(): Promise<void> {
@@ -3047,7 +3030,7 @@ export class App implements OnInit, OnDestroy {
           ),
         );
       }
-      await this.refreshCurrentCommitState();
+      this.refreshCurrentCommitStateFromKnownState();
     } catch {
       // Active-slot probe is informational; leave current UI state unchanged on failure.
     } finally {
