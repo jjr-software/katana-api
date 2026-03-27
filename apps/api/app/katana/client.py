@@ -268,8 +268,8 @@ class AmpClient:
             await self._select_patch(slot)
             await self._apply_selected_patch_payload(patch_payload)
             await self._send_only(build_dt1(PATCH_WRITE_ADDR, [0x00, int(slot)]))
-            await asyncio.sleep(0.2)
-            payload = await self._read_selected_patch_payload()
+            payload = self._clone_patch_payload(patch_payload)
+            payload["config_hash_sha256"] = self._config_hash(payload)
             return SlotPatchSummary(
                 slot=slot,
                 slot_label=slot_label(slot),
