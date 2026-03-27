@@ -3,7 +3,7 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from app.hashing import snapshot_hash
+from app.hashing import canonical_blob, snapshot_hash
 from app.katana.protocol import (
     ADDR_PATCH_AMP,
     ADDR_PATCH_BOOSTER_1,
@@ -270,6 +270,16 @@ class AmpClient:
             await self._send_only(build_dt1(PATCH_WRITE_ADDR, [0x00, int(slot)]))
             payload = self._clone_patch_payload(patch_payload)
             payload["config_hash_sha256"] = self._config_hash(payload)
+            await asyncio.sleep(0.2)
+            readback = await self._read_selected_patch_payload()
+            expected_hash = str(payload["config_hash_sha256"])
+            actual_hash = str(readback["config_hash_sha256"])
+            if actual_hash != expected_hash:
+                raise AmpClientError(
+                    "Committed slot readback hash mismatch: "
+                    f"expected {expected_hash}, got {actual_hash}; "
+                    f"expected={canonical_blob(payload)} actual={canonical_blob(readback)}"
+                )
             return SlotPatchSummary(
                 slot=slot,
                 slot_label=slot_label(slot),
@@ -497,6 +507,16 @@ class AmpClient:
         patch_name = self._normalize_patch_name(str(payload.get("patch_name", "")))
         await self._send_only(build_dt1(ADDR_PATCH_COM, patch_name))
 
+        routing_obj = payload.get("routing")
+        if isinstance(routing_obj, dict):
+            routing_data = self._read_compact_raw_block(
+                routing_obj,
+                raw_key=None,
+                field_names=("chain_pattern", "cabinet_resonance", "master_key"),
+                field_name_prefix="routing",
+            )
+            await self._send_only(build_dt1(ADDR_PATCH_OTHER, routing_data))
+
         amp_obj = payload.get("amp")
         if isinstance(amp_obj, dict):
             amp_raw = amp_obj.get("raw")
@@ -569,6 +589,16 @@ class AmpClient:
                 size=17,
                 field_name="stages.delay.raw",
             )
+            delay_obj = stages_obj.get("delay")
+            if isinstance(delay_obj, dict):
+                delay2_data = self._read_compact_raw_block(
+                    delay_obj,
+                    raw_key="delay2_raw",
+                    field_names=(),
+                    field_name_prefix="stages.delay.delay2_raw",
+                    expected_size=17,
+                )
+                await self._send_only(build_dt1(addr_add(ADDR_PATCH_DELAY_4, 0x200 * max(0, min(2, int(color_data[3] if len(color_data) >= 4 else 0)))), delay2_data))
             await self._write_stage_variant(
                 stages_obj.get("reverb"),
                 color_index=color_data[4] if len(color_data) >= 5 else 0,
@@ -576,6 +606,136 @@ class AmpClient:
                 size=13,
                 field_name="stages.reverb.raw",
             )
+            eq1_obj = stages_obj.get("eq1")
+            if isinstance(eq1_obj, dict):
+                eq1_each = self._read_compact_raw_block(
+                    eq1_obj,
+                    raw_key=None,
+                    field_names=("position", "on", "type"),
+                    field_name_prefix="stages.eq1",
+                )
+                await self._send_only(build_dt1(ADDR_PATCH_EQ_EACH_1, eq1_each))
+                await self._send_only(
+                    build_dt1(
+                        ADDR_PATCH_EQ_PEQ_1,
+                        self._read_compact_raw_block(
+                            eq1_obj,
+                            raw_key="peq_raw",
+                            field_names=(),
+                            field_name_prefix="stages.eq1.peq_raw",
+                            expected_size=11,
+                        ),
+                    )
+                )
+                await self._send_only(
+                    build_dt1(
+                        ADDR_PATCH_EQ_GE10_1,
+                        self._read_compact_raw_block(
+                            eq1_obj,
+                            raw_key="ge10_raw",
+                            field_names=(),
+                            field_name_prefix="stages.eq1.ge10_raw",
+                            expected_size=11,
+                        ),
+                    )
+                )
+            eq2_obj = stages_obj.get("eq2")
+            if isinstance(eq2_obj, dict):
+                eq2_each = self._read_compact_raw_block(
+                    eq2_obj,
+                    raw_key=None,
+                    field_names=("position", "on", "type"),
+                    field_name_prefix="stages.eq2",
+                )
+                await self._send_only(build_dt1(ADDR_PATCH_EQ_EACH_2, eq2_each))
+                await self._send_only(
+                    build_dt1(
+                        ADDR_PATCH_EQ_PEQ_2,
+                        self._read_compact_raw_block(
+                            eq2_obj,
+                            raw_key="peq_raw",
+                            field_names=(),
+                            field_name_prefix="stages.eq2.peq_raw",
+                            expected_size=11,
+                        ),
+                    )
+                )
+                await self._send_only(
+                    build_dt1(
+                        ADDR_PATCH_EQ_GE10_2,
+                        self._read_compact_raw_block(
+                            eq2_obj,
+                            raw_key="ge10_raw",
+                            field_names=(),
+                            field_name_prefix="stages.eq2.ge10_raw",
+                            expected_size=11,
+                        ),
+                    )
+                )
+            ns_obj = stages_obj.get("ns")
+            if isinstance(ns_obj, dict):
+                await self._send_only(
+                    build_dt1(
+                        ADDR_PATCH_NS,
+                        self._read_compact_raw_block(
+                            ns_obj,
+                            raw_key="raw",
+                            field_names=("on", "threshold", "release"),
+                            field_name_prefix="stages.ns",
+                        ),
+                    )
+                )
+            send_return_obj = stages_obj.get("send_return")
+            if isinstance(send_return_obj, dict):
+                await self._send_only(
+                    build_dt1(
+                        ADDR_PATCH_SENDRETURN,
+                        self._read_compact_raw_block(
+                            send_return_obj,
+                            raw_key="raw",
+                            field_names=("on", "position", "mode", "send_level", "return_level"),
+                            field_name_prefix="stages.send_return",
+                        ),
+                    )
+                )
+            solo_obj = stages_obj.get("solo")
+            if isinstance(solo_obj, dict):
+                await self._send_only(
+                    build_dt1(
+                        ADDR_PATCH_SOLO_COM,
+                        self._read_compact_raw_block(
+                            solo_obj,
+                            raw_key="raw",
+                            field_names=("on", "effect_level"),
+                            field_name_prefix="stages.solo",
+                        ),
+                    )
+                )
+            pedalfx_obj = stages_obj.get("pedalfx")
+            if isinstance(pedalfx_obj, dict):
+                await self._send_only(
+                    build_dt1(
+                        ADDR_PATCH_PEDALFX_COM,
+                        self._read_compact_raw_block(
+                            pedalfx_obj,
+                            raw_key="raw_com",
+                            field_names=("position", "on", "type"),
+                            field_name_prefix="stages.pedalfx",
+                        ),
+                    )
+                )
+                await self._send_only(
+                    build_dt1(
+                        ADDR_PATCH_PEDALFX,
+                        self._read_compact_raw_block(
+                            pedalfx_obj,
+                            raw_key="raw",
+                            field_names=(),
+                            field_name_prefix="stages.pedalfx.raw",
+                            expected_size=15,
+                        ),
+                    )
+                )
 
     async def _write_stage_variant(
         self,
@@ -659,6 +819,39 @@ class AmpClient:
                 raise AmpClientError(f"Invalid payload: {field_name}[{idx}] out of range 0..127")
             out.append(ivalue)
         return out
+
+    @classmethod
+    def _read_compact_raw_block(
+        cls,
+        source: dict[str, Any],
+        raw_key: str | None,
+        field_names: tuple[str, ...],
+        field_name_prefix: str,
+        expected_size: int | None = None,
+    ) -> list[int]:
+        if raw_key is not None:
+            raw = source.get(raw_key)
+            if isinstance(raw, list):
+                if expected_size is None:
+                    expected_size = len(raw)
+                return cls._to_int_list(raw, expected_size=expected_size, field_name=raw_key if "." in raw_key else f"{field_name_prefix}.{raw_key}")
+        values: list[int] = []
+        for field_name in field_names:
+            value = source.get(field_name)
+            if isinstance(value, bool):
+                values.append(1 if value else 0)
+                continue
+            if not isinstance(value, (int, float)):
+                raise AmpClientError(f"Invalid payload: {field_name_prefix}.{field_name} must be numeric")
+            ivalue = int(value)
+            if ivalue < 0 or ivalue > 127:
+                raise AmpClientError(f"Invalid payload: {field_name_prefix}.{field_name} out of range 0..127")
+            values.append(ivalue)
+        if expected_size is not None and len(values) != expected_size:
+            raise AmpClientError(
+                f"Invalid payload: {field_name_prefix} must have length {expected_size} (got {len(values)})"
+            )
+        return values
 
     @staticmethod
     def _normalize_patch_name(name: str) -> list[int]:
