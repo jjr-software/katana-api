@@ -99,7 +99,7 @@
         <div class="row g-3">
           @for (slot of slotsForBank('A'); track slot.slot) {
             <div class="col-12 col-md-6 col-xl-3">
-              <article class="card h-100 patch-card">
+              <article class="card h-100 patch-card" [class.patch-card-active]="isActiveSlot(slot)">
                 <div class="card-body p-3">
                   <p class="small mb-1 text-primary fw-semibold">{{ slot.slot_label }}</p>
                   <h3 class="h6 mb-2 text-break">{{ displayPatchName(slot) }} ({{ displayHash(slot) }})</h3>
@@ -175,7 +175,7 @@
         <div class="row g-3">
           @for (slot of slotsForBank('B'); track slot.slot) {
             <div class="col-12 col-md-6 col-xl-3">
-              <article class="card h-100 patch-card">
+              <article class="card h-100 patch-card" [class.patch-card-active]="isActiveSlot(slot)">
                 <div class="card-body p-3">
                   <p class="small mb-1 text-primary fw-semibold">{{ slot.slot_label }}</p>
                   <h3 class="h6 mb-2 text-break">{{ displayPatchName(slot) }} ({{ displayHash(slot) }})</h3>

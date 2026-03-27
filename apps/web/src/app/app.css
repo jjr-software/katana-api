@@ -15,6 +15,12 @@
   overflow-wrap: anywhere;
 }
 
+.patch-card-active {
+  background: linear-gradient(180deg, #eef8f1 0%, #e0f0e5 100%);
+  border-color: #5a9b6f;
+  box-shadow: 0 0 0 1px rgba(90, 155, 111, 0.2);
+}
+
 .rms-graph {
   width: 100%;
   height: 64px;
