@@ -280,6 +280,7 @@ interface AiPatchAdviceResponse {
   overall_goal: string;
   suggested_changes: AiPatchAdviceChange[];
   cautions: string[];
+  proposed_patch: Record<string, unknown>;
   model: string;
 }
 
@@ -426,6 +427,7 @@ export class App implements OnInit, OnDestroy {
   patchSamplesModalTitle = signal('');
   patchSamplesRows = signal<AudioSampleResponse[]>([]);
   aiModalOpen = signal(false);
+  aiModalSlotNumber = signal<number | null>(null);
   aiModalSlotLabel = signal('');
   aiModalPatchName = signal('');
   aiModalPatch = signal<Record<string, unknown> | null>(null);
@@ -1168,6 +1170,7 @@ export class App implements OnInit, OnDestroy {
       this.status.set(`No full patch payload loaded for ${slot.slot_label}. Sync this slot first.`);
       return;
     }
+    this.aiModalSlotNumber.set(slot.slot);
     this.aiModalSlotLabel.set(slot.slot_label);
     this.aiModalPatchName.set(slot.patch_name || 'Unnamed Patch');
     this.aiModalPatch.set(this.clonePatch(slot.patch));
@@ -1180,6 +1183,7 @@ export class App implements OnInit, OnDestroy {
 
   closeAiModal(): void {
     this.aiModalOpen.set(false);
+    this.aiModalSlotNumber.set(null);
     this.aiModalSlotLabel.set('');
     this.aiModalPatchName.set('');
     this.aiModalPatch.set(null);
@@ -1241,6 +1245,42 @@ export class App implements OnInit, OnDestroy {
 
   setAiModalPrompt(value: string): void {
     this.aiModalPrompt.set(value);
+  }
+
+  applyAiAdviceToPatch(): void {
+    const advice = this.aiModalAdvice();
+    const slotNumber = this.aiModalSlotNumber();
+    if (!advice || slotNumber === null) {
+      return;
+    }
+    const proposedPatch = this.clonePatch(advice.proposed_patch);
+    proposedPatch['config_hash_sha256'] = '';
+    const proposedName = this.readString(proposedPatch, 'patch_name') ?? this.aiModalPatchName();
+    this.slots.update((current) =>
+      current.map((card) => {
+        if (card.slot !== slotNumber) {
+          return card;
+        }
+        return {
+          ...card,
+          patch_name: proposedName || card.patch_name,
+          patch: this.clonePatch(proposedPatch),
+          config_hash_sha256: '',
+          in_sync: false,
+          is_saved: false,
+          out_synced: false,
+        };
+      }),
+    );
+    if (this.editorModalOpen() && this.editorSlotNumber() === slotNumber) {
+      this.editorPatchDraft.set(this.clonePatch(proposedPatch));
+      this.editorLiveApplyError.set('');
+      this.editorLiveApplyReadbackAt.set('');
+      this.scheduleEditorLiveApply();
+    }
+    this.aiModalPatch.set(this.clonePatch(proposedPatch));
+    this.aiModalPatchName.set(proposedName || this.aiModalPatchName());
+    this.status.set(`Applied AI proposal to ${this.aiModalSlotLabel()} as local patch state`);
   }
 
   navigateToPage(page: 'dashboard' | 'samples'): void {

@@ -1,5 +1,6 @@
 import asyncio
 import json
+from copy import deepcopy
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 
@@ -42,7 +43,8 @@ The JSON object must match this shape:
   ],
   "cautions": [
     "short caution"
-  ]
+  ],
+  "proposed_patch": { "full patch object with the suggested changes already applied" }
 }
 """
 
@@ -66,7 +68,59 @@ class PatchAdviceResponse(BaseModel):
     overall_goal: str
     suggested_changes: list[PatchAdviceChange]
     cautions: list[str]
+    proposed_patch: dict
     model: str | None = None
+
+
+def _apply_path_value(target: dict, field_path: str, value: object) -> None:
+    path = [segment for segment in field_path.split(".") if segment]
+    if not path:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "AI returned empty field path",
+                "field": field_path,
+            },
+        )
+    current: object = target
+    for segment in path[:-1]:
+        if not isinstance(current, dict) or segment not in current:
+            raise HTTPException(
+                status_code=502,
+                detail={
+                    "message": "AI returned unknown field path",
+                    "field": field_path,
+                    "missing_segment": segment,
+                },
+            )
+        current = current[segment]
+    if not isinstance(current, dict):
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "AI returned non-object parent path",
+                "field": field_path,
+            },
+        )
+    leaf = path[-1]
+    if leaf not in current:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "AI returned unknown leaf field",
+                "field": field_path,
+                "leaf": leaf,
+            },
+        )
+    current[leaf] = value
+
+
+def _materialize_proposed_patch(source_patch: dict, changes: list[PatchAdviceChange]) -> dict:
+    proposed = deepcopy(source_patch)
+    for change in changes:
+        _apply_path_value(proposed, change.field, change.suggested_value)
+    proposed.pop("config_hash_sha256", None)
+    return proposed
 
 
 def _extract_response_text(payload: dict) -> str:
@@ -169,6 +223,9 @@ def _call_openai_patch_advisor(settings: Settings, request_payload: PatchAdviceR
                 "output_text": advice_json,
             },
         ) from exc
+    if "proposed_patch" not in advice_payload:
+        validated_changes = [PatchAdviceChange.model_validate(item) for item in advice_payload.get("suggested_changes", [])]
+        advice_payload["proposed_patch"] = _materialize_proposed_patch(request_payload.patch, validated_changes)
     advice = PatchAdviceResponse.model_validate(advice_payload)
     return advice.model_copy(update={"model": settings.openai_model})
 
