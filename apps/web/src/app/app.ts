@@ -356,6 +356,7 @@ function defaultSlotCards(): SlotCard[] {
   styleUrl: './app.css',
 })
 export class App implements OnInit, OnDestroy {
+  currentPage = signal<'dashboard' | 'samples'>(this.resolvePageFromPath());
   status = signal('Idle');
   responseJson = signal('');
   slots = signal<SlotCard[]>(defaultSlotCards());
@@ -412,8 +413,12 @@ export class App implements OnInit, OnDestroy {
   patchConfigTargetLabel = signal('');
   patchConfigRows = signal<PatchConfigResponse[]>([]);
   private activeSlotPollInFlight = false;
+  private readonly onPopState = (): void => {
+    this.currentPage.set(this.resolvePageFromPath());
+  };
 
   ngOnInit(): void {
+    window.addEventListener('popstate', this.onPopState);
     void this.refreshQueueState();
     void this.loadAudioLevelMarker();
     void this.loadRecentAudioSamples();
@@ -428,6 +433,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    window.removeEventListener('popstate', this.onPopState);
     if (this.queuePollHandle !== null) {
       clearInterval(this.queuePollHandle);
       this.queuePollHandle = null;
@@ -1062,6 +1068,25 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  navigateToPage(page: 'dashboard' | 'samples'): void {
+    const targetPath = page === 'samples' ? '/samples' : '/';
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({}, '', targetPath);
+    }
+    this.currentPage.set(page);
+    if (page === 'samples') {
+      void this.loadRecentAudioSamples();
+    }
+  }
+
+  isSamplesPage(): boolean {
+    return this.currentPage() === 'samples';
+  }
+
+  isDashboardPage(): boolean {
+    return this.currentPage() === 'dashboard';
+  }
+
   startLiveMeter(): void {
     this.stopLiveMeter();
     this.status.set('Starting live audio meter feed...');
@@ -1194,6 +1219,10 @@ export class App implements OnInit, OnDestroy {
     const clamped = Math.max(minDb, Math.min(maxDb, value));
     const normalized = (clamped - minDb) / (maxDb - minDb);
     return (1 - normalized) * height;
+  }
+
+  private resolvePageFromPath(): 'dashboard' | 'samples' {
+    return window.location.pathname === '/samples' ? 'samples' : 'dashboard';
   }
 
   async measureAllSlotsRms(): Promise<void> {
