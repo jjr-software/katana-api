@@ -1567,6 +1567,25 @@
 - Changes:
   - success now requires absolute error to target within tolerance,
   - run log now prints per-iteration RMS error vs target,
-  - AI direction text/prompt now switches correctly between louder/quieter and increase/reduce loudness.
+- AI direction text/prompt now switches correctly between louder/quieter and increase/reduce loudness.
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
+
+## Session Update - 2026-03-27 (AI Advice Contract Reduced To One Control)
+- Fixed AI patch advice contract in:
+  - `apps/api/app/api/ai.py`
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Root cause:
+  - the AI endpoint asked for multiple suggested changes plus a full proposed patch, which produced oversized/unstable outputs and invited unsupported field paths.
+- Changes:
+  - AI now returns exactly one suggested change:
+    - one dotted field path,
+    - one numeric current value,
+    - one numeric suggested value,
+    - one short rationale,
+  - server now materializes `proposed_patch` itself from that single change,
+  - server rejects bracket/array/raw field syntax and other invalid advice shapes,
+  - auto-level/apply UI now consumes and displays one change only.
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`

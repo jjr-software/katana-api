@@ -270,7 +270,6 @@ interface AudioSampleResponse {
 }
 
 interface AiPatchAdviceChange {
-  area: string;
   field: string;
   current_value: string | number;
   suggested_value: string | number;
@@ -279,9 +278,7 @@ interface AiPatchAdviceChange {
 
 interface AiPatchAdviceResponse {
   summary: string;
-  overall_goal: string;
-  suggested_changes: AiPatchAdviceChange[];
-  cautions: string[];
+  suggested_change: AiPatchAdviceChange;
   proposed_patch: Record<string, unknown>;
   model: string;
 }
@@ -1196,7 +1193,7 @@ export class App implements OnInit, OnDestroy {
     this.aiModalPatch.set(this.clonePatch(slot.patch));
     this.aiModalCurrentMeasuredRms.set(slot.measured_rms_dbfs);
     this.aiModalTargetRms.set(slot.measured_rms_dbfs !== null ? slot.measured_rms_dbfs.toFixed(2) : '');
-    this.aiModalPrompt.set('Suggest the most useful concrete improvements for this patch. Focus on tone, EQ, gain structure, and clarity.');
+    this.aiModalPrompt.set('Suggest exactly one concrete control change for this patch. Return one field path and one numeric value only.');
     this.aiModalAdvice.set(null);
     this.aiModalError.set('');
     this.aiModalOpen.set(true);
@@ -1404,16 +1401,12 @@ export class App implements OnInit, OnDestroy {
         const direction = errorDb > 0 ? 'quieter' : 'louder';
         this.pushAutoLevelLog(`Iteration ${iteration}: asking AI for a ${direction} proposal...`);
         const advice = await this.fetchAiPatchAdvice(slot.slot_label, prompt, currentSlot.patch);
-        if (advice.suggested_changes.length === 0) {
-          throw new Error('AI returned no concrete changes for the auto-level pass.');
-        }
-        for (const change of advice.suggested_changes) {
-          this.pushAutoLevelLog(
-            `AI change: ${change.field} ${this.formatAiValue(change.current_value)} -> ${this.formatAiValue(change.suggested_value)} (${change.rationale})`,
-          );
-        }
+        const change = advice.suggested_change;
+        this.pushAutoLevelLog(
+          `AI change: ${change.field} ${this.formatAiValue(change.current_value)} -> ${this.formatAiValue(change.suggested_value)} (${change.rationale})`,
+        );
         this.autoLevelState.set('applying');
-        this.pushAutoLevelLog(`Iteration ${iteration}: applying AI proposal with ${advice.suggested_changes.length} changes...`);
+        this.pushAutoLevelLog(`Iteration ${iteration}: applying AI proposal...`);
         await this.applyProposedPatchToSlot(slot.slot, advice.proposed_patch, true);
         this.pushAutoLevelLog(`Iteration ${iteration}: proposal applied to active patch.`);
       }
@@ -1446,9 +1439,9 @@ export class App implements OnInit, OnDestroy {
 
   aiModalDescription(): string {
     if (this.aiModalMode() === 'level') {
-      return 'The AI is fed the current patch JSON plus measured RMS and target RMS, and should trim whatever parts of the chain are actually driving loudness.';
+      return 'The AI is fed the current patch JSON plus measured RMS and target RMS, and must return one concrete control/value change to move loudness toward target.';
     }
-    return 'The AI is fed the current patch JSON and returns concrete Katana parameter suggestions.';
+    return 'The AI is fed the current patch JSON and returns one concrete Katana control/value change.';
   }
 
   private buildAiTargetRmsPrompt(currentRmsDbfs: number, targetRmsDbfs: number): string {
@@ -1457,10 +1450,11 @@ export class App implements OnInit, OnDestroy {
     return [
       `Current 10s Max RMS is ${currentRmsDbfs.toFixed(2)} dBFS.`,
       `Target 10s Max RMS is ${targetRmsDbfs.toFixed(2)} dBFS.`,
-      `Suggest concrete patch changes to ${direction} loudness toward that target while preserving the overall tone character where possible.`,
+      `Suggest exactly one concrete numeric control change to ${direction} loudness toward that target while preserving the overall tone character where possible.`,
+      'Return one field path and one numeric value only.',
       'Do not assume amp.volume is the only control to use.',
       'Consider whichever parts of the chain are actually contributing level, including booster drive/effect level, mod/fx levels, delay/reverb levels, solo, send_return, EQ boosts, amp gain, and amp volume.',
-      'Prefer the smallest effective set of changes.',
+      'Prefer the smallest effective change.',
     ].join(' ');
   }
 

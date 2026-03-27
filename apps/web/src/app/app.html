@@ -417,32 +417,19 @@
               <div>
                 <p class="small text-secondary mb-1">Model: <code>{{ advice.model }}</code></p>
                 <p class="mb-1"><strong>Summary:</strong> {{ advice.summary }}</p>
-                <p class="mb-0"><strong>Goal:</strong> {{ advice.overall_goal }}</p>
               </div>
 
               <div class="d-flex justify-content-end">
                 <button type="button" class="btn btn-sm btn-success" (click)="applyAiAdviceToPatch()">Apply To Patch</button>
               </div>
 
-              <div class="d-grid gap-2">
-                <p class="small text-uppercase text-secondary mb-0">Suggested Changes</p>
-                @for (change of advice.suggested_changes; track $index) {
-                  <article class="border rounded p-2 bg-white ai-change-card">
-                    <p class="mb-1"><strong>{{ change.area }}</strong> · <code>{{ change.field }}</code></p>
-                    <p class="mb-1 small">
-                      current <code>{{ change.current_value }}</code> -> suggested <code>{{ change.suggested_value }}</code>
-                    </p>
-                    <p class="mb-0 small text-secondary">{{ change.rationale }}</p>
-                  </article>
-                }
-              </div>
-
-              <div class="d-grid gap-1">
-                <p class="small text-uppercase text-secondary mb-0">Cautions</p>
-                @for (caution of advice.cautions; track $index) {
-                  <p class="small mb-0">• {{ caution }}</p>
-                }
-              </div>
+              <article class="border rounded p-2 bg-white ai-change-card">
+                <p class="mb-1"><code>{{ advice.suggested_change.field }}</code></p>
+                <p class="mb-1 small">
+                  current <code>{{ advice.suggested_change.current_value }}</code> -> suggested <code>{{ advice.suggested_change.suggested_value }}</code>
+                </p>
+                <p class="mb-0 small text-secondary">{{ advice.suggested_change.rationale }}</p>
+              </article>
             </article>
           }
         </div>

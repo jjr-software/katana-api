@@ -6,6 +6,7 @@ from urllib import request as urllib_request
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from pydantic import ValidationError
 
 from app.settings import Settings, get_settings
 
@@ -17,34 +18,26 @@ You are advising on a single Katana patch snapshot from a web editor. The patch 
 
 Rules:
 - Only suggest changes to fields that already exist in the provided patch JSON.
+- Pick exactly one numeric control field and exactly one numeric suggested value.
 - Prefer concrete Katana changes over vague tone adjectives.
 - Focus on guitar tone shaping: EQ, gain, level, booster/mod/fx/delay/reverb, noise suppressor, routing, send/return, solo, pedal FX.
-- When values look like raw device values, still reference the exact field path and exact suggested numeric value.
+- Use dotted object paths only, for example `amp.volume` or `stages.booster.effect_level`.
+- Do not use array indexing, bracket syntax, or `raw` fields.
 - If a value is likely centered or neutral, say so plainly.
 - Avoid inventing unsupported pedals, controls, or hidden parameters.
 - Keep suggestions practical and audible.
-- Return at most 6 suggested_changes.
-- Keep each rationale short.
-- Return at most 3 cautions.
+- Keep the rationale short.
 - Return JSON only. No markdown. No prose outside the JSON object.
 
 The JSON object must match this shape:
 {
   "summary": "short summary",
-  "overall_goal": "what tone direction these changes aim for",
-  "suggested_changes": [
-    {
-      "area": "amp|booster|mod|fx|delay|reverb|eq1|eq2|ns|routing|solo|send_return|pedalfx|colors|delay2",
-      "field": "precise field path",
-      "current_value": "string or number",
-      "suggested_value": "string or number",
-      "rationale": "short audible reason"
-    }
-  ],
-  "cautions": [
-    "short caution"
-  ],
-  "proposed_patch": { "full patch object with the suggested changes already applied" }
+  "suggested_change": {
+    "field": "precise dotted field path",
+    "current_value": "number",
+    "suggested_value": "number",
+    "rationale": "short audible reason"
+  }
 }
 """
 
@@ -56,23 +49,28 @@ class PatchAdviceRequest(BaseModel):
 
 
 class PatchAdviceChange(BaseModel):
-    area: str
     field: str
-    current_value: object
-    suggested_value: object
+    current_value: int | float
+    suggested_value: int | float
     rationale: str
 
 
 class PatchAdviceResponse(BaseModel):
     summary: str
-    overall_goal: str
-    suggested_changes: list[PatchAdviceChange]
-    cautions: list[str]
+    suggested_change: PatchAdviceChange
     proposed_patch: dict
     model: str | None = None
 
 
-def _apply_path_value(target: dict, field_path: str, value: object) -> None:
+def _resolve_path(target: dict, field_path: str) -> tuple[dict, str]:
+    if "[" in field_path or "]" in field_path or ".raw" in field_path or field_path.startswith("raw"):
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "AI returned unsupported field path syntax",
+                "field": field_path,
+            },
+        )
     path = [segment for segment in field_path.split(".") if segment]
     if not path:
         raise HTTPException(
@@ -112,13 +110,32 @@ def _apply_path_value(target: dict, field_path: str, value: object) -> None:
                 "leaf": leaf,
             },
         )
-    current[leaf] = value
+    return current, leaf
 
 
-def _materialize_proposed_patch(source_patch: dict, changes: list[PatchAdviceChange]) -> dict:
+def _read_numeric_field(source_patch: dict, field_path: str) -> int | float:
+    parent, leaf = _resolve_path(source_patch, field_path)
+    value = parent[leaf]
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "AI returned non-numeric field",
+                "field": field_path,
+                "value": value,
+            },
+        )
+    return value
+
+
+def _apply_path_value(target: dict, field_path: str, value: int | float) -> None:
+    parent, leaf = _resolve_path(target, field_path)
+    parent[leaf] = value
+
+
+def _materialize_proposed_patch(source_patch: dict, change: PatchAdviceChange) -> dict:
     proposed = deepcopy(source_patch)
-    for change in changes:
-        _apply_path_value(proposed, change.field, change.suggested_value)
+    _apply_path_value(proposed, change.field, change.suggested_value)
     proposed.pop("config_hash_sha256", None)
     return proposed
 
@@ -223,9 +240,21 @@ def _call_openai_patch_advisor(settings: Settings, request_payload: PatchAdviceR
                 "output_text": advice_json,
             },
         ) from exc
+    try:
+        validated_change = PatchAdviceChange.model_validate(advice_payload.get("suggested_change"))
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "OpenAI returned invalid advice shape",
+                "errors": exc.errors(),
+                "payload": advice_payload,
+            },
+        ) from exc
+    actual_current = _read_numeric_field(request_payload.patch, validated_change.field)
+    advice_payload["suggested_change"] = validated_change.model_copy(update={"current_value": actual_current}).model_dump()
     if "proposed_patch" not in advice_payload:
-        validated_changes = [PatchAdviceChange.model_validate(item) for item in advice_payload.get("suggested_changes", [])]
-        advice_payload["proposed_patch"] = _materialize_proposed_patch(request_payload.patch, validated_changes)
+        advice_payload["proposed_patch"] = _materialize_proposed_patch(request_payload.patch, validated_change)
     advice = PatchAdviceResponse.model_validate(advice_payload)
     return advice.model_copy(update={"model": settings.openai_model})
 
