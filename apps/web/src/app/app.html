@@ -159,6 +159,7 @@
                     @if (canOpenEditor(slot)) {
                       <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openEditor(slot)">Editor</button>
                     }
+                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openAskAiModal(slot)" [disabled]="!canAskAi(slot)">Ask AI</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openPatchSamplesModal(slot)" [disabled]="!canShowPatchSamples(slot)">Samples</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="showRaw(slot)" [disabled]="!canUseSlotActions(slot)">Raw</button>
                   </div>
@@ -242,6 +243,7 @@
                     @if (canOpenEditor(slot)) {
                       <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openEditor(slot)">Editor</button>
                     }
+                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openAskAiModal(slot)" [disabled]="!canAskAi(slot)">Ask AI</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openPatchSamplesModal(slot)" [disabled]="!canShowPatchSamples(slot)">Samples</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="showRaw(slot)" [disabled]="!canUseSlotActions(slot)">Raw</button>
                   </div>
@@ -354,6 +356,70 @@
                 }
               </article>
             }
+          }
+        </div>
+      </section>
+    </div>
+  }
+
+  @if (aiModalOpen()) {
+    <div class="raw-modal-backdrop" (click)="closeAiModal()">
+      <section class="raw-modal ai-modal" role="dialog" aria-modal="true" aria-label="Ask AI About Patch" (click)="$event.stopPropagation()">
+        <header class="raw-modal-head">
+          <h3>Ask AI · {{ aiModalSlotLabel() }} · {{ aiModalPatchName() }}</h3>
+          <button type="button" class="btn btn-sm btn-light" (click)="closeAiModal()">Close</button>
+        </header>
+        <div class="p-3 d-grid gap-3 ai-modal-body">
+          <article class="border rounded p-3 bg-body-tertiary d-grid gap-2">
+            <label class="form-label small mb-1" for="aiPrompt">Prompt</label>
+            <textarea id="aiPrompt" class="form-control" rows="4" [value]="aiModalPrompt()" (input)="setAiModalPrompt($any($event.target).value)"></textarea>
+            <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+              <p class="small text-secondary mb-0">The AI is fed the current patch JSON and returns concrete Katana parameter suggestions.</p>
+              <button type="button" class="btn btn-sm btn-primary" (click)="requestAiPatchAdvice()" [disabled]="aiModalLoading()">Ask AI</button>
+            </div>
+          </article>
+
+          @if (aiModalLoading()) {
+            <article class="border rounded p-3 bg-body-tertiary">
+              <p class="small mb-0">Consulting Katana patch advisor...</p>
+            </article>
+          }
+
+          @if (aiModalError()) {
+            <article class="border border-danger rounded p-3 bg-danger-subtle">
+              <p class="small fw-semibold mb-2">AI request failed</p>
+              <pre class="raw-modal-json ai-error-json">{{ aiModalError() }}</pre>
+            </article>
+          }
+
+          @if (aiModalAdvice(); as advice) {
+            <article class="border rounded p-3 bg-body-tertiary d-grid gap-3">
+              <div>
+                <p class="small text-secondary mb-1">Model: <code>{{ advice.model }}</code></p>
+                <p class="mb-1"><strong>Summary:</strong> {{ advice.summary }}</p>
+                <p class="mb-0"><strong>Goal:</strong> {{ advice.overall_goal }}</p>
+              </div>
+
+              <div class="d-grid gap-2">
+                <p class="small text-uppercase text-secondary mb-0">Suggested Changes</p>
+                @for (change of advice.suggested_changes; track $index) {
+                  <article class="border rounded p-2 bg-white ai-change-card">
+                    <p class="mb-1"><strong>{{ change.area }}</strong> · <code>{{ change.field }}</code></p>
+                    <p class="mb-1 small">
+                      current <code>{{ change.current_value }}</code> -> suggested <code>{{ change.suggested_value }}</code>
+                    </p>
+                    <p class="mb-0 small text-secondary">{{ change.rationale }}</p>
+                  </article>
+                }
+              </div>
+
+              <div class="d-grid gap-1">
+                <p class="small text-uppercase text-secondary mb-0">Cautions</p>
+                @for (caution of advice.cautions; track $index) {
+                  <p class="small mb-0">• {{ caution }}</p>
+                }
+              </div>
+            </article>
           }
         </div>
       </section>

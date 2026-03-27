@@ -96,6 +96,23 @@ pre {
   width: min(1080px, 100%);
 }
 
+.ai-modal {
+  width: min(980px, 100%);
+}
+
+.ai-modal-body {
+  max-height: calc(90vh - 84px);
+  overflow: auto;
+}
+
+.ai-change-card {
+  overflow-wrap: anywhere;
+}
+
+.ai-error-json {
+  max-height: 18rem;
+}
+
 .editor-modal-body {
   max-height: calc(90vh - 130px);
   overflow: auto;

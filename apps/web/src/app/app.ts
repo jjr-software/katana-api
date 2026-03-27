@@ -267,6 +267,22 @@ interface AudioSampleResponse {
   created_at: string;
 }
 
+interface AiPatchAdviceChange {
+  area: string;
+  field: string;
+  current_value: string | number;
+  suggested_value: string | number;
+  rationale: string;
+}
+
+interface AiPatchAdviceResponse {
+  summary: string;
+  overall_goal: string;
+  suggested_changes: AiPatchAdviceChange[];
+  cautions: string[];
+  model: string;
+}
+
 interface QueueJobSummary {
   job_id: string;
   operation: string;
@@ -409,6 +425,14 @@ export class App implements OnInit, OnDestroy {
   patchSamplesModalOpen = signal(false);
   patchSamplesModalTitle = signal('');
   patchSamplesRows = signal<AudioSampleResponse[]>([]);
+  aiModalOpen = signal(false);
+  aiModalSlotLabel = signal('');
+  aiModalPatchName = signal('');
+  aiModalPatch = signal<Record<string, unknown> | null>(null);
+  aiModalPrompt = signal('Suggest the most useful concrete improvements for this patch. Focus on tone, EQ, gain structure, and clarity.');
+  aiModalLoading = signal(false);
+  aiModalError = signal('');
+  aiModalAdvice = signal<AiPatchAdviceResponse | null>(null);
   editorModalOpen = signal(false);
   editorSlotNumber = signal<number | null>(null);
   editorSlotLabel = signal('');
@@ -1133,6 +1157,90 @@ export class App implements OnInit, OnDestroy {
     this.patchSamplesModalOpen.set(false);
     this.patchSamplesModalTitle.set('');
     this.patchSamplesRows.set([]);
+  }
+
+  canAskAi(slot: SlotCard): boolean {
+    return slot.patch !== null;
+  }
+
+  async openAskAiModal(slot: SlotCard): Promise<void> {
+    if (!slot.patch) {
+      this.status.set(`No full patch payload loaded for ${slot.slot_label}. Sync this slot first.`);
+      return;
+    }
+    this.aiModalSlotLabel.set(slot.slot_label);
+    this.aiModalPatchName.set(slot.patch_name || 'Unnamed Patch');
+    this.aiModalPatch.set(this.clonePatch(slot.patch));
+    this.aiModalPrompt.set('Suggest the most useful concrete improvements for this patch. Focus on tone, EQ, gain structure, and clarity.');
+    this.aiModalAdvice.set(null);
+    this.aiModalError.set('');
+    this.aiModalOpen.set(true);
+    await this.requestAiPatchAdvice();
+  }
+
+  closeAiModal(): void {
+    this.aiModalOpen.set(false);
+    this.aiModalSlotLabel.set('');
+    this.aiModalPatchName.set('');
+    this.aiModalPatch.set(null);
+    this.aiModalPrompt.set('Suggest the most useful concrete improvements for this patch. Focus on tone, EQ, gain structure, and clarity.');
+    this.aiModalLoading.set(false);
+    this.aiModalError.set('');
+    this.aiModalAdvice.set(null);
+  }
+
+  async requestAiPatchAdvice(): Promise<void> {
+    const patch = this.aiModalPatch();
+    if (!patch) {
+      this.aiModalError.set('No patch payload loaded for AI advice.');
+      return;
+    }
+    this.aiModalLoading.set(true);
+    this.aiModalError.set('');
+    this.aiModalAdvice.set(null);
+    this.status.set(`Asking AI about ${this.aiModalSlotLabel()}...`);
+    this.responseJson.set('');
+    try {
+      const response = await fetch('/api/v1/ai/patch-advice', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          slot_label: this.aiModalSlotLabel(),
+          question: this.aiModalPrompt(),
+          patch,
+        }),
+      });
+      const payload = (await response.json()) as AiPatchAdviceResponse | { detail?: unknown };
+      if (!response.ok) {
+        const detailText = JSON.stringify(payload, null, 2);
+        this.aiModalError.set(detailText);
+        this.responseJson.set(detailText);
+        this.status.set(`AI advice failed for ${this.aiModalSlotLabel()}`);
+        return;
+      }
+      this.aiModalAdvice.set(payload as AiPatchAdviceResponse);
+      this.status.set(`AI advice loaded for ${this.aiModalSlotLabel()}`);
+    } catch (error: unknown) {
+      const detailText = JSON.stringify(
+        {
+          message: 'Browser request failed',
+          error: String(error),
+        },
+        null,
+        2,
+      );
+      this.aiModalError.set(detailText);
+      this.responseJson.set(detailText);
+      this.status.set(`AI advice failed for ${this.aiModalSlotLabel()}`);
+    } finally {
+      this.aiModalLoading.set(false);
+    }
+  }
+
+  setAiModalPrompt(value: string): void {
+    this.aiModalPrompt.set(value);
   }
 
   navigateToPage(page: 'dashboard' | 'samples'): void {

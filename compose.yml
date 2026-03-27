@@ -30,6 +30,7 @@ services:
       PIPEWIRE_SOCKET: /run/user/1000/pipewire-0
       MIDI_DEVICE_DIR: /dev/snd
       KATANA_MIDI_PORT: ${KATANA_MIDI_PORT:?Set KATANA_MIDI_PORT via scripts/resolve_katana_midi.py}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required}
       XDG_RUNTIME_DIR: /run/user/1000
     depends_on:
       db:

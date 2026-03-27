@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from app.api.ai import router as ai_router
 from app.api.amp import router as amp_router
 from app.api.audio import router as audio_router
 from app.amp_queue import amp_job_queue
@@ -10,6 +11,7 @@ app = FastAPI(title="Katana API", version="0.1.0")
 app.include_router(patches_router)
 app.include_router(amp_router)
 app.include_router(audio_router)
+app.include_router(ai_router)
 
 
 @app.on_event("startup")

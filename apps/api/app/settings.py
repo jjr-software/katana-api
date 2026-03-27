@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     amidi_rq1_timeout_seconds: float = 0.12
     full_sync_timeout_seconds: float = 120.0
     quick_sync_timeout_seconds: float = 45.0
+    openai_api_key: str
+    openai_model: str = "gpt-5-mini"
 
 
 @lru_cache
