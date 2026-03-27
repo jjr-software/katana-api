@@ -1385,7 +1385,9 @@ export class App implements OnInit, OnDestroy {
         const sample = await this.captureActivePatchMeasurement(slot.slot, AUTO_LEVEL_MEASURE_SEC);
         this.autoLevelCurrentRms.set(sample.rms_dbfs);
         this.pushAutoLevelLog(`Iteration ${iteration}: measured ${sample.rms_dbfs.toFixed(2)} dBFS.`);
-        if (sample.rms_dbfs <= targetRms + AUTO_LEVEL_TOLERANCE_DB) {
+        const errorDb = sample.rms_dbfs - targetRms;
+        this.pushAutoLevelLog(`Iteration ${iteration}: error ${errorDb.toFixed(2)} dB vs target.`);
+        if (Math.abs(errorDb) <= AUTO_LEVEL_TOLERANCE_DB) {
           this.autoLevelState.set('succeeded');
           this.pushAutoLevelLog(
             `Target reached within ${AUTO_LEVEL_TOLERANCE_DB.toFixed(1)} dB tolerance. Final RMS ${sample.rms_dbfs.toFixed(2)} dBFS.`,
@@ -1399,7 +1401,8 @@ export class App implements OnInit, OnDestroy {
         }
         const prompt = this.buildAiTargetRmsPrompt(sample.rms_dbfs, targetRms);
         this.autoLevelState.set('asking');
-        this.pushAutoLevelLog(`Iteration ${iteration}: asking AI for a quieter proposal...`);
+        const direction = errorDb > 0 ? 'quieter' : 'louder';
+        this.pushAutoLevelLog(`Iteration ${iteration}: asking AI for a ${direction} proposal...`);
         const advice = await this.fetchAiPatchAdvice(slot.slot_label, prompt, currentSlot.patch);
         if (advice.suggested_changes.length === 0) {
           throw new Error('AI returned no concrete changes for the auto-level pass.');
@@ -1449,10 +1452,12 @@ export class App implements OnInit, OnDestroy {
   }
 
   private buildAiTargetRmsPrompt(currentRmsDbfs: number, targetRmsDbfs: number): string {
+    const deltaDb = targetRmsDbfs - currentRmsDbfs;
+    const direction = deltaDb < 0 ? 'reduce' : 'increase';
     return [
       `Current 10s Max RMS is ${currentRmsDbfs.toFixed(2)} dBFS.`,
       `Target 10s Max RMS is ${targetRmsDbfs.toFixed(2)} dBFS.`,
-      'Suggest concrete patch changes to reduce loudness toward that target while preserving the overall tone character where possible.',
+      `Suggest concrete patch changes to ${direction} loudness toward that target while preserving the overall tone character where possible.`,
       'Do not assume amp.volume is the only control to use.',
       'Consider whichever parts of the chain are actually contributing level, including booster drive/effect level, mod/fx levels, delay/reverb levels, solo, send_return, EQ boosts, amp gain, and amp volume.',
       'Prefer the smallest effective set of changes.',

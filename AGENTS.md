@@ -1558,3 +1558,15 @@
   - `POST /api/v1/amp/current-patch/live-apply` succeeds with the expanded payload.
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-27 (Auto-Level Success Check Fix)
+- Fixed frontend auto-level success logic in:
+  - `apps/web/src/app/app.ts`
+- Root cause:
+  - success condition accepted any measured RMS at or below `target + tolerance`, so badly under-target results could be reported as success.
+- Changes:
+  - success now requires absolute error to target within tolerance,
+  - run log now prints per-iteration RMS error vs target,
+  - AI direction text/prompt now switches correctly between louder/quieter and increase/reduce loudness.
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
