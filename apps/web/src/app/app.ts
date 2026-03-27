@@ -121,6 +121,13 @@ interface SlotSyncResponse {
   slot: SlotPatchSummary;
 }
 
+interface SlotActivateResponse {
+  slot: number;
+  slot_label: string;
+  activated_at: string;
+  activate_ms: number;
+}
+
 interface SlotWriteResponse {
   synced_at: string;
   slot: SlotPatchSummary;
@@ -473,26 +480,48 @@ export class App implements OnInit, OnDestroy {
     this.status.set(`Activating ${slot.slot_label} on amp...`);
     this.responseJson.set('');
     try {
-      const response = await fetch(`/api/v1/amp/slots/${slot.slot}/sync`, {
+      const activateResponse = await fetch(`/api/v1/amp/slots/${slot.slot}/activate`, {
         method: 'POST',
         cache: 'no-store',
       });
-      const payload = (await response.json()) as SlotSyncResponse | { detail?: unknown };
-      if (!response.ok) {
+      const activatePayload = (await activateResponse.json()) as SlotActivateResponse | { detail?: unknown };
+      if (!activateResponse.ok) {
         this.status.set(`Failed activating ${slot.slot_label}`);
-        this.responseJson.set(JSON.stringify(payload, null, 2));
+        this.responseJson.set(JSON.stringify(activatePayload, null, 2));
         return;
       }
-      const synced = payload as SlotSyncResponse;
-      this.applySyncedSlot(synced.slot);
+      const activated = activatePayload as SlotActivateResponse;
       this.selectedAmpSlot.set(slot.slot);
+      this.status.set(`Activated ${slot.slot_label} on amp (${this.formatMs(activated.activate_ms)}). Reading patch state back...`);
+
+      const syncResponse = await fetch(`/api/v1/amp/slots/${slot.slot}/sync`, {
+        method: 'POST',
+        cache: 'no-store',
+      });
+      const syncPayload = (await syncResponse.json()) as SlotSyncResponse | { detail?: unknown };
+      if (!syncResponse.ok) {
+        this.status.set(`Activated ${slot.slot_label}; patch readback failed`);
+        this.responseJson.set(
+          JSON.stringify(
+            {
+              activate: activated,
+              readback: syncPayload,
+            },
+            null,
+            2,
+          ),
+        );
+        return;
+      }
+      const synced = syncPayload as SlotSyncResponse;
+      this.applySyncedSlot(synced.slot);
       this.lastSyncedAt.set(synced.synced_at);
       this.totalSyncMs.set(synced.slot.slot_sync_ms);
       this.currentAmpPatchHash.set(synced.slot.config_hash_sha256 || '');
       if (this.selectedAmpSlot() !== null) {
         await this.refreshCurrentCommitState();
       }
-      this.status.set(`Activated ${slot.slot_label} on amp`);
+      this.status.set(`Activated ${slot.slot_label}; patch state read back (${this.formatMs(synced.slot.slot_sync_ms)})`);
     } catch (error: unknown) {
       this.status.set(`Failed activating ${slot.slot_label}`);
       this.responseJson.set(

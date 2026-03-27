@@ -11,6 +11,7 @@ from app.katana.client import (
     SlotPatchSummary,
     SlotsStateSnapshot,
 )
+from app.katana.protocol import slot_label
 
 __all__ = [
     "AmpClient",
@@ -24,4 +25,5 @@ __all__ = [
     "SlotDump",
     "SlotPatchSummary",
     "SlotsStateSnapshot",
+    "slot_label",
 ]

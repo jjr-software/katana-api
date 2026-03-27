@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.amp_queue import amp_job_queue
 from app.deps import get_amp_client, get_db
-from app.katana import AmpClient, QuickSlotName, SlotDump, SlotPatchSummary
+from app.katana import AmpClient, QuickSlotName, SlotDump, SlotPatchSummary, slot_label
 from app.models import AmpSyncHistory, PatchConfig, PatchSet, PatchSetMember
 
 router = APIRouter(prefix="/api/v1/amp", tags=["amp"])
@@ -59,6 +59,13 @@ class SlotsStateResponse(BaseModel):
 class SlotSyncResponse(BaseModel):
     synced_at: str
     slot: SlotPatchSummaryResponse
+
+
+class SlotActivateResponse(BaseModel):
+    slot: int
+    slot_label: str
+    activated_at: str
+    activate_ms: int
 
 
 class SlotWriteRequest(BaseModel):
@@ -361,6 +368,21 @@ async def sync_single_slot(
     return SlotSyncResponse(
         synced_at=item.synced_at,
         slot=SlotPatchSummaryResponse(**_slot_to_dict(item, curated_by_hash, saved_hashes)),
+    )
+
+
+@router.post("/slots/{slot:int}/activate", response_model=SlotActivateResponse)
+async def activate_single_slot(
+    slot: int,
+    client: AmpClient = Depends(get_amp_client),
+) -> SlotActivateResponse:
+    activated_at = datetime.now().isoformat(timespec="seconds")
+    activate_ms = await client.activate_slot(slot)
+    return SlotActivateResponse(
+        slot=slot,
+        slot_label=slot_label(slot),
+        activated_at=activated_at,
+        activate_ms=activate_ms,
     )
 
 
