@@ -86,6 +86,7 @@ const EQ_GE10_BAND_LABELS = ['31', '62', '125', '250', '500', '1k', '2k', '4k', 
 const LIVE_RMS_WINDOW_POINTS = 96;
 const EDITOR_LIVE_APPLY_DEBOUNCE_MS = 2000;
 const EDITOR_LIVE_APPLY_MIN_GAP_MS = 120;
+const AUTO_LEVEL_TOLERANCE_DB = 0.4;
 
 interface AmpConnectionTestResponse {
   ok: boolean;
@@ -1379,7 +1380,6 @@ export class App implements OnInit, OnDestroy {
     try {
       await this.waitForPlayingStart(slot.slot_label);
       const maxIterations = 4;
-      const toleranceDb = 0.75;
       for (let iteration = 1; iteration <= maxIterations; iteration += 1) {
         this.autoLevelIteration.set(iteration);
         this.autoLevelState.set('measuring');
@@ -1387,9 +1387,11 @@ export class App implements OnInit, OnDestroy {
         const sample = await this.captureActivePatchMeasurement(slot.slot, 10.0);
         this.autoLevelCurrentRms.set(sample.rms_dbfs);
         this.pushAutoLevelLog(`Iteration ${iteration}: measured ${sample.rms_dbfs.toFixed(2)} dBFS.`);
-        if (sample.rms_dbfs <= targetRms + toleranceDb) {
+        if (sample.rms_dbfs <= targetRms + AUTO_LEVEL_TOLERANCE_DB) {
           this.autoLevelState.set('succeeded');
-          this.pushAutoLevelLog(`Target reached within tolerance. Final RMS ${sample.rms_dbfs.toFixed(2)} dBFS.`);
+          this.pushAutoLevelLog(
+            `Target reached within ${AUTO_LEVEL_TOLERANCE_DB.toFixed(1)} dB tolerance. Final RMS ${sample.rms_dbfs.toFixed(2)} dBFS.`,
+          );
           this.status.set(`AI auto-level succeeded for ${slot.slot_label}`);
           return;
         }
@@ -1401,6 +1403,14 @@ export class App implements OnInit, OnDestroy {
         this.autoLevelState.set('asking');
         this.pushAutoLevelLog(`Iteration ${iteration}: asking AI for a quieter proposal...`);
         const advice = await this.fetchAiPatchAdvice(slot.slot_label, prompt, currentSlot.patch);
+        if (advice.suggested_changes.length === 0) {
+          throw new Error('AI returned no concrete changes for the auto-level pass.');
+        }
+        for (const change of advice.suggested_changes) {
+          this.pushAutoLevelLog(
+            `AI change: ${change.field} ${this.formatAiValue(change.current_value)} -> ${this.formatAiValue(change.suggested_value)} (${change.rationale})`,
+          );
+        }
         this.autoLevelState.set('applying');
         this.pushAutoLevelLog(`Iteration ${iteration}: applying AI proposal with ${advice.suggested_changes.length} changes...`);
         await this.applyProposedPatchToSlot(slot.slot, advice.proposed_patch, true);
@@ -2912,6 +2922,16 @@ export class App implements OnInit, OnDestroy {
 
   private pushAutoLevelLog(message: string): void {
     this.autoLevelLogs.update((current) => [...current, message]);
+  }
+
+  private formatAiValue(value: unknown): string {
+    if (Array.isArray(value)) {
+      return JSON.stringify(value);
+    }
+    if (value && typeof value === 'object') {
+      return JSON.stringify(value);
+    }
+    return String(value);
   }
 
   private async persistPatchMeasurement(
