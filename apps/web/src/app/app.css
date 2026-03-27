@@ -113,6 +113,11 @@ pre {
   max-height: 18rem;
 }
 
+.auto-level-log {
+  max-height: 20rem;
+  overflow: auto;
+}
+
 .editor-modal-body {
   max-height: calc(90vh - 130px);
   overflow: auto;

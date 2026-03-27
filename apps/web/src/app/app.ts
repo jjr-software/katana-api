@@ -438,6 +438,16 @@ export class App implements OnInit, OnDestroy {
   aiModalLoading = signal(false);
   aiModalError = signal('');
   aiModalAdvice = signal<AiPatchAdviceResponse | null>(null);
+  autoLevelModalOpen = signal(false);
+  autoLevelSlotNumber = signal<number | null>(null);
+  autoLevelSlotLabel = signal('');
+  autoLevelPatchName = signal('');
+  autoLevelTargetRms = signal('');
+  autoLevelCurrentRms = signal<number | null>(null);
+  autoLevelIteration = signal(0);
+  autoLevelState = signal<'idle' | 'waiting' | 'measuring' | 'asking' | 'applying' | 'succeeded' | 'failed'>('idle');
+  autoLevelRunning = signal(false);
+  autoLevelLogs = signal<string[]>([]);
   editorModalOpen = signal(false);
   editorSlotNumber = signal<number | null>(null);
   editorSlotLabel = signal('');
@@ -1169,7 +1179,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   canAskAiLevel(slot: SlotCard): boolean {
-    return slot.patch !== null && slot.measured_rms_dbfs !== null;
+    return slot.patch !== null && slot.measured_rms_dbfs !== null && this.isActiveSlot(slot);
   }
 
   async openAskAiModal(slot: SlotCard): Promise<void> {
@@ -1200,17 +1210,23 @@ export class App implements OnInit, OnDestroy {
       this.status.set(`No 10s Max RMS recorded for ${slot.slot_label}. Measure it first.`);
       return;
     }
-    this.aiModalMode.set('level');
-    this.aiModalSlotNumber.set(slot.slot);
-    this.aiModalSlotLabel.set(slot.slot_label);
-    this.aiModalPatchName.set(slot.patch_name || 'Unnamed Patch');
-    this.aiModalPatch.set(this.clonePatch(slot.patch));
-    this.aiModalCurrentMeasuredRms.set(slot.measured_rms_dbfs);
-    this.aiModalTargetRms.set(slot.measured_rms_dbfs.toFixed(2));
-    this.aiModalPrompt.set(this.buildAiTargetRmsPrompt(slot.measured_rms_dbfs, slot.measured_rms_dbfs));
-    this.aiModalAdvice.set(null);
-    this.aiModalError.set('');
-    this.aiModalOpen.set(true);
+    if (!this.isActiveSlot(slot)) {
+      this.status.set(`${slot.slot_label} is not active on amp. Activate it first.`);
+      return;
+    }
+    this.autoLevelSlotNumber.set(slot.slot);
+    this.autoLevelSlotLabel.set(slot.slot_label);
+    this.autoLevelPatchName.set(slot.patch_name || 'Unnamed Patch');
+    this.autoLevelTargetRms.set(slot.measured_rms_dbfs.toFixed(2));
+    this.autoLevelCurrentRms.set(slot.measured_rms_dbfs);
+    this.autoLevelIteration.set(0);
+    this.autoLevelState.set('idle');
+    this.autoLevelRunning.set(false);
+    this.autoLevelLogs.set([
+      `${slot.slot_label}: current 10s Max RMS is ${slot.measured_rms_dbfs.toFixed(2)} dBFS.`,
+      'Set a target RMS and start the AI auto-level run.',
+    ]);
+    this.autoLevelModalOpen.set(true);
   }
 
   closeAiModal(): void {
@@ -1228,6 +1244,21 @@ export class App implements OnInit, OnDestroy {
     this.aiModalAdvice.set(null);
   }
 
+  closeAutoLevelModal(): void {
+    if (this.autoLevelRunning()) {
+      return;
+    }
+    this.autoLevelModalOpen.set(false);
+    this.autoLevelSlotNumber.set(null);
+    this.autoLevelSlotLabel.set('');
+    this.autoLevelPatchName.set('');
+    this.autoLevelTargetRms.set('');
+    this.autoLevelCurrentRms.set(null);
+    this.autoLevelIteration.set(0);
+    this.autoLevelState.set('idle');
+    this.autoLevelLogs.set([]);
+  }
+
   async requestAiPatchAdvice(promptOverride?: string): Promise<void> {
     const patch = this.aiModalPatch();
     if (!patch) {
@@ -1241,26 +1272,8 @@ export class App implements OnInit, OnDestroy {
     this.status.set(`Asking AI about ${this.aiModalSlotLabel()}...`);
     this.responseJson.set('');
     try {
-      const response = await fetch('/api/v1/ai/patch-advice', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          slot_label: this.aiModalSlotLabel(),
-          question: prompt,
-          patch,
-        }),
-      });
-      const payload = (await response.json()) as AiPatchAdviceResponse | { detail?: unknown };
-      if (!response.ok) {
-        const detailText = JSON.stringify(payload, null, 2);
-        this.aiModalError.set(detailText);
-        this.responseJson.set(detailText);
-        this.status.set(`AI advice failed for ${this.aiModalSlotLabel()}`);
-        return;
-      }
-      this.aiModalAdvice.set(payload as AiPatchAdviceResponse);
+      const advice = await this.fetchAiPatchAdvice(this.aiModalSlotLabel(), prompt, patch);
+      this.aiModalAdvice.set(advice);
       this.status.set(`AI advice loaded for ${this.aiModalSlotLabel()}`);
     } catch (error: unknown) {
       const detailText = JSON.stringify(
@@ -1303,39 +1316,116 @@ export class App implements OnInit, OnDestroy {
     await this.requestAiPatchAdvice(prompt);
   }
 
+  setAutoLevelTargetRms(value: string): void {
+    this.autoLevelTargetRms.set(value);
+  }
+
+  autoLevelStateLabel(): string {
+    const state = this.autoLevelState();
+    if (state === 'idle') {
+      return 'Ready';
+    }
+    if (state === 'waiting') {
+      return 'Waiting For Playing';
+    }
+    if (state === 'measuring') {
+      return 'Measuring';
+    }
+    if (state === 'asking') {
+      return 'Consulting AI';
+    }
+    if (state === 'applying') {
+      return 'Applying Proposal';
+    }
+    if (state === 'succeeded') {
+      return 'Succeeded';
+    }
+    return 'Failed';
+  }
+
+  async startAutoLevelRun(): Promise<void> {
+    if (this.autoLevelRunning()) {
+      return;
+    }
+    const slotNumber = this.autoLevelSlotNumber();
+    if (slotNumber === null) {
+      return;
+    }
+    const targetRms = Number.parseFloat(this.autoLevelTargetRms());
+    if (!Number.isFinite(targetRms)) {
+      this.pushAutoLevelLog('Target RMS is invalid.');
+      this.autoLevelState.set('failed');
+      return;
+    }
+    const slot = this.slots().find((item) => item.slot === slotNumber) ?? null;
+    if (!slot || !slot.patch) {
+      this.pushAutoLevelLog('No slot patch is available for auto-level.');
+      this.autoLevelState.set('failed');
+      return;
+    }
+    if (!this.isActiveSlot(slot)) {
+      this.pushAutoLevelLog(`${slot.slot_label} is no longer active on the amp.`);
+      this.autoLevelState.set('failed');
+      return;
+    }
+    this.autoLevelRunning.set(true);
+    this.autoLevelState.set('waiting');
+    this.autoLevelIteration.set(0);
+    this.autoLevelLogs.set([
+      `${slot.slot_label}: target RMS ${targetRms.toFixed(2)} dBFS.`,
+      'Waiting for you to start playing...',
+    ]);
+    this.responseJson.set('');
+    try {
+      await this.waitForPlayingStart(slot.slot_label);
+      const maxIterations = 4;
+      const toleranceDb = 0.75;
+      for (let iteration = 1; iteration <= maxIterations; iteration += 1) {
+        this.autoLevelIteration.set(iteration);
+        this.autoLevelState.set('measuring');
+        this.pushAutoLevelLog(`Iteration ${iteration}: measuring 10s Max RMS...`);
+        const sample = await this.captureActivePatchMeasurement(slot.slot, 10.0);
+        this.autoLevelCurrentRms.set(sample.rms_dbfs);
+        this.pushAutoLevelLog(`Iteration ${iteration}: measured ${sample.rms_dbfs.toFixed(2)} dBFS.`);
+        if (sample.rms_dbfs <= targetRms + toleranceDb) {
+          this.autoLevelState.set('succeeded');
+          this.pushAutoLevelLog(`Target reached within tolerance. Final RMS ${sample.rms_dbfs.toFixed(2)} dBFS.`);
+          this.status.set(`AI auto-level succeeded for ${slot.slot_label}`);
+          return;
+        }
+        const currentSlot = this.slots().find((item) => item.slot === slot.slot) ?? null;
+        if (!currentSlot || !currentSlot.patch) {
+          throw new Error('Active slot patch disappeared during auto-level run.');
+        }
+        const prompt = this.buildAiTargetRmsPrompt(sample.rms_dbfs, targetRms);
+        this.autoLevelState.set('asking');
+        this.pushAutoLevelLog(`Iteration ${iteration}: asking AI for a quieter proposal...`);
+        const advice = await this.fetchAiPatchAdvice(slot.slot_label, prompt, currentSlot.patch);
+        this.autoLevelState.set('applying');
+        this.pushAutoLevelLog(`Iteration ${iteration}: applying AI proposal with ${advice.suggested_changes.length} changes...`);
+        await this.applyProposedPatchToSlot(slot.slot, advice.proposed_patch, true);
+        this.pushAutoLevelLog(`Iteration ${iteration}: proposal applied to active patch.`);
+      }
+      throw new Error(`Failed to reach target ${targetRms.toFixed(2)} dBFS after ${maxIterations} iterations.`);
+    } catch (error: unknown) {
+      this.autoLevelState.set('failed');
+      this.pushAutoLevelLog(String(error));
+      this.status.set(`AI auto-level failed for ${this.autoLevelSlotLabel()}`);
+    } finally {
+      this.autoLevelRunning.set(false);
+    }
+  }
+
   applyAiAdviceToPatch(): void {
     const advice = this.aiModalAdvice();
     const slotNumber = this.aiModalSlotNumber();
     if (!advice || slotNumber === null) {
       return;
     }
-    const proposedPatch = this.clonePatch(advice.proposed_patch);
-    proposedPatch['config_hash_sha256'] = '';
-    const proposedName = this.readString(proposedPatch, 'patch_name') ?? this.aiModalPatchName();
-    this.slots.update((current) =>
-      current.map((card) => {
-        if (card.slot !== slotNumber) {
-          return card;
-        }
-        return {
-          ...card,
-          patch_name: proposedName || card.patch_name,
-          patch: this.clonePatch(proposedPatch),
-          config_hash_sha256: '',
-          in_sync: false,
-          is_saved: false,
-          out_synced: false,
-        };
-      }),
-    );
-    if (this.editorModalOpen() && this.editorSlotNumber() === slotNumber) {
-      this.editorPatchDraft.set(this.clonePatch(proposedPatch));
-      this.editorLiveApplyError.set('');
-      this.editorLiveApplyReadbackAt.set('');
-      this.scheduleEditorLiveApply();
-    }
-    this.aiModalPatch.set(this.clonePatch(proposedPatch));
-    this.aiModalPatchName.set(proposedName || this.aiModalPatchName());
+    const proposedName = this.readString(advice.proposed_patch, 'patch_name') ?? this.aiModalPatchName();
+    void this.applyProposedPatchToSlot(slotNumber, advice.proposed_patch, false).then(() => {
+      this.aiModalPatchName.set(proposedName || this.aiModalPatchName());
+    });
     this.status.set(`Applied AI proposal to ${this.aiModalSlotLabel()} as local patch state`);
   }
 
@@ -1359,6 +1449,25 @@ export class App implements OnInit, OnDestroy {
       'Consider whichever parts of the chain are actually contributing level, including booster drive/effect level, mod/fx levels, delay/reverb levels, solo, send_return, EQ boosts, amp gain, and amp volume.',
       'Prefer the smallest effective set of changes.',
     ].join(' ');
+  }
+
+  private async fetchAiPatchAdvice(slotLabel: string, prompt: string, patch: Record<string, unknown>): Promise<AiPatchAdviceResponse> {
+    const response = await fetch('/api/v1/ai/patch-advice', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        slot_label: slotLabel,
+        question: prompt,
+        patch,
+      }),
+    });
+    const payload = (await response.json()) as AiPatchAdviceResponse | { detail?: unknown };
+    if (!response.ok) {
+      throw new Error(JSON.stringify(payload, null, 2));
+    }
+    return payload as AiPatchAdviceResponse;
   }
 
   navigateToPage(page: 'dashboard' | 'samples'): void {
@@ -2671,6 +2780,27 @@ export class App implements OnInit, OnDestroy {
     return payload as AudioSampleResponse;
   }
 
+  private async captureActivePatchMeasurement(slotNumber: number, durationSec: number): Promise<AudioSampleResponse> {
+    const response = await fetch('/api/v1/audio/measure', {
+      method: 'POST',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        patch_hash: null,
+        slot: slotNumber,
+        duration_sec: durationSec,
+      }),
+    });
+    const payload = (await response.json()) as AudioSampleResponse | { detail?: unknown };
+    if (!response.ok) {
+      throw new Error(`active patch sample failed: ${JSON.stringify(payload)}`);
+    }
+    const sample = payload as AudioSampleResponse;
+    this.setSlotMeasuredRms(slotNumber, sample.rms_dbfs, sample.peak_dbfs, sample.created_at);
+    await this.loadRecentAudioSamples();
+    return sample;
+  }
+
   private setSlotMeasuredRms(slotNumber: number, rmsDbfs: number, peakDbfs: number, measuredAt: string): void {
     this.slots.update((current) =>
       current.map((card) => {
@@ -2685,6 +2815,103 @@ export class App implements OnInit, OnDestroy {
         };
       }),
     );
+  }
+
+  private async applyProposedPatchToSlot(slotNumber: number, proposedPatchInput: Record<string, unknown>, applyLive: boolean): Promise<void> {
+    const proposedPatch = this.clonePatch(proposedPatchInput);
+    proposedPatch['config_hash_sha256'] = '';
+    const proposedName = this.readString(proposedPatch, 'patch_name') ?? '';
+    this.slots.update((current) =>
+      current.map((card) => {
+        if (card.slot !== slotNumber) {
+          return card;
+        }
+        return {
+          ...card,
+          patch_name: proposedName || card.patch_name,
+          patch: this.clonePatch(proposedPatch),
+          config_hash_sha256: '',
+          in_sync: false,
+          is_saved: false,
+          out_synced: false,
+        };
+      }),
+    );
+    if (this.editorModalOpen() && this.editorSlotNumber() === slotNumber) {
+      this.editorPatchDraft.set(this.clonePatch(proposedPatch));
+      this.editorLiveApplyError.set('');
+      this.editorLiveApplyReadbackAt.set('');
+    }
+    if (applyLive) {
+      const response = await fetch('/api/v1/amp/current-patch/live-apply', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patch: proposedPatch }),
+      });
+      const payload = (await response.json()) as ApplyCurrentPatchResponse | { detail?: unknown };
+      if (!response.ok) {
+        throw new Error(`active live-apply failed: ${JSON.stringify(payload)}`);
+      }
+      const applied = payload as ApplyCurrentPatchResponse;
+      const appliedPatch = this.clonePatch(applied.patch);
+      const hash = this.readString(appliedPatch, 'config_hash_sha256') ?? '';
+      this.currentAmpPatchHash.set(hash);
+      this.currentAmpCommitState.set('uncommitted');
+      this.slots.update((current) =>
+        current.map((card) => {
+          if (card.slot !== slotNumber) {
+            return card;
+          }
+          return {
+            ...card,
+            patch_name: proposedName || card.patch_name,
+            patch: this.clonePatch(appliedPatch),
+            config_hash_sha256: hash,
+            in_sync: true,
+            is_saved: false,
+            out_synced: true,
+          };
+        }),
+      );
+      if (this.editorModalOpen() && this.editorSlotNumber() === slotNumber) {
+        this.editorPatchDraft.set(this.clonePatch(appliedPatch));
+        this.editorLiveApplyReadbackAt.set(applied.applied_at);
+      }
+      this.aiModalPatch.set(this.clonePatch(appliedPatch));
+      this.aiModalPatchName.set(proposedName || this.aiModalPatchName());
+      return;
+    }
+    this.aiModalPatch.set(this.clonePatch(proposedPatch));
+    this.aiModalPatchName.set(proposedName || this.aiModalPatchName());
+  }
+
+  private async waitForPlayingStart(slotLabel: string): Promise<void> {
+    if (!this.liveMeterConnected()) {
+      throw new Error('Live meter is not connected. Auto-level requires the live meter.');
+    }
+    const deadlineMs = Date.now() + 60000;
+    const playingThresholdDbfs = -55;
+    while (Date.now() < deadlineMs) {
+      const currentSelectedSlot = this.selectedAmpSlot();
+      const autoSlot = this.autoLevelSlotNumber();
+      if (autoSlot === null || currentSelectedSlot !== autoSlot) {
+        throw new Error(`${slotLabel} is no longer the active slot.`);
+      }
+      const rms = this.liveRmsDbfs();
+      if (rms !== null && rms > playingThresholdDbfs) {
+        this.pushAutoLevelLog(`Detected playing at ${rms.toFixed(2)} dBFS on the live meter.`);
+        return;
+      }
+      await new Promise<void>((resolve) => {
+        setTimeout(() => resolve(), 250);
+      });
+    }
+    throw new Error('Timed out waiting for playing to start.');
+  }
+
+  private pushAutoLevelLog(message: string): void {
+    this.autoLevelLogs.update((current) => [...current, message]);
   }
 
   private async persistPatchMeasurement(

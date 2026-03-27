@@ -450,6 +450,54 @@
     </div>
   }
 
+  @if (autoLevelModalOpen()) {
+    <div class="raw-modal-backdrop" (click)="closeAutoLevelModal()">
+      <section class="raw-modal ai-modal" role="dialog" aria-modal="true" aria-label="AI Auto Level" (click)="$event.stopPropagation()">
+        <header class="raw-modal-head">
+          <h3>AI Auto Level · {{ autoLevelSlotLabel() }} · {{ autoLevelPatchName() }}</h3>
+          <button type="button" class="btn btn-sm btn-light" (click)="closeAutoLevelModal()" [disabled]="autoLevelRunning()">Close</button>
+        </header>
+        <div class="p-3 d-grid gap-3 ai-modal-body">
+          <article class="border rounded p-3 bg-body-tertiary d-grid gap-2">
+            <div class="row g-2">
+              <div class="col-12 col-md-4">
+                <label class="form-label small mb-1">State</label>
+                <input type="text" class="form-control" [value]="autoLevelStateLabel()" readonly />
+              </div>
+              <div class="col-12 col-md-4">
+                <label class="form-label small mb-1">Current 10s Max RMS</label>
+                <input type="text" class="form-control" [value]="formatDb(autoLevelCurrentRms())" readonly />
+              </div>
+              <div class="col-12 col-md-4">
+                <label class="form-label small mb-1" for="autoLevelTargetRms">Target 10s Max RMS</label>
+                <input id="autoLevelTargetRms" type="number" step="0.1" class="form-control" [value]="autoLevelTargetRms()" (input)="setAutoLevelTargetRms($any($event.target).value)" [disabled]="autoLevelRunning()" />
+              </div>
+            </div>
+            <p class="small text-secondary mb-0">
+              This waits for live playing, measures the active patch, asks AI for quieter proposals, applies them live, and fails hard if it cannot get under the target in time.
+            </p>
+            <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+              <p class="small mb-0">Iteration <code>{{ autoLevelIteration() }}</code></p>
+              <button type="button" class="btn btn-sm btn-primary" (click)="startAutoLevelRun()" [disabled]="autoLevelRunning()">Start Auto Level</button>
+            </div>
+          </article>
+
+          <article class="border rounded p-3 bg-body-tertiary d-grid gap-2">
+            <p class="small text-uppercase text-secondary mb-0">Run Log</p>
+            <div class="auto-level-log">
+              @for (line of autoLevelLogs(); track $index) {
+                <p class="small mb-1">{{ line }}</p>
+              }
+              @if (autoLevelLogs().length === 0) {
+                <p class="small text-secondary mb-0">No run started yet.</p>
+              }
+            </div>
+          </article>
+        </div>
+      </section>
+    </div>
+  }
+
   @if (patchSetModalOpen()) {
     <div class="raw-modal-backdrop" (click)="closePatchSetModal()">
       <section class="raw-modal" role="dialog" aria-modal="true" aria-label="Load Patch Set Snapshot" (click)="$event.stopPropagation()">
