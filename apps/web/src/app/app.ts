@@ -427,10 +427,13 @@ export class App implements OnInit, OnDestroy {
   patchSamplesModalTitle = signal('');
   patchSamplesRows = signal<AudioSampleResponse[]>([]);
   aiModalOpen = signal(false);
+  aiModalMode = signal<'general' | 'level'>('general');
   aiModalSlotNumber = signal<number | null>(null);
   aiModalSlotLabel = signal('');
   aiModalPatchName = signal('');
   aiModalPatch = signal<Record<string, unknown> | null>(null);
+  aiModalCurrentMeasuredRms = signal<number | null>(null);
+  aiModalTargetRms = signal('');
   aiModalPrompt = signal('Suggest the most useful concrete improvements for this patch. Focus on tone, EQ, gain structure, and clarity.');
   aiModalLoading = signal(false);
   aiModalError = signal('');
@@ -1165,15 +1168,22 @@ export class App implements OnInit, OnDestroy {
     return slot.patch !== null;
   }
 
+  canAskAiLevel(slot: SlotCard): boolean {
+    return slot.patch !== null && slot.measured_rms_dbfs !== null;
+  }
+
   async openAskAiModal(slot: SlotCard): Promise<void> {
     if (!slot.patch) {
       this.status.set(`No full patch payload loaded for ${slot.slot_label}. Sync this slot first.`);
       return;
     }
+    this.aiModalMode.set('general');
     this.aiModalSlotNumber.set(slot.slot);
     this.aiModalSlotLabel.set(slot.slot_label);
     this.aiModalPatchName.set(slot.patch_name || 'Unnamed Patch');
     this.aiModalPatch.set(this.clonePatch(slot.patch));
+    this.aiModalCurrentMeasuredRms.set(slot.measured_rms_dbfs);
+    this.aiModalTargetRms.set(slot.measured_rms_dbfs !== null ? slot.measured_rms_dbfs.toFixed(2) : '');
     this.aiModalPrompt.set('Suggest the most useful concrete improvements for this patch. Focus on tone, EQ, gain structure, and clarity.');
     this.aiModalAdvice.set(null);
     this.aiModalError.set('');
@@ -1181,24 +1191,50 @@ export class App implements OnInit, OnDestroy {
     await this.requestAiPatchAdvice();
   }
 
+  openAiLevelModal(slot: SlotCard): void {
+    if (!slot.patch) {
+      this.status.set(`No full patch payload loaded for ${slot.slot_label}. Sync this slot first.`);
+      return;
+    }
+    if (slot.measured_rms_dbfs === null) {
+      this.status.set(`No 10s Max RMS recorded for ${slot.slot_label}. Measure it first.`);
+      return;
+    }
+    this.aiModalMode.set('level');
+    this.aiModalSlotNumber.set(slot.slot);
+    this.aiModalSlotLabel.set(slot.slot_label);
+    this.aiModalPatchName.set(slot.patch_name || 'Unnamed Patch');
+    this.aiModalPatch.set(this.clonePatch(slot.patch));
+    this.aiModalCurrentMeasuredRms.set(slot.measured_rms_dbfs);
+    this.aiModalTargetRms.set(slot.measured_rms_dbfs.toFixed(2));
+    this.aiModalPrompt.set(this.buildAiTargetRmsPrompt(slot.measured_rms_dbfs, slot.measured_rms_dbfs));
+    this.aiModalAdvice.set(null);
+    this.aiModalError.set('');
+    this.aiModalOpen.set(true);
+  }
+
   closeAiModal(): void {
     this.aiModalOpen.set(false);
+    this.aiModalMode.set('general');
     this.aiModalSlotNumber.set(null);
     this.aiModalSlotLabel.set('');
     this.aiModalPatchName.set('');
     this.aiModalPatch.set(null);
+    this.aiModalCurrentMeasuredRms.set(null);
+    this.aiModalTargetRms.set('');
     this.aiModalPrompt.set('Suggest the most useful concrete improvements for this patch. Focus on tone, EQ, gain structure, and clarity.');
     this.aiModalLoading.set(false);
     this.aiModalError.set('');
     this.aiModalAdvice.set(null);
   }
 
-  async requestAiPatchAdvice(): Promise<void> {
+  async requestAiPatchAdvice(promptOverride?: string): Promise<void> {
     const patch = this.aiModalPatch();
     if (!patch) {
       this.aiModalError.set('No patch payload loaded for AI advice.');
       return;
     }
+    const prompt = promptOverride ?? this.aiModalPrompt();
     this.aiModalLoading.set(true);
     this.aiModalError.set('');
     this.aiModalAdvice.set(null);
@@ -1212,7 +1248,7 @@ export class App implements OnInit, OnDestroy {
         },
         body: JSON.stringify({
           slot_label: this.aiModalSlotLabel(),
-          question: this.aiModalPrompt(),
+          question: prompt,
           patch,
         }),
       });
@@ -1245,6 +1281,26 @@ export class App implements OnInit, OnDestroy {
 
   setAiModalPrompt(value: string): void {
     this.aiModalPrompt.set(value);
+  }
+
+  setAiModalTargetRms(value: string): void {
+    this.aiModalTargetRms.set(value);
+  }
+
+  async requestAiTargetRmsAdvice(): Promise<void> {
+    const currentMeasured = this.aiModalCurrentMeasuredRms();
+    if (currentMeasured === null) {
+      this.aiModalError.set('No current measured RMS is available for this slot.');
+      return;
+    }
+    const parsed = Number.parseFloat(this.aiModalTargetRms());
+    if (!Number.isFinite(parsed)) {
+      this.aiModalError.set('Enter a valid target dBFS value.');
+      return;
+    }
+    const prompt = this.buildAiTargetRmsPrompt(currentMeasured, parsed);
+    this.aiModalPrompt.set(prompt);
+    await this.requestAiPatchAdvice(prompt);
   }
 
   applyAiAdviceToPatch(): void {
@@ -1281,6 +1337,28 @@ export class App implements OnInit, OnDestroy {
     this.aiModalPatch.set(this.clonePatch(proposedPatch));
     this.aiModalPatchName.set(proposedName || this.aiModalPatchName());
     this.status.set(`Applied AI proposal to ${this.aiModalSlotLabel()} as local patch state`);
+  }
+
+  aiModalPrimaryButtonLabel(): string {
+    return this.aiModalMode() === 'level' ? 'Ask AI To Hit Target' : 'Ask AI';
+  }
+
+  aiModalDescription(): string {
+    if (this.aiModalMode() === 'level') {
+      return 'The AI is fed the current patch JSON plus measured RMS and target RMS, and should trim whatever parts of the chain are actually driving loudness.';
+    }
+    return 'The AI is fed the current patch JSON and returns concrete Katana parameter suggestions.';
+  }
+
+  private buildAiTargetRmsPrompt(currentRmsDbfs: number, targetRmsDbfs: number): string {
+    return [
+      `Current 10s Max RMS is ${currentRmsDbfs.toFixed(2)} dBFS.`,
+      `Target 10s Max RMS is ${targetRmsDbfs.toFixed(2)} dBFS.`,
+      'Suggest concrete patch changes to reduce loudness toward that target while preserving the overall tone character where possible.',
+      'Do not assume amp.volume is the only control to use.',
+      'Consider whichever parts of the chain are actually contributing level, including booster drive/effect level, mod/fx levels, delay/reverb levels, solo, send_return, EQ boosts, amp gain, and amp volume.',
+      'Prefer the smallest effective set of changes.',
+    ].join(' ');
   }
 
   navigateToPage(page: 'dashboard' | 'samples'): void {
