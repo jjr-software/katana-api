@@ -101,10 +101,14 @@ async def create_audio_measurement(
 @router.get("/measures", response_model=list[AudioSampleResponse])
 def list_audio_measurements(
     limit: int = 50,
+    patch_hash: str | None = None,
     db: Session = Depends(get_db),
 ) -> list[AudioSampleResponse]:
     bounded = max(1, min(limit, 200))
-    rows = list(db.scalars(select(AudioSample).order_by(AudioSample.id.desc()).limit(bounded)))
+    query = select(AudioSample)
+    if patch_hash:
+        query = query.where(AudioSample.patch_hash == patch_hash)
+    rows = list(db.scalars(query.order_by(AudioSample.id.desc()).limit(bounded)))
     return [_audio_sample_response(row, db) for row in rows]
 
 

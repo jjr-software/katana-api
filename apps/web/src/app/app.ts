@@ -387,6 +387,9 @@ export class App implements OnInit, OnDestroy {
   rawModalOpen = signal(false);
   rawModalTitle = signal('');
   rawModalJson = signal('');
+  patchSamplesModalOpen = signal(false);
+  patchSamplesModalTitle = signal('');
+  patchSamplesRows = signal<AudioSampleResponse[]>([]);
   editorModalOpen = signal(false);
   editorSlotNumber = signal<number | null>(null);
   editorSlotLabel = signal('');
@@ -1066,6 +1069,53 @@ export class App implements OnInit, OnDestroy {
     } catch {
       // samples panel is informational; keep current UI state
     }
+  }
+
+  canShowPatchSamples(slot: SlotCard): boolean {
+    return Boolean(slot.is_saved && slot.config_hash_sha256);
+  }
+
+  async openPatchSamplesModal(slot: SlotCard): Promise<void> {
+    if (!slot.config_hash_sha256) {
+      this.status.set(`No DB-known patch hash for ${slot.slot_label}`);
+      return;
+    }
+    this.status.set(`Loading samples for ${slot.slot_label}...`);
+    this.responseJson.set('');
+    try {
+      const response = await fetch(`/api/v1/audio/measures?limit=50&patch_hash=${encodeURIComponent(slot.config_hash_sha256)}`, {
+        method: 'GET',
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as AudioSampleResponse[] | { detail?: unknown };
+      if (!response.ok) {
+        this.status.set(`Failed loading samples for ${slot.slot_label}`);
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      this.patchSamplesRows.set((payload as AudioSampleResponse[]).filter((item) => !item.is_level_marker));
+      this.patchSamplesModalTitle.set(`${slot.slot_label} · ${slot.patch_name || 'Unnamed Patch'} Samples`);
+      this.patchSamplesModalOpen.set(true);
+      this.status.set(`Loaded samples for ${slot.slot_label}`);
+    } catch (error: unknown) {
+      this.status.set(`Failed loading samples for ${slot.slot_label}`);
+      this.responseJson.set(
+        JSON.stringify(
+          {
+            message: 'Browser request failed',
+            error: String(error),
+          },
+          null,
+          2,
+        ),
+      );
+    }
+  }
+
+  closePatchSamplesModal(): void {
+    this.patchSamplesModalOpen.set(false);
+    this.patchSamplesModalTitle.set('');
+    this.patchSamplesRows.set([]);
   }
 
   navigateToPage(page: 'dashboard' | 'samples'): void {

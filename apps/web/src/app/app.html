@@ -159,6 +159,7 @@
                     @if (canOpenEditor(slot)) {
                       <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openEditor(slot)">Editor</button>
                     }
+                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openPatchSamplesModal(slot)" [disabled]="!canShowPatchSamples(slot)">Samples</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="showRaw(slot)" [disabled]="!canUseSlotActions(slot)">Raw</button>
                   </div>
                   <p class="small mb-1 patch-summary"><strong>Amp:</strong> {{ ampSummary(slot) }}</p>
@@ -235,6 +236,7 @@
                     @if (canOpenEditor(slot)) {
                       <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openEditor(slot)">Editor</button>
                     }
+                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openPatchSamplesModal(slot)" [disabled]="!canShowPatchSamples(slot)">Samples</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="showRaw(slot)" [disabled]="!canUseSlotActions(slot)">Raw</button>
                   </div>
                   <p class="small mb-1 patch-summary"><strong>Amp:</strong> {{ ampSummary(slot) }}</p>
@@ -311,6 +313,40 @@
           <button type="button" class="btn btn-sm btn-light" (click)="closeRawModal()">Close</button>
         </header>
         <pre class="raw-modal-json">{{ rawModalJson() }}</pre>
+      </section>
+    </div>
+  }
+
+  @if (patchSamplesModalOpen()) {
+    <div class="raw-modal-backdrop" (click)="closePatchSamplesModal()">
+      <section class="raw-modal" role="dialog" aria-modal="true" aria-label="Patch Samples" (click)="$event.stopPropagation()">
+        <header class="raw-modal-head">
+          <h3>{{ patchSamplesModalTitle() }}</h3>
+          <button type="button" class="btn btn-sm btn-light" (click)="closePatchSamplesModal()">Close</button>
+        </header>
+        <div class="p-3 d-grid gap-2">
+          @if (patchSamplesRows().length === 0) {
+            <p class="small text-secondary mb-0">No samples found for this saved patch.</p>
+          } @else {
+            @for (sample of patchSamplesRows(); track sample.id) {
+              <article class="border rounded p-2 small bg-body-tertiary">
+                <p class="mb-1">
+                  <strong>{{ sample.patch_name || sample.slot_label || ('Sample #' + sample.id) }}</strong>
+                </p>
+                <p class="mb-2 text-secondary">
+                  recorded <code>{{ sample.created_at }}</code> |
+                  RMS/Peak <code>{{ formatDb(sample.rms_dbfs) }} / {{ formatDb(sample.peak_dbfs) }}</code> |
+                  duration <code>{{ sample.duration_sec }}s</code>
+                </p>
+                @if (sample.playback_url) {
+                  <audio class="sample-player" controls preload="none" [src]="sample.playback_url"></audio>
+                } @else {
+                  <p class="mb-0 text-secondary">No stored audio for this sample.</p>
+                }
+              </article>
+            }
+          }
+        </div>
       </section>
     </div>
   }
