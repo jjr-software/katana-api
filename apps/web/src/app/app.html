@@ -175,6 +175,12 @@
                   <p class="small mb-1 patch-summary"><strong [class.text-success]="isEqOn(slot, 'eq1')" [class.text-danger]="!isEqOn(slot, 'eq1')">EQ1:</strong> {{ eqSummary(slot, 'eq1') }}</p>
                   <p class="small mb-1 patch-summary"><strong [class.text-success]="isEqOn(slot, 'eq2')" [class.text-danger]="!isEqOn(slot, 'eq2')">EQ2:</strong> {{ eqSummary(slot, 'eq2') }}</p>
                   <p class="small mb-2 patch-summary"><strong [class.text-success]="isStageOn(slot, 'reverb')" [class.text-danger]="!isStageOn(slot, 'reverb')">Reverb:</strong> {{ reverbSummary(slot) }}</p>
+                  @if (isActiveSlot(slot)) {
+                    <div class="alert alert-info py-2 px-2 mb-2 small" role="status">
+                      <strong>Live RMS/Peak:</strong>
+                      <code>{{ formatDb(liveRmsDbfs()) }} / {{ formatDb(livePeakDbfs()) }}</code>
+                    </div>
+                  }
                   <p class="small mb-1 text-secondary">
                     10s Max RMS/Peak: <code>{{ formatDb(slot.measured_rms_dbfs) }} / {{ formatDb(slot.measured_peak_dbfs) }}</code>
                   </p>
@@ -261,6 +267,12 @@
                   <p class="small mb-1 patch-summary"><strong [class.text-success]="isEqOn(slot, 'eq1')" [class.text-danger]="!isEqOn(slot, 'eq1')">EQ1:</strong> {{ eqSummary(slot, 'eq1') }}</p>
                   <p class="small mb-1 patch-summary"><strong [class.text-success]="isEqOn(slot, 'eq2')" [class.text-danger]="!isEqOn(slot, 'eq2')">EQ2:</strong> {{ eqSummary(slot, 'eq2') }}</p>
                   <p class="small mb-2 patch-summary"><strong [class.text-success]="isStageOn(slot, 'reverb')" [class.text-danger]="!isStageOn(slot, 'reverb')">Reverb:</strong> {{ reverbSummary(slot) }}</p>
+                  @if (isActiveSlot(slot)) {
+                    <div class="alert alert-info py-2 px-2 mb-2 small" role="status">
+                      <strong>Live RMS/Peak:</strong>
+                      <code>{{ formatDb(liveRmsDbfs()) }} / {{ formatDb(livePeakDbfs()) }}</code>
+                    </div>
+                  }
                   <p class="small mb-1 text-secondary">
                     10s Max RMS/Peak: <code>{{ formatDb(slot.measured_rms_dbfs) }} / {{ formatDb(slot.measured_peak_dbfs) }}</code>
                   </p>
