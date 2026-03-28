@@ -369,6 +369,13 @@ interface EqPeqGraphNode {
   gain: number;
 }
 
+interface EqPeqFftBar {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 interface TypeOption {
   value: number;
   label: string;
@@ -2246,22 +2253,29 @@ export class App implements OnInit, OnDestroy {
     return `${gain >= 0 ? '+' : ''}${gain} dB`;
   }
 
-  editorEqPeqFftPath(): string {
+  editorEqPeqFftBars(): EqPeqFftBar[] {
     const bins = this.liveFftBinsDb();
     if (bins.length === 0) {
-      return '';
+      return [];
     }
     const width = 512;
+    const graphFloor = 88;
+    const graphHeight = 76;
     const minDb = -60;
     const maxDb = 0;
-    return bins
-      .map((value, index) => {
-        const x = bins.length === 1 ? 0 : (index / (bins.length - 1)) * width;
-        const clamped = Math.max(minDb, Math.min(maxDb, value));
-        const y = 88 - ((clamped - minDb) / (maxDb - minDb)) * 76;
-        return `${index === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
-      })
-      .join(' ');
+    const step = width / bins.length;
+    const barWidth = Math.max(2, step * 0.72);
+    return bins.map((value, index) => {
+      const clamped = Math.max(minDb, Math.min(maxDb, value));
+      const normalized = (clamped - minDb) / (maxDb - minDb);
+      const height = Math.max(1, normalized * graphHeight);
+      return {
+        x: (index * step) + ((step - barWidth) / 2),
+        y: graphFloor - height,
+        width: barWidth,
+        height,
+      };
+    });
   }
 
   editorEqGe10Bands(eqName: EqStageName): EqGe10BandField[] {
