@@ -3116,6 +3116,7 @@ export class App implements OnInit, OnDestroy {
   private async applyProposedPatchToSlot(slotNumber: number, proposedPatchInput: Record<string, unknown>, applyLive: boolean): Promise<void> {
     const proposedPatch = this.clonePatch(proposedPatchInput);
     proposedPatch['config_hash_sha256'] = '';
+    const localProposedSnapshot = this.clonePatch(proposedPatch);
     const proposedName = this.readString(proposedPatch, 'patch_name') ?? '';
     this.slots.update((current) =>
       current.map((card) => {
@@ -3134,6 +3135,7 @@ export class App implements OnInit, OnDestroy {
         };
       }),
     );
+    void this.recalculateLocalPatchHash(slotNumber, localProposedSnapshot);
     if (this.editorModalOpen() && this.editorSlotNumber() === slotNumber) {
       this.editorPatchDraft.set(this.clonePatch(proposedPatch));
       this.editorLiveApplyError.set('');
@@ -3945,6 +3947,8 @@ export class App implements OnInit, OnDestroy {
   }
 
   private updateEditorPatch(mutator: (draft: Record<string, unknown>) => void): void {
+    let nextDraftSnapshot: Record<string, unknown> | null = null;
+    let slotNumberForHash: number | null = null;
     this.editorPatchDraft.update((current) => {
       if (current === null) {
         return null;
@@ -3953,6 +3957,8 @@ export class App implements OnInit, OnDestroy {
       mutator(next);
       next['config_hash_sha256'] = '';
       const slotNumber = this.editorSlotNumber();
+      slotNumberForHash = slotNumber;
+      nextDraftSnapshot = this.clonePatch(next);
       if (slotNumber !== null) {
         this.slots.update((cards) =>
           cards.map((card) => {
@@ -3975,7 +3981,42 @@ export class App implements OnInit, OnDestroy {
     });
     this.editorLiveApplyError.set('');
     this.editorLiveApplyReadbackAt.set('');
+    if (nextDraftSnapshot && slotNumberForHash !== null) {
+      void this.recalculateLocalPatchHash(slotNumberForHash, nextDraftSnapshot);
+    }
     this.scheduleEditorLiveApply();
+  }
+
+  private async recalculateLocalPatchHash(slotNumber: number, patch: Record<string, unknown>): Promise<void> {
+    const fingerprint = this.patchFingerprint(patch);
+    const hash = await this.computePatchHash(patch);
+    this.slots.update((current) =>
+      current.map((card) => {
+        if (card.slot !== slotNumber) {
+          return card;
+        }
+        const currentPatch = card.patch;
+        if (!currentPatch || this.patchFingerprint(currentPatch) !== fingerprint) {
+          return card;
+        }
+        const nextPatch = this.clonePatch(currentPatch);
+        nextPatch['config_hash_sha256'] = hash;
+        return {
+          ...card,
+          patch: nextPatch,
+          config_hash_sha256: hash,
+          is_saved: Boolean(card.saved_hash_sha256) && card.saved_hash_sha256 === hash,
+        };
+      }),
+    );
+    if (this.editorModalOpen() && this.editorSlotNumber() === slotNumber) {
+      const draft = this.editorPatchDraft();
+      if (draft && this.patchFingerprint(draft) === fingerprint) {
+        const nextDraft = this.clonePatch(draft);
+        nextDraft['config_hash_sha256'] = hash;
+        this.editorPatchDraft.set(nextDraft);
+      }
+    }
   }
 
   private scheduleEditorLiveApply(): void {
@@ -4112,6 +4153,250 @@ export class App implements OnInit, OnDestroy {
     const normalized = this.clonePatch(patch);
     delete normalized['config_hash_sha256'];
     return this.stableStringify(normalized);
+  }
+
+  private async computePatchHash(patch: Record<string, unknown>): Promise<string> {
+    if (!globalThis.crypto?.subtle) {
+      throw new Error('Web Crypto API is unavailable; cannot compute patch hash.');
+    }
+    const canonical = this.canonicalBlobForHash(patch);
+    const bytes = new TextEncoder().encode(canonical);
+    const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(digest))
+      .map((value) => value.toString(16).padStart(2, '0'))
+      .join('');
+  }
+
+  private canonicalBlobForHash(snapshot: Record<string, unknown>): string {
+    return this.stableStringify(this.canonicalizeSnapshotForHash(snapshot));
+  }
+
+  private canonicalizeSnapshotForHash(snapshot: Record<string, unknown>): Record<string, unknown> {
+    const canonical: Record<string, unknown> = {};
+
+    const routing = this.readObject(snapshot, 'routing');
+    if (routing) {
+      const routingOut: Record<string, unknown> = {};
+      for (const key of ['chain_pattern', 'cabinet_resonance', 'master_key'] as const) {
+        if (routing[key] !== undefined) {
+          routingOut[key] = routing[key];
+        }
+      }
+      if (Object.keys(routingOut).length > 0) {
+        canonical['routing'] = routingOut;
+      }
+    }
+
+    const colors = this.readObject(snapshot, 'colors');
+    if (colors) {
+      const colorsOut: Record<string, unknown> = {};
+      for (const stage of ['booster', 'mod', 'fx', 'delay', 'reverb'] as const) {
+        const stageColor = this.readObject(colors, stage);
+        if (stageColor && stageColor['index'] !== undefined) {
+          colorsOut[stage] = { index: stageColor['index'] };
+        }
+      }
+      if (Object.keys(colorsOut).length > 0) {
+        canonical['colors'] = colorsOut;
+      }
+    }
+
+    const amp = this.readObject(snapshot, 'amp');
+    if (amp) {
+      const ampOut: Record<string, unknown> = {};
+      if (Array.isArray(amp['raw'])) {
+        ampOut['raw'] = amp['raw'];
+      } else {
+        for (const key of ['gain', 'volume', 'bass', 'middle', 'treble', 'presence', 'poweramp_variation', 'amp_type', 'resonance', 'preamp_variation'] as const) {
+          if (amp[key] !== undefined) {
+            ampOut[key] = amp[key];
+          }
+        }
+      }
+      if (Object.keys(ampOut).length > 0) {
+        canonical['amp'] = ampOut;
+      }
+    }
+
+    const stages = this.readObject(snapshot, 'stages');
+    if (stages) {
+      const stagesOut: Record<string, unknown> = {};
+
+      const booster = this.readObject(stages, 'booster');
+      if (booster) {
+        const out: Record<string, unknown> = {};
+        if (booster['on'] !== undefined) {
+          out['on'] = booster['on'];
+        }
+        if (Array.isArray(booster['variants_raw'])) {
+          out['variants_raw'] = booster['variants_raw'];
+        } else if (Array.isArray(booster['raw'])) {
+          out['raw'] = booster['raw'];
+        }
+        if (Object.keys(out).length > 0) {
+          stagesOut['booster'] = out;
+        }
+      }
+
+      for (const stageName of ['mod', 'fx'] as const) {
+        const stage = this.readObject(stages, stageName);
+        if (!stage) {
+          continue;
+        }
+        const out: Record<string, unknown> = {};
+        if (stage['on'] !== undefined) {
+          out['on'] = stage['on'];
+        }
+        if (Array.isArray(stage['variants_raw'])) {
+          out['variants_raw'] = stage['variants_raw'];
+        } else if (Array.isArray(stage['raw'])) {
+          out['raw'] = stage['raw'];
+        }
+        if (Object.keys(out).length > 0) {
+          stagesOut[stageName] = out;
+        }
+      }
+
+      const delay = this.readObject(stages, 'delay');
+      if (delay) {
+        const out: Record<string, unknown> = {};
+        if (delay['on'] !== undefined) {
+          out['on'] = delay['on'];
+        }
+        if (delay['delay2_on'] !== undefined) {
+          out['delay2_on'] = delay['delay2_on'];
+        }
+        if (Array.isArray(delay['variants_raw'])) {
+          out['variants_raw'] = delay['variants_raw'];
+        } else if (Array.isArray(delay['raw'])) {
+          out['raw'] = delay['raw'];
+        }
+        if (Array.isArray(delay['variants2_raw'])) {
+          out['variants2_raw'] = delay['variants2_raw'];
+        } else if (Array.isArray(delay['delay2_raw'])) {
+          out['delay2_raw'] = delay['delay2_raw'];
+        }
+        if (Object.keys(out).length > 0) {
+          stagesOut['delay'] = out;
+        }
+      }
+
+      const reverb = this.readObject(stages, 'reverb');
+      if (reverb) {
+        const out: Record<string, unknown> = {};
+        if (reverb['on'] !== undefined) {
+          out['on'] = reverb['on'];
+        }
+        if (Array.isArray(reverb['variants_raw'])) {
+          out['variants_raw'] = reverb['variants_raw'];
+        } else if (Array.isArray(reverb['raw'])) {
+          out['raw'] = reverb['raw'];
+        }
+        if (Object.keys(out).length > 0) {
+          stagesOut['reverb'] = out;
+        }
+      }
+
+      for (const eqName of ['eq1', 'eq2'] as const) {
+        const eq = this.readObject(stages, eqName);
+        if (!eq) {
+          continue;
+        }
+        const out: Record<string, unknown> = {};
+        for (const key of ['position', 'on', 'type'] as const) {
+          if (eq[key] !== undefined) {
+            out[key] = eq[key];
+          }
+        }
+        if (Array.isArray(eq['peq_raw'])) {
+          out['peq_raw'] = eq['peq_raw'];
+        }
+        if (Array.isArray(eq['ge10_raw'])) {
+          out['ge10_raw'] = eq['ge10_raw'];
+        }
+        if (Object.keys(out).length > 0) {
+          stagesOut[eqName] = out;
+        }
+      }
+
+      const ns = this.readObject(stages, 'ns');
+      if (ns) {
+        const out: Record<string, unknown> = {};
+        if (Array.isArray(ns['raw'])) {
+          out['raw'] = ns['raw'];
+        } else {
+          for (const key of ['on', 'threshold', 'release'] as const) {
+            if (ns[key] !== undefined) {
+              out[key] = ns[key];
+            }
+          }
+        }
+        if (Object.keys(out).length > 0) {
+          stagesOut['ns'] = out;
+        }
+      }
+
+      const sendReturn = this.readObject(stages, 'send_return');
+      if (sendReturn) {
+        const out: Record<string, unknown> = {};
+        if (Array.isArray(sendReturn['raw'])) {
+          out['raw'] = sendReturn['raw'];
+        } else {
+          for (const key of ['on', 'position', 'mode', 'send_level', 'return_level'] as const) {
+            if (sendReturn[key] !== undefined) {
+              out[key] = sendReturn[key];
+            }
+          }
+        }
+        if (Object.keys(out).length > 0) {
+          stagesOut['send_return'] = out;
+        }
+      }
+
+      const solo = this.readObject(stages, 'solo');
+      if (solo) {
+        const out: Record<string, unknown> = {};
+        if (Array.isArray(solo['raw'])) {
+          out['raw'] = solo['raw'];
+        } else {
+          for (const key of ['on', 'effect_level'] as const) {
+            if (solo[key] !== undefined) {
+              out[key] = solo[key];
+            }
+          }
+        }
+        if (Object.keys(out).length > 0) {
+          stagesOut['solo'] = out;
+        }
+      }
+
+      const pedalfx = this.readObject(stages, 'pedalfx');
+      if (pedalfx) {
+        const out: Record<string, unknown> = {};
+        if (Array.isArray(pedalfx['raw_com'])) {
+          out['raw_com'] = pedalfx['raw_com'];
+        }
+        if (Array.isArray(pedalfx['raw'])) {
+          out['raw'] = pedalfx['raw'];
+        }
+        if (Object.keys(out).length === 0) {
+          for (const key of ['position', 'on', 'type'] as const) {
+            if (pedalfx[key] !== undefined) {
+              out[key] = pedalfx[key];
+            }
+          }
+        }
+        if (Object.keys(out).length > 0) {
+          stagesOut['pedalfx'] = out;
+        }
+      }
+
+      if (Object.keys(stagesOut).length > 0) {
+        canonical['stages'] = stagesOut;
+      }
+    }
+
+    return canonical;
   }
 
   private startEditorLiveApplyCountdown(waitMs: number): void {
