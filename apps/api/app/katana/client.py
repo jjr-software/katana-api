@@ -267,25 +267,24 @@ class AmpClient:
             await self._send_only(EDITOR_MODE_ON)
             await self._select_patch(slot)
             await self._apply_selected_patch_payload(patch_payload)
+            live_applied = await self._read_selected_patch_payload()
             await self._send_only(build_dt1(PATCH_WRITE_ADDR, [0x00, int(slot)]))
-            payload = self._clone_patch_payload(patch_payload)
-            payload["config_hash_sha256"] = self._config_hash(payload)
             await asyncio.sleep(0.2)
             readback = await self._read_selected_patch_payload()
-            expected_hash = str(payload["config_hash_sha256"])
+            expected_hash = str(live_applied["config_hash_sha256"])
             actual_hash = str(readback["config_hash_sha256"])
             if actual_hash != expected_hash:
                 raise AmpClientError(
                     "Committed slot readback hash mismatch: "
                     f"expected {expected_hash}, got {actual_hash}; "
-                    f"expected={canonical_blob(payload)} actual={canonical_blob(readback)}"
+                    f"expected={canonical_blob(live_applied)} actual={canonical_blob(readback)}"
                 )
             return SlotPatchSummary(
                 slot=slot,
                 slot_label=slot_label(slot),
-                patch_name=str(payload.get("patch_name", "")),
-                config_hash_sha256=str(payload["config_hash_sha256"]),
-                payload=payload,
+                patch_name=str(readback.get("patch_name", "")),
+                config_hash_sha256=str(readback["config_hash_sha256"]),
+                payload=readback,
                 synced_at=synced_at,
                 slot_sync_ms=int(round((time.perf_counter() - started) * 1000)),
             )

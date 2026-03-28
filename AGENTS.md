@@ -1686,3 +1686,15 @@
   - Parametric EQ graph now overlays the live spectrum as a red trace.
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-28 (Slot Authority + Commit Verification Fix)
+- Updated slot-write verification and web slot merge behavior in:
+  - `apps/api/app/katana/client.py`
+  - `apps/web/src/app/app.ts`
+- Changes:
+  - slot commit verification now compares committed readback against the live-applied amp state instead of a raw request clone,
+  - amp readbacks no longer overwrite a loaded web slot's authoritative `patch`, `patch_name`, `config_hash_sha256`, or `is_saved` state,
+  - quick-sync name inference no longer stomps already-loaded slot cards,
+  - staged/live apply preserves the web slot identity and only updates amp-state hashes.
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

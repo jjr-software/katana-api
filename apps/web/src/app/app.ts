@@ -739,7 +739,6 @@ export class App implements OnInit, OnDestroy {
       }
       const staged = payload as ApplyCurrentPatchResponse;
       const appliedPatch = this.clonePatch(staged.patch);
-      const patchName = this.readString(appliedPatch, 'patch_name') ?? '';
       const hash = this.readString(appliedPatch, 'config_hash_sha256') ?? '';
       this.currentAmpPatchHash.set(hash);
       this.slots.update((rows) =>
@@ -747,12 +746,14 @@ export class App implements OnInit, OnDestroy {
           card.slot === slot.slot
             ? {
                 ...card,
-                patch_name: patchName || card.patch_name,
-                patch: appliedPatch,
+                patch: {
+                  ...this.clonePatch(card.patch ?? appliedPatch),
+                  config_hash_sha256: hash,
+                },
                 config_hash_sha256: hash,
                 in_sync: true,
                 out_synced: true,
-                is_saved: false,
+                is_saved: card.is_saved,
               }
             : card,
         ),
@@ -2848,19 +2849,20 @@ export class App implements OnInit, OnDestroy {
       if (!quick) {
         return current ?? base;
       }
+      const preserveLocal = this.slotHasLocalAuthority(current);
       return {
         slot: quick.slot,
         slot_label: quick.slot_label,
-        patch_name: quick.patch_name,
-        config_hash_sha256: quick.inferred_hash_sha256 ?? '',
+        patch_name: preserveLocal ? (current?.patch_name ?? '') : quick.patch_name,
+        config_hash_sha256: preserveLocal ? (current?.config_hash_sha256 ?? '') : (quick.inferred_hash_sha256 ?? ''),
         committed_hash_sha256: current?.committed_hash_sha256 ?? (quick.inferred_hash_sha256 ?? ''),
         patch: current?.patch ?? null,
-        in_sync: quick.in_sync,
-        is_saved: quick.is_saved,
+        in_sync: preserveLocal && current ? current.config_hash_sha256 === (quick.inferred_hash_sha256 ?? '') : quick.in_sync,
+        is_saved: preserveLocal ? (current?.is_saved ?? false) : quick.is_saved,
         synced_at: quick.synced_at,
         slot_sync_ms: quick.slot_sync_ms,
-        inferred: quick.inferred_hash_sha256 !== null,
-        match_count: quick.match_count,
+        inferred: preserveLocal ? (current?.inferred ?? false) : quick.inferred_hash_sha256 !== null,
+        match_count: preserveLocal ? (current?.match_count ?? 0) : quick.match_count,
         out_synced: current?.out_synced ?? false,
         measured_rms_dbfs: quick.measured_rms_dbfs ?? current?.measured_rms_dbfs ?? null,
         measured_peak_dbfs: quick.measured_peak_dbfs ?? current?.measured_peak_dbfs ?? null,
@@ -2875,20 +2877,21 @@ export class App implements OnInit, OnDestroy {
         if (card.slot !== slot.slot) {
           return card;
         }
+        const preserveLocal = this.slotHasLocalAuthority(card);
         return {
           slot: slot.slot,
           slot_label: slot.slot_label,
-          patch_name: slot.patch_name,
-          config_hash_sha256: slot.config_hash_sha256,
+          patch_name: preserveLocal ? card.patch_name : slot.patch_name,
+          config_hash_sha256: preserveLocal ? card.config_hash_sha256 : slot.config_hash_sha256,
           committed_hash_sha256: slot.config_hash_sha256,
-          patch: slot.patch ?? null,
-          in_sync: slot.in_sync,
-          is_saved: slot.is_saved,
+          patch: preserveLocal ? card.patch : (slot.patch ?? null),
+          in_sync: preserveLocal ? card.config_hash_sha256 === slot.config_hash_sha256 : slot.in_sync,
+          is_saved: preserveLocal ? card.is_saved : slot.is_saved,
           synced_at: slot.synced_at,
           slot_sync_ms: slot.slot_sync_ms,
-          inferred: false,
-          match_count: 1,
-          out_synced: true,
+          inferred: preserveLocal ? card.inferred : false,
+          match_count: preserveLocal ? card.match_count : 1,
+          out_synced: preserveLocal ? card.out_synced : true,
           measured_rms_dbfs: slot.measured_rms_dbfs ?? card.measured_rms_dbfs,
           measured_peak_dbfs: slot.measured_peak_dbfs ?? card.measured_peak_dbfs,
           measured_at: slot.measured_at ?? card.measured_at,
@@ -2964,6 +2967,13 @@ export class App implements OnInit, OnDestroy {
     );
   }
 
+  private slotHasLocalAuthority(slot: SlotCard | undefined): boolean {
+    if (!slot) {
+      return false;
+    }
+    return slot.patch !== null;
+  }
+
   private async applyProposedPatchToSlot(slotNumber: number, proposedPatchInput: Record<string, unknown>, applyLive: boolean): Promise<void> {
     const proposedPatch = this.clonePatch(proposedPatchInput);
     proposedPatch['config_hash_sha256'] = '';
@@ -3010,10 +3020,12 @@ export class App implements OnInit, OnDestroy {
           if (card.slot !== slotNumber) {
             return card;
           }
+          const localPatch = this.clonePatch(card.patch ?? proposedPatch);
+          localPatch['config_hash_sha256'] = hash;
           return {
             ...card,
             patch_name: proposedName || card.patch_name,
-            patch: this.clonePatch(appliedPatch),
+            patch: localPatch,
             config_hash_sha256: hash,
             in_sync: true,
             is_saved: false,
