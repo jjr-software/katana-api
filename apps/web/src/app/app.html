@@ -717,25 +717,38 @@
                 <div class="row g-2 mt-1">
                   @for (param of editorStageParams($any(stageName)); track param.id) {
                     <div class="col-12 col-md-6">
-                      <label class="form-label small mb-1">{{ param.label }} <span class="text-secondary">[{{ param.min }}..{{ param.max }}]</span></label>
-                      <div class="editor-range-field">
-                        <input
-                          type="range"
-                          [min]="param.min"
-                          [max]="param.max"
-                          class="form-range editor-range-slider"
-                          [value]="param.value"
-                          (input)="setEditorStageParam($any(stageName), param.key, $any($event.target).value)"
-                        />
-                        <input
-                          type="number"
-                          [min]="param.min"
-                          [max]="param.max"
-                          class="form-control form-control-sm editor-range-value"
-                          [value]="param.value"
-                          (input)="setEditorStageParam($any(stageName), param.key, $any($event.target).value)"
-                        />
-                      </div>
+                      @if (stageParamIsToggle(param)) {
+                        <label class="form-label small mb-1">{{ param.label }}</label>
+                        <div class="form-check form-switch editor-toggle-field">
+                          <input
+                            class="form-check-input"
+                            type="checkbox"
+                            [checked]="param.value === param.max"
+                            (change)="setEditorStageParam($any(stageName), param.key, $any($event.target).checked ? param.max : param.min)"
+                          />
+                          <span class="small text-secondary">{{ stageParamToggleLabel(param) }}</span>
+                        </div>
+                      } @else {
+                        <label class="form-label small mb-1">{{ param.label }} <span class="text-secondary">[{{ param.min }}..{{ param.max }}]</span></label>
+                        <div class="editor-range-field">
+                          <input
+                            type="range"
+                            [min]="param.min"
+                            [max]="param.max"
+                            class="form-range editor-range-slider"
+                            [value]="param.value"
+                            (input)="setEditorStageParam($any(stageName), param.key, $any($event.target).value)"
+                          />
+                          <input
+                            type="number"
+                            [min]="param.min"
+                            [max]="param.max"
+                            class="form-control form-control-sm editor-range-value"
+                            [value]="param.value"
+                            (input)="setEditorStageParam($any(stageName), param.key, $any($event.target).value)"
+                          />
+                        </div>
+                      }
                     </div>
                   }
                 </div>

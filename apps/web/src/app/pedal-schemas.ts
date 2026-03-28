@@ -1,4 +1,5 @@
 export type ParamEncoding = 'int1x7' | 'int2x4' | 'int4x4';
+export type ParamControlKind = 'range' | 'toggle';
 
 export interface StageParamSchema {
   key: string;
@@ -8,6 +9,9 @@ export interface StageParamSchema {
   min: number;
   max: number;
   offset: number;
+  control?: ParamControlKind;
+  offLabel?: string;
+  onLabel?: string;
 }
 
 export const BOOSTER_PARAM_SCHEMA: readonly StageParamSchema[] = [
@@ -287,7 +291,7 @@ export const FX_PARAM_SCHEMAS_BY_TYPE: ReadonlyArray<readonly StageParamSchema[]
     { key: 'level', label: 'Level', rawIndex: 196, size: 'int1x7', min: 0, max: 100, offset: 0 },
   ],
   [
-    { key: 'script', label: 'Script', rawIndex: 197, size: 'int1x7', min: 0, max: 1, offset: 0 },
+    { key: 'script', label: 'Script Voicing', rawIndex: 197, size: 'int1x7', min: 0, max: 1, offset: 0, control: 'toggle', offLabel: 'Block', onLabel: 'Script' },
     { key: 'speed', label: 'Speed', rawIndex: 198, size: 'int1x7', min: 0, max: 100, offset: 0 },
   ],
   [
@@ -304,14 +308,14 @@ export const FX_PARAM_SCHEMAS_BY_TYPE: ReadonlyArray<readonly StageParamSchema[]
     { key: 'direct_mix', label: 'Direct Mix', rawIndex: 207, size: 'int1x7', min: 0, max: 100, offset: 0 },
   ],
   [
-    { key: 'select', label: 'Select', rawIndex: 208, size: 'int1x7', min: 0, max: 1, offset: 0 },
+    { key: 'select', label: 'Select', rawIndex: 208, size: 'int1x7', min: 0, max: 1, offset: 0, control: 'toggle' },
     { key: 'input_volume', label: 'Input Volume', rawIndex: 209, size: 'int1x7', min: 0, max: 100, offset: 0 },
     { key: 'chorus_intensity', label: 'Chorus Intensity', rawIndex: 210, size: 'int1x7', min: 0, max: 100, offset: 0 },
     { key: 'echo_repeat_rate', label: 'Echo Repeat Rate', rawIndex: 211, size: 'int4x4', min: 40, max: 600, offset: 0 },
     { key: 'echo_intensisty', label: 'Echo Intensisty', rawIndex: 215, size: 'int1x7', min: 0, max: 100, offset: 0 },
     { key: 'echo_volume', label: 'Echo Volume', rawIndex: 216, size: 'int1x7', min: 0, max: 100, offset: 0 },
     { key: 'tone', label: 'Tone', rawIndex: 217, size: 'int1x7', min: 0, max: 100, offset: 0 },
-    { key: 'output', label: 'Output', rawIndex: 218, size: 'int1x7', min: 0, max: 1, offset: 0 },
+    { key: 'output', label: 'Output', rawIndex: 218, size: 'int1x7', min: 0, max: 1, offset: 0, control: 'toggle' },
   ],
   [
     { key: '1oct_level', label: '1OCT Level', rawIndex: 219, size: 'int1x7', min: 0, max: 100, offset: 0 },

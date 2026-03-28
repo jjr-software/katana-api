@@ -145,6 +145,13 @@ pre {
   text-align: right;
 }
 
+.editor-toggle-field {
+  min-height: 2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .eq-spectrum {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(4.5rem, 1fr));

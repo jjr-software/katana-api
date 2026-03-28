@@ -1634,3 +1634,17 @@
   - meter block is sticky at the top of the editor scroll area.
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-28 (Binary Stage Params Now Use Toggles)
+- Updated stage parameter schema and editor rendering in:
+  - `apps/web/src/app/pedal-schemas.ts`
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+  - `apps/web/src/app/app.css`
+- Changes:
+  - generic stage editor no longer renders `0/1` effect parameters as sliders,
+  - binary params now render as explicit labeled toggles,
+  - MXR Phase 90 `script` was renamed in UI to `Script Voicing`,
+  - `Script Voicing` toggle now shows `Block` / `Script` states instead of raw numeric values.
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

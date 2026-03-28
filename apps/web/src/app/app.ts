@@ -2,6 +2,7 @@ import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import {
   BOOSTER_PARAM_SCHEMA,
   DELAY_PARAM_SCHEMA,
+  type ParamControlKind,
   FX_PARAM_SCHEMAS_BY_TYPE,
   type ParamEncoding,
   REVERB_PARAM_SCHEMA,
@@ -350,6 +351,9 @@ interface StageParam {
   value: number;
   min: number;
   max: number;
+  control: ParamControlKind;
+  offLabel: string;
+  onLabel: string;
 }
 
 type TriState = 'true' | 'false' | 'unknown';
@@ -2416,9 +2420,20 @@ export class App implements OnInit, OnDestroy {
         value: decoded,
         min: schema.min,
         max: schema.max,
+        control: this.stageParamControl(schema),
+        offLabel: schema.offLabel ?? 'Off',
+        onLabel: schema.onLabel ?? 'On',
       });
     }
     return params;
+  }
+
+  stageParamIsToggle(param: StageParam): boolean {
+    return param.control === 'toggle';
+  }
+
+  stageParamToggleLabel(param: StageParam): string {
+    return param.value === param.max ? param.onLabel : param.offLabel;
   }
 
   editorStageSchemaWarning(stageName: StageName): string | null {
@@ -2435,7 +2450,7 @@ export class App implements OnInit, OnDestroy {
     return null;
   }
 
-  setEditorStageParam(stageName: StageName, paramKey: string, value: string): void {
+  setEditorStageParam(stageName: StageName, paramKey: string, value: string | number): void {
     const schema = this.findStageParamSchema(stageName, paramKey);
     if (!schema) {
       return;
@@ -3448,6 +3463,16 @@ export class App implements OnInit, OnDestroy {
     return this.stageParamSchema(stageName).find((schema) => schema.key === paramKey) ?? null;
   }
 
+  private stageParamControl(schema: StageParamSchema): ParamControlKind {
+    if (schema.control) {
+      return schema.control;
+    }
+    if (schema.size === 'int1x7' && schema.min === 0 && schema.max === 1) {
+      return 'toggle';
+    }
+    return 'range';
+  }
+
   private stageParamArrayIndex(stageName: StageName, schema: StageParamSchema): number {
     if (stageName === 'mod' || stageName === 'fx') {
       return schema.rawIndex;
@@ -3589,7 +3614,10 @@ export class App implements OnInit, OnDestroy {
     return slot.patch !== null;
   }
 
-  private parseInteger(value: string): number {
+  private parseInteger(value: string | number): number {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? Math.trunc(value) : 0;
+    }
     const parsed = Number.parseInt(value, 10);
     if (!Number.isFinite(parsed)) {
       return 0;
