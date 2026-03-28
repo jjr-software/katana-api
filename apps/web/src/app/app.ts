@@ -361,6 +361,14 @@ interface EqParamField {
   max: number;
 }
 
+interface EqPeqGraphNode {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  gain: number;
+}
+
 interface TypeOption {
   value: number;
   label: string;
@@ -2195,6 +2203,40 @@ export class App implements OnInit, OnDestroy {
     this.setEditorEqRawValue(eqName, 'peq_raw', schema.index, `${encoded}`);
   }
 
+  editorEqPeqGraphPath(eqName: EqStageName): string {
+    const nodes = this.editorEqPeqGraphNodes(eqName);
+    if (nodes.length === 0) {
+      return '';
+    }
+    return nodes.map((node, index) => `${index === 0 ? 'M' : 'L'} ${node.x} ${node.y}`).join(' ');
+  }
+
+  editorEqPeqGraphNodes(eqName: EqStageName): EqPeqGraphNode[] {
+    const params = this.editorEqPeqParamMap(eqName);
+    const lowMidFreq = params.get('lowmid_freq')?.value ?? 14;
+    const highMidFreq = params.get('highmid_freq')?.value ?? 23;
+    return [
+      this.buildEqPeqGraphNode(eqName, 'Low', 28, params.get('low_gain')?.value ?? 0),
+      this.buildEqPeqGraphNode(eqName, 'Low Mid', this.eqPeqMidBandX(lowMidFreq, 92, 240), params.get('lowmid_gain')?.value ?? 0),
+      this.buildEqPeqGraphNode(eqName, 'High Mid', this.eqPeqMidBandX(highMidFreq, 272, 420), params.get('highmid_gain')?.value ?? 0),
+      this.buildEqPeqGraphNode(eqName, 'High', 484, params.get('high_gain')?.value ?? 0),
+    ];
+  }
+
+  editorEqPeqLowCutWidth(eqName: EqStageName): number {
+    const lowCut = this.editorEqPeqParamMap(eqName).get('low_cut')?.value ?? 0;
+    return Math.round((lowCut / 17) * 84);
+  }
+
+  editorEqPeqHighCutWidth(eqName: EqStageName): number {
+    const highCut = this.editorEqPeqParamMap(eqName).get('high_cut')?.value ?? 0;
+    return Math.round((highCut / 14) * 96);
+  }
+
+  editorEqPeqGainLabel(gain: number): string {
+    return `${gain >= 0 ? '+' : ''}${gain} dB`;
+  }
+
   editorEqGe10Bands(eqName: EqStageName): EqGe10BandField[] {
     const fields = this.editorEqRawFields(eqName, 'ge10_raw');
     return fields.slice(0, EQ_GE10_BAND_LABELS.length).map((field, index) => {
@@ -2212,6 +2254,30 @@ export class App implements OnInit, OnDestroy {
   setEditorEqGe10BandValue(eqName: EqStageName, index: number, value: string): void {
     const offset = this.clampInteger(this.parseInteger(value), -24, 24);
     this.setEditorEqRawValue(eqName, 'ge10_raw', index, `${offset + 24}`);
+  }
+
+  private editorEqPeqParamMap(eqName: EqStageName): Map<string, EqParamField> {
+    return new Map(this.editorEqPeqParams(eqName).map((param) => [param.key, param]));
+  }
+
+  private buildEqPeqGraphNode(eqName: EqStageName, label: string, x: number, gain: number): EqPeqGraphNode {
+    return {
+      id: `${eqName}-peq-node-${label.toLowerCase().replace(/\s+/g, '-')}`,
+      label,
+      x,
+      y: this.eqPeqGainY(gain),
+      gain,
+    };
+  }
+
+  private eqPeqGainY(gain: number): number {
+    const clamped = this.clampInteger(gain, -20, 20);
+    return 72 - ((clamped + 20) / 40) * 56;
+  }
+
+  private eqPeqMidBandX(value: number, minX: number, maxX: number): number {
+    const clamped = this.clampInteger(value, 0, 27);
+    return Math.round(minX + (clamped / 27) * (maxX - minX));
   }
 
   editorNsOn(): boolean {

@@ -780,6 +780,24 @@
                   </div>
                 </div>
                 @if (editorEqIsParametric($any(eqName))) {
+                  <div class="mt-2">
+                    <p class="small text-secondary mb-2">Parametric EQ Shape</p>
+                    <div class="peq-graph">
+                      <div class="peq-graph-cut peq-graph-cut-low" [style.width.px]="editorEqPeqLowCutWidth($any(eqName))"></div>
+                      <div class="peq-graph-cut peq-graph-cut-high" [style.width.px]="editorEqPeqHighCutWidth($any(eqName))"></div>
+                      <svg class="peq-graph-svg" viewBox="0 0 512 96" preserveAspectRatio="none" aria-label="Parametric EQ shape">
+                        <line x1="0" y1="44" x2="512" y2="44" class="peq-graph-zero" />
+                        <line x1="0" y1="16" x2="512" y2="16" class="peq-graph-guide" />
+                        <line x1="0" y1="72" x2="512" y2="72" class="peq-graph-guide" />
+                        <path [attr.d]="editorEqPeqGraphPath($any(eqName))" class="peq-graph-line" />
+                        @for (node of editorEqPeqGraphNodes($any(eqName)); track node.id) {
+                          <circle [attr.cx]="node.x" [attr.cy]="node.y" r="4.5" class="peq-graph-node" />
+                          <text [attr.x]="node.x" [attr.y]="node.y - 10" text-anchor="middle" class="peq-graph-node-label">{{ node.label }}</text>
+                          <text [attr.x]="node.x" [attr.y]="node.y + 17" text-anchor="middle" class="peq-graph-node-value">{{ editorEqPeqGainLabel(node.gain) }}</text>
+                        }
+                      </svg>
+                    </div>
+                  </div>
                   <div class="row g-2 mt-1">
                     @for (param of editorEqPeqParams($any(eqName)); track param.id) {
                       <div class="col-12 col-md-6">

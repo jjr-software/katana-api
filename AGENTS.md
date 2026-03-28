@@ -1660,3 +1660,15 @@
   - restored editable Parametric EQ controls for low/high cuts, low gain, low/high mid frequency and Q, low/high mid gain, high gain, and level.
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-28 (Parametric EQ Visual Added)
+- Updated Parametric EQ editor presentation in:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+  - `apps/web/src/app/app.css`
+- Changes:
+  - added a PEQ response sketch above the Parametric EQ controls,
+  - visual shows low/low-mid/high-mid/high gain anchors against a zero line,
+  - low-cut and high-cut are indicated as shaded edge regions in the graph.
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

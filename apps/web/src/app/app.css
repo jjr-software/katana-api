@@ -207,6 +207,79 @@ pre {
   text-align: center;
 }
 
+.peq-graph {
+  position: relative;
+  height: 10rem;
+  border: 1px solid #ced4da;
+  border-radius: 0.75rem;
+  background:
+    linear-gradient(180deg, rgba(13, 110, 253, 0.07) 0%, rgba(13, 110, 253, 0.02) 100%),
+    linear-gradient(180deg, #f8f9fa 0%, #eef2f6 100%);
+  overflow: hidden;
+}
+
+.peq-graph-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  position: relative;
+  z-index: 1;
+}
+
+.peq-graph-zero {
+  stroke: rgba(33, 37, 41, 0.45);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+
+.peq-graph-guide {
+  stroke: rgba(33, 37, 41, 0.14);
+  stroke-width: 1;
+}
+
+.peq-graph-line {
+  fill: none;
+  stroke: #0d6efd;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.peq-graph-node {
+  fill: #0d6efd;
+  stroke: white;
+  stroke-width: 2;
+}
+
+.peq-graph-node-label,
+.peq-graph-node-value {
+  fill: #495057;
+  font-size: 10px;
+}
+
+.peq-graph-node-label {
+  font-weight: 600;
+}
+
+.peq-graph-cut {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(180deg, rgba(108, 117, 125, 0.2) 0%, rgba(108, 117, 125, 0.08) 100%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.peq-graph-cut-low {
+  left: 0;
+  border-right: 1px dashed rgba(108, 117, 125, 0.55);
+}
+
+.peq-graph-cut-high {
+  right: 0;
+  border-left: 1px dashed rgba(108, 117, 125, 0.55);
+}
+
 @media (max-width: 1199.98px) {
   .queue-panel {
     position: static;
