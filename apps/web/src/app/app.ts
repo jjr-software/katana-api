@@ -321,6 +321,7 @@ interface SlotCard {
   slot_label: string;
   patch_name: string;
   config_hash_sha256: string;
+  saved_hash_sha256: string;
   committed_hash_sha256: string;
   patch: Record<string, unknown> | null;
   in_sync: boolean;
@@ -405,6 +406,7 @@ function defaultSlotCards(): SlotCard[] {
       slot_label: `${bank}:${channel}`,
       patch_name: '',
       config_hash_sha256: '',
+      saved_hash_sha256: '',
       committed_hash_sha256: '',
       patch: null,
       in_sync: false,
@@ -753,7 +755,7 @@ export class App implements OnInit, OnDestroy {
                 config_hash_sha256: hash,
                 in_sync: true,
                 out_synced: true,
-                is_saved: card.is_saved,
+                is_saved: Boolean(card.saved_hash_sha256) && card.saved_hash_sha256 === hash,
               }
             : card,
         ),
@@ -813,6 +815,25 @@ export class App implements OnInit, OnDestroy {
       }
       const committed = payload as SlotWriteResponse;
       this.applySyncedSlot(committed.slot);
+      this.slots.update((rows) =>
+        rows.map((card) => {
+          if (card.slot !== slot.slot) {
+            return card;
+          }
+          const nextPatch = this.clonePatch(card.patch ?? committed.slot.patch ?? {});
+          nextPatch['config_hash_sha256'] = committed.slot.config_hash_sha256;
+          const savedHash = card.saved_hash_sha256;
+          return {
+            ...card,
+            patch: nextPatch,
+            config_hash_sha256: committed.slot.config_hash_sha256,
+            committed_hash_sha256: committed.slot.config_hash_sha256,
+            in_sync: true,
+            is_saved: Boolean(savedHash) && savedHash === committed.slot.config_hash_sha256,
+            out_synced: true,
+          };
+        }),
+      );
       this.selectedAmpSlot.set(slot.slot);
       this.lastSyncedAt.set(committed.synced_at);
       this.totalSyncMs.set(committed.slot.slot_sync_ms);
@@ -878,6 +899,7 @@ export class App implements OnInit, OnDestroy {
             ? {
                 ...card,
                 config_hash_sha256: saved.hash_id,
+                saved_hash_sha256: saved.hash_id,
                 is_saved: true,
                 measured_rms_dbfs: saved.measured_rms_dbfs,
                 measured_peak_dbfs: saved.measured_peak_dbfs,
@@ -968,8 +990,12 @@ export class App implements OnInit, OnDestroy {
         return {
           ...card,
           patch_name: patchName || card.patch_name,
-          patch: snapshot,
+          patch: {
+            ...snapshot,
+            config_hash_sha256: config.hash_id,
+          },
           config_hash_sha256: config.hash_id,
+          saved_hash_sha256: config.hash_id,
           is_saved: true,
           measured_rms_dbfs: config.measured_rms_dbfs,
           measured_peak_dbfs: config.measured_peak_dbfs,
@@ -2792,6 +2818,7 @@ export class App implements OnInit, OnDestroy {
         slot_label: full.slot_label,
         patch_name: patchName ?? '',
         config_hash_sha256: hash ?? '',
+        saved_hash_sha256: full.is_saved ? (hash ?? '') : (current?.saved_hash_sha256 ?? ''),
         committed_hash_sha256: hash ?? '',
         patch: full.patch,
         in_sync: full.in_sync,
@@ -2824,6 +2851,7 @@ export class App implements OnInit, OnDestroy {
         slot_label: full.slot_label,
         patch_name: patchName ?? '',
         config_hash_sha256: hash ?? '',
+        saved_hash_sha256: hash ?? '',
         committed_hash_sha256: hash ?? '',
         patch: full.patch,
         in_sync: false,
@@ -2855,6 +2883,7 @@ export class App implements OnInit, OnDestroy {
         slot_label: quick.slot_label,
         patch_name: preserveLocal ? (current?.patch_name ?? '') : quick.patch_name,
         config_hash_sha256: preserveLocal ? (current?.config_hash_sha256 ?? '') : (quick.inferred_hash_sha256 ?? ''),
+        saved_hash_sha256: current?.saved_hash_sha256 ?? (quick.is_saved ? (quick.inferred_hash_sha256 ?? '') : ''),
         committed_hash_sha256: current?.committed_hash_sha256 ?? (quick.inferred_hash_sha256 ?? ''),
         patch: current?.patch ?? null,
         in_sync: preserveLocal && current ? current.config_hash_sha256 === (quick.inferred_hash_sha256 ?? '') : quick.in_sync,
@@ -2883,6 +2912,7 @@ export class App implements OnInit, OnDestroy {
           slot_label: slot.slot_label,
           patch_name: preserveLocal ? card.patch_name : slot.patch_name,
           config_hash_sha256: preserveLocal ? card.config_hash_sha256 : slot.config_hash_sha256,
+          saved_hash_sha256: preserveLocal ? card.saved_hash_sha256 : (slot.is_saved ? slot.config_hash_sha256 : ''),
           committed_hash_sha256: slot.config_hash_sha256,
           patch: preserveLocal ? card.patch : (slot.patch ?? null),
           in_sync: preserveLocal ? card.config_hash_sha256 === slot.config_hash_sha256 : slot.in_sync,
@@ -2988,6 +3018,7 @@ export class App implements OnInit, OnDestroy {
           patch_name: proposedName || card.patch_name,
           patch: this.clonePatch(proposedPatch),
           config_hash_sha256: '',
+          saved_hash_sha256: card.saved_hash_sha256,
           in_sync: false,
           is_saved: false,
           out_synced: false,
@@ -3027,8 +3058,9 @@ export class App implements OnInit, OnDestroy {
             patch_name: proposedName || card.patch_name,
             patch: localPatch,
             config_hash_sha256: hash,
+            saved_hash_sha256: card.saved_hash_sha256,
             in_sync: true,
-            is_saved: false,
+            is_saved: Boolean(card.saved_hash_sha256) && card.saved_hash_sha256 === hash,
             out_synced: true,
           };
         }),
@@ -3155,10 +3187,13 @@ export class App implements OnInit, OnDestroy {
   }
 
   dbState(slot: SlotCard): TriState {
-    if (!slot.config_hash_sha256) {
+    if (!slot.saved_hash_sha256) {
       return slot.patch ? 'false' : 'unknown';
     }
-    return slot.is_saved ? 'true' : 'false';
+    if (!slot.config_hash_sha256) {
+      return 'false';
+    }
+    return slot.config_hash_sha256 === slot.saved_hash_sha256 ? 'true' : 'false';
   }
 
   isLiveOnAmp(slot: SlotCard): boolean {
