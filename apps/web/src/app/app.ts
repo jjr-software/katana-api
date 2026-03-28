@@ -4048,18 +4048,6 @@ export class App implements OnInit, OnDestroy {
       }
       this.selectedAmpSlot.set(active.slot);
       this.selectedAmpSlotText.set(active.slot_label || 'n/a');
-      if (active.slot !== null && active.patch_name) {
-        this.slots.update((rows) =>
-          rows.map((card) =>
-            card.slot === active.slot
-              ? {
-                  ...card,
-                  patch_name: active.patch_name,
-                }
-              : card,
-          ),
-        );
-      }
       this.refreshCurrentCommitStateFromKnownState();
     } catch {
       // Active-slot probe is informational; leave current UI state unchanged on failure.
