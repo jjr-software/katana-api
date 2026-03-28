@@ -1648,3 +1648,15 @@
   - `Script Voicing` toggle now shows `Block` / `Script` states instead of raw numeric values.
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-28 (Parametric EQ Editor Controls Restored)
+- Updated EQ editor rendering in:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Root cause:
+  - the editor only rendered the `GE-10` branch, so `Parametric EQ` had no tweakable controls despite `peq_raw` being present in slot data.
+- Changes:
+  - added a PEQ parameter schema for the 11 `peq_raw` values,
+  - restored editable Parametric EQ controls for low/high cuts, low gain, low/high mid frequency and Q, low/high mid gain, high gain, and level.
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

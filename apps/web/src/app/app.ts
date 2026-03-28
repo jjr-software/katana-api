@@ -84,6 +84,19 @@ const REVERB_TYPE_NAMES = ['Plate Reverb', 'Room Reverb', 'Hall Reverb', 'Spring
 const EQ_TYPE_NAMES = ['Parametric EQ', 'GE-10'];
 const EQ_POSITION_NAMES = ['Input', 'Post Amp'];
 const EQ_GE10_BAND_LABELS = ['31', '62', '125', '250', '500', '1k', '2k', '4k', '8k', '16k', 'Level'];
+const EQ_PEQ_PARAM_SCHEMA: ReadonlyArray<{ key: string; label: string; index: number; min: number; max: number; offset?: number }> = [
+  { key: 'low_cut', label: 'Low Cut', index: 0, min: 0, max: 17 },
+  { key: 'low_gain', label: 'Low Gain', index: 1, min: -20, max: 20, offset: 20 },
+  { key: 'lowmid_freq', label: 'Low Mid Freq', index: 2, min: 0, max: 27 },
+  { key: 'lowmid_q', label: 'Low Mid Q', index: 3, min: 0, max: 5 },
+  { key: 'lowmid_gain', label: 'Low Mid Gain', index: 4, min: -20, max: 20, offset: 20 },
+  { key: 'highmid_freq', label: 'High Mid Freq', index: 5, min: 0, max: 27 },
+  { key: 'highmid_q', label: 'High Mid Q', index: 6, min: 0, max: 5 },
+  { key: 'highmid_gain', label: 'High Mid Gain', index: 7, min: -20, max: 20, offset: 20 },
+  { key: 'high_gain', label: 'High Gain', index: 8, min: -20, max: 20, offset: 20 },
+  { key: 'high_cut', label: 'High Cut', index: 9, min: 0, max: 14 },
+  { key: 'level', label: 'Level', index: 10, min: -20, max: 20, offset: 20 },
+];
 const LIVE_RMS_WINDOW_POINTS = 96;
 const EDITOR_LIVE_APPLY_DEBOUNCE_MS = 2000;
 const EDITOR_LIVE_APPLY_MIN_GAP_MS = 120;
@@ -337,6 +350,15 @@ interface EqGe10BandField {
   label: string;
   offsetValue: number;
   percent: number;
+}
+
+interface EqParamField {
+  id: string;
+  key: string;
+  label: string;
+  value: number;
+  min: number;
+  max: number;
 }
 
 interface TypeOption {
@@ -2145,6 +2167,32 @@ export class App implements OnInit, OnDestroy {
 
   setEditorEqRawValue(eqName: EqStageName, rawKey: 'peq_raw' | 'ge10_raw', index: number, value: string): void {
     this.setEditorNestedRawValue(['stages', eqName], rawKey, index, value);
+  }
+
+  editorEqPeqParams(eqName: EqStageName): EqParamField[] {
+    const fields = this.editorEqRawFields(eqName, 'peq_raw');
+    return EQ_PEQ_PARAM_SCHEMA.map((schema) => {
+      const rawValue = fields[schema.index]?.value ?? 0;
+      const value = rawValue - (schema.offset ?? 0);
+      return {
+        id: `${eqName}-peq-${schema.key}`,
+        key: schema.key,
+        label: schema.label,
+        value,
+        min: schema.min,
+        max: schema.max,
+      };
+    });
+  }
+
+  setEditorEqPeqValue(eqName: EqStageName, paramKey: string, value: string): void {
+    const schema = EQ_PEQ_PARAM_SCHEMA.find((item) => item.key === paramKey);
+    if (!schema) {
+      return;
+    }
+    const parsed = this.clampInteger(this.parseInteger(value), schema.min, schema.max);
+    const encoded = parsed + (schema.offset ?? 0);
+    this.setEditorEqRawValue(eqName, 'peq_raw', schema.index, `${encoded}`);
   }
 
   editorEqGe10Bands(eqName: EqStageName): EqGe10BandField[] {
