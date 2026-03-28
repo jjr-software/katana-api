@@ -526,219 +526,235 @@ class AmpClient:
             amp_data = self._to_int_list(amp_raw, expected_size=10, field_name="amp.raw")
             await self._send_only(build_dt1(ADDR_PATCH_AMP, amp_data))
 
-        sw_data = await self._read_rq1(ADDR_PATCH_SW, 6)
-        stage_map = {
-            "booster": 0,
-            "mod": 1,
-            "fx": 2,
-            "delay": 3,
-            "reverb": 5,
-        }
         stages_obj = payload.get("stages")
-        if isinstance(stages_obj, dict):
-            for stage_name, sw_index in stage_map.items():
-                stage_obj = stages_obj.get(stage_name)
-                if not isinstance(stage_obj, dict):
-                    continue
-                if "on" in stage_obj:
-                    sw_data[sw_index] = 1 if bool(stage_obj.get("on")) else 0
-        await self._send_only(build_dt1(ADDR_PATCH_SW, sw_data[:6]))
-
-        color_data = await self._read_rq1(ADDR_PATCH_COLOR, 5)
         colors_obj = payload.get("colors")
-        if isinstance(colors_obj, dict):
-            color_index_map = {
-                "booster": 0,
-                "mod": 1,
-                "fx": 2,
-                "delay": 3,
-                "reverb": 4,
-            }
-            for stage_name, color_index in color_index_map.items():
-                stage_color_obj = colors_obj.get(stage_name)
-                if not isinstance(stage_color_obj, dict):
-                    continue
-                color_value = stage_color_obj.get("index")
-                if isinstance(color_value, (int, float)):
-                    color_data[color_index] = max(0, min(2, int(color_value)))
-        await self._send_only(build_dt1(ADDR_PATCH_COLOR, color_data[:5]))
+        if not isinstance(stages_obj, dict):
+            raise AmpClientError("Invalid payload: stages must be an object")
+        if not isinstance(colors_obj, dict):
+            raise AmpClientError("Invalid payload: colors must be an object")
 
-        if isinstance(stages_obj, dict):
-            await self._write_stage_variant(
-                stages_obj.get("booster"),
-                color_index=color_data[0] if len(color_data) >= 1 else 0,
-                base_addr=ADDR_PATCH_BOOSTER_1,
-                size=8,
-                field_name="stages.booster.raw",
+        sw_data = [
+            self._required_bool_flag(stages_obj, "booster", "on"),
+            self._required_bool_flag(stages_obj, "mod", "on"),
+            self._required_bool_flag(stages_obj, "fx", "on"),
+            self._required_bool_flag(stages_obj, "delay", "on"),
+            self._required_bool_flag(stages_obj, "delay", "delay2_on"),
+            self._required_bool_flag(stages_obj, "reverb", "on"),
+        ]
+        await self._send_only(build_dt1(ADDR_PATCH_SW, sw_data))
+
+        color_data = [
+            self._required_color_index(colors_obj, "booster"),
+            self._required_color_index(colors_obj, "mod"),
+            self._required_color_index(colors_obj, "fx"),
+            self._required_color_index(colors_obj, "delay"),
+            self._required_color_index(colors_obj, "reverb"),
+        ]
+        await self._send_only(build_dt1(ADDR_PATCH_COLOR, color_data))
+
+        await self._write_stage_variant(
+            stages_obj.get("booster"),
+            color_index=color_data[0],
+            base_addr=ADDR_PATCH_BOOSTER_1,
+            size=8,
+            field_name="stages.booster.raw",
+        )
+        await self._write_fx_stage_variant(
+            stages_obj.get("mod"),
+            color_index=color_data[1],
+            type_base_addr=ADDR_PATCH_FX_1,
+            detail_base_addr=ADDR_PATCH_FX_DETAIL_1,
+            field_name="stages.mod.raw",
+        )
+        await self._write_fx_stage_variant(
+            stages_obj.get("fx"),
+            color_index=color_data[2],
+            type_base_addr=ADDR_PATCH_FX_4,
+            detail_base_addr=ADDR_PATCH_FX_DETAIL_4,
+            field_name="stages.fx.raw",
+        )
+        await self._write_stage_variant(
+            stages_obj.get("delay"),
+            color_index=color_data[3],
+            base_addr=ADDR_PATCH_DELAY_1,
+            size=17,
+            field_name="stages.delay.raw",
+        )
+        delay_obj = stages_obj.get("delay")
+        if isinstance(delay_obj, dict):
+            delay2_data = self._read_compact_raw_block(
+                delay_obj,
+                raw_key="delay2_raw",
+                field_names=(),
+                field_name_prefix="stages.delay.delay2_raw",
+                expected_size=17,
             )
-            await self._write_fx_stage_variant(
-                stages_obj.get("mod"),
-                color_index=color_data[1] if len(color_data) >= 2 else 0,
-                type_base_addr=ADDR_PATCH_FX_1,
-                detail_base_addr=ADDR_PATCH_FX_DETAIL_1,
-                field_name="stages.mod.raw",
+            await self._send_only(
+                build_dt1(
+                    addr_add(ADDR_PATCH_DELAY_4, 0x200 * color_data[3]),
+                    delay2_data,
+                )
             )
-            await self._write_fx_stage_variant(
-                stages_obj.get("fx"),
-                color_index=color_data[2] if len(color_data) >= 3 else 0,
-                type_base_addr=ADDR_PATCH_FX_4,
-                detail_base_addr=ADDR_PATCH_FX_DETAIL_4,
-                field_name="stages.fx.raw",
+        await self._write_stage_variant(
+            stages_obj.get("reverb"),
+            color_index=color_data[4],
+            base_addr=ADDR_PATCH_REVERB_1,
+            size=13,
+            field_name="stages.reverb.raw",
+        )
+        eq1_obj = stages_obj.get("eq1")
+        if isinstance(eq1_obj, dict):
+            eq1_each = self._read_compact_raw_block(
+                eq1_obj,
+                raw_key=None,
+                field_names=("position", "on", "type"),
+                field_name_prefix="stages.eq1",
             )
-            await self._write_stage_variant(
-                stages_obj.get("delay"),
-                color_index=color_data[3] if len(color_data) >= 4 else 0,
-                base_addr=ADDR_PATCH_DELAY_1,
-                size=17,
-                field_name="stages.delay.raw",
+            await self._send_only(build_dt1(ADDR_PATCH_EQ_EACH_1, eq1_each))
+            await self._send_only(
+                build_dt1(
+                    ADDR_PATCH_EQ_PEQ_1,
+                    self._read_compact_raw_block(
+                        eq1_obj,
+                        raw_key="peq_raw",
+                        field_names=(),
+                        field_name_prefix="stages.eq1.peq_raw",
+                        expected_size=11,
+                    ),
+                )
             )
-            delay_obj = stages_obj.get("delay")
-            if isinstance(delay_obj, dict):
-                delay2_data = self._read_compact_raw_block(
-                    delay_obj,
-                    raw_key="delay2_raw",
-                    field_names=(),
-                    field_name_prefix="stages.delay.delay2_raw",
-                    expected_size=17,
+            await self._send_only(
+                build_dt1(
+                    ADDR_PATCH_EQ_GE10_1,
+                    self._read_compact_raw_block(
+                        eq1_obj,
+                        raw_key="ge10_raw",
+                        field_names=(),
+                        field_name_prefix="stages.eq1.ge10_raw",
+                        expected_size=11,
+                    ),
                 )
-                await self._send_only(build_dt1(addr_add(ADDR_PATCH_DELAY_4, 0x200 * max(0, min(2, int(color_data[3] if len(color_data) >= 4 else 0)))), delay2_data))
-            await self._write_stage_variant(
-                stages_obj.get("reverb"),
-                color_index=color_data[4] if len(color_data) >= 5 else 0,
-                base_addr=ADDR_PATCH_REVERB_1,
-                size=13,
-                field_name="stages.reverb.raw",
             )
-            eq1_obj = stages_obj.get("eq1")
-            if isinstance(eq1_obj, dict):
-                eq1_each = self._read_compact_raw_block(
-                    eq1_obj,
-                    raw_key=None,
-                    field_names=("position", "on", "type"),
-                    field_name_prefix="stages.eq1",
+        eq2_obj = stages_obj.get("eq2")
+        if isinstance(eq2_obj, dict):
+            eq2_each = self._read_compact_raw_block(
+                eq2_obj,
+                raw_key=None,
+                field_names=("position", "on", "type"),
+                field_name_prefix="stages.eq2",
+            )
+            await self._send_only(build_dt1(ADDR_PATCH_EQ_EACH_2, eq2_each))
+            await self._send_only(
+                build_dt1(
+                    ADDR_PATCH_EQ_PEQ_2,
+                    self._read_compact_raw_block(
+                        eq2_obj,
+                        raw_key="peq_raw",
+                        field_names=(),
+                        field_name_prefix="stages.eq2.peq_raw",
+                        expected_size=11,
+                    ),
                 )
-                await self._send_only(build_dt1(ADDR_PATCH_EQ_EACH_1, eq1_each))
-                await self._send_only(
-                    build_dt1(
-                        ADDR_PATCH_EQ_PEQ_1,
-                        self._read_compact_raw_block(
-                            eq1_obj,
-                            raw_key="peq_raw",
-                            field_names=(),
-                            field_name_prefix="stages.eq1.peq_raw",
-                            expected_size=11,
-                        ),
-                    )
+            )
+            await self._send_only(
+                build_dt1(
+                    ADDR_PATCH_EQ_GE10_2,
+                    self._read_compact_raw_block(
+                        eq2_obj,
+                        raw_key="ge10_raw",
+                        field_names=(),
+                        field_name_prefix="stages.eq2.ge10_raw",
+                        expected_size=11,
+                    ),
                 )
-                await self._send_only(
-                    build_dt1(
-                        ADDR_PATCH_EQ_GE10_1,
-                        self._read_compact_raw_block(
-                            eq1_obj,
-                            raw_key="ge10_raw",
-                            field_names=(),
-                            field_name_prefix="stages.eq1.ge10_raw",
-                            expected_size=11,
-                        ),
-                    )
+            )
+        ns_obj = stages_obj.get("ns")
+        if isinstance(ns_obj, dict):
+            await self._send_only(
+                build_dt1(
+                    ADDR_PATCH_NS,
+                    self._read_compact_raw_block(
+                        ns_obj,
+                        raw_key="raw",
+                        field_names=("on", "threshold", "release"),
+                        field_name_prefix="stages.ns",
+                    ),
                 )
-            eq2_obj = stages_obj.get("eq2")
-            if isinstance(eq2_obj, dict):
-                eq2_each = self._read_compact_raw_block(
-                    eq2_obj,
-                    raw_key=None,
-                    field_names=("position", "on", "type"),
-                    field_name_prefix="stages.eq2",
+            )
+        send_return_obj = stages_obj.get("send_return")
+        if isinstance(send_return_obj, dict):
+            await self._send_only(
+                build_dt1(
+                    ADDR_PATCH_SENDRETURN,
+                    self._read_compact_raw_block(
+                        send_return_obj,
+                        raw_key="raw",
+                        field_names=("on", "position", "mode", "send_level", "return_level"),
+                        field_name_prefix="stages.send_return",
+                    ),
                 )
-                await self._send_only(build_dt1(ADDR_PATCH_EQ_EACH_2, eq2_each))
-                await self._send_only(
-                    build_dt1(
-                        ADDR_PATCH_EQ_PEQ_2,
-                        self._read_compact_raw_block(
-                            eq2_obj,
-                            raw_key="peq_raw",
-                            field_names=(),
-                            field_name_prefix="stages.eq2.peq_raw",
-                            expected_size=11,
-                        ),
-                    )
+            )
+        solo_obj = stages_obj.get("solo")
+        if isinstance(solo_obj, dict):
+            await self._send_only(
+                build_dt1(
+                    ADDR_PATCH_SOLO_COM,
+                    self._read_compact_raw_block(
+                        solo_obj,
+                        raw_key="raw",
+                        field_names=("on", "effect_level"),
+                        field_name_prefix="stages.solo",
+                    ),
                 )
-                await self._send_only(
-                    build_dt1(
-                        ADDR_PATCH_EQ_GE10_2,
-                        self._read_compact_raw_block(
-                            eq2_obj,
-                            raw_key="ge10_raw",
-                            field_names=(),
-                            field_name_prefix="stages.eq2.ge10_raw",
-                            expected_size=11,
-                        ),
-                    )
+            )
+        pedalfx_obj = stages_obj.get("pedalfx")
+        if isinstance(pedalfx_obj, dict):
+            await self._send_only(
+                build_dt1(
+                    ADDR_PATCH_PEDALFX_COM,
+                    self._read_compact_raw_block(
+                        pedalfx_obj,
+                        raw_key="raw_com",
+                        field_names=("position", "on", "type"),
+                        field_name_prefix="stages.pedalfx",
+                    ),
                 )
-            ns_obj = stages_obj.get("ns")
-            if isinstance(ns_obj, dict):
-                await self._send_only(
-                    build_dt1(
-                        ADDR_PATCH_NS,
-                        self._read_compact_raw_block(
-                            ns_obj,
-                            raw_key="raw",
-                            field_names=("on", "threshold", "release"),
-                            field_name_prefix="stages.ns",
-                        ),
-                    )
+            )
+            await self._send_only(
+                build_dt1(
+                    ADDR_PATCH_PEDALFX,
+                    self._read_compact_raw_block(
+                        pedalfx_obj,
+                        raw_key="raw",
+                        field_names=(),
+                        field_name_prefix="stages.pedalfx.raw",
+                        expected_size=15,
+                    ),
                 )
-            send_return_obj = stages_obj.get("send_return")
-            if isinstance(send_return_obj, dict):
-                await self._send_only(
-                    build_dt1(
-                        ADDR_PATCH_SENDRETURN,
-                        self._read_compact_raw_block(
-                            send_return_obj,
-                            raw_key="raw",
-                            field_names=("on", "position", "mode", "send_level", "return_level"),
-                            field_name_prefix="stages.send_return",
-                        ),
-                    )
-                )
-            solo_obj = stages_obj.get("solo")
-            if isinstance(solo_obj, dict):
-                await self._send_only(
-                    build_dt1(
-                        ADDR_PATCH_SOLO_COM,
-                        self._read_compact_raw_block(
-                            solo_obj,
-                            raw_key="raw",
-                            field_names=("on", "effect_level"),
-                            field_name_prefix="stages.solo",
-                        ),
-                    )
-                )
-            pedalfx_obj = stages_obj.get("pedalfx")
-            if isinstance(pedalfx_obj, dict):
-                await self._send_only(
-                    build_dt1(
-                        ADDR_PATCH_PEDALFX_COM,
-                        self._read_compact_raw_block(
-                            pedalfx_obj,
-                            raw_key="raw_com",
-                            field_names=("position", "on", "type"),
-                            field_name_prefix="stages.pedalfx",
-                        ),
-                    )
-                )
-                await self._send_only(
-                    build_dt1(
-                        ADDR_PATCH_PEDALFX,
-                        self._read_compact_raw_block(
-                            pedalfx_obj,
-                            raw_key="raw",
-                            field_names=(),
-                            field_name_prefix="stages.pedalfx.raw",
-                            expected_size=15,
-                        ),
-                    )
-                )
+            )
+
+    @staticmethod
+    def _required_bool_flag(stages_obj: dict[str, Any], stage_name: str, field_name: str) -> int:
+        stage_obj = stages_obj.get(stage_name)
+        if not isinstance(stage_obj, dict):
+            raise AmpClientError(f"Invalid payload: stages.{stage_name} must be an object")
+        value = stage_obj.get(field_name)
+        if not isinstance(value, bool):
+            raise AmpClientError(f"Invalid payload: stages.{stage_name}.{field_name} must be boolean")
+        return 1 if value else 0
+
+    @staticmethod
+    def _required_color_index(colors_obj: dict[str, Any], stage_name: str) -> int:
+        stage_color_obj = colors_obj.get(stage_name)
+        if not isinstance(stage_color_obj, dict):
+            raise AmpClientError(f"Invalid payload: colors.{stage_name} must be an object")
+        value = stage_color_obj.get("index")
+        if not isinstance(value, (int, float)):
+            raise AmpClientError(f"Invalid payload: colors.{stage_name}.index must be numeric")
+        ivalue = int(value)
+        if ivalue < 0 or ivalue > 2:
+            raise AmpClientError(f"Invalid payload: colors.{stage_name}.index out of range 0..2")
+        return ivalue
 
     async def _write_stage_variant(
         self,
