@@ -112,6 +112,7 @@ const EQ_PEQ_PARAM_SCHEMA: ReadonlyArray<{ key: string; label: string; index: nu
 const LIVE_RMS_WINDOW_POINTS = 96;
 const EDITOR_LIVE_APPLY_DEBOUNCE_MS = 2000;
 const EDITOR_LIVE_APPLY_MIN_GAP_MS = 120;
+const DEFAULT_TARGET_RMS_DBFS = -31.0;
 const AUTO_LEVEL_TOLERANCE_DB = 0.4;
 const AUTO_LEVEL_MEASURE_SEC = 2.0;
 
@@ -1326,7 +1327,7 @@ export class App implements OnInit, OnDestroy {
     this.aiModalPatchName.set(slot.patch_name || 'Unnamed Patch');
     this.aiModalPatch.set(this.clonePatch(slot.patch));
     this.aiModalCurrentMeasuredRms.set(slot.measured_rms_dbfs);
-    this.aiModalTargetRms.set(slot.measured_rms_dbfs !== null ? slot.measured_rms_dbfs.toFixed(2) : '');
+    this.aiModalTargetRms.set(DEFAULT_TARGET_RMS_DBFS.toFixed(2));
     this.aiModalPrompt.set('Suggest the most useful concrete improvements for this patch. Focus on tone, EQ, gain structure, and clarity.');
     this.aiModalAdvice.set(null);
     this.aiModalError.set('');
@@ -1345,7 +1346,7 @@ export class App implements OnInit, OnDestroy {
     this.autoLevelSlotNumber.set(slot.slot);
     this.autoLevelSlotLabel.set(slot.slot_label);
     this.autoLevelPatchName.set(slot.patch_name || 'Unnamed Patch');
-    this.autoLevelTargetRms.set(slot.measured_rms_dbfs !== null ? slot.measured_rms_dbfs.toFixed(2) : '');
+    this.autoLevelTargetRms.set(DEFAULT_TARGET_RMS_DBFS.toFixed(2));
     this.autoLevelCurrentRms.set(slot.measured_rms_dbfs);
     this.autoLevelIteration.set(0);
     this.autoLevelState.set('idle');
@@ -1354,7 +1355,7 @@ export class App implements OnInit, OnDestroy {
       slot.measured_rms_dbfs !== null
         ? `${slot.slot_label}: current 10s Max RMS is ${slot.measured_rms_dbfs.toFixed(2)} dBFS.`
         : `${slot.slot_label}: no stored 10s Max RMS yet. The run will measure from the live amp first.`,
-      'Set a target RMS and start the AI auto-level run.',
+      `Default target RMS is ${DEFAULT_TARGET_RMS_DBFS.toFixed(2)} dBFS.`,
     ]);
     this.autoLevelModalOpen.set(true);
   }
