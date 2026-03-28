@@ -266,6 +266,7 @@ async def stream_live_audio_measurement_sse(
                         "type": "audio_metrics",
                         "rms_dbfs": sample.rms_dbfs,
                         "peak_dbfs": sample.peak_dbfs,
+                        "fft_bins_db": sample.fft_bins_db,
                         "sample_count": sample.sample_count,
                         "duration_sec": bounded_window,
                         "source": source,

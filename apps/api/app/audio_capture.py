@@ -32,6 +32,7 @@ class LiveAudioMetrics:
     rms_dbfs: float
     peak_dbfs: float
     sample_count: int
+    fft_bins_db: list[float]
 
 
 def _linear_to_dbfs(value: float) -> float:
@@ -52,7 +53,86 @@ def _decode_f32le_samples(raw: bytes) -> list[float]:
     return out
 
 
-def analyze_f32le_metrics(raw: bytes) -> LiveAudioMetrics | None:
+def _power_of_two_floor(value: int) -> int:
+    if value < 2:
+        return 0
+    return 1 << (value.bit_length() - 1)
+
+
+def _fft_inplace(values: list[complex]) -> None:
+    n = len(values)
+    j = 0
+    for i in range(1, n):
+        bit = n >> 1
+        while j & bit:
+            j ^= bit
+            bit >>= 1
+        j ^= bit
+        if i < j:
+            values[i], values[j] = values[j], values[i]
+
+    length = 2
+    while length <= n:
+        angle = -2.0 * math.pi / length
+        wlen = complex(math.cos(angle), math.sin(angle))
+        for start in range(0, n, length):
+            w = 1 + 0j
+            half = length // 2
+            for offset in range(half):
+                u = values[start + offset]
+                v = values[start + offset + half] * w
+                values[start + offset] = u + v
+                values[start + offset + half] = u - v
+                w *= wlen
+        length <<= 1
+
+
+def _build_fft_bins_db(samples: list[float], rate: int, bin_count: int = 64) -> list[float]:
+    fft_size = min(2048, _power_of_two_floor(len(samples)))
+    if fft_size < 256:
+        return []
+    windowed = samples[-fft_size:]
+    values: list[complex] = []
+    denom = max(1, fft_size - 1)
+    for index, sample in enumerate(windowed):
+        hann = 0.5 - 0.5 * math.cos((2.0 * math.pi * index) / denom)
+        values.append(complex(sample * hann, 0.0))
+    _fft_inplace(values)
+
+    half = fft_size // 2
+    magnitudes = [abs(values[index]) for index in range(1, half)]
+    if not magnitudes:
+        return []
+
+    min_freq = 60.0
+    max_freq = min(12_000.0, rate / 2.0)
+    if max_freq <= min_freq:
+        return []
+
+    max_mag = max(magnitudes)
+    if max_mag <= 1e-12:
+        return [-60.0] * bin_count
+
+    log_min = math.log10(min_freq)
+    log_max = math.log10(max_freq)
+    out: list[float] = []
+    for bucket in range(bin_count):
+        start_freq = 10 ** (log_min + (bucket / bin_count) * (log_max - log_min))
+        end_freq = 10 ** (log_min + ((bucket + 1) / bin_count) * (log_max - log_min))
+        start_index = max(1, int(start_freq * fft_size / rate))
+        end_index = min(half - 1, int(end_freq * fft_size / rate))
+        if end_index < start_index:
+            end_index = start_index
+        bucket_mag = max(magnitudes[start_index - 1:end_index] or [0.0])
+        if bucket_mag <= 1e-12:
+            out.append(-60.0)
+            continue
+        db = 20.0 * math.log10(bucket_mag / max_mag)
+        out.append(round(max(-60.0, min(0.0, db)), 2))
+    return out
+
+
+def analyze_f32le_metrics(raw: bytes, rate: int = KATANA_CAPTURE_RATE) -> LiveAudioMetrics | None:
     samples = _decode_f32le_samples(raw)
     if not samples:
         return None
@@ -68,6 +148,7 @@ def analyze_f32le_metrics(raw: bytes) -> LiveAudioMetrics | None:
         rms_dbfs=round(_linear_to_dbfs(rms), 3),
         peak_dbfs=round(_linear_to_dbfs(peak), 3),
         sample_count=len(samples),
+        fft_bins_db=_build_fft_bins_db(samples, rate=rate),
     )
 
 
@@ -233,7 +314,7 @@ class PipeWireLiveMeter:
 
     async def read_window(self) -> LiveAudioMetrics:
         raw = await self._read_exact(self._bytes_per_window)
-        analyzed = analyze_f32le_metrics(raw)
+        analyzed = analyze_f32le_metrics(raw, rate=self.rate)
         if analyzed is None:
             raise RuntimeError("no audio samples captured from persistent stream")
         return analyzed

@@ -789,6 +789,9 @@
                         <line x1="0" y1="44" x2="512" y2="44" class="peq-graph-zero" />
                         <line x1="0" y1="16" x2="512" y2="16" class="peq-graph-guide" />
                         <line x1="0" y1="72" x2="512" y2="72" class="peq-graph-guide" />
+                        @if (editorEqPeqFftPath()) {
+                          <path [attr.d]="editorEqPeqFftPath()" class="peq-graph-fft" />
+                        }
                         <path [attr.d]="editorEqPeqGraphPath($any(eqName))" class="peq-graph-line" />
                         @for (node of editorEqPeqGraphNodes($any(eqName)); track node.id) {
                           <circle [attr.cx]="node.x" [attr.cy]="node.y" r="4.5" class="peq-graph-node" />

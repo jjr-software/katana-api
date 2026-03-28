@@ -439,6 +439,7 @@ export class App implements OnInit, OnDestroy {
   levelMarkerCapturedAt = signal('');
   liveRmsDbfs = signal<number | null>(null);
   livePeakDbfs = signal<number | null>(null);
+  liveFftBinsDb = signal<number[]>([]);
   liveMeterAt = signal('');
   liveMeterConnected = signal(false);
   liveRmsHistory = signal<number[]>([]);
@@ -1549,6 +1550,13 @@ export class App implements OnInit, OnDestroy {
         if (Number.isFinite(peak)) {
           this.livePeakDbfs.set(peak);
         }
+        const fftBinsUnknown = payload['fft_bins_db'];
+        if (Array.isArray(fftBinsUnknown)) {
+          const fftBins = fftBinsUnknown
+            .map((item) => (typeof item === 'number' && Number.isFinite(item) ? item : null))
+            .filter((item): item is number => item !== null);
+          this.liveFftBinsDb.set(fftBins);
+        }
         this.liveMeterAt.set(ts);
       } catch (error: unknown) {
         this.status.set('Live audio meter parse failed');
@@ -1587,6 +1595,7 @@ export class App implements OnInit, OnDestroy {
       this.liveMeterSource = null;
     }
     this.liveMeterConnected.set(false);
+    this.liveFftBinsDb.set([]);
   }
 
   liveMeterButtonLabel(): string {
@@ -2235,6 +2244,24 @@ export class App implements OnInit, OnDestroy {
 
   editorEqPeqGainLabel(gain: number): string {
     return `${gain >= 0 ? '+' : ''}${gain} dB`;
+  }
+
+  editorEqPeqFftPath(): string {
+    const bins = this.liveFftBinsDb();
+    if (bins.length === 0) {
+      return '';
+    }
+    const width = 512;
+    const minDb = -60;
+    const maxDb = 0;
+    return bins
+      .map((value, index) => {
+        const x = bins.length === 1 ? 0 : (index / (bins.length - 1)) * width;
+        const clamped = Math.max(minDb, Math.min(maxDb, value));
+        const y = 88 - ((clamped - minDb) / (maxDb - minDb)) * 76;
+        return `${index === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+      })
+      .join(' ');
   }
 
   editorEqGe10Bands(eqName: EqStageName): EqGe10BandField[] {

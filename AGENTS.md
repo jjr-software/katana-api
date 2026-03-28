@@ -1672,3 +1672,17 @@
   - low-cut and high-cut are indicated as shaded edge regions in the graph.
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-28 (Live FFT Overlay Added To PEQ)
+- Updated live audio capture and PEQ editor overlay in:
+  - `apps/api/app/audio_capture.py`
+  - `apps/api/app/api/audio.py`
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+  - `apps/web/src/app/app.css`
+- Changes:
+  - live audio SSE now includes FFT bin data alongside RMS/peak,
+  - web app stores the live FFT bins while the meter is connected,
+  - Parametric EQ graph now overlays the live spectrum as a red trace.
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
