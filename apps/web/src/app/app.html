@@ -51,11 +51,11 @@
             Katana limitation: only the active slot can be read/staged/committed. Activate a card first.
           </div>
           <div class="d-flex flex-wrap gap-2 mb-2">
-            <button type="button" class="btn btn-primary btn-sm" (click)="testAmpConnection()">Test Amp Connection</button>
-            <button type="button" class="btn btn-outline-primary btn-sm" (click)="quickSyncAmpSlots()">Quick Sync Names</button>
-            <button type="button" class="btn btn-success btn-sm" (click)="loadAmpState()">Load Amp State</button>
-            <button type="button" class="btn btn-outline-success btn-sm" (click)="openPatchSetLoader()">Load Patch Set</button>
-            <button type="button" class="btn btn-outline-success btn-sm" (click)="captureAudioLevelMarker()">Set Level Marker</button>
+            <button type="button" class="btn btn-primary btn-sm" (click)="testAmpConnection()" [disabled]="isActionBusy('test-amp-connection')">{{ headerActionLabel('test-amp-connection', 'Test Amp Connection', 'Testing...') }}</button>
+            <button type="button" class="btn btn-outline-primary btn-sm" (click)="quickSyncAmpSlots()" [disabled]="isActionBusy('quick-sync')">{{ headerActionLabel('quick-sync', 'Quick Sync Names', 'Syncing...') }}</button>
+            <button type="button" class="btn btn-success btn-sm" (click)="loadAmpState()" [disabled]="isActionBusy('load-amp-state')">{{ headerActionLabel('load-amp-state', 'Load Amp State', 'Loading...') }}</button>
+            <button type="button" class="btn btn-outline-success btn-sm" (click)="openPatchSetLoader()" [disabled]="isActionBusy('open-patch-set-loader')">{{ headerActionLabel('open-patch-set-loader', 'Load Patch Set', 'Loading...') }}</button>
+            <button type="button" class="btn btn-outline-success btn-sm" (click)="captureAudioLevelMarker()" [disabled]="isActionBusy('capture-level-marker')">{{ headerActionLabel('capture-level-marker', 'Set Level Marker', 'Capturing...') }}</button>
             <button type="button" class="btn btn-outline-dark btn-sm" (click)="measureAllSlotsRms()" [disabled]="isMeasuringSlotsRms()">
               Measure 5s RMS (All Slots)
             </button>
@@ -142,22 +142,22 @@
                   </p>
                   <div class="d-flex flex-wrap gap-2 mb-2">
                     @if (canActivateSlot(slot)) {
-                      <button type="button" class="btn btn-sm btn-primary" (click)="activateSlot(slot)">Activate</button>
+                      <button type="button" class="btn btn-sm btn-primary" (click)="activateSlot(slot)" [disabled]="isActionBusy(slotActionKey('activate', slot.slot))">{{ slotActionLabel('activate', slot.slot, 'Activate', 'Activating...') }}</button>
                     }
                     @if (canReadActiveSlot(slot)) {
-                      <button type="button" class="btn btn-sm btn-outline-primary" (click)="readActiveAmpSlot(slot)">Read AMP</button>
+                      <button type="button" class="btn btn-sm btn-outline-primary" (click)="readActiveAmpSlot(slot)" [disabled]="isActionBusy(slotActionKey('read-amp', slot.slot))">{{ slotActionLabel('read-amp', slot.slot, 'Read AMP', 'Reading...') }}</button>
                       <button type="button" class="btn btn-sm btn-outline-primary" (click)="measureActivePatch()" [disabled]="isMeasuringActivePatch()">
                         {{ measureActiveButtonLabel() }}
                       </button>
                     }
-                    <button type="button" class="btn btn-sm btn-outline-primary" (click)="openPatchConfigLoadModal(slot)" [disabled]="!canLoadSlot(slot)">Load</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" (click)="openPatchConfigLoadModal(slot)" [disabled]="!canLoadSlot(slot) || isActionBusy(slotActionKey('load-configs', slot.slot))">{{ slotActionLabel('load-configs', slot.slot, 'Load', 'Loading...') }}</button>
                     @if (canStageSlot(slot)) {
-                      <button type="button" class="btn btn-sm btn-outline-warning" (click)="stageSlotToAmp(slot)">Stage to AMP</button>
+                      <button type="button" class="btn btn-sm btn-outline-warning" (click)="stageSlotToAmp(slot)" [disabled]="isActionBusy(slotActionKey('stage', slot.slot))">{{ slotActionLabel('stage', slot.slot, 'Stage to AMP', 'Staging...') }}</button>
                     }
                     @if (canCommitSlot(slot)) {
-                      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="commitSlotToAmp(slot)">Commit to AMP</button>
+                      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="commitSlotToAmp(slot)" [disabled]="isActionBusy(slotActionKey('commit', slot.slot))">{{ slotActionLabel('commit', slot.slot, 'Commit to AMP', 'Committing...') }}</button>
                     }
-                    <button type="button" class="btn btn-sm btn-outline-success" (click)="saveSlotToDb(slot)" [disabled]="!canUseSlotActions(slot)">Save DB</button>
+                    <button type="button" class="btn btn-sm btn-outline-success" (click)="saveSlotToDb(slot)" [disabled]="!canUseSlotActions(slot) || isActionBusy(slotActionKey('save-db', slot.slot))">{{ slotActionLabel('save-db', slot.slot, 'Save DB', 'Saving...') }}</button>
                     @if (canOpenEditor(slot)) {
                       <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openEditor(slot)">Editor</button>
                     }
@@ -228,22 +228,22 @@
                   </p>
                   <div class="d-flex flex-wrap gap-2 mb-2">
                     @if (canActivateSlot(slot)) {
-                      <button type="button" class="btn btn-sm btn-primary" (click)="activateSlot(slot)">Activate</button>
+                      <button type="button" class="btn btn-sm btn-primary" (click)="activateSlot(slot)" [disabled]="isActionBusy(slotActionKey('activate', slot.slot))">{{ slotActionLabel('activate', slot.slot, 'Activate', 'Activating...') }}</button>
                     }
                     @if (canReadActiveSlot(slot)) {
-                      <button type="button" class="btn btn-sm btn-outline-primary" (click)="readActiveAmpSlot(slot)">Read AMP</button>
+                      <button type="button" class="btn btn-sm btn-outline-primary" (click)="readActiveAmpSlot(slot)" [disabled]="isActionBusy(slotActionKey('read-amp', slot.slot))">{{ slotActionLabel('read-amp', slot.slot, 'Read AMP', 'Reading...') }}</button>
                       <button type="button" class="btn btn-sm btn-outline-primary" (click)="measureActivePatch()" [disabled]="isMeasuringActivePatch()">
                         {{ measureActiveButtonLabel() }}
                       </button>
                     }
-                    <button type="button" class="btn btn-sm btn-outline-primary" (click)="openPatchConfigLoadModal(slot)" [disabled]="!canLoadSlot(slot)">Load</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" (click)="openPatchConfigLoadModal(slot)" [disabled]="!canLoadSlot(slot) || isActionBusy(slotActionKey('load-configs', slot.slot))">{{ slotActionLabel('load-configs', slot.slot, 'Load', 'Loading...') }}</button>
                     @if (canStageSlot(slot)) {
-                      <button type="button" class="btn btn-sm btn-outline-warning" (click)="stageSlotToAmp(slot)">Stage to AMP</button>
+                      <button type="button" class="btn btn-sm btn-outline-warning" (click)="stageSlotToAmp(slot)" [disabled]="isActionBusy(slotActionKey('stage', slot.slot))">{{ slotActionLabel('stage', slot.slot, 'Stage to AMP', 'Staging...') }}</button>
                     }
                     @if (canCommitSlot(slot)) {
-                      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="commitSlotToAmp(slot)">Commit to AMP</button>
+                      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="commitSlotToAmp(slot)" [disabled]="isActionBusy(slotActionKey('commit', slot.slot))">{{ slotActionLabel('commit', slot.slot, 'Commit to AMP', 'Committing...') }}</button>
                     }
-                    <button type="button" class="btn btn-sm btn-outline-success" (click)="saveSlotToDb(slot)" [disabled]="!canUseSlotActions(slot)">Save DB</button>
+                    <button type="button" class="btn btn-sm btn-outline-success" (click)="saveSlotToDb(slot)" [disabled]="!canUseSlotActions(slot) || isActionBusy(slotActionKey('save-db', slot.slot))">{{ slotActionLabel('save-db', slot.slot, 'Save DB', 'Saving...') }}</button>
                     @if (canOpenEditor(slot)) {
                       <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openEditor(slot)">Editor</button>
                     }
@@ -487,7 +487,7 @@
                 slots: <code>{{ snapshot.slot_count }}</code> |
                 time: <code>{{ formatMs(snapshot.total_sync_ms) }}</code>
               </p>
-              <button type="button" class="btn btn-sm btn-primary" (click)="loadPatchSetSnapshot(snapshot)">Load</button>
+              <button type="button" class="btn btn-sm btn-primary" (click)="loadPatchSetSnapshot(snapshot)" [disabled]="isActionBusy('load-patch-set-snapshot:' + snapshot.id)">{{ isActionBusy('load-patch-set-snapshot:' + snapshot.id) ? 'Loading...' : 'Load' }}</button>
             </article>
           }
           @if (patchSetSnapshots().length === 0) {

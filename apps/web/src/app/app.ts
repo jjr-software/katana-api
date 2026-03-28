@@ -470,6 +470,7 @@ export class App implements OnInit, OnDestroy {
   isMeasuringSlotsRms = signal(false);
   isMeasuringActivePatch = signal(false);
   measureCountdownSec = signal(0);
+  busyActions = signal<Record<string, boolean>>({});
   queuePollHandle: ReturnType<typeof setInterval> | null = null;
   activeSlotPollHandle: ReturnType<typeof setInterval> | null = null;
   liveMeterSource: EventSource | null = null;
@@ -561,7 +562,35 @@ export class App implements OnInit, OnDestroy {
     this.stopEditorLiveApplyCountdown();
   }
 
+  isActionBusy(key: string): boolean {
+    return Boolean(this.busyActions()[key]);
+  }
+
+  private setActionBusy(key: string, busy: boolean): void {
+    this.busyActions.update((current) => {
+      if (busy) {
+        return { ...current, [key]: true };
+      }
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  }
+
+  slotActionKey(action: string, slot: number): string {
+    return `${action}:${slot}`;
+  }
+
+  headerActionLabel(key: string, idle: string, busy: string): string {
+    return this.isActionBusy(key) ? busy : idle;
+  }
+
+  slotActionLabel(action: string, slot: number, idle: string, busy: string): string {
+    return this.isActionBusy(this.slotActionKey(action, slot)) ? busy : idle;
+  }
+
   async testAmpConnection(): Promise<void> {
+    this.setActionBusy('test-amp-connection', true);
     this.status.set('Running amp identity request...');
     this.responseJson.set('');
 
@@ -591,6 +620,8 @@ export class App implements OnInit, OnDestroy {
         null,
         2,
       ));
+    } finally {
+      this.setActionBusy('test-amp-connection', false);
     }
   }
 
@@ -632,6 +663,8 @@ export class App implements OnInit, OnDestroy {
   }
 
   async activateSlot(slot: SlotCard): Promise<void> {
+    const actionKey = this.slotActionKey('activate', slot.slot);
+    this.setActionBusy(actionKey, true);
     this.status.set(`Activating ${slot.slot_label} on amp...`);
     this.responseJson.set('');
     try {
@@ -688,10 +721,14 @@ export class App implements OnInit, OnDestroy {
           2,
         ),
       );
+    } finally {
+      this.setActionBusy(actionKey, false);
     }
   }
 
   async readActiveAmpSlot(slot: SlotCard): Promise<void> {
+    const actionKey = this.slotActionKey('read-amp', slot.slot);
+    this.setActionBusy(actionKey, true);
     this.status.set(`Reading active patch state for ${slot.slot_label}...`);
     this.responseJson.set('');
     try {
@@ -726,6 +763,8 @@ export class App implements OnInit, OnDestroy {
           2,
         ),
       );
+    } finally {
+      this.setActionBusy(actionKey, false);
     }
   }
 
@@ -738,6 +777,8 @@ export class App implements OnInit, OnDestroy {
       this.status.set(`No full patch payload loaded for ${slot.slot_label}. Load or activate first.`);
       return;
     }
+    const actionKey = this.slotActionKey('stage', slot.slot);
+    this.setActionBusy(actionKey, true);
     this.status.set(`Staging ${slot.slot_label} to active amp patch...`);
     this.responseJson.set('');
     try {
@@ -800,6 +841,8 @@ export class App implements OnInit, OnDestroy {
           2,
         ),
       );
+    } finally {
+      this.setActionBusy(actionKey, false);
     }
   }
 
@@ -812,6 +855,8 @@ export class App implements OnInit, OnDestroy {
       this.status.set(`No full patch payload loaded for ${slot.slot_label}. Load or activate first.`);
       return;
     }
+    const actionKey = this.slotActionKey('commit', slot.slot);
+    this.setActionBusy(actionKey, true);
     this.status.set(`Committing ${slot.slot_label} to amp memory...`);
     this.responseJson.set('');
     try {
@@ -878,6 +923,8 @@ export class App implements OnInit, OnDestroy {
           2,
         ),
       );
+    } finally {
+      this.setActionBusy(actionKey, false);
     }
   }
 
@@ -886,6 +933,8 @@ export class App implements OnInit, OnDestroy {
       this.status.set(`No patch payload loaded for ${slot.slot_label}. Read or Load first.`);
       return;
     }
+    const actionKey = this.slotActionKey('save-db', slot.slot);
+    this.setActionBusy(actionKey, true);
     this.status.set(`Saving ${slot.slot_label} to patch DB...`);
     this.responseJson.set('');
     try {
@@ -946,10 +995,14 @@ export class App implements OnInit, OnDestroy {
           2,
         ),
       );
+    } finally {
+      this.setActionBusy(actionKey, false);
     }
   }
 
   async openPatchConfigLoadModal(slot: SlotCard): Promise<void> {
+    const actionKey = this.slotActionKey('load-configs', slot.slot);
+    this.setActionBusy(actionKey, true);
     this.status.set(`Loading patch configs for ${slot.slot_label}...`);
     this.responseJson.set('');
     try {
@@ -980,6 +1033,8 @@ export class App implements OnInit, OnDestroy {
           2,
         ),
       );
+    } finally {
+      this.setActionBusy(actionKey, false);
     }
   }
 
@@ -1112,6 +1167,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   async captureAudioLevelMarker(): Promise<void> {
+    this.setActionBusy('capture-level-marker', true);
     this.status.set('Capturing audio level marker...');
     this.responseJson.set('');
     try {
@@ -1158,6 +1214,8 @@ export class App implements OnInit, OnDestroy {
           2,
         ),
       );
+    } finally {
+      this.setActionBusy('capture-level-marker', false);
     }
   }
 
@@ -1813,6 +1871,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   async quickSyncAmpSlots(): Promise<void> {
+    this.setActionBusy('quick-sync', true);
     this.status.set('Quick sync queued...');
     this.responseJson.set('');
 
@@ -1866,10 +1925,13 @@ export class App implements OnInit, OnDestroy {
           2,
         ),
       );
+    } finally {
+      this.setActionBusy('quick-sync', false);
     }
   }
 
   async loadAmpState(): Promise<void> {
+    this.setActionBusy('load-amp-state', true);
     this.status.set('Load amp state queued...');
     this.responseJson.set('');
 
@@ -1934,10 +1996,13 @@ export class App implements OnInit, OnDestroy {
           2,
         ),
       );
+    } finally {
+      this.setActionBusy('load-amp-state', false);
     }
   }
 
   async openPatchSetLoader(): Promise<void> {
+    this.setActionBusy('open-patch-set-loader', true);
     this.status.set('Loading recent full-sync data...');
     this.responseJson.set('');
     try {
@@ -1971,6 +2036,8 @@ export class App implements OnInit, OnDestroy {
           2,
         ),
       );
+    } finally {
+      this.setActionBusy('open-patch-set-loader', false);
     }
   }
 
@@ -2669,6 +2736,8 @@ export class App implements OnInit, OnDestroy {
   }
 
   async loadPatchSetSnapshot(snapshot: BackupSnapshotSummary): Promise<void> {
+    const actionKey = `load-patch-set-snapshot:${snapshot.id}`;
+    this.setActionBusy(actionKey, true);
     this.status.set(`Loading snapshot ${snapshot.label}...`);
     this.responseJson.set('');
     try {
@@ -2713,6 +2782,8 @@ export class App implements OnInit, OnDestroy {
           2,
         ),
       );
+    } finally {
+      this.setActionBusy(actionKey, false);
     }
   }
 
