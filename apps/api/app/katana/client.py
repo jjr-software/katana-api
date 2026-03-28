@@ -266,6 +266,10 @@ class AmpClient:
             started = time.perf_counter()
             await self._send_only(EDITOR_MODE_ON)
             await self._select_patch(slot)
+            authoritative_payload = self._clone_patch_payload(patch_payload)
+            authoritative_hash = self._config_hash(authoritative_payload)
+            authoritative_payload["config_hash_sha256"] = authoritative_hash
+            authoritative_name = str(authoritative_payload.get("patch_name", ""))
             await self._apply_selected_patch_payload(patch_payload)
             live_applied = await self._read_selected_patch_payload()
             await self._send_only(build_dt1(PATCH_WRITE_ADDR, [0x00, int(slot)]))
@@ -282,9 +286,9 @@ class AmpClient:
             return SlotPatchSummary(
                 slot=slot,
                 slot_label=slot_label(slot),
-                patch_name=str(readback.get("patch_name", "")),
-                config_hash_sha256=str(readback["config_hash_sha256"]),
-                payload=readback,
+                patch_name=authoritative_name,
+                config_hash_sha256=authoritative_hash,
+                payload=authoritative_payload,
                 synced_at=synced_at,
                 slot_sync_ms=int(round((time.perf_counter() - started) * 1000)),
             )
