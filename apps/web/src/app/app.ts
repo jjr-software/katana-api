@@ -79,7 +79,7 @@ const DELAY_TYPE_NAMES = [
   'Modulate Delay',
   'Roland SDE-3000 Delay',
 ];
-const AMP_TYPE_NAMES = ['Acoustic', 'Clean', 'Crunch', 'Lead', 'Brown'];
+const AMP_TYPE_NAMES = ['Acoustic', 'Clean', 'Pushed', 'Crunch', 'Lead', 'Brown'];
 const REVERB_TYPE_NAMES = ['Plate Reverb', 'Room Reverb', 'Hall Reverb', 'Spring Reverb', 'Modulate Reverb'];
 const EQ_TYPE_NAMES = ['Parametric EQ', 'GE-10'];
 const EQ_POSITION_NAMES = ['Input', 'Post Amp'];
