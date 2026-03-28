@@ -84,17 +84,29 @@ const REVERB_TYPE_NAMES = ['Plate Reverb', 'Room Reverb', 'Hall Reverb', 'Spring
 const EQ_TYPE_NAMES = ['Parametric EQ', 'GE-10'];
 const EQ_POSITION_NAMES = ['Input', 'Post Amp'];
 const EQ_GE10_BAND_LABELS = ['31', '62', '125', '250', '500', '1k', '2k', '4k', '8k', '16k', 'Level'];
-const EQ_PEQ_PARAM_SCHEMA: ReadonlyArray<{ key: string; label: string; index: number; min: number; max: number; offset?: number }> = [
-  { key: 'low_cut', label: 'Low Cut', index: 0, min: 0, max: 17 },
+const EQ_PEQ_LOW_CUT_LABELS = ['Flat', '20 Hz', '25 Hz', '31.5 Hz', '40 Hz', '50 Hz', '63 Hz', '80 Hz', '100 Hz', '125 Hz', '160 Hz', '200 Hz', '250 Hz', '315 Hz', '400 Hz', '500 Hz', '630 Hz', '800 Hz'];
+const EQ_PEQ_MID_FREQ_LABELS = ['20 Hz', '25 Hz', '31.5 Hz', '40 Hz', '50 Hz', '63 Hz', '80 Hz', '100 Hz', '125 Hz', '160 Hz', '200 Hz', '250 Hz', '315 Hz', '400 Hz', '500 Hz', '630 Hz', '800 Hz', '1.00 kHz', '1.25 kHz', '1.60 kHz', '2.00 kHz', '2.50 kHz', '3.15 kHz', '4.00 kHz', '5.00 kHz', '6.30 kHz', '8.00 kHz', '10.0 kHz'];
+const EQ_PEQ_Q_LABELS = ['0.5', '1', '2', '4', '8', '16'];
+const EQ_PEQ_HIGH_CUT_LABELS = ['630 Hz', '800 Hz', '1.00 kHz', '1.25 kHz', '1.60 kHz', '2.00 kHz', '2.50 kHz', '3.15 kHz', '4.00 kHz', '5.00 kHz', '6.30 kHz', '8.00 kHz', '10.0 kHz', '12.5 kHz', 'Flat'];
+
+interface ValueOption {
+  value: number;
+  label: string;
+}
+
+const buildValueOptions = (labels: readonly string[]): ValueOption[] => labels.map((label, value) => ({ value, label }));
+
+const EQ_PEQ_PARAM_SCHEMA: ReadonlyArray<{ key: string; label: string; index: number; min: number; max: number; offset?: number; options?: ValueOption[] }> = [
+  { key: 'low_cut', label: 'Low Cut', index: 0, min: 0, max: 17, options: buildValueOptions(EQ_PEQ_LOW_CUT_LABELS) },
   { key: 'low_gain', label: 'Low Gain', index: 1, min: -20, max: 20, offset: 20 },
-  { key: 'lowmid_freq', label: 'Low Mid Freq', index: 2, min: 0, max: 27 },
-  { key: 'lowmid_q', label: 'Low Mid Q', index: 3, min: 0, max: 5 },
+  { key: 'lowmid_freq', label: 'Low Mid Freq', index: 2, min: 0, max: 27, options: buildValueOptions(EQ_PEQ_MID_FREQ_LABELS) },
+  { key: 'lowmid_q', label: 'Low Mid Q', index: 3, min: 0, max: 5, options: buildValueOptions(EQ_PEQ_Q_LABELS) },
   { key: 'lowmid_gain', label: 'Low Mid Gain', index: 4, min: -20, max: 20, offset: 20 },
-  { key: 'highmid_freq', label: 'High Mid Freq', index: 5, min: 0, max: 27 },
-  { key: 'highmid_q', label: 'High Mid Q', index: 6, min: 0, max: 5 },
+  { key: 'highmid_freq', label: 'High Mid Freq', index: 5, min: 0, max: 27, options: buildValueOptions(EQ_PEQ_MID_FREQ_LABELS) },
+  { key: 'highmid_q', label: 'High Mid Q', index: 6, min: 0, max: 5, options: buildValueOptions(EQ_PEQ_Q_LABELS) },
   { key: 'highmid_gain', label: 'High Mid Gain', index: 7, min: -20, max: 20, offset: 20 },
   { key: 'high_gain', label: 'High Gain', index: 8, min: -20, max: 20, offset: 20 },
-  { key: 'high_cut', label: 'High Cut', index: 9, min: 0, max: 14 },
+  { key: 'high_cut', label: 'High Cut', index: 9, min: 0, max: 14, options: buildValueOptions(EQ_PEQ_HIGH_CUT_LABELS) },
   { key: 'level', label: 'Level', index: 10, min: -20, max: 20, offset: 20 },
 ];
 const LIVE_RMS_WINDOW_POINTS = 96;
@@ -360,6 +372,8 @@ interface EqParamField {
   value: number;
   min: number;
   max: number;
+  valueLabel: string | null;
+  options: ValueOption[] | null;
 }
 
 interface EqPeqGraphNode {
@@ -2225,6 +2239,7 @@ export class App implements OnInit, OnDestroy {
     return EQ_PEQ_PARAM_SCHEMA.map((schema) => {
       const rawValue = fields[schema.index]?.value ?? 0;
       const value = rawValue - (schema.offset ?? 0);
+      const valueLabel = schema.options?.find((option) => option.value === value)?.label ?? null;
       return {
         id: `${eqName}-peq-${schema.key}`,
         key: schema.key,
@@ -2232,6 +2247,8 @@ export class App implements OnInit, OnDestroy {
         value,
         min: schema.min,
         max: schema.max,
+        valueLabel,
+        options: schema.options ?? null,
       };
     });
   }
