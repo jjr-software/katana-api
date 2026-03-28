@@ -2140,6 +2140,25 @@ export class App implements OnInit, OnDestroy {
     return 'n/a';
   }
 
+  editorDbStateLabel(): string {
+    const slotNumber = this.editorSlotNumber();
+    if (slotNumber === null) {
+      return 'DB ?';
+    }
+    const slot = this.slots().find((card) => card.slot === slotNumber);
+    if (!slot?.saved_hash_sha256) {
+      return this.editorPatchDraft() ? 'DB ✗' : 'DB ?';
+    }
+    if (this.editorIsModified()) {
+      return 'DB ✗';
+    }
+    const draftHash = this.readString(this.editorPatchDraft(), 'config_hash_sha256') ?? '';
+    if (!draftHash) {
+      return 'DB ✗';
+    }
+    return draftHash === slot.saved_hash_sha256 ? 'DB ✓' : 'DB ✗';
+  }
+
   setEditorPatchName(value: string): void {
     this.updateEditorPatch((draft) => {
       draft['patch_name'] = value;

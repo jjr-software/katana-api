@@ -601,6 +601,12 @@
                 }
                 · Hash: <code>{{ editorHashLabel() }}</code>
               </p>
+              <p class="small mb-0 text-secondary">
+                DB State:
+                <code [class.text-success]="editorDbStateLabel() === 'DB ✓'" [class.text-danger]="editorDbStateLabel() === 'DB ✗'">
+                  {{ editorDbStateLabel() }}
+                </code>
+              </p>
               @if (editorLiveApplyError()) {
                 <p class="small mb-0 text-danger mt-1">{{ editorLiveApplyError() }}</p>
               }
