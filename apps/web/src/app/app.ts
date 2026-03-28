@@ -305,7 +305,7 @@ interface AiPatchAdviceChange {
 
 interface AiPatchAdviceResponse {
   summary: string;
-  suggested_change: AiPatchAdviceChange;
+  suggested_changes: AiPatchAdviceChange[];
   proposed_patch: Record<string, unknown>;
   model: string;
 }
@@ -1536,10 +1536,11 @@ export class App implements OnInit, OnDestroy {
         const direction = errorDb > 0 ? 'quieter' : 'louder';
         this.pushAutoLevelLog(`Iteration ${iteration}: asking AI for a ${direction} proposal...`);
         const advice = await this.fetchAiPatchAdvice(slot.slot_label, prompt, currentSlot.patch);
-        const change = advice.suggested_change;
-        this.pushAutoLevelLog(
-          `AI change: ${change.field} ${this.formatAiValue(change.current_value)} -> ${this.formatAiValue(change.suggested_value)} (${change.rationale})`,
-        );
+        for (const change of advice.suggested_changes) {
+          this.pushAutoLevelLog(
+            `AI change: ${change.field} ${this.formatAiValue(change.current_value)} -> ${this.formatAiValue(change.suggested_value)} (${change.rationale})`,
+          );
+        }
         this.autoLevelState.set('applying');
         this.pushAutoLevelLog(`Iteration ${iteration}: applying AI proposal...`);
         await this.applyProposedPatchToSlot(slot.slot, advice.proposed_patch, true);
@@ -1574,9 +1575,9 @@ export class App implements OnInit, OnDestroy {
 
   aiModalDescription(): string {
     if (this.aiModalMode() === 'level') {
-      return 'The AI is fed the current patch JSON plus measured RMS and target RMS, and must return one concrete control/value change to move loudness toward target.';
+      return 'The AI is fed the current patch JSON plus measured RMS and target RMS, and may return multiple concrete control/value changes to move loudness toward target.';
     }
-    return 'The AI is fed the current patch JSON and returns one concrete Katana control/value change.';
+    return 'The AI is fed the current patch JSON and may return multiple concrete Katana control/value changes.';
   }
 
   private buildAiTargetRmsPrompt(currentRmsDbfs: number, targetRmsDbfs: number): string {
@@ -1585,8 +1586,8 @@ export class App implements OnInit, OnDestroy {
     return [
       `Current 10s Max RMS is ${currentRmsDbfs.toFixed(2)} dBFS.`,
       `Target 10s Max RMS is ${targetRmsDbfs.toFixed(2)} dBFS.`,
-      `Suggest exactly one concrete numeric control change to ${direction} loudness toward that target while preserving the overall tone character where possible.`,
-      'Return one field path and one numeric value only.',
+      `Suggest concrete numeric control changes to ${direction} loudness toward that target while preserving the overall tone character where possible.`,
+      'You may return multiple changes when they clearly work together.',
       'Do not assume amp.volume is the only control to use.',
       'Consider whichever parts of the chain are actually contributing level, including booster drive/effect level, mod/fx levels, delay/reverb levels, solo, send_return, EQ boosts, amp gain, and amp volume.',
       'Prefer the smallest effective change.',
