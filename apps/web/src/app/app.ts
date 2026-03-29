@@ -110,7 +110,6 @@ const EQ_PEQ_PARAM_SCHEMA: ReadonlyArray<{ key: string; label: string; index: nu
   { key: 'level', label: 'Level', index: 10, min: -20, max: 20, offset: 20 },
 ];
 const LIVE_RMS_WINDOW_POINTS = 96;
-const EDITOR_LIVE_APPLY_MIN_GAP_MS = 120;
 const DEFAULT_TARGET_RMS_DBFS = -31.0;
 const AUTO_LEVEL_TOLERANCE_DB = 0.4;
 const AUTO_LEVEL_MEASURE_SEC = 2.0;
@@ -568,16 +567,10 @@ export class App implements OnInit, OnDestroy {
   editorTargetIsActive = signal(false);
   editorBaseFingerprint = signal('');
   editorBaseConfigHash = signal('');
-  editorLiveApplyEnabled = signal(true);
   editorLiveApplyPending = signal(false);
   editorLiveApplyError = signal('');
   editorLiveApplyReadbackAt = signal('');
-  editorLiveApplyCountdownSec = signal<number | null>(null);
-  editorLiveApplyHandle: ReturnType<typeof setTimeout> | null = null;
-  editorLiveApplyCountdownHandle: ReturnType<typeof setInterval> | null = null;
-  editorLiveApplyDueAtMs: number | null = null;
   editorLiveApplyInFlight = false;
-  editorLiveApplyLastStartedAtMs = 0;
   editorLiveApplyLastAppliedFingerprint = '';
   editorLiveApplyQueuedFingerprint: string | null = null;
   patchSetModalOpen = signal(false);
@@ -602,7 +595,12 @@ export class App implements OnInit, OnDestroy {
   toneAssignGroupByPatchObject = signal<Record<number, string>>({});
   tonePatchQuery = signal('');
   tonePatchSourceFilter = signal('');
+  tonePatchGroupFilter = signal('');
   toneStoreSlot = signal('1');
+  toneManualSetName = signal('');
+  toneManualSetDescription = signal('');
+  toneManualSetSlots = signal<Record<number, string>>({});
+  toneSetSlotAssignments = signal<Record<string, string>>({});
   private activeSlotPollInFlight = false;
   private readonly onPopState = (): void => {
     this.currentPage.set(this.resolvePageFromPath());
@@ -636,11 +634,6 @@ export class App implements OnInit, OnDestroy {
       this.activeSlotPollHandle = null;
     }
     this.stopLiveMeter();
-    if (this.editorLiveApplyHandle !== null) {
-      clearTimeout(this.editorLiveApplyHandle);
-      this.editorLiveApplyHandle = null;
-    }
-    this.stopEditorLiveApplyCountdown();
   }
 
   isActionBusy(key: string): boolean {
@@ -770,7 +763,6 @@ export class App implements OnInit, OnDestroy {
       this.editorLiveApplyLastAppliedFingerprint = this.patchFingerprint(draft);
       this.editorLiveApplyQueuedFingerprint = null;
       this.editorLiveApplyInFlight = false;
-      this.editorLiveApplyEnabled.set(true);
       this.editorLiveApplyPending.set(false);
       this.editorLiveApplyError.set('');
       this.editorLiveApplyReadbackAt.set('');
@@ -862,8 +854,46 @@ export class App implements OnInit, OnDestroy {
     this.tonePatchSourceFilter.set(value);
   }
 
+  setTonePatchGroupFilter(value: string): void {
+    this.tonePatchGroupFilter.set(value);
+  }
+
   setToneStoreSlot(value: string): void {
     this.toneStoreSlot.set(value);
+  }
+
+  setToneManualSetName(value: string): void {
+    this.toneManualSetName.set(value);
+  }
+
+  setToneManualSetDescription(value: string): void {
+    this.toneManualSetDescription.set(value);
+  }
+
+  setToneManualSetSlot(slot: number, value: string): void {
+    this.toneManualSetSlots.update((current) => {
+      const next = { ...current };
+      if (value.trim()) {
+        next[slot] = value;
+      } else {
+        delete next[slot];
+      }
+      return next;
+    });
+  }
+
+  toneManualSetSlotValue(slot: number): string {
+    return this.toneManualSetSlots()[slot] ?? '';
+  }
+
+  setToneSetSlotAssignment(setId: number, slot: number, value: string): void {
+    const key = this.toneSetSlotAssignmentKey(setId, slot);
+    this.toneSetSlotAssignments.update((current) => ({ ...current, [key]: value }));
+  }
+
+  toneSetSlotAssignmentValue(toneSet: TonePatchObjectSetResponse, slot: number, currentPatchObjectId: number): string {
+    const key = this.toneSetSlotAssignmentKey(toneSet.id, slot);
+    return this.toneSetSlotAssignments()[key] ?? String(currentPatchObjectId);
   }
 
   async loadToneLabData(): Promise<void> {
@@ -873,16 +903,24 @@ export class App implements OnInit, OnDestroy {
   async loadTonePatchObjects(): Promise<void> {
     try {
       const params = new URLSearchParams();
+      const groupFilter = this.tonePatchGroupFilter().trim();
       if (this.tonePatchQuery().trim()) {
         params.set('q', this.tonePatchQuery().trim());
       }
       if (this.tonePatchSourceFilter().trim()) {
         params.set('source_type', this.tonePatchSourceFilter().trim());
       }
+      if (groupFilter) {
+        params.set('group_id', groupFilter);
+      }
       const suffix = params.toString() ? `?${params.toString()}` : '';
       const response = await fetch(`/api/v1/patch-objects${suffix}`, { method: 'GET', cache: 'no-store' });
       const payload = (await response.json()) as TonePatchObjectResponse[] | { detail?: unknown };
       if (!response.ok || !Array.isArray(payload)) {
+        if (response.status === 404 && groupFilter) {
+          this.tonePatchGroupFilter.set('');
+          await this.loadTonePatchObjects();
+        }
         return;
       }
       this.tonePatchObjects.set(payload as TonePatchObjectResponse[]);
@@ -1049,6 +1087,96 @@ export class App implements OnInit, OnDestroy {
       this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
     } finally {
       this.setActionBusy('tone-create-group', false);
+    }
+  }
+
+  async createManualToneSet(): Promise<void> {
+    const name = this.toneManualSetName().trim();
+    if (!name) {
+      this.status.set('Manual set creation requires a name.');
+      return;
+    }
+    const slots = Object.entries(this.toneManualSetSlots())
+      .map(([slotText, patchObjectIdText]) => ({
+        slot: Number.parseInt(slotText, 10),
+        patch_object_id: Number.parseInt(patchObjectIdText, 10),
+      }))
+      .filter((item) => Number.isFinite(item.slot) && item.slot >= 1 && item.slot <= 8 && Number.isFinite(item.patch_object_id) && item.patch_object_id > 0)
+      .sort((a, b) => a.slot - b.slot);
+    if (slots.length === 0) {
+      this.status.set('Select at least one patch object before creating a set.');
+      return;
+    }
+    this.setActionBusy('tone-create-set', true);
+    this.status.set(`Creating set ${name}...`);
+    this.responseJson.set('');
+    try {
+      const response = await fetch('/api/v1/sets', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          description: this.toneManualSetDescription(),
+          slots,
+        }),
+      });
+      const payload = (await response.json()) as TonePatchObjectSetResponse | { detail?: unknown };
+      if (!response.ok) {
+        this.status.set('Set creation failed');
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      this.toneManualSetName.set('');
+      this.toneManualSetDescription.set('');
+      this.toneManualSetSlots.set({});
+      await this.loadToneSets();
+      this.status.set(`Created set ${name}`);
+      this.responseJson.set(JSON.stringify(payload, null, 2));
+    } catch (error: unknown) {
+      this.status.set('Set creation failed');
+      this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
+    } finally {
+      this.setActionBusy('tone-create-set', false);
+    }
+  }
+
+  async updateToneSetSlot(toneSet: TonePatchObjectSetResponse, slot: number): Promise<void> {
+    const patchObjectId = Number.parseInt(this.toneSetSlotAssignmentValue(toneSet, slot, 0), 10);
+    if (!Number.isFinite(patchObjectId) || patchObjectId <= 0) {
+      this.status.set(`Select a patch object before updating ${toneSet.name} slot ${slot}.`);
+      return;
+    }
+    const actionKey = `tone-update-set-slot:${toneSet.id}:${slot}`;
+    this.setActionBusy(actionKey, true);
+    this.status.set(`Updating ${toneSet.name} slot ${slot}...`);
+    this.responseJson.set('');
+    try {
+      const response = await fetch(`/api/v1/sets/${toneSet.id}/slots/${slot}`, {
+        method: 'PUT',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patch_object_id: patchObjectId }),
+      });
+      const payload = (await response.json()) as TonePatchObjectSetResponse | { detail?: unknown };
+      if (!response.ok) {
+        this.status.set(`Failed updating ${toneSet.name} slot ${slot}`);
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      this.toneSetSlotAssignments.update((current) => {
+        const next = { ...current };
+        delete next[this.toneSetSlotAssignmentKey(toneSet.id, slot)];
+        return next;
+      });
+      await this.loadToneSets();
+      this.status.set(`Updated ${toneSet.name} slot ${slot}`);
+      this.responseJson.set(JSON.stringify(payload, null, 2));
+    } catch (error: unknown) {
+      this.status.set(`Failed updating ${toneSet.name} slot ${slot}`);
+      this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
+    } finally {
+      this.setActionBusy(actionKey, false);
     }
   }
 
@@ -2734,7 +2862,6 @@ export class App implements OnInit, OnDestroy {
     this.editorLiveApplyLastAppliedFingerprint = this.patchFingerprint(draft);
     this.editorLiveApplyQueuedFingerprint = null;
     this.editorLiveApplyInFlight = false;
-    this.editorLiveApplyEnabled.set(this.isActiveSlot(slot));
     this.editorLiveApplyPending.set(false);
     this.editorLiveApplyError.set('');
     this.editorLiveApplyReadbackAt.set('');
@@ -2746,11 +2873,6 @@ export class App implements OnInit, OnDestroy {
     this.editorLiveApplyPending.set(false);
     this.editorLiveApplyError.set('');
     this.editorLiveApplyReadbackAt.set('');
-    if (this.editorLiveApplyHandle !== null) {
-      clearTimeout(this.editorLiveApplyHandle);
-      this.editorLiveApplyHandle = null;
-    }
-    this.stopEditorLiveApplyCountdown();
     this.editorLiveApplyInFlight = false;
     this.editorLiveApplyQueuedFingerprint = null;
     this.editorTargetIsActive.set(false);
@@ -2760,16 +2882,6 @@ export class App implements OnInit, OnDestroy {
 
   editorLiveApplyAvailable(): boolean {
     return this.editorTargetIsActive();
-  }
-
-  setEditorLiveApplyEnabled(enabled: boolean): void {
-    this.editorLiveApplyEnabled.set(enabled);
-    if (!enabled) {
-      this.stopEditorLiveApplyCountdown();
-    }
-    if (enabled) {
-      this.scheduleEditorLiveApply();
-    }
   }
 
   editorPatchName(): string {
@@ -4679,7 +4791,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   private scheduleEditorLiveApply(): void {
-    if (!this.editorModalOpen() || !this.editorLiveApplyEnabled() || !this.editorLiveApplyAvailable()) {
+    if (!this.editorModalOpen() || !this.editorLiveApplyAvailable()) {
       return;
     }
     const draftFingerprint = this.editorDraftFingerprint();
@@ -4690,16 +4802,11 @@ export class App implements OnInit, OnDestroy {
     if (this.editorLiveApplyInFlight) {
       return;
     }
-    if (this.editorLiveApplyHandle !== null) {
-      clearTimeout(this.editorLiveApplyHandle);
-      this.editorLiveApplyHandle = null;
-    }
-    this.stopEditorLiveApplyCountdown();
     void this.flushEditorLiveApplyQueue();
   }
 
   private async flushEditorLiveApplyQueue(): Promise<void> {
-    if (!this.editorModalOpen() || !this.editorLiveApplyEnabled() || !this.editorLiveApplyAvailable()) {
+    if (!this.editorModalOpen() || !this.editorLiveApplyAvailable()) {
       return;
     }
     if (this.editorLiveApplyInFlight) {
@@ -4715,7 +4822,7 @@ export class App implements OnInit, OnDestroy {
   private async applyEditorPatchLive(expectedFingerprint: string): Promise<void> {
     const draft = this.editorPatchDraft();
     const slotNumber = this.editorSlotNumber();
-    if (!this.editorLiveApplyEnabled() || !this.editorLiveApplyAvailable() || draft === null || this.editorLiveApplyInFlight) {
+    if (!this.editorLiveApplyAvailable() || draft === null || this.editorLiveApplyInFlight) {
       return;
     }
     const currentFingerprint = this.patchFingerprint(draft);
@@ -4728,8 +4835,6 @@ export class App implements OnInit, OnDestroy {
     }
     const draftSnapshot = this.clonePatch(draft);
     this.editorLiveApplyInFlight = true;
-    this.editorLiveApplyLastStartedAtMs = Date.now();
-    this.stopEditorLiveApplyCountdown();
     this.editorLiveApplyPending.set(true);
     this.editorLiveApplyReadbackAt.set('');
     try {
@@ -4781,19 +4886,7 @@ export class App implements OnInit, OnDestroy {
       this.editorLiveApplyInFlight = false;
       this.editorLiveApplyPending.set(false);
       if (this.editorLiveApplyQueuedFingerprint && this.editorLiveApplyQueuedFingerprint !== this.editorLiveApplyLastAppliedFingerprint) {
-        const sinceLastStartMs = Date.now() - this.editorLiveApplyLastStartedAtMs;
-        const gapWaitMs = Math.max(0, EDITOR_LIVE_APPLY_MIN_GAP_MS - sinceLastStartMs);
-        if (gapWaitMs > 0) {
-          if (this.editorLiveApplyHandle !== null) {
-            clearTimeout(this.editorLiveApplyHandle);
-          }
-          this.editorLiveApplyHandle = setTimeout(() => {
-            this.editorLiveApplyHandle = null;
-            void this.flushEditorLiveApplyQueue();
-          }, gapWaitMs);
-        } else {
-          void this.flushEditorLiveApplyQueue();
-        }
+        void this.flushEditorLiveApplyQueue();
       }
     }
   }
@@ -4804,14 +4897,6 @@ export class App implements OnInit, OnDestroy {
       return '';
     }
     return this.patchFingerprint(draft);
-  }
-
-  editorLiveApplyGraceLabel(): string {
-    const remaining = this.editorLiveApplyCountdownSec();
-    if (remaining === null) {
-      return '';
-    }
-    return `${remaining.toFixed(1)}s`;
   }
 
   editorLiveApplyHasApplied(): boolean {
@@ -5068,31 +5153,12 @@ export class App implements OnInit, OnDestroy {
     return canonical;
   }
 
-  private startEditorLiveApplyCountdown(waitMs: number): void {
-    this.stopEditorLiveApplyCountdown();
-    this.editorLiveApplyDueAtMs = Date.now() + waitMs;
-    this.updateEditorLiveApplyCountdown();
-    this.editorLiveApplyCountdownHandle = setInterval(() => {
-      this.updateEditorLiveApplyCountdown();
-    }, 100);
+  private toneSetSlotAssignmentKey(setId: number, slot: number): string {
+    return `${setId}:${slot}`;
   }
 
-  private updateEditorLiveApplyCountdown(): void {
-    if (this.editorLiveApplyDueAtMs === null) {
-      this.editorLiveApplyCountdownSec.set(null);
-      return;
-    }
-    const remainingMs = Math.max(0, this.editorLiveApplyDueAtMs - Date.now());
-    this.editorLiveApplyCountdownSec.set(remainingMs / 1000);
-  }
-
-  private stopEditorLiveApplyCountdown(): void {
-    if (this.editorLiveApplyCountdownHandle !== null) {
-      clearInterval(this.editorLiveApplyCountdownHandle);
-      this.editorLiveApplyCountdownHandle = null;
-    }
-    this.editorLiveApplyDueAtMs = null;
-    this.editorLiveApplyCountdownSec.set(null);
+  setLabelForSlot(slot: number): string {
+    return slot <= 4 ? `A:${slot}` : `B:${slot - 4}`;
   }
 
   private stableStringify(value: unknown): string {

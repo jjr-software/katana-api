@@ -256,16 +256,24 @@
                 <button type="button" class="btn btn-sm btn-outline-secondary" (click)="loadTonePatchObjects()">Refresh</button>
               </div>
               <div class="row g-2">
-                <div class="col-12 col-md-7">
+                <div class="col-12 col-lg-5">
                   <input type="text" class="form-control form-control-sm" placeholder="Search name or description" [value]="tonePatchQuery()" (input)="setTonePatchQuery($any($event.target).value)" />
                 </div>
-                <div class="col-12 col-md-5">
+                <div class="col-12 col-md-6 col-lg-3">
                   <select class="form-select form-select-sm" [value]="tonePatchSourceFilter()" (change)="setTonePatchSourceFilter($any($event.target).value)">
                     <option value="">All sources</option>
                     <option value="manual">manual</option>
                     <option value="ai">ai</option>
                     <option value="captured">captured</option>
                     <option value="imported">imported</option>
+                  </select>
+                </div>
+                <div class="col-12 col-md-6 col-lg-4">
+                  <select class="form-select form-select-sm" [value]="tonePatchGroupFilter()" (change)="setTonePatchGroupFilter($any($event.target).value)">
+                    <option value="">All groups</option>
+                    @for (group of toneGroups(); track group.id) {
+                      <option [value]="group.id">{{ group.name }}</option>
+                    }
                   </select>
                 </div>
               </div>
@@ -323,6 +331,40 @@
                 </div>
                 <button type="button" class="btn btn-sm btn-outline-secondary" (click)="loadToneSets()">Refresh</button>
               </div>
+              <article class="border rounded p-2 bg-body-tertiary d-grid gap-2">
+                <div>
+                  <p class="mb-1"><strong>Manual Set Builder</strong></p>
+                  <p class="mb-0 text-secondary">Create a set directly from saved patch objects, then edit individual slots below.</p>
+                </div>
+                <div class="row g-2">
+                  <div class="col-12 col-lg-6">
+                    <label class="form-label small mb-1" for="toneManualSetName">Set Name</label>
+                    <input id="toneManualSetName" type="text" class="form-control form-control-sm" [value]="toneManualSetName()" (input)="setToneManualSetName($any($event.target).value)" />
+                  </div>
+                  <div class="col-12 col-lg-6">
+                    <label class="form-label small mb-1" for="toneManualSetDescription">Description</label>
+                    <input id="toneManualSetDescription" type="text" class="form-control form-control-sm" [value]="toneManualSetDescription()" (input)="setToneManualSetDescription($any($event.target).value)" />
+                  </div>
+                </div>
+                <div class="row g-2">
+                  @for (slot of [1, 2, 3, 4, 5, 6, 7, 8]; track slot) {
+                    <div class="col-12 col-md-6 col-xl-3">
+                      <label class="form-label small mb-1">{{ setLabelForSlot(slot) }}</label>
+                      <select class="form-select form-select-sm" [value]="toneManualSetSlotValue(slot)" (change)="setToneManualSetSlot(slot, $any($event.target).value)">
+                        <option value="">Empty</option>
+                        @for (patchObject of tonePatchObjects(); track patchObject.id) {
+                          <option [value]="patchObject.id">{{ patchObject.name }}</option>
+                        }
+                      </select>
+                    </div>
+                  }
+                </div>
+                <div class="d-flex justify-content-end">
+                  <button type="button" class="btn btn-sm btn-primary" (click)="createManualToneSet()" [disabled]="tonePatchObjects().length === 0 || isActionBusy('tone-create-set')">
+                    {{ isActionBusy('tone-create-set') ? 'Creating...' : 'Create Manual Set' }}
+                  </button>
+                </div>
+              </article>
               <div class="tone-list">
                 @for (toneSet of toneSets(); track toneSet.id) {
                   <article class="border rounded p-2 small bg-body-tertiary d-grid gap-2">
@@ -348,6 +390,16 @@
                         <div class="border rounded px-2 py-1 bg-white">
                           <p class="mb-1"><strong>{{ item.slot }}.</strong> {{ item.patch_object_name }}</p>
                           <p class="mb-0 text-secondary">{{ item.blocks.join(', ') }}</p>
+                          <div class="d-flex gap-2 align-items-center mt-2">
+                            <select class="form-select form-select-sm tone-inline-select" [value]="toneSetSlotAssignmentValue(toneSet, item.slot, item.patch_object_id)" (change)="setToneSetSlotAssignment(toneSet.id, item.slot, $any($event.target).value)">
+                              @for (patchObject of tonePatchObjects(); track patchObject.id) {
+                                <option [value]="patchObject.id">{{ patchObject.name }}</option>
+                              }
+                            </select>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="updateToneSetSlot(toneSet, item.slot)" [disabled]="tonePatchObjects().length === 0 || isActionBusy('tone-update-set-slot:' + toneSet.id + ':' + item.slot)">
+                              {{ isActionBusy('tone-update-set-slot:' + toneSet.id + ':' + item.slot) ? 'Updating...' : 'Update' }}
+                            </button>
+                          </div>
                         </div>
                       }
                     </div>
@@ -825,12 +877,10 @@
               </div>
             </article>
             <article class="border rounded p-2">
-              <div class="form-check form-switch mb-2">
-                <input class="form-check-input" type="checkbox" [checked]="editorLiveApplyEnabled()" [disabled]="!editorLiveApplyAvailable()" (change)="setEditorLiveApplyEnabled($any($event.target).checked)" id="liveApplySwitch" />
-                <label class="form-check-label small" for="liveApplySwitch">Live Apply To Amp While Editing</label>
-              </div>
               @if (!editorLiveApplyAvailable()) {
                 <p class="small mb-1 text-secondary">Local-only edit: this patch is not currently active on the amp.</p>
+              } @else {
+                <p class="small mb-1 text-secondary">Live edit: manual changes apply to the amp immediately.</p>
               }
               <p class="small mb-0 text-secondary">
                 State:
@@ -840,10 +890,10 @@
                   <code class="text-danger">error</code>
                 } @else if (editorLiveApplyHasApplied()) {
                   <code class="text-info">applied</code>
-                } @else if (editorLiveApplyEnabled()) {
+                } @else if (editorLiveApplyAvailable()) {
                   <code class="text-success">ready</code>
                 } @else {
-                  <code>disabled</code>
+                  <code>local only</code>
                 }
               </p>
               @if (editorLiveApplyHasApplied()) {
