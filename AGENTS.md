@@ -1771,3 +1771,16 @@
   - no grace period,
   - no delayed apply window,
   - no debounce that interrupts audible feedback during tone design.
+
+## Session Update - 2026-03-29 (Concrete Implementation Plan Added)
+- Added:
+  - `docs/implementation-plan.md`
+- Purpose:
+  - turns the forward design into concrete first-cut implementation choices for schema, matching, API, UI, and phased delivery.
+- Key implementation choices captured:
+  - first-cut core table is `patch_objects` with sparse block JSON,
+  - `Live Patch` and `amp_slot_snapshots` are explicit last-known-state runtime tables,
+  - exact and partial matching rules are defined separately,
+  - `save from live` requires explicit block selection,
+  - manual UI edits are immediate write-through to `Live Patch`,
+  - phase 1 avoids heavier recipe/composition schema until the core loop is working.
