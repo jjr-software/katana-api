@@ -134,146 +134,434 @@
 
       <p class="small mb-3">{{ status() }}</p>
 
-      <section class="row g-3 mb-4">
-        <div class="col-12 col-lg-4">
-          <article class="card h-100">
-            <div class="card-body d-grid gap-2">
+      <section class="mb-4">
+        <article class="card">
+          <div class="card-body d-grid gap-3">
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
               <div>
-                <h2 class="h6 mb-1">Live Patch Capture</h2>
-                <p class="small text-secondary mb-0">Save a sparse object from the current Live Patch. Present blocks are owned; absent blocks are wildcards.</p>
+                <h2 class="h5 mb-1">Live Patch</h2>
+                <p class="small text-secondary mb-0">
+                  This is the main sound-design surface. Local patch objects matter more than what is stored in amp slots; slot state is secondary persistence and auditioning information.
+                </p>
               </div>
-              <div>
-                <label class="form-label small mb-1" for="toneSaveName">Name</label>
-                <input id="toneSaveName" type="text" class="form-control" [value]="toneSaveName()" (input)="setToneSaveName($any($event.target).value)" />
-              </div>
-              <div>
-                <label class="form-label small mb-1" for="toneSaveDescription">Description</label>
-                <textarea id="toneSaveDescription" class="form-control" rows="3" [value]="toneSaveDescription()" (input)="setToneSaveDescription($any($event.target).value)"></textarea>
-              </div>
-              <div>
-                <label class="form-label small mb-1" for="toneSaveGroup">Assign Group</label>
-                <select id="toneSaveGroup" class="form-select" [value]="toneSaveGroupId()" (change)="setToneSaveGroupId($any($event.target).value)">
-                  <option value="">No group</option>
-                  @for (group of toneGroups(); track group.id) {
-                    <option [value]="group.id">{{ group.name }}</option>
-                  }
-                </select>
-              </div>
-              <div>
-                <p class="form-label small mb-1">Blocks</p>
-                <div class="tone-block-grid">
-                  @for (block of toneBlockOptions(); track block) {
-                    <label class="form-check small mb-0">
-                      <input class="form-check-input" type="checkbox" [checked]="isToneBlockSelected(block)" (change)="setToneBlockSelected(block, $any($event.target).checked)" />
-                      <span class="form-check-label">{{ block }}</span>
-                    </label>
-                  }
-                </div>
-              </div>
-              <div class="row g-2">
-                <div class="col-12 col-md-5">
-                  <label class="form-label small mb-1" for="toneStoreSlot">Store To Slot</label>
-                  <select id="toneStoreSlot" class="form-select" [value]="toneStoreSlot()" (change)="setToneStoreSlot($any($event.target).value)">
-                    <option value="1">A:1</option>
-                    <option value="2">A:2</option>
-                    <option value="3">A:3</option>
-                    <option value="4">A:4</option>
-                    <option value="5">B:1</option>
-                    <option value="6">B:2</option>
-                    <option value="7">B:3</option>
-                    <option value="8">B:4</option>
-                  </select>
-                </div>
-              </div>
-              <div class="d-flex justify-content-end flex-wrap gap-2">
-                <button type="button" class="btn btn-sm btn-outline-primary" (click)="storeLivePatchToSelectedSlot()" [disabled]="isActionBusy('tone-store-live-slot')">
-                  {{ isActionBusy('tone-store-live-slot') ? 'Storing...' : 'Store To Slot' }}
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-success me-2" (click)="saveFullLiveAsTonePatchObject()" [disabled]="isActionBusy('tone-save-live')">
-                  Save Full Live
-                </button>
-                <button type="button" class="btn btn-sm btn-success" (click)="saveLiveAsTonePatchObject()" [disabled]="isActionBusy('tone-save-live')">
-                  {{ isActionBusy('tone-save-live') ? 'Saving...' : 'Save From Live Patch' }}
-                </button>
+              <div class="d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-sm btn-outline-primary" (click)="openLiveEditor()">Reset From Live</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openToneBaseModal()">Load Base Patch</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="useCurrentLivePatchAsBase()">Use Current Live As Base</button>
+                <button type="button" class="btn btn-sm btn-outline-success" (click)="openToneSaveModal()">Save Patch Object</button>
+                <button type="button" class="btn btn-sm btn-outline-primary" (click)="openToneDesignerModal()">AI Designer</button>
               </div>
             </div>
-          </article>
-        </div>
 
-        <div class="col-12 col-lg-5">
-          <article class="card h-100">
-            <div class="card-body d-grid gap-2">
-              <div>
-                <h2 class="h6 mb-1">AI Designer</h2>
-                <p class="small text-secondary mb-0">Generate a named set of sparse candidates against the current Live Patch as the base context.</p>
+            <div class="row g-3">
+              <div class="col-12 col-lg-4">
+                <article class="border rounded p-3 bg-body-tertiary h-100">
+                  <p class="small text-uppercase text-secondary mb-1">Active Slot</p>
+                  <p class="mb-1"><strong>{{ selectedAmpSlotLabel() }}</strong></p>
+                  <p class="small text-secondary mb-0">Useful context only. The live sound can differ from everything stored in the amp and in the database.</p>
+                </article>
               </div>
-              <div class="row g-2">
-                <div class="col-12 col-md-8">
-                  <label class="form-label small mb-1" for="toneAiSetName">Set Name</label>
-                  <input id="toneAiSetName" type="text" class="form-control" [value]="toneAiSetName()" (input)="setToneAiSetName($any($event.target).value)" />
-                </div>
-                <div class="col-12 col-md-4">
-                  <label class="form-label small mb-1" for="toneAiCount">Count</label>
-                  <input id="toneAiCount" type="number" min="1" max="8" class="form-control" [value]="toneAiCount()" (input)="setToneAiCount($any($event.target).value)" />
-                </div>
-              </div>
-              <div>
-                <label class="form-label small mb-1" for="toneAiDescription">Description</label>
-                <input id="toneAiDescription" type="text" class="form-control" [value]="toneAiDescription()" (input)="setToneAiDescription($any($event.target).value)" />
-              </div>
-              <div>
-                <label class="form-label small mb-1" for="toneAiNamePrefix">Object Name Prefix</label>
-                <input id="toneAiNamePrefix" type="text" class="form-control" [value]="toneAiNamePrefix()" (input)="setToneAiNamePrefix($any($event.target).value)" />
-              </div>
-              <div>
-                <label class="form-label small mb-1" for="toneAiPrompt">Prompt</label>
-                <textarea id="toneAiPrompt" class="form-control" rows="5" [value]="toneAiPrompt()" (input)="setToneAiPrompt($any($event.target).value)"></textarea>
-              </div>
-              <div class="d-flex justify-content-end flex-wrap gap-2">
-                <button type="button" class="btn btn-sm btn-outline-primary" (click)="generateToneAiPatchObjects()" [disabled]="isActionBusy('tone-ai-generate-objects')">
-                  {{ isActionBusy('tone-ai-generate-objects') ? 'Generating...' : 'Generate Objects' }}
-                </button>
-                <button type="button" class="btn btn-sm btn-primary" (click)="generateToneAiSet()" [disabled]="isActionBusy('tone-ai-generate')">
-                  {{ isActionBusy('tone-ai-generate') ? 'Generating...' : 'Generate AI Set' }}
-                </button>
-              </div>
-            </div>
-          </article>
-        </div>
-
-        <div class="col-12 col-lg-3">
-          <article class="card h-100">
-            <div class="card-body d-grid gap-2">
-              <div>
-                <h2 class="h6 mb-1">Groups</h2>
-                <p class="small text-secondary mb-0">Create named groups for keepers and later curation.</p>
-              </div>
-              <div>
-                <label class="form-label small mb-1" for="toneGroupName">Name</label>
-                <input id="toneGroupName" type="text" class="form-control" [value]="toneGroupName()" (input)="setToneGroupName($any($event.target).value)" />
-              </div>
-              <div>
-                <label class="form-label small mb-1" for="toneGroupDescription">Description</label>
-                <textarea id="toneGroupDescription" class="form-control" rows="3" [value]="toneGroupDescription()" (input)="setToneGroupDescription($any($event.target).value)"></textarea>
-              </div>
-              <div class="d-flex justify-content-end">
-                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="createToneGroup()" [disabled]="isActionBusy('tone-create-group')">
-                  {{ isActionBusy('tone-create-group') ? 'Creating...' : 'Create Group' }}
-                </button>
-              </div>
-              <div class="tone-groups-list">
-                @for (group of toneGroups(); track group.id) {
-                  <div class="small border rounded px-2 py-1 bg-body-tertiary">
-                    <strong>{{ group.name }}</strong>
+              <div class="col-12 col-lg-4">
+                <article class="border rounded p-3 bg-body-tertiary h-100">
+                  <p class="small text-uppercase text-secondary mb-1">Base Patch</p>
+                  <p class="mb-1"><strong>{{ livePatchBaseName() }}</strong></p>
+                  <p class="small text-secondary mb-0">Edits are compared against this full patch. Changed blocks are auto-selected for sparse save scope.</p>
+                  <div class="d-flex gap-2 flex-wrap mt-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openToneBaseModal()">Change Base</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="clearToneBasePatch()" [disabled]="livePatchBaseName() === 'None'">Clear Base</button>
                   </div>
-                }
-                @if (toneGroups().length === 0) {
-                  <p class="small text-secondary mb-0">No groups yet.</p>
-                }
+                </article>
+              </div>
+              <div class="col-12 col-lg-4">
+                <article class="border rounded p-3 bg-body-tertiary h-100">
+                  <p class="small text-uppercase text-secondary mb-1">Save Scope</p>
+                  <p class="small mb-2">{{ livePatchSelectedBlocksSummary() }}</p>
+                  <div class="tone-block-grid">
+                    @for (block of toneBlockOptions(); track block) {
+                      <label class="form-check small mb-0">
+                        <input class="form-check-input" type="checkbox" [checked]="isToneBlockSelected(block)" (change)="setToneBlockSelected(block, $any($event.target).checked)" />
+                        <span class="form-check-label">{{ block }}</span>
+                      </label>
+                    }
+                  </div>
+                </article>
               </div>
             </div>
-          </article>
-        </div>
+
+            @if (editorModalOpen()) {
+              @if (editorPatchDraft(); as draft) {
+                <div class="d-grid gap-3">
+                  <article class="border rounded p-2">
+                    <p class="small mb-1 text-secondary">
+                      Live Edit State:
+                      @if (editorLiveApplyPending()) {
+                        <code class="text-warning">applying...</code>
+                      } @else if (editorLiveApplyError()) {
+                        <code class="text-danger">error</code>
+                      } @else if (editorLiveApplyHasApplied()) {
+                        <code class="text-info">applied</code>
+                      } @else if (editorLiveApplyAvailable()) {
+                        <code class="text-success">ready</code>
+                      } @else {
+                        <code>local only</code>
+                      }
+                    </p>
+                    <p class="small mb-0 text-secondary">
+                      Modified:
+                      @if (editorIsModified()) {
+                        <code class="text-warning">yes</code>
+                      } @else {
+                        <code class="text-success">no</code>
+                      }
+                      · Hash: <code>{{ editorHashLabel() }}</code>
+                    </p>
+                    @if (editorLiveApplyError()) {
+                      <p class="small mb-0 text-danger mt-1">{{ editorLiveApplyError() }}</p>
+                    }
+                  </article>
+
+                  <article class="border rounded p-2">
+                    <h4 class="h6 mb-2">Patch</h4>
+                    <label class="form-label small mb-1">Name</label>
+                    <input
+                      type="text"
+                      class="form-control form-control-sm"
+                      [value]="editorPatchName()"
+                      (input)="setEditorPatchName($any($event.target).value)"
+                    />
+                  </article>
+
+                  <article class="border rounded p-2">
+                    <h4 class="h6 mb-2">Routing</h4>
+                    <div class="row g-2">
+                      <div class="col-12 col-md-4">
+                        <label class="form-label small mb-1">Chain Pattern</label>
+                        <div class="editor-range-field">
+                          <input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorRoutingNumber('chain_pattern') ?? 0" (input)="setEditorRoutingNumber('chain_pattern', $any($event.target).value)" />
+                          <input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorRoutingNumber('chain_pattern') ?? 0" (input)="setEditorRoutingNumber('chain_pattern', $any($event.target).value)" />
+                        </div>
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <label class="form-label small mb-1">Cab Resonance</label>
+                        <div class="editor-range-field">
+                          <input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorRoutingNumber('cabinet_resonance') ?? 0" (input)="setEditorRoutingNumber('cabinet_resonance', $any($event.target).value)" />
+                          <input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorRoutingNumber('cabinet_resonance') ?? 0" (input)="setEditorRoutingNumber('cabinet_resonance', $any($event.target).value)" />
+                        </div>
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <label class="form-label small mb-1">Master Key</label>
+                        <div class="editor-range-field">
+                          <input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorRoutingNumber('master_key') ?? 0" (input)="setEditorRoutingNumber('master_key', $any($event.target).value)" />
+                          <input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorRoutingNumber('master_key') ?? 0" (input)="setEditorRoutingNumber('master_key', $any($event.target).value)" />
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+
+                  <article class="border rounded p-2">
+                    <h4 class="h6 mb-2">Colors</h4>
+                    <div class="row g-2">
+                      @for (stageName of ['booster', 'mod', 'fx', 'delay', 'reverb']; track stageName) {
+                        <div class="col-6 col-md-4">
+                          <label class="form-label small mb-1 text-capitalize">{{ stageName }}</label>
+                          <select class="form-select form-select-sm" (change)="setEditorColorIndex($any(stageName), $any($event.target).value)">
+                            @for (opt of editorColorOptions(); track opt.value) {
+                              <option [value]="opt.value" [selected]="editorColorIndex($any(stageName)) === opt.value">{{ opt.label }}</option>
+                            }
+                          </select>
+                        </div>
+                      }
+                    </div>
+                  </article>
+
+                  <article class="border rounded p-2">
+                    <h4 class="h6 mb-2">Amp</h4>
+                    <div class="row g-2">
+                      <div class="col-6 col-md-4">
+                        <label class="form-label small mb-1">Type</label>
+                        <select class="form-select form-select-sm" (change)="setEditorAmpNumber('amp_type', $any($event.target).value)">
+                          @for (opt of editorAmpTypeOptions(); track opt.value) {
+                            <option [value]="opt.value" [selected]="editorAmpRawValue(7) === opt.value">{{ opt.label }}</option>
+                          }
+                        </select>
+                      </div>
+                      <div class="col-6 col-md-4">
+                        <label class="form-label small mb-1">Variation</label>
+                        <select class="form-select form-select-sm" (change)="setEditorAmpNumber('preamp_variation', $any($event.target).value)">
+                          <option [value]="0" [selected]="editorAmpRawValue(9) === 0">Off</option>
+                          <option [value]="1" [selected]="editorAmpRawValue(9) === 1">On</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="row g-2 mt-1">
+                      <div class="col-12 col-md-6"><label class="form-label small mb-1">Gain</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorAmpNumber('gain') ?? 0" (input)="setEditorAmpNumber('gain', $any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorAmpNumber('gain') ?? 0" (input)="setEditorAmpNumber('gain', $any($event.target).value)" /></div></div>
+                      <div class="col-12 col-md-6"><label class="form-label small mb-1">Volume</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorAmpNumber('volume') ?? 0" (input)="setEditorAmpNumber('volume', $any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorAmpNumber('volume') ?? 0" (input)="setEditorAmpNumber('volume', $any($event.target).value)" /></div></div>
+                      <div class="col-12 col-md-6"><label class="form-label small mb-1">Bass</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorAmpNumber('bass') ?? 0" (input)="setEditorAmpNumber('bass', $any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorAmpNumber('bass') ?? 0" (input)="setEditorAmpNumber('bass', $any($event.target).value)" /></div></div>
+                      <div class="col-12 col-md-6"><label class="form-label small mb-1">Middle</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorAmpNumber('middle') ?? 0" (input)="setEditorAmpNumber('middle', $any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorAmpNumber('middle') ?? 0" (input)="setEditorAmpNumber('middle', $any($event.target).value)" /></div></div>
+                      <div class="col-12 col-md-6"><label class="form-label small mb-1">Treble</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorAmpNumber('treble') ?? 0" (input)="setEditorAmpNumber('treble', $any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorAmpNumber('treble') ?? 0" (input)="setEditorAmpNumber('treble', $any($event.target).value)" /></div></div>
+                      <div class="col-12 col-md-6"><label class="form-label small mb-1">Presence</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorAmpNumber('presence') ?? 0" (input)="setEditorAmpNumber('presence', $any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorAmpNumber('presence') ?? 0" (input)="setEditorAmpNumber('presence', $any($event.target).value)" /></div></div>
+                    </div>
+                  </article>
+
+                  <article class="border rounded p-2">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <h4 class="h6 mb-0">Delay Extras</h4>
+                      <label class="form-check-label small d-flex align-items-center gap-1">
+                        <input class="form-check-input m-0" type="checkbox" [checked]="editorDelay2On()" (change)="setEditorDelay2On($any($event.target).checked)" />
+                        <span>Delay2 Enabled</span>
+                      </label>
+                    </div>
+                  </article>
+
+                  @for (stageName of ['booster', 'mod', 'fx', 'delay', 'reverb']; track stageName) {
+                    <article class="border rounded p-2">
+                      <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h4 class="h6 mb-0 text-capitalize" [class.text-success]="editorStageOn($any(stageName))" [class.text-danger]="!editorStageOn($any(stageName))">{{ stageName }}</h4>
+                        <label class="form-check-label small d-flex align-items-center gap-1">
+                          <input class="form-check-input m-0" type="checkbox" [checked]="editorStageOn($any(stageName))" (change)="setEditorStageOn($any(stageName), $any($event.target).checked)" />
+                          <span>Enabled</span>
+                        </label>
+                      </div>
+                      <div class="row g-2">
+                        <div class="col-12 col-md-6">
+                          <label class="form-label small mb-1">Type</label>
+                          <select class="form-select form-select-sm" (change)="setEditorStageType($any(stageName), $any($event.target).value)">
+                            @for (opt of stageTypeOptions($any(stageName)); track opt.value) {
+                              <option [value]="opt.value" [selected]="editorStageType($any(stageName)) === opt.value">{{ opt.label }}</option>
+                            }
+                          </select>
+                        </div>
+                      </div>
+                      @if (editorStageSchemaWarning($any(stageName)); as warning) {
+                        <div class="small text-danger mt-2">{{ warning }}</div>
+                      }
+                      <div class="row g-2 mt-1">
+                        @for (param of editorStageParams($any(stageName)); track param.id) {
+                          <div class="col-12 col-md-6">
+                            @if (stageParamIsToggle(param)) {
+                              <label class="form-label small mb-1">{{ param.label }}</label>
+                              <div class="form-check form-switch editor-toggle-field">
+                                <input
+                                  class="form-check-input"
+                                  type="checkbox"
+                                  [checked]="param.value === param.max"
+                                  (change)="setEditorStageParam($any(stageName), param.key, $any($event.target).checked ? param.max : param.min)"
+                                />
+                                <span class="small text-secondary">{{ stageParamToggleLabel(param) }}</span>
+                              </div>
+                            } @else {
+                              <label class="form-label small mb-1">{{ param.label }} <span class="text-secondary">[{{ param.min }}..{{ param.max }}]</span></label>
+                              <div class="editor-range-field">
+                                <input
+                                  type="range"
+                                  [min]="param.min"
+                                  [max]="param.max"
+                                  class="form-range editor-range-slider"
+                                  [value]="param.value"
+                                  (input)="setEditorStageParam($any(stageName), param.key, $any($event.target).value)"
+                                />
+                                <input
+                                  type="number"
+                                  [min]="param.min"
+                                  [max]="param.max"
+                                  class="form-control form-control-sm editor-range-value"
+                                  [value]="param.value"
+                                  (input)="setEditorStageParam($any(stageName), param.key, $any($event.target).value)"
+                                />
+                              </div>
+                            }
+                          </div>
+                        }
+                      </div>
+                    </article>
+                  }
+
+                  @for (eqName of ['eq1', 'eq2']; track eqName) {
+                    <article class="border rounded p-2">
+                      <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h4 class="h6 mb-0 text-uppercase" [class.text-success]="editorEqOn($any(eqName))" [class.text-danger]="!editorEqOn($any(eqName))">{{ eqName }}</h4>
+                        <label class="form-check-label small d-flex align-items-center gap-1">
+                          <input class="form-check-input m-0" type="checkbox" [checked]="editorEqOn($any(eqName))" (change)="setEditorEqOn($any(eqName), $any($event.target).checked)" />
+                          <span>Enabled</span>
+                        </label>
+                      </div>
+                      <div class="row g-2">
+                        <div class="col-6 col-md-4">
+                          <label class="form-label small mb-1">Type</label>
+                          <select class="form-select form-select-sm" (change)="setEditorEqNumber($any(eqName), 'type', $any($event.target).value)">
+                            @for (opt of editorEqTypeOptions(); track opt.value) {
+                              <option [value]="opt.value" [selected]="editorEqNumber($any(eqName), 'type') === opt.value">{{ opt.label }}</option>
+                            }
+                          </select>
+                        </div>
+                        <div class="col-6 col-md-4">
+                          <label class="form-label small mb-1">Position</label>
+                          <select class="form-select form-select-sm" (change)="setEditorEqNumber($any(eqName), 'position', $any($event.target).value)">
+                            @for (opt of editorEqPositionOptions(); track opt.value) {
+                              <option [value]="opt.value" [selected]="editorEqNumber($any(eqName), 'position') === opt.value">{{ opt.label }}</option>
+                            }
+                          </select>
+                        </div>
+                      </div>
+                      @if (editorEqIsParametric($any(eqName))) {
+                        <div class="mt-2">
+                          <p class="small text-secondary mb-2">Parametric EQ Shape</p>
+                          <div class="peq-graph">
+                            <div class="peq-graph-cut peq-graph-cut-low" [style.width.px]="editorEqPeqLowCutWidth($any(eqName))"></div>
+                            <div class="peq-graph-cut peq-graph-cut-high" [style.width.px]="editorEqPeqHighCutWidth($any(eqName))"></div>
+                            <svg class="peq-graph-svg" viewBox="0 0 512 96" preserveAspectRatio="none" aria-label="Parametric EQ shape">
+                              <line x1="0" y1="44" x2="512" y2="44" class="peq-graph-zero" />
+                              <line x1="0" y1="16" x2="512" y2="16" class="peq-graph-guide" />
+                              <line x1="0" y1="72" x2="512" y2="72" class="peq-graph-guide" />
+                              @if (editorEqPeqFftBars().length > 0) {
+                                @for (bar of editorEqPeqFftBars(); track $index) {
+                                  <rect [attr.x]="bar.x" [attr.y]="bar.y" [attr.width]="bar.width" [attr.height]="bar.height" class="peq-graph-fft-bar" />
+                                }
+                              }
+                              <path [attr.d]="editorEqPeqGraphPath($any(eqName))" class="peq-graph-line" />
+                              @for (node of editorEqPeqGraphNodes($any(eqName)); track node.id) {
+                                <circle [attr.cx]="node.x" [attr.cy]="node.y" r="4.5" class="peq-graph-node" />
+                                <text [attr.x]="node.x" [attr.y]="node.y - 10" text-anchor="middle" class="peq-graph-node-label">{{ node.label }}</text>
+                                <text [attr.x]="node.x" [attr.y]="node.y + 17" text-anchor="middle" class="peq-graph-node-value">{{ editorEqPeqGainLabel(node.gain) }}</text>
+                              }
+                            </svg>
+                          </div>
+                        </div>
+                        <div class="row g-2 mt-1">
+                          @for (param of editorEqPeqParams($any(eqName)); track param.id) {
+                            <div class="col-12 col-md-6">
+                              <label class="form-label small mb-1">
+                                {{ param.label }}
+                                @if (param.valueLabel) {
+                                  <span class="text-secondary">{{ param.valueLabel }}</span>
+                                } @else {
+                                  <span class="text-secondary">[{{ param.min }}..{{ param.max }}]</span>
+                                }
+                              </label>
+                              @if (param.options) {
+                                <select class="form-select form-select-sm" (change)="setEditorEqPeqValue($any(eqName), param.key, $any($event.target).value)">
+                                  @for (opt of param.options; track opt.value) {
+                                    <option [value]="opt.value" [selected]="param.value === opt.value">{{ opt.label }}</option>
+                                  }
+                                </select>
+                              } @else {
+                                <div class="editor-range-field">
+                                  <input
+                                    type="range"
+                                    [min]="param.min"
+                                    [max]="param.max"
+                                    class="form-range editor-range-slider"
+                                    [value]="param.value"
+                                    (input)="setEditorEqPeqValue($any(eqName), param.key, $any($event.target).value)"
+                                  />
+                                  <input
+                                    type="number"
+                                    [min]="param.min"
+                                    [max]="param.max"
+                                    class="form-control form-control-sm editor-range-value"
+                                    [value]="param.value"
+                                    (input)="setEditorEqPeqValue($any(eqName), param.key, $any($event.target).value)"
+                                  />
+                                </div>
+                              }
+                            </div>
+                          }
+                        </div>
+                      }
+                      @if (editorEqIsGe10($any(eqName))) {
+                        <div class="mt-2">
+                          <p class="small text-secondary mb-2">GE-10 Spectrum</p>
+                          <div class="eq-spectrum">
+                            @for (band of editorEqGe10Bands($any(eqName)); track band.id) {
+                              <div class="eq-spectrum-band">
+                                <div class="eq-spectrum-meter">
+                                  <div class="eq-spectrum-zero"></div>
+                                  <div class="eq-spectrum-fill" [style.height.%]="band.percent"></div>
+                                </div>
+                                <div class="eq-spectrum-value">{{ band.offsetValue >= 0 ? '+' : '' }}{{ band.offsetValue }}</div>
+                                <input
+                                  type="range"
+                                  min="-24"
+                                  max="24"
+                                  class="form-range editor-range-slider"
+                                  [value]="band.offsetValue"
+                                  (input)="setEditorEqGe10BandValue($any(eqName), $index, $any($event.target).value)"
+                                />
+                                <div class="eq-spectrum-label">{{ band.label }}</div>
+                              </div>
+                            }
+                          </div>
+                        </div>
+                      }
+                    </article>
+                  }
+
+                  <article class="border rounded p-2">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <h4 class="h6 mb-0">NS</h4>
+                      <label class="form-check-label small d-flex align-items-center gap-1">
+                        <input class="form-check-input m-0" type="checkbox" [checked]="editorNsOn()" (change)="setEditorNsOn($any($event.target).checked)" />
+                        <span>Enabled</span>
+                      </label>
+                    </div>
+                    <div class="row g-2">
+                      <div class="col-12 col-md-6"><label class="form-label small mb-1">Threshold</label><div class="editor-range-field"><input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorNsNumber('threshold') ?? 0" (input)="setEditorNsNumber('threshold', $any($event.target).value)" /><input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorNsNumber('threshold') ?? 0" (input)="setEditorNsNumber('threshold', $any($event.target).value)" /></div></div>
+                      <div class="col-12 col-md-6"><label class="form-label small mb-1">Release</label><div class="editor-range-field"><input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorNsNumber('release') ?? 0" (input)="setEditorNsNumber('release', $any($event.target).value)" /><input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorNsNumber('release') ?? 0" (input)="setEditorNsNumber('release', $any($event.target).value)" /></div></div>
+                    </div>
+                  </article>
+
+                  <article class="border rounded p-2">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <h4 class="h6 mb-0">Send / Return</h4>
+                      <label class="form-check-label small d-flex align-items-center gap-1">
+                        <input class="form-check-input m-0" type="checkbox" [checked]="editorSendReturnOn()" (change)="setEditorSendReturnOn($any($event.target).checked)" />
+                        <span>Enabled</span>
+                      </label>
+                    </div>
+                    <div class="row g-2">
+                      <div class="col-12 col-md-6"><label class="form-label small mb-1">Position</label><div class="editor-range-field"><input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorSendReturnNumber('position') ?? 0" (input)="setEditorSendReturnNumber('position', $any($event.target).value)" /><input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorSendReturnNumber('position') ?? 0" (input)="setEditorSendReturnNumber('position', $any($event.target).value)" /></div></div>
+                      <div class="col-12 col-md-6"><label class="form-label small mb-1">Mode</label><div class="editor-range-field"><input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorSendReturnNumber('mode') ?? 0" (input)="setEditorSendReturnNumber('mode', $any($event.target).value)" /><input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorSendReturnNumber('mode') ?? 0" (input)="setEditorSendReturnNumber('mode', $any($event.target).value)" /></div></div>
+                      <div class="col-12 col-md-6"><label class="form-label small mb-1">Send Level</label><div class="editor-range-field"><input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorSendReturnNumber('send_level') ?? 0" (input)="setEditorSendReturnNumber('send_level', $any($event.target).value)" /><input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorSendReturnNumber('send_level') ?? 0" (input)="setEditorSendReturnNumber('send_level', $any($event.target).value)" /></div></div>
+                      <div class="col-12 col-md-6"><label class="form-label small mb-1">Return Level</label><div class="editor-range-field"><input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorSendReturnNumber('return_level') ?? 0" (input)="setEditorSendReturnNumber('return_level', $any($event.target).value)" /><input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorSendReturnNumber('return_level') ?? 0" (input)="setEditorSendReturnNumber('return_level', $any($event.target).value)" /></div></div>
+                    </div>
+                  </article>
+
+                  <article class="border rounded p-2">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <h4 class="h6 mb-0">Solo</h4>
+                      <label class="form-check-label small d-flex align-items-center gap-1">
+                        <input class="form-check-input m-0" type="checkbox" [checked]="editorSoloOn()" (change)="setEditorSoloOn($any($event.target).checked)" />
+                        <span>Enabled</span>
+                      </label>
+                    </div>
+                    <div class="row g-2">
+                      <div class="col-12 col-md-6"><label class="form-label small mb-1">Level</label><div class="editor-range-field"><input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorSoloLevel() ?? 0" (input)="setEditorSoloLevel($any($event.target).value)" /><input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorSoloLevel() ?? 0" (input)="setEditorSoloLevel($any($event.target).value)" /></div></div>
+                    </div>
+                  </article>
+
+                  <article class="border rounded p-2">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <h4 class="h6 mb-0">Pedal FX</h4>
+                      <label class="form-check-label small d-flex align-items-center gap-1">
+                        <input class="form-check-input m-0" type="checkbox" [checked]="editorPedalFxOn()" (change)="setEditorPedalFxOn($any($event.target).checked)" />
+                        <span>Enabled</span>
+                      </label>
+                    </div>
+                    <div class="row g-2">
+                      <div class="col-6 col-md-4"><label class="form-label small mb-1">Position</label><input type="number" min="0" max="127" class="form-control form-control-sm" [value]="editorPedalFxNumber('position') ?? 0" (input)="setEditorPedalFxNumber('position', $any($event.target).value)" /></div>
+                      <div class="col-6 col-md-4"><label class="form-label small mb-1">Type</label><input type="number" min="0" max="127" class="form-control form-control-sm" [value]="editorPedalFxNumber('type') ?? 0" (input)="setEditorPedalFxNumber('type', $any($event.target).value)" /></div>
+                    </div>
+                  </article>
+                </div>
+              }
+            } @else {
+              <article class="border rounded p-3 bg-body-tertiary">
+                <p class="small text-secondary mb-2">No live editor state is loaded yet.</p>
+                <button type="button" class="btn btn-sm btn-outline-primary" (click)="openLiveEditor()">Load Live Patch</button>
+              </article>
+            }
+          </div>
+        </article>
       </section>
 
       <section class="row g-3 mb-4">
@@ -282,10 +570,13 @@
             <div class="card-body d-grid gap-2">
               <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
                 <div>
-                  <h2 class="h6 mb-1">Patch Objects</h2>
-                  <p class="small text-secondary mb-0">Sparse saved ideas and full-scope keepers.</p>
+                  <h2 class="h6 mb-1">Local Patch Library</h2>
+                  <p class="small text-secondary mb-0">Sparse ideas and full-scope keepers are the same object type here.</p>
                 </div>
-                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="loadTonePatchObjects()">Refresh</button>
+                <div class="d-flex gap-2 flex-wrap">
+                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openToneGroupModal()">New Group</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="loadTonePatchObjects()">Refresh</button>
+                </div>
               </div>
               <div class="row g-2">
                 <div class="col-12 col-lg-5">
@@ -373,44 +664,13 @@
               <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
                 <div>
                   <h2 class="h6 mb-1">Sets</h2>
-                  <p class="small text-secondary mb-0">Ordered audition batches. Program them to slots using the current Live Patch as the base render context.</p>
+                  <p class="small text-secondary mb-0">Ordered audition batches. Build them locally first; use amp programming only when you actually want persistence.</p>
                 </div>
-                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="loadToneSets()">Refresh</button>
+                <div class="d-flex gap-2 flex-wrap">
+                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openToneSetModal()">New Set</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="loadToneSets()">Refresh</button>
+                </div>
               </div>
-              <article class="border rounded p-2 bg-body-tertiary d-grid gap-2">
-                <div>
-                  <p class="mb-1"><strong>Manual Set Builder</strong></p>
-                  <p class="mb-0 text-secondary">Create a set directly from saved patch objects, then edit individual slots below.</p>
-                </div>
-                <div class="row g-2">
-                  <div class="col-12 col-lg-6">
-                    <label class="form-label small mb-1" for="toneManualSetName">Set Name</label>
-                    <input id="toneManualSetName" type="text" class="form-control form-control-sm" [value]="toneManualSetName()" (input)="setToneManualSetName($any($event.target).value)" />
-                  </div>
-                  <div class="col-12 col-lg-6">
-                    <label class="form-label small mb-1" for="toneManualSetDescription">Description</label>
-                    <input id="toneManualSetDescription" type="text" class="form-control form-control-sm" [value]="toneManualSetDescription()" (input)="setToneManualSetDescription($any($event.target).value)" />
-                  </div>
-                </div>
-                <div class="row g-2">
-                  @for (slot of [1, 2, 3, 4, 5, 6, 7, 8]; track slot) {
-                    <div class="col-12 col-md-6 col-xl-3">
-                      <label class="form-label small mb-1">{{ setLabelForSlot(slot) }}</label>
-                      <select class="form-select form-select-sm" [value]="toneManualSetSlotValue(slot)" (change)="setToneManualSetSlot(slot, $any($event.target).value)">
-                        <option value="">Empty</option>
-                        @for (patchObject of tonePatchObjects(); track patchObject.id) {
-                          <option [value]="patchObject.id">{{ patchObject.name }}</option>
-                        }
-                      </select>
-                    </div>
-                  }
-                </div>
-                <div class="d-flex justify-content-end">
-                  <button type="button" class="btn btn-sm btn-primary" (click)="createManualToneSet()" [disabled]="tonePatchObjects().length === 0 || isActionBusy('tone-create-set')">
-                    {{ isActionBusy('tone-create-set') ? 'Creating...' : 'Create Manual Set' }}
-                  </button>
-                </div>
-              </article>
               <div class="tone-list">
                 @for (toneSet of toneSets(); track toneSet.id) {
                   <article class="border rounded p-2 small bg-body-tertiary d-grid gap-2">
@@ -460,9 +720,11 @@
         </div>
       </section>
 
-      <section class="mb-4">
+      <details class="mb-4">
+        <summary class="h6 text-uppercase text-secondary mb-2">Amp Slots / Persistence</summary>
+        <p class="small text-secondary mb-2 mt-2">Stored amp slots are secondary now. Use them when you want persistence on the amp or GA-FC auditioning, not as the main tone-design workspace.</p>
+        <section class="mb-4">
         <h2 class="h6 text-uppercase text-secondary mb-2">Channel Bank A</h2>
-        <p class="small text-secondary mb-2">Stored amp slots. Use them for activation, persistence, and keeping winners into the Tone Lab library.</p>
         <div class="row g-3">
           @for (slot of slotsForBank('A'); track slot.slot) {
             <div class="col-12 col-md-6 col-xl-3">
@@ -515,9 +777,6 @@
                       <button type="button" class="btn btn-sm btn-outline-secondary" (click)="commitSlotToAmp(slot)" [disabled]="isActionBusy(slotActionKey('commit', slot.slot))">{{ slotActionLabel('commit', slot.slot, 'Store', 'Storing...') }}</button>
                     }
                     <button type="button" class="btn btn-sm btn-outline-success" (click)="keepSlotToToneLibrary(slot)" [disabled]="!canUseSlotActions(slot) || isActionBusy(slotActionKey('keep-tone', slot.slot))">{{ slotActionLabel('keep-tone', slot.slot, 'Keep', 'Keeping...') }}</button>
-                    @if (canOpenEditor(slot)) {
-                      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openEditor(slot)">Editor</button>
-                    }
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openAskAiModal(slot)" [disabled]="!canAskAi(slot)">Ask AI</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openAiLevelModal(slot)" [disabled]="!canAskAiLevel(slot)">AI Level</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openPatchSamplesModal(slot)" [disabled]="!canShowPatchSamples(slot)">Samples</button>
@@ -550,7 +809,7 @@
             </div>
           }
         </div>
-      </section>
+        </section>
 
       <section>
         <h2 class="h6 text-uppercase text-secondary mb-2">Channel Bank B</h2>
@@ -606,9 +865,6 @@
                       <button type="button" class="btn btn-sm btn-outline-secondary" (click)="commitSlotToAmp(slot)" [disabled]="isActionBusy(slotActionKey('commit', slot.slot))">{{ slotActionLabel('commit', slot.slot, 'Store', 'Storing...') }}</button>
                     }
                     <button type="button" class="btn btn-sm btn-outline-success" (click)="keepSlotToToneLibrary(slot)" [disabled]="!canUseSlotActions(slot) || isActionBusy(slotActionKey('keep-tone', slot.slot))">{{ slotActionLabel('keep-tone', slot.slot, 'Keep', 'Keeping...') }}</button>
-                    @if (canOpenEditor(slot)) {
-                      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openEditor(slot)">Editor</button>
-                    }
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openAskAiModal(slot)" [disabled]="!canAskAi(slot)">Ask AI</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openAiLevelModal(slot)" [disabled]="!canAskAiLevel(slot)">AI Level</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openPatchSamplesModal(slot)" [disabled]="!canShowPatchSamples(slot)">Samples</button>
@@ -642,6 +898,7 @@
           }
         </div>
       </section>
+      </details>
     </section>
   </section>
   } @else {
@@ -689,6 +946,205 @@
 
   @if (responseJson()) {
     <pre class="card p-3 mt-3 mb-0">{{ responseJson() }}</pre>
+  }
+
+  @if (toneSaveModalOpen()) {
+    <div class="raw-modal-backdrop" (click)="closeToneSaveModal()">
+      <section class="raw-modal" role="dialog" aria-modal="true" aria-label="Save Patch Object" (click)="$event.stopPropagation()">
+        <header class="raw-modal-head">
+          <h3>Save Patch Object</h3>
+          <button type="button" class="btn btn-sm btn-light" (click)="closeToneSaveModal()">Close</button>
+        </header>
+        <div class="p-3 d-grid gap-3">
+          <p class="small text-secondary mb-0">Present blocks are owned. Absent blocks are wildcards. Auto-selection is based on the current base patch, but you can override it here.</p>
+          <div>
+            <label class="form-label small mb-1" for="toneSaveName">Name</label>
+            <input id="toneSaveName" type="text" class="form-control" [value]="toneSaveName()" (input)="setToneSaveName($any($event.target).value)" />
+          </div>
+          <div>
+            <label class="form-label small mb-1" for="toneSaveDescription">Description</label>
+            <textarea id="toneSaveDescription" class="form-control" rows="3" [value]="toneSaveDescription()" (input)="setToneSaveDescription($any($event.target).value)"></textarea>
+          </div>
+          <div>
+            <label class="form-label small mb-1" for="toneSaveGroup">Assign Group</label>
+            <select id="toneSaveGroup" class="form-select" [value]="toneSaveGroupId()" (change)="setToneSaveGroupId($any($event.target).value)">
+              <option value="">No group</option>
+              @for (group of toneGroups(); track group.id) {
+                <option [value]="group.id">{{ group.name }}</option>
+              }
+            </select>
+          </div>
+          <div>
+            <p class="form-label small mb-1">Blocks</p>
+            <div class="tone-block-grid">
+              @for (block of toneBlockOptions(); track block) {
+                <label class="form-check small mb-0">
+                  <input class="form-check-input" type="checkbox" [checked]="isToneBlockSelected(block)" (change)="setToneBlockSelected(block, $any($event.target).checked)" />
+                  <span class="form-check-label">{{ block }}</span>
+                </label>
+              }
+            </div>
+          </div>
+          <div class="d-flex justify-content-end flex-wrap gap-2">
+            <button type="button" class="btn btn-sm btn-outline-success" (click)="saveFullLiveAsTonePatchObject()" [disabled]="isActionBusy('tone-save-live')">Save Full Live</button>
+            <button type="button" class="btn btn-sm btn-success" (click)="saveLiveAsTonePatchObject()" [disabled]="isActionBusy('tone-save-live')">
+              {{ isActionBusy('tone-save-live') ? 'Saving...' : 'Save Patch Object' }}
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  }
+
+  @if (toneDesignerModalOpen()) {
+    <div class="raw-modal-backdrop" (click)="closeToneDesignerModal()">
+      <section class="raw-modal ai-modal" role="dialog" aria-modal="true" aria-label="AI Designer" (click)="$event.stopPropagation()">
+        <header class="raw-modal-head">
+          <h3>AI Designer</h3>
+          <button type="button" class="btn btn-sm btn-light" (click)="closeToneDesignerModal()">Close</button>
+        </header>
+        <div class="p-3 d-grid gap-3">
+          <p class="small text-secondary mb-0">Generate sparse candidates against the current Live Patch and its selected save scope.</p>
+          <div class="row g-2">
+            <div class="col-12 col-md-8">
+              <label class="form-label small mb-1" for="toneAiSetName">Set Name</label>
+              <input id="toneAiSetName" type="text" class="form-control" [value]="toneAiSetName()" (input)="setToneAiSetName($any($event.target).value)" />
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label small mb-1" for="toneAiCount">Count</label>
+              <input id="toneAiCount" type="number" min="1" max="8" class="form-control" [value]="toneAiCount()" (input)="setToneAiCount($any($event.target).value)" />
+            </div>
+          </div>
+          <div>
+            <label class="form-label small mb-1" for="toneAiDescription">Description</label>
+            <input id="toneAiDescription" type="text" class="form-control" [value]="toneAiDescription()" (input)="setToneAiDescription($any($event.target).value)" />
+          </div>
+          <div>
+            <label class="form-label small mb-1" for="toneAiNamePrefix">Object Name Prefix</label>
+            <input id="toneAiNamePrefix" type="text" class="form-control" [value]="toneAiNamePrefix()" (input)="setToneAiNamePrefix($any($event.target).value)" />
+          </div>
+          <div>
+            <label class="form-label small mb-1" for="toneAiPrompt">Prompt</label>
+            <textarea id="toneAiPrompt" class="form-control" rows="5" [value]="toneAiPrompt()" (input)="setToneAiPrompt($any($event.target).value)"></textarea>
+          </div>
+          <div>
+            <p class="form-label small mb-1">Preferred Blocks</p>
+            <div class="tone-block-grid">
+              @for (block of toneBlockOptions(); track block) {
+                <label class="form-check small mb-0">
+                  <input class="form-check-input" type="checkbox" [checked]="isToneBlockSelected(block)" (change)="setToneBlockSelected(block, $any($event.target).checked)" />
+                  <span class="form-check-label">{{ block }}</span>
+                </label>
+              }
+            </div>
+          </div>
+          <div class="d-flex justify-content-end flex-wrap gap-2">
+            <button type="button" class="btn btn-sm btn-outline-primary" (click)="generateToneAiPatchObjects()" [disabled]="isActionBusy('tone-ai-generate-objects')">
+              {{ isActionBusy('tone-ai-generate-objects') ? 'Generating...' : 'Generate Objects' }}
+            </button>
+            <button type="button" class="btn btn-sm btn-primary" (click)="generateToneAiSet()" [disabled]="isActionBusy('tone-ai-generate')">
+              {{ isActionBusy('tone-ai-generate') ? 'Generating...' : 'Generate AI Set' }}
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  }
+
+  @if (toneGroupModalOpen()) {
+    <div class="raw-modal-backdrop" (click)="closeToneGroupModal()">
+      <section class="raw-modal" role="dialog" aria-modal="true" aria-label="Create Group" (click)="$event.stopPropagation()">
+        <header class="raw-modal-head">
+          <h3>Create Group</h3>
+          <button type="button" class="btn btn-sm btn-light" (click)="closeToneGroupModal()">Close</button>
+        </header>
+        <div class="p-3 d-grid gap-3">
+          <div>
+            <label class="form-label small mb-1" for="toneGroupName">Name</label>
+            <input id="toneGroupName" type="text" class="form-control" [value]="toneGroupName()" (input)="setToneGroupName($any($event.target).value)" />
+          </div>
+          <div>
+            <label class="form-label small mb-1" for="toneGroupDescription">Description</label>
+            <textarea id="toneGroupDescription" class="form-control" rows="3" [value]="toneGroupDescription()" (input)="setToneGroupDescription($any($event.target).value)"></textarea>
+          </div>
+          <div class="d-flex justify-content-end">
+            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="createToneGroup()" [disabled]="isActionBusy('tone-create-group')">
+              {{ isActionBusy('tone-create-group') ? 'Creating...' : 'Create Group' }}
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  }
+
+  @if (toneSetModalOpen()) {
+    <div class="raw-modal-backdrop" (click)="closeToneSetModal()">
+      <section class="raw-modal ai-modal" role="dialog" aria-modal="true" aria-label="Create Set" (click)="$event.stopPropagation()">
+        <header class="raw-modal-head">
+          <h3>Create Set</h3>
+          <button type="button" class="btn btn-sm btn-light" (click)="closeToneSetModal()">Close</button>
+        </header>
+        <div class="p-3 d-grid gap-3">
+          <div class="row g-2">
+            <div class="col-12 col-lg-6">
+              <label class="form-label small mb-1" for="toneManualSetName">Set Name</label>
+              <input id="toneManualSetName" type="text" class="form-control form-control-sm" [value]="toneManualSetName()" (input)="setToneManualSetName($any($event.target).value)" />
+            </div>
+            <div class="col-12 col-lg-6">
+              <label class="form-label small mb-1" for="toneManualSetDescription">Description</label>
+              <input id="toneManualSetDescription" type="text" class="form-control form-control-sm" [value]="toneManualSetDescription()" (input)="setToneManualSetDescription($any($event.target).value)" />
+            </div>
+          </div>
+          <div class="row g-2">
+            @for (slot of [1, 2, 3, 4, 5, 6, 7, 8]; track slot) {
+              <div class="col-12 col-md-6 col-xl-3">
+                <label class="form-label small mb-1">{{ setLabelForSlot(slot) }}</label>
+                <select class="form-select form-select-sm" [value]="toneManualSetSlotValue(slot)" (change)="setToneManualSetSlot(slot, $any($event.target).value)">
+                  <option value="">Empty</option>
+                  @for (patchObject of tonePatchObjects(); track patchObject.id) {
+                    <option [value]="patchObject.id">{{ patchObject.name }}</option>
+                  }
+                </select>
+              </div>
+            }
+          </div>
+          <div class="d-flex justify-content-end">
+            <button type="button" class="btn btn-sm btn-primary" (click)="createManualToneSet()" [disabled]="tonePatchObjects().length === 0 || isActionBusy('tone-create-set')">
+              {{ isActionBusy('tone-create-set') ? 'Creating...' : 'Create Set' }}
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  }
+
+  @if (toneBaseModalOpen()) {
+    <div class="raw-modal-backdrop" (click)="closeToneBaseModal()">
+      <section class="raw-modal" role="dialog" aria-modal="true" aria-label="Load Base Patch" (click)="$event.stopPropagation()">
+        <header class="raw-modal-head">
+          <h3>Load Base Patch</h3>
+          <button type="button" class="btn btn-sm btn-light" (click)="closeToneBaseModal()">Close</button>
+        </header>
+        <div class="p-3 d-grid gap-3">
+          <p class="small text-secondary mb-0">Choose a saved full-scope patch object when you want a clean base. It will be applied to Live Patch and become the comparison base for sparse saves.</p>
+          <div>
+            <label class="form-label small mb-1" for="toneBasePatchObjectId">Saved Patch Object</label>
+            <select id="toneBasePatchObjectId" class="form-select" [value]="toneBasePatchObjectId()" (change)="setToneBasePatchObjectId($any($event.target).value)">
+              <option value="">Select patch object</option>
+              @for (patchObject of tonePatchObjects(); track patchObject.id) {
+                <option [value]="patchObject.id">{{ patchObject.name }}</option>
+              }
+            </select>
+          </div>
+          <div class="d-flex justify-content-end gap-2 flex-wrap">
+            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="useCurrentLivePatchAsBase()">Use Current Live</button>
+            <button type="button" class="btn btn-sm btn-primary" (click)="applyToneBasePatchObject()" [disabled]="isActionBusy('tone-apply-base:' + toneBasePatchObjectId())">
+              {{ isActionBusy('tone-apply-base:' + toneBasePatchObjectId()) ? 'Applying...' : 'Apply As Base' }}
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
   }
 
   @if (patchSamplesModalOpen()) {
@@ -847,418 +1303,4 @@
     </div>
   }
 
-  @if (editorModalOpen()) {
-    <div class="raw-modal-backdrop" (click)="closeEditorModal()">
-      <section class="raw-modal editor-modal" role="dialog" aria-modal="true" aria-label="Patch Editor" (click)="$event.stopPropagation()">
-        <header class="raw-modal-head">
-          <h3>Editor · {{ editorSlotLabel() }}</h3>
-          <button type="button" class="btn btn-sm btn-light" (click)="closeEditorModal()">Close</button>
-        </header>
-        @if (editorPatchDraft(); as draft) {
-          <div class="p-3 d-grid gap-3 editor-modal-body">
-            <article class="border rounded p-2 bg-body editor-sticky-meter">
-              <p class="small mb-1 text-secondary">
-                Current RMS: <code>{{ formatDb(liveRmsDbfs()) }}</code>
-              </p>
-              <div class="d-flex align-items-center gap-2">
-                <span class="small text-secondary">Live RMS Graph:</span>
-                <svg class="rms-graph" viewBox="0 0 1000 64" preserveAspectRatio="none" aria-label="Live RMS graph">
-                  @for (bar of rmsGraphBars(); track $index) {
-                    <rect
-                      [attr.x]="bar.x"
-                      [attr.y]="bar.y"
-                      [attr.width]="bar.width"
-                      [attr.height]="bar.height"
-                    />
-                  }
-                </svg>
-              </div>
-            </article>
-            <article class="border rounded p-2">
-              @if (!editorLiveApplyAvailable()) {
-                <p class="small mb-1 text-secondary">Local-only edit: this patch is not currently active on the amp.</p>
-              } @else {
-                <p class="small mb-1 text-secondary">Live edit: manual changes apply to the amp immediately.</p>
-              }
-              <p class="small mb-0 text-secondary">
-                State:
-                @if (editorLiveApplyPending()) {
-                  <code class="text-warning">applying state...</code>
-                } @else if (editorLiveApplyError()) {
-                  <code class="text-danger">error</code>
-                } @else if (editorLiveApplyHasApplied()) {
-                  <code class="text-info">applied</code>
-                } @else if (editorLiveApplyAvailable()) {
-                  <code class="text-success">ready</code>
-                } @else {
-                  <code>local only</code>
-                }
-              </p>
-              @if (editorLiveApplyHasApplied()) {
-                <p class="small mb-0 text-secondary">
-                  Applied At: <code>{{ editorLiveApplyReadbackAt() }}</code>
-                </p>
-              }
-              <p class="small mb-0 text-secondary">
-                Modified:
-                @if (editorIsModified()) {
-                  <code class="text-warning">yes</code>
-                } @else {
-                  <code class="text-success">no</code>
-                }
-                · Hash: <code>{{ editorHashLabel() }}</code>
-              </p>
-              <p class="small mb-0 text-secondary">
-                DB State:
-                <code [class.text-success]="editorDbStateLabel() === 'DB ✓'" [class.text-danger]="editorDbStateLabel() === 'DB ✗'">
-                  {{ editorDbStateLabel() }}
-                </code>
-              </p>
-              @if (editorLiveApplyError()) {
-                <p class="small mb-0 text-danger mt-1">{{ editorLiveApplyError() }}</p>
-              }
-              <p class="small mb-0 text-secondary mt-1">
-                DB save is handled on the card via <code>Save DB</code>.
-              </p>
-            </article>
-            <article class="border rounded p-2">
-              <h4 class="h6 mb-2">Patch</h4>
-              <label class="form-label small mb-1">Name</label>
-              <input
-                type="text"
-                class="form-control form-control-sm"
-                [value]="editorPatchName()"
-                (input)="setEditorPatchName($any($event.target).value)"
-              />
-            </article>
-
-            <article class="border rounded p-2">
-              <h4 class="h6 mb-2">Routing</h4>
-              <div class="row g-2">
-                <div class="col-12 col-md-4">
-                  <label class="form-label small mb-1">Chain Pattern</label>
-                  <div class="editor-range-field">
-                    <input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorRoutingNumber('chain_pattern') ?? 0" (input)="setEditorRoutingNumber('chain_pattern', $any($event.target).value)" />
-                    <input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorRoutingNumber('chain_pattern') ?? 0" (input)="setEditorRoutingNumber('chain_pattern', $any($event.target).value)" />
-                  </div>
-                </div>
-                <div class="col-12 col-md-4">
-                  <label class="form-label small mb-1">Cab Resonance</label>
-                  <div class="editor-range-field">
-                    <input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorRoutingNumber('cabinet_resonance') ?? 0" (input)="setEditorRoutingNumber('cabinet_resonance', $any($event.target).value)" />
-                    <input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorRoutingNumber('cabinet_resonance') ?? 0" (input)="setEditorRoutingNumber('cabinet_resonance', $any($event.target).value)" />
-                  </div>
-                </div>
-                <div class="col-12 col-md-4">
-                  <label class="form-label small mb-1">Master Key</label>
-                  <div class="editor-range-field">
-                    <input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorRoutingNumber('master_key') ?? 0" (input)="setEditorRoutingNumber('master_key', $any($event.target).value)" />
-                    <input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorRoutingNumber('master_key') ?? 0" (input)="setEditorRoutingNumber('master_key', $any($event.target).value)" />
-                  </div>
-                </div>
-              </div>
-            </article>
-
-            <article class="border rounded p-2">
-              <h4 class="h6 mb-2">Colors</h4>
-              <div class="row g-2">
-                @for (stageName of ['booster', 'mod', 'fx', 'delay', 'reverb']; track stageName) {
-                  <div class="col-6 col-md-4">
-                    <label class="form-label small mb-1 text-capitalize">{{ stageName }}</label>
-                    <select class="form-select form-select-sm" (change)="setEditorColorIndex($any(stageName), $any($event.target).value)">
-                      @for (opt of editorColorOptions(); track opt.value) {
-                        <option [value]="opt.value" [selected]="editorColorIndex($any(stageName)) === opt.value">{{ opt.label }}</option>
-                      }
-                    </select>
-                  </div>
-                }
-              </div>
-            </article>
-
-            <article class="border rounded p-2">
-              <h4 class="h6 mb-2">Amp</h4>
-              <div class="row g-2">
-                <div class="col-6 col-md-4">
-                  <label class="form-label small mb-1">Type</label>
-                  <select class="form-select form-select-sm" (change)="setEditorAmpNumber('amp_type', $any($event.target).value)">
-                    @for (opt of editorAmpTypeOptions(); track opt.value) {
-                      <option [value]="opt.value" [selected]="editorAmpRawValue(7) === opt.value">{{ opt.label }}</option>
-                    }
-                  </select>
-                </div>
-                <div class="col-6 col-md-4">
-                  <label class="form-label small mb-1">Variation</label>
-                  <select class="form-select form-select-sm" (change)="setEditorAmpNumber('preamp_variation', $any($event.target).value)">
-                    <option [value]="0" [selected]="editorAmpRawValue(9) === 0">Off</option>
-                    <option [value]="1" [selected]="editorAmpRawValue(9) === 1">On</option>
-                  </select>
-                </div>
-              </div>
-              <div class="row g-2 mt-1">
-                <div class="col-12 col-md-6"><label class="form-label small mb-1">Gain</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorAmpNumber('gain') ?? 0" (input)="setEditorAmpNumber('gain', $any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorAmpNumber('gain') ?? 0" (input)="setEditorAmpNumber('gain', $any($event.target).value)" /></div></div>
-                <div class="col-12 col-md-6"><label class="form-label small mb-1">Volume</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorAmpNumber('volume') ?? 0" (input)="setEditorAmpNumber('volume', $any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorAmpNumber('volume') ?? 0" (input)="setEditorAmpNumber('volume', $any($event.target).value)" /></div></div>
-                <div class="col-12 col-md-6"><label class="form-label small mb-1">Bass</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorAmpNumber('bass') ?? 0" (input)="setEditorAmpNumber('bass', $any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorAmpNumber('bass') ?? 0" (input)="setEditorAmpNumber('bass', $any($event.target).value)" /></div></div>
-                <div class="col-12 col-md-6"><label class="form-label small mb-1">Middle</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorAmpNumber('middle') ?? 0" (input)="setEditorAmpNumber('middle', $any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorAmpNumber('middle') ?? 0" (input)="setEditorAmpNumber('middle', $any($event.target).value)" /></div></div>
-                <div class="col-12 col-md-6"><label class="form-label small mb-1">Treble</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorAmpNumber('treble') ?? 0" (input)="setEditorAmpNumber('treble', $any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorAmpNumber('treble') ?? 0" (input)="setEditorAmpNumber('treble', $any($event.target).value)" /></div></div>
-                <div class="col-12 col-md-6"><label class="form-label small mb-1">Presence</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorAmpNumber('presence') ?? 0" (input)="setEditorAmpNumber('presence', $any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorAmpNumber('presence') ?? 0" (input)="setEditorAmpNumber('presence', $any($event.target).value)" /></div></div>
-              </div>
-            </article>
-
-            <article class="border rounded p-2">
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <h4 class="h6 mb-0">Delay Extras</h4>
-                <label class="form-check-label small d-flex align-items-center gap-1">
-                  <input class="form-check-input m-0" type="checkbox" [checked]="editorDelay2On()" (change)="setEditorDelay2On($any($event.target).checked)" />
-                  <span>Delay2 Enabled</span>
-                </label>
-              </div>
-            </article>
-
-            @for (stageName of ['booster', 'mod', 'fx', 'delay', 'reverb']; track stageName) {
-              <article class="border rounded p-2">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                  <h4 class="h6 mb-0 text-capitalize" [class.text-success]="editorStageOn($any(stageName))" [class.text-danger]="!editorStageOn($any(stageName))">{{ stageName }}</h4>
-                  <label class="form-check-label small d-flex align-items-center gap-1">
-                    <input class="form-check-input m-0" type="checkbox" [checked]="editorStageOn($any(stageName))" (change)="setEditorStageOn($any(stageName), $any($event.target).checked)" />
-                    <span>Enabled</span>
-                  </label>
-                </div>
-                <div class="row g-2">
-                  <div class="col-12 col-md-6">
-                    <label class="form-label small mb-1">Type</label>
-                    <select class="form-select form-select-sm" (change)="setEditorStageType($any(stageName), $any($event.target).value)">
-                      @for (opt of stageTypeOptions($any(stageName)); track opt.value) {
-                        <option [value]="opt.value" [selected]="editorStageType($any(stageName)) === opt.value">{{ opt.label }}</option>
-                      }
-                    </select>
-                  </div>
-                </div>
-                @if (editorStageSchemaWarning($any(stageName)); as warning) {
-                  <div class="small text-danger mt-2">{{ warning }}</div>
-                }
-                <div class="row g-2 mt-1">
-                  @for (param of editorStageParams($any(stageName)); track param.id) {
-                    <div class="col-12 col-md-6">
-                      @if (stageParamIsToggle(param)) {
-                        <label class="form-label small mb-1">{{ param.label }}</label>
-                        <div class="form-check form-switch editor-toggle-field">
-                          <input
-                            class="form-check-input"
-                            type="checkbox"
-                            [checked]="param.value === param.max"
-                            (change)="setEditorStageParam($any(stageName), param.key, $any($event.target).checked ? param.max : param.min)"
-                          />
-                          <span class="small text-secondary">{{ stageParamToggleLabel(param) }}</span>
-                        </div>
-                      } @else {
-                        <label class="form-label small mb-1">{{ param.label }} <span class="text-secondary">[{{ param.min }}..{{ param.max }}]</span></label>
-                        <div class="editor-range-field">
-                          <input
-                            type="range"
-                            [min]="param.min"
-                            [max]="param.max"
-                            class="form-range editor-range-slider"
-                            [value]="param.value"
-                            (input)="setEditorStageParam($any(stageName), param.key, $any($event.target).value)"
-                          />
-                          <input
-                            type="number"
-                            [min]="param.min"
-                            [max]="param.max"
-                            class="form-control form-control-sm editor-range-value"
-                            [value]="param.value"
-                            (input)="setEditorStageParam($any(stageName), param.key, $any($event.target).value)"
-                          />
-                        </div>
-                      }
-                    </div>
-                  }
-                </div>
-              </article>
-            }
-
-            @for (eqName of ['eq1', 'eq2']; track eqName) {
-              <article class="border rounded p-2">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                  <h4 class="h6 mb-0 text-uppercase" [class.text-success]="editorEqOn($any(eqName))" [class.text-danger]="!editorEqOn($any(eqName))">{{ eqName }}</h4>
-                  <label class="form-check-label small d-flex align-items-center gap-1">
-                    <input class="form-check-input m-0" type="checkbox" [checked]="editorEqOn($any(eqName))" (change)="setEditorEqOn($any(eqName), $any($event.target).checked)" />
-                    <span>Enabled</span>
-                  </label>
-                </div>
-                <div class="row g-2">
-                  <div class="col-6 col-md-4">
-                    <label class="form-label small mb-1">Type</label>
-                    <select class="form-select form-select-sm" (change)="setEditorEqNumber($any(eqName), 'type', $any($event.target).value)">
-                      @for (opt of editorEqTypeOptions(); track opt.value) {
-                        <option [value]="opt.value" [selected]="editorEqNumber($any(eqName), 'type') === opt.value">{{ opt.label }}</option>
-                      }
-                    </select>
-                  </div>
-                  <div class="col-6 col-md-4">
-                    <label class="form-label small mb-1">Position</label>
-                    <select class="form-select form-select-sm" (change)="setEditorEqNumber($any(eqName), 'position', $any($event.target).value)">
-                      @for (opt of editorEqPositionOptions(); track opt.value) {
-                        <option [value]="opt.value" [selected]="editorEqNumber($any(eqName), 'position') === opt.value">{{ opt.label }}</option>
-                      }
-                    </select>
-                  </div>
-                </div>
-                @if (editorEqIsParametric($any(eqName))) {
-                  <div class="mt-2">
-                    <p class="small text-secondary mb-2">Parametric EQ Shape</p>
-                    <div class="peq-graph">
-                      <div class="peq-graph-cut peq-graph-cut-low" [style.width.px]="editorEqPeqLowCutWidth($any(eqName))"></div>
-                      <div class="peq-graph-cut peq-graph-cut-high" [style.width.px]="editorEqPeqHighCutWidth($any(eqName))"></div>
-                      <svg class="peq-graph-svg" viewBox="0 0 512 96" preserveAspectRatio="none" aria-label="Parametric EQ shape">
-                        <line x1="0" y1="44" x2="512" y2="44" class="peq-graph-zero" />
-                        <line x1="0" y1="16" x2="512" y2="16" class="peq-graph-guide" />
-                        <line x1="0" y1="72" x2="512" y2="72" class="peq-graph-guide" />
-                        @if (editorEqPeqFftBars().length > 0) {
-                          @for (bar of editorEqPeqFftBars(); track $index) {
-                            <rect [attr.x]="bar.x" [attr.y]="bar.y" [attr.width]="bar.width" [attr.height]="bar.height" class="peq-graph-fft-bar" />
-                          }
-                        }
-                        <path [attr.d]="editorEqPeqGraphPath($any(eqName))" class="peq-graph-line" />
-                        @for (node of editorEqPeqGraphNodes($any(eqName)); track node.id) {
-                          <circle [attr.cx]="node.x" [attr.cy]="node.y" r="4.5" class="peq-graph-node" />
-                          <text [attr.x]="node.x" [attr.y]="node.y - 10" text-anchor="middle" class="peq-graph-node-label">{{ node.label }}</text>
-                          <text [attr.x]="node.x" [attr.y]="node.y + 17" text-anchor="middle" class="peq-graph-node-value">{{ editorEqPeqGainLabel(node.gain) }}</text>
-                        }
-                      </svg>
-                    </div>
-                  </div>
-                  <div class="row g-2 mt-1">
-                    @for (param of editorEqPeqParams($any(eqName)); track param.id) {
-                      <div class="col-12 col-md-6">
-                        <label class="form-label small mb-1">
-                          {{ param.label }}
-                          @if (param.valueLabel) {
-                            <span class="text-secondary">{{ param.valueLabel }}</span>
-                          } @else {
-                            <span class="text-secondary">[{{ param.min }}..{{ param.max }}]</span>
-                          }
-                        </label>
-                        @if (param.options) {
-                          <select class="form-select form-select-sm" (change)="setEditorEqPeqValue($any(eqName), param.key, $any($event.target).value)">
-                            @for (opt of param.options; track opt.value) {
-                              <option [value]="opt.value" [selected]="param.value === opt.value">{{ opt.label }}</option>
-                            }
-                          </select>
-                        } @else {
-                          <div class="editor-range-field">
-                            <input
-                              type="range"
-                              [min]="param.min"
-                              [max]="param.max"
-                              class="form-range editor-range-slider"
-                              [value]="param.value"
-                              (input)="setEditorEqPeqValue($any(eqName), param.key, $any($event.target).value)"
-                            />
-                            <input
-                              type="number"
-                              [min]="param.min"
-                              [max]="param.max"
-                              class="form-control form-control-sm editor-range-value"
-                              [value]="param.value"
-                              (input)="setEditorEqPeqValue($any(eqName), param.key, $any($event.target).value)"
-                            />
-                          </div>
-                        }
-                      </div>
-                    }
-                  </div>
-                }
-                @if (editorEqIsGe10($any(eqName))) {
-                  <div class="mt-2">
-                    <p class="small text-secondary mb-2">GE-10 Spectrum</p>
-                    <div class="eq-spectrum">
-                      @for (band of editorEqGe10Bands($any(eqName)); track band.id) {
-                        <div class="eq-spectrum-band">
-                          <div class="eq-spectrum-meter">
-                            <div class="eq-spectrum-zero"></div>
-                            <div class="eq-spectrum-fill" [style.height.%]="band.percent"></div>
-                          </div>
-                          <div class="eq-spectrum-value">{{ band.offsetValue >= 0 ? '+' : '' }}{{ band.offsetValue }}</div>
-                          <input
-                            type="range"
-                            min="-24"
-                            max="24"
-                            class="form-range editor-range-slider"
-                            [value]="band.offsetValue"
-                            (input)="setEditorEqGe10BandValue($any(eqName), $index, $any($event.target).value)"
-                          />
-                          <div class="eq-spectrum-label">{{ band.label }}</div>
-                        </div>
-                      }
-                    </div>
-                  </div>
-                }
-              </article>
-            }
-
-            <article class="border rounded p-2">
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <h4 class="h6 mb-0">NS</h4>
-                <label class="form-check-label small d-flex align-items-center gap-1">
-                  <input class="form-check-input m-0" type="checkbox" [checked]="editorNsOn()" (change)="setEditorNsOn($any($event.target).checked)" />
-                  <span>Enabled</span>
-                </label>
-              </div>
-              <div class="row g-2">
-                <div class="col-12 col-md-6"><label class="form-label small mb-1">Threshold</label><div class="editor-range-field"><input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorNsNumber('threshold') ?? 0" (input)="setEditorNsNumber('threshold', $any($event.target).value)" /><input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorNsNumber('threshold') ?? 0" (input)="setEditorNsNumber('threshold', $any($event.target).value)" /></div></div>
-                <div class="col-12 col-md-6"><label class="form-label small mb-1">Release</label><div class="editor-range-field"><input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorNsNumber('release') ?? 0" (input)="setEditorNsNumber('release', $any($event.target).value)" /><input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorNsNumber('release') ?? 0" (input)="setEditorNsNumber('release', $any($event.target).value)" /></div></div>
-              </div>
-            </article>
-
-            <article class="border rounded p-2">
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <h4 class="h6 mb-0">Send / Return</h4>
-                <label class="form-check-label small d-flex align-items-center gap-1">
-                  <input class="form-check-input m-0" type="checkbox" [checked]="editorSendReturnOn()" (change)="setEditorSendReturnOn($any($event.target).checked)" />
-                  <span>Enabled</span>
-                </label>
-              </div>
-              <div class="row g-2">
-                <div class="col-12 col-md-6"><label class="form-label small mb-1">Position</label><div class="editor-range-field"><input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorSendReturnNumber('position') ?? 0" (input)="setEditorSendReturnNumber('position', $any($event.target).value)" /><input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorSendReturnNumber('position') ?? 0" (input)="setEditorSendReturnNumber('position', $any($event.target).value)" /></div></div>
-                <div class="col-12 col-md-6"><label class="form-label small mb-1">Mode</label><div class="editor-range-field"><input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorSendReturnNumber('mode') ?? 0" (input)="setEditorSendReturnNumber('mode', $any($event.target).value)" /><input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorSendReturnNumber('mode') ?? 0" (input)="setEditorSendReturnNumber('mode', $any($event.target).value)" /></div></div>
-                <div class="col-12 col-md-6"><label class="form-label small mb-1">Send Level</label><div class="editor-range-field"><input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorSendReturnNumber('send_level') ?? 0" (input)="setEditorSendReturnNumber('send_level', $any($event.target).value)" /><input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorSendReturnNumber('send_level') ?? 0" (input)="setEditorSendReturnNumber('send_level', $any($event.target).value)" /></div></div>
-                <div class="col-12 col-md-6"><label class="form-label small mb-1">Return Level</label><div class="editor-range-field"><input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorSendReturnNumber('return_level') ?? 0" (input)="setEditorSendReturnNumber('return_level', $any($event.target).value)" /><input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorSendReturnNumber('return_level') ?? 0" (input)="setEditorSendReturnNumber('return_level', $any($event.target).value)" /></div></div>
-              </div>
-            </article>
-
-            <article class="border rounded p-2">
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <h4 class="h6 mb-0">Solo</h4>
-                <label class="form-check-label small d-flex align-items-center gap-1">
-                  <input class="form-check-input m-0" type="checkbox" [checked]="editorSoloOn()" (change)="setEditorSoloOn($any($event.target).checked)" />
-                  <span>Enabled</span>
-                </label>
-              </div>
-              <div class="row g-2">
-                <div class="col-12 col-md-6"><label class="form-label small mb-1">Level</label><div class="editor-range-field"><input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorSoloLevel() ?? 0" (input)="setEditorSoloLevel($any($event.target).value)" /><input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorSoloLevel() ?? 0" (input)="setEditorSoloLevel($any($event.target).value)" /></div></div>
-              </div>
-            </article>
-
-            <article class="border rounded p-2">
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <h4 class="h6 mb-0">Pedal FX</h4>
-                <label class="form-check-label small d-flex align-items-center gap-1">
-                  <input class="form-check-input m-0" type="checkbox" [checked]="editorPedalFxOn()" (change)="setEditorPedalFxOn($any($event.target).checked)" />
-                  <span>Enabled</span>
-                </label>
-              </div>
-              <div class="row g-2">
-                <div class="col-6 col-md-4"><label class="form-label small mb-1">Position</label><input type="number" min="0" max="127" class="form-control form-control-sm" [value]="editorPedalFxNumber('position') ?? 0" (input)="setEditorPedalFxNumber('position', $any($event.target).value)" /></div>
-                <div class="col-6 col-md-4"><label class="form-label small mb-1">Type</label><input type="number" min="0" max="127" class="form-control form-control-sm" [value]="editorPedalFxNumber('type') ?? 0" (input)="setEditorPedalFxNumber('type', $any($event.target).value)" /></div>
-              </div>
-            </article>
-          </div>
-          <footer class="p-3 pt-2 border-top d-flex gap-2 justify-content-end">
-            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="closeEditorModal()">Close</button>
-          </footer>
-        }
-      </section>
-    </div>
-  }
 </main>
