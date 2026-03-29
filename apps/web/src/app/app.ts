@@ -1867,6 +1867,71 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  async keepSlotToToneLibrary(slot: SlotCard): Promise<void> {
+    if (!slot.patch) {
+      this.status.set(`No patch payload loaded for ${slot.slot_label}. Read or load it first.`);
+      return;
+    }
+    const suggestedName = (slot.patch_name || `${slot.slot_label} Keeper`).trim();
+    const name = window.prompt(`Keep ${slot.slot_label} in Tone Lab as:`, suggestedName);
+    if (name === null) {
+      return;
+    }
+    const trimmed = name.trim();
+    if (!trimmed) {
+      this.status.set('Keep requires a non-empty name.');
+      return;
+    }
+    const groupId = Number.parseInt(this.toneSaveGroupId().trim() || '0', 10);
+    const actionKey = this.slotActionKey('keep-tone', slot.slot);
+    this.setActionBusy(actionKey, true);
+    this.status.set(`Keeping ${slot.slot_label} in Tone Lab...`);
+    this.responseJson.set('');
+    try {
+      const response = await fetch('/api/v1/patch-objects', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: trimmed,
+          description: `Captured from ${slot.slot_label}${slot.patch_name ? ` · ${slot.patch_name}` : ''}`,
+          patch_json: slot.patch,
+          source_type: 'captured',
+          parent_patch_object_id: null,
+        }),
+      });
+      const payload = (await response.json()) as TonePatchObjectResponse | { detail?: unknown };
+      if (!response.ok || !('id' in payload)) {
+        this.status.set(`Failed keeping ${slot.slot_label} in Tone Lab`);
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      const created = payload as TonePatchObjectResponse;
+      if (Number.isFinite(groupId) && groupId > 0) {
+        const groupResponse = await fetch(`/api/v1/groups/${groupId}/patch-objects/${created.id}`, {
+          method: 'POST',
+          cache: 'no-store',
+        });
+        const groupPayload = (await groupResponse.json()) as { detail?: unknown };
+        if (!groupResponse.ok) {
+          this.status.set(`Kept ${slot.slot_label}, but failed assigning it to the selected group`);
+          this.responseJson.set(JSON.stringify(groupPayload, null, 2));
+          return;
+        }
+      }
+      this.toneHighlightedPatchObjectId.set(created.id);
+      await this.loadTonePatchObjects();
+      this.status.set(`Kept ${slot.slot_label} as ${trimmed}`);
+      this.responseJson.set(JSON.stringify(created, null, 2));
+      globalThis.document?.getElementById('tone-patch-objects')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (error: unknown) {
+      this.status.set(`Failed keeping ${slot.slot_label} in Tone Lab`);
+      this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
+    } finally {
+      this.setActionBusy(actionKey, false);
+    }
+  }
+
   async openPatchConfigLoadModal(slot: SlotCard): Promise<void> {
     const actionKey = this.slotActionKey('load-configs', slot.slot);
     this.setActionBusy(actionKey, true);
@@ -4139,12 +4204,12 @@ export class App implements OnInit, OnDestroy {
   slotDbStatusLabel(slot: SlotCard): string {
     const state = this.dbState(slot);
     if (state === 'true') {
-      return 'DB ✓';
+      return 'LIBRARY ✓';
     }
     if (state === 'false') {
-      return 'DB ✗';
+      return 'LIBRARY ✗';
     }
-    return 'DB ?';
+    return 'LIBRARY ?';
   }
 
   dbState(slot: SlotCard): TriState {
