@@ -44,6 +44,7 @@ Full patch JSON remains the canonical deployment format sent to the amp, but it 
 12. AI designer flow is a core product path, not an optional add-on.
 13. AI outputs must be structured and schema-validated before anything is persisted or pushed to hardware.
 14. During tone design, fast apply to `Live Patch` is preferred over slot commit. Committing to amp slots is a persistence operation, not the default design loop.
+15. Manual parameter edits in the UI must apply to `Live Patch` immediately. No grace period, debounce window, or delayed apply should interrupt the design loop.
 
 ## 3) Domain Model
 ## 3.1 Fragment
@@ -159,6 +160,7 @@ Rules:
 
 Design priority:
 - the UI should optimize for getting AI suggestions and manual fragment edits into `Live Patch` quickly,
+- manual UI edits should write through immediately to `Live Patch`,
 - persistence indicators should answer whether `Live Patch` is saved:
   - to an amp slot,
   - to a DB object,
@@ -219,6 +221,12 @@ Target workflow:
 3. User plays immediately.
 4. App swaps another candidate into `Live Patch` without committing any slot.
 5. User saves or stores only when something is worth keeping.
+
+Manual edit rule:
+1. User changes a control in the UI.
+2. The change is sent to `Live Patch` immediately.
+3. The user hears the result immediately.
+4. Save/store decisions happen later and separately.
 
 ## 5.1 Build An Exploration Set
 Target workflow:
@@ -427,6 +435,7 @@ Planned target surface:
 
 Priority interaction path:
 - AI generate -> save to DB -> apply to `Live Patch` -> play -> keep/store if worth it.
+- manual edit in UI -> immediate apply to `Live Patch` -> hear result now.
 
 Amp-facing operations should remain queued. The queue status UI remains valid and useful.
 
@@ -464,6 +473,7 @@ Migration rule:
 - slot cards being more conceptually central than `Live Patch`,
 - stale assumptions about slot-level staged state,
 - committing to amp slots too early in the design flow,
+- delayed/grace-period live apply during manual editing,
 - patch-only library mental model,
 - limited support for partial-setting composition and promotion.
 
@@ -474,7 +484,8 @@ Deliver:
 - introduce `Live Patch` as first-class runtime model and top-level UI object,
 - introduce unique-name rules with explicit collision failure,
 - define render pipeline from partial structures to full patch JSON,
-- define single-source-of-truth storage constraints for all persisted entities.
+- define single-source-of-truth storage constraints for all persisted entities,
+- define immediate write-through behavior for manual live editing.
 
 Exit criteria:
 - app has a stable internal model that matches tone-discovery workflow.
@@ -517,6 +528,7 @@ Exit criteria:
 2. Define `Live Patch`, stored amp slot, and DB object status model explicitly in API and UI terms.
 3. Define the render/apply contract:
    - partial apply to `Live Patch`,
+   - immediate manual UI write-through to `Live Patch`,
    - full render when required,
    - explicit store only for amp persistence.
 4. Replace patch-set/hash-oriented schema plan with concrete `full_patch_objects`, `fragments`, `variants`, `sets`, and `groups` migrations.

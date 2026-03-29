@@ -1762,3 +1762,12 @@
   - It is just an ordinary saved patch object whose JSON happens to include all relevant blocks.
   - Most AI output should be sparse and usually limited to about `1-4` blocks.
   - Full-scope outputs are the exception, not the default.
+
+## Session Update - 2026-03-29 (Immediate Live Apply For Manual Editing)
+- Tightened the forward design doc again in:
+  - `docs/forward-implementation.md`
+- Hard interaction correction captured:
+  - manual parameter changes in the UI must update `Live Patch` immediately,
+  - no grace period,
+  - no delayed apply window,
+  - no debounce that interrupts audible feedback during tone design.
