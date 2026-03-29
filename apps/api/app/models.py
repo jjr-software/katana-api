@@ -119,6 +119,28 @@ class PatchObjectGroupMember(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
 
+class PatchObjectSet(Base):
+    __tablename__ = "patch_object_sets"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    source_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class PatchObjectSetSlot(Base):
+    __tablename__ = "patch_object_set_slots"
+    __table_args__ = (UniqueConstraint("patch_object_set_id", "slot", name="uq_patch_object_set_slots_set_slot"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    patch_object_set_id: Mapped[int] = mapped_column(ForeignKey("patch_object_sets.id", ondelete="CASCADE"), nullable=False, index=True)
+    slot: Mapped[int] = mapped_column(Integer, nullable=False)
+    patch_object_id: Mapped[int] = mapped_column(ForeignKey("patch_objects.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
 class LivePatchState(Base):
     __tablename__ = "live_patch_state"
 

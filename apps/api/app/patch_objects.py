@@ -25,6 +25,54 @@ ALLOWED_BLOCKS = (
 
 COLOR_BLOCKS = {"booster", "mod", "fx", "delay", "reverb"}
 STAGE_BLOCKS = {"booster", "mod", "fx", "delay", "reverb", "eq1", "eq2", "ns", "send_return", "solo", "pedalfx"}
+AMP_FIELD_TO_RAW_INDEX = {
+    "gain": 0,
+    "volume": 1,
+    "bass": 2,
+    "middle": 3,
+    "treble": 4,
+    "presence": 5,
+    "poweramp_variation": 6,
+    "amp_type": 7,
+    "resonance": 8,
+    "preamp_variation": 9,
+}
+STAGE_RAW_FIELD_MAP: dict[str, dict[str, int]] = {
+    "booster": {
+        "type": 0,
+        "drive": 1,
+        "bottom": 2,
+        "tone": 3,
+        "solo_level": 4,
+        "effect_level": 6,
+        "direct_mix": 7,
+    },
+    "mod": {"type": 0},
+    "fx": {"type": 0},
+    "delay": {
+        "type": 0,
+        "feedback": 5,
+        "high_cut": 6,
+        "effect_level": 7,
+        "direct_level": 8,
+    },
+    "reverb": {
+        "type": 0,
+        "layer_mode": 1,
+        "time": 2,
+        "pre_delay": 3,
+        "low_cut": 8,
+        "high_cut": 9,
+        "effect_level": 10,
+        "direct_level": 11,
+    },
+    "ns": {"threshold": 1, "release": 2},
+    "send_return": {"position": 1, "mode": 2, "send_level": 3, "return_level": 4},
+    "solo": {"effect_level": 1},
+    "pedalfx": {"position": 0, "type": 2},
+}
+DELAY_TIME_RAW_START = 1
+DELAY_TIME_RAW_END = 5
 
 
 def patch_object_block_names(patch_object: dict[str, Any]) -> list[str]:
@@ -91,9 +139,10 @@ def merge_patch_object_into_full_patch(full_patch: dict[str, Any], patch_object:
     normalized = normalize_patch_object(patch_object)
 
     if "routing" in normalized:
-        merged["routing"] = deepcopy(normalized["routing"])
+        routing_target = _ensure_object(merged, "routing")
+        routing_target.update(deepcopy(normalized["routing"]))
     if "amp" in normalized:
-        merged["amp"] = deepcopy(normalized["amp"])
+        _merge_amp_block(_ensure_object(merged, "amp"), normalized["amp"])
 
     stages = merged.setdefault("stages", {})
     colors = merged.setdefault("colors", {})
@@ -103,7 +152,11 @@ def merge_patch_object_into_full_patch(full_patch: dict[str, Any], patch_object:
             continue
         block = deepcopy(normalized[block_name])
         color_index = block.pop("color_index", None)
-        stages[block_name] = block
+        stage_target = stages.get(block_name)
+        if not isinstance(stage_target, dict):
+            stage_target = {}
+            stages[block_name] = stage_target
+        _merge_stage_block(block_name, stage_target, block)
         if block_name in COLOR_BLOCKS and isinstance(color_index, int):
             color_block = colors.setdefault(block_name, {})
             color_block["index"] = color_index
@@ -199,6 +252,26 @@ def _normalize_block(block_name: str, block: dict[str, Any]) -> dict[str, Any]:
             out["raw"] = list(block["raw"])
         if block_name == "delay" and isinstance(block.get("delay2_raw"), list):
             out["delay2_raw"] = list(block["delay2_raw"])
+        for key in (
+            "type",
+            "drive",
+            "bottom",
+            "tone",
+            "solo_level",
+            "feedback",
+            "effect_level",
+            "direct_mix",
+            "direct_level",
+            "layer_mode",
+            "time",
+            "pre_delay",
+            "high_cut",
+            "low_cut",
+        ):
+            if key in block:
+                out[key] = block[key]
+        if block_name == "delay" and isinstance(block.get("time_raw"), list):
+            out["time_raw"] = list(block["time_raw"])
         return out
 
     if block_name in {"eq1", "eq2"}:
@@ -211,8 +284,12 @@ def _normalize_block(block_name: str, block: dict[str, Any]) -> dict[str, Any]:
             out["ge10_raw"] = list(block["ge10_raw"])
         return out
 
-    if block_name in {"ns", "send_return", "solo"} and isinstance(block.get("raw"), list):
-        out["raw"] = list(block["raw"])
+    if block_name in {"ns", "send_return", "solo"}:
+        if isinstance(block.get("raw"), list):
+            out["raw"] = list(block["raw"])
+        for key in ("threshold", "release", "position", "mode", "send_level", "return_level", "effect_level"):
+            if key in block:
+                out[key] = block[key]
         return out
 
     if block_name == "pedalfx":
@@ -220,6 +297,172 @@ def _normalize_block(block_name: str, block: dict[str, Any]) -> dict[str, Any]:
             out["raw_com"] = list(block["raw_com"])
         if isinstance(block.get("raw"), list):
             out["raw"] = list(block["raw"])
+        for key in ("position", "on", "type"):
+            if key in block:
+                out[key] = block[key]
         return out
 
     return out
+
+
+def _ensure_object(target: dict[str, Any], key: str) -> dict[str, Any]:
+    value = target.get(key)
+    if isinstance(value, dict):
+        return value
+    value = {}
+    target[key] = value
+    return value
+
+
+def _merge_amp_block(target: dict[str, Any], patch_block: dict[str, Any]) -> None:
+    for key, value in patch_block.items():
+        if key == "raw" and isinstance(value, list):
+            target["raw"] = list(value)
+        elif key != "color_index":
+            target[key] = deepcopy(value)
+    raw = target.get("raw")
+    if isinstance(raw, list):
+        for key, index in AMP_FIELD_TO_RAW_INDEX.items():
+            if key in patch_block and 0 <= index < len(raw):
+                raw[index] = int(target[key])
+    else:
+        raw = [0] * 10
+        for key, index in AMP_FIELD_TO_RAW_INDEX.items():
+            value = target.get(key)
+            if isinstance(value, (int, float)):
+                raw[index] = int(value)
+        target["raw"] = raw
+    for key, index in AMP_FIELD_TO_RAW_INDEX.items():
+        if 0 <= index < len(raw):
+            target[key] = raw[index]
+
+
+def _merge_stage_block(block_name: str, target: dict[str, Any], patch_block: dict[str, Any]) -> None:
+    for key, value in patch_block.items():
+        if isinstance(value, list):
+            target[key] = list(value)
+        else:
+            target[key] = deepcopy(value)
+
+    _sync_stage_raw_from_compact(block_name, target, patch_block)
+    _sync_stage_compact_from_raw(block_name, target)
+
+
+def _sync_stage_raw_from_compact(block_name: str, target: dict[str, Any], patch_block: dict[str, Any]) -> None:
+    raw_map = STAGE_RAW_FIELD_MAP.get(block_name, {})
+    raw = target.get("raw")
+    if isinstance(raw, list):
+        for key, index in raw_map.items():
+            if key in patch_block and 0 <= index < len(raw) and isinstance(target.get(key), (int, float)):
+                raw[index] = int(target[key])
+        if block_name == "delay":
+            time_raw = target.get("time_raw")
+            if isinstance(time_raw, list) and len(raw) >= DELAY_TIME_RAW_END:
+                for raw_index, value in enumerate(time_raw[: DELAY_TIME_RAW_END - DELAY_TIME_RAW_START], start=DELAY_TIME_RAW_START):
+                    raw[raw_index] = int(value)
+    elif block_name in {"ns", "send_return", "solo"}:
+        max_index = max(raw_map.values(), default=0)
+        raw = [0] * (max_index + 1)
+        if isinstance(target.get("on"), bool):
+            raw[0] = 1 if target["on"] else 0
+        for key, index in raw_map.items():
+            value = target.get(key)
+            if isinstance(value, (int, float)):
+                raw[index] = int(value)
+        target["raw"] = raw
+
+    if block_name == "pedalfx":
+        raw_com = target.get("raw_com")
+        if isinstance(raw_com, list):
+            if isinstance(target.get("position"), (int, float)) and len(raw_com) >= 1:
+                raw_com[0] = int(target["position"])
+            if isinstance(target.get("on"), bool) and len(raw_com) >= 2:
+                raw_com[1] = 1 if target["on"] else 0
+            if isinstance(target.get("type"), (int, float)) and len(raw_com) >= 3:
+                raw_com[2] = int(target["type"])
+        else:
+            raw_com = [0, 0, 0]
+            if isinstance(target.get("position"), (int, float)):
+                raw_com[0] = int(target["position"])
+            if isinstance(target.get("on"), bool):
+                raw_com[1] = 1 if target["on"] else 0
+            if isinstance(target.get("type"), (int, float)):
+                raw_com[2] = int(target["type"])
+            target["raw_com"] = raw_com
+
+
+def _sync_stage_compact_from_raw(block_name: str, target: dict[str, Any]) -> None:
+    raw = target.get("raw")
+    if block_name == "booster" and isinstance(raw, list):
+        if len(raw) >= 1:
+            target["type"] = raw[0]
+        if len(raw) >= 2:
+            target["drive"] = raw[1]
+        if len(raw) >= 3:
+            target["bottom"] = raw[2]
+        if len(raw) >= 4:
+            target["tone"] = raw[3]
+        if len(raw) >= 5:
+            target["solo_level"] = raw[4]
+        if len(raw) >= 7:
+            target["effect_level"] = raw[6]
+        if len(raw) >= 8:
+            target["direct_mix"] = raw[7]
+    elif block_name in {"mod", "fx"} and isinstance(raw, list):
+        if len(raw) >= 1:
+            target["type"] = raw[0]
+    elif block_name == "delay" and isinstance(raw, list):
+        if len(raw) >= 1:
+            target["type"] = raw[0]
+        if len(raw) >= DELAY_TIME_RAW_END:
+            target["time_raw"] = list(raw[DELAY_TIME_RAW_START:DELAY_TIME_RAW_END])
+        if len(raw) >= 6:
+            target["feedback"] = raw[5]
+        if len(raw) >= 8:
+            target["effect_level"] = raw[7]
+        if len(raw) >= 9:
+            target["direct_level"] = raw[8]
+    elif block_name == "reverb" and isinstance(raw, list):
+        if len(raw) >= 1:
+            target["type"] = raw[0]
+        if len(raw) >= 2:
+            target["layer_mode"] = raw[1]
+        if len(raw) >= 3:
+            target["time"] = raw[2]
+        if len(raw) >= 11:
+            target["effect_level"] = raw[10]
+        if len(raw) >= 12:
+            target["direct_level"] = raw[11]
+    elif block_name == "ns" and isinstance(raw, list):
+        if len(raw) >= 1:
+            target["on"] = bool(raw[0])
+        if len(raw) >= 2:
+            target["threshold"] = raw[1]
+        if len(raw) >= 3:
+            target["release"] = raw[2]
+    elif block_name == "send_return" and isinstance(raw, list):
+        if len(raw) >= 1:
+            target["on"] = bool(raw[0])
+        if len(raw) >= 2:
+            target["position"] = raw[1]
+        if len(raw) >= 3:
+            target["mode"] = raw[2]
+        if len(raw) >= 4:
+            target["send_level"] = raw[3]
+        if len(raw) >= 5:
+            target["return_level"] = raw[4]
+    elif block_name == "solo" and isinstance(raw, list):
+        if len(raw) >= 1:
+            target["on"] = bool(raw[0])
+        if len(raw) >= 2:
+            target["effect_level"] = raw[1]
+
+    if block_name == "pedalfx":
+        raw_com = target.get("raw_com")
+        if isinstance(raw_com, list):
+            if len(raw_com) >= 1:
+                target["position"] = raw_com[0]
+            if len(raw_com) >= 2:
+                target["on"] = bool(raw_com[1])
+            if len(raw_com) >= 3:
+                target["type"] = raw_com[2]

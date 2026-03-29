@@ -114,6 +114,7 @@ const EDITOR_LIVE_APPLY_MIN_GAP_MS = 120;
 const DEFAULT_TARGET_RMS_DBFS = -31.0;
 const AUTO_LEVEL_TOLERANCE_DB = 0.4;
 const AUTO_LEVEL_MEASURE_SEC = 2.0;
+const TONE_BLOCK_OPTIONS = ['routing', 'amp', 'booster', 'mod', 'fx', 'delay', 'reverb', 'eq1', 'eq2', 'ns', 'send_return', 'solo', 'pedalfx'] as const;
 
 interface AmpConnectionTestResponse {
   ok: boolean;
@@ -277,6 +278,49 @@ interface LivePatchResponse {
   exact_amp_slot: { slot: number; patch_name: string } | null;
   partial_amp_slots: { slot: number; patch_name: string }[];
   compat_hash_sha256: string;
+}
+
+interface TonePatchObjectResponse {
+  id: number;
+  name: string;
+  description: string;
+  patch_json: Record<string, unknown>;
+  source_type: string;
+  source_prompt: string | null;
+  parent_patch_object_id: number | null;
+  blocks: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+interface ToneGroupResponse {
+  id: number;
+  name: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface TonePatchObjectSetSlotResponse {
+  slot: number;
+  patch_object_id: number;
+  patch_object_name: string;
+  blocks: string[];
+}
+
+interface TonePatchObjectSetResponse {
+  id: number;
+  name: string;
+  description: string;
+  source_prompt: string | null;
+  slots: TonePatchObjectSetSlotResponse[];
+  created_at: string;
+  updated_at: string;
+}
+
+interface ToneAiGenerateSetResponse {
+  summary: string;
+  set: TonePatchObjectSetResponse;
 }
 
 interface PatchConfigResponse {
@@ -542,6 +586,19 @@ export class App implements OnInit, OnDestroy {
   patchConfigTargetSlot = signal<number | null>(null);
   patchConfigTargetLabel = signal('');
   patchConfigRows = signal<PatchConfigResponse[]>([]);
+  tonePatchObjects = signal<TonePatchObjectResponse[]>([]);
+  toneGroups = signal<ToneGroupResponse[]>([]);
+  toneSets = signal<TonePatchObjectSetResponse[]>([]);
+  toneSaveName = signal('');
+  toneSaveDescription = signal('');
+  toneGroupName = signal('');
+  toneGroupDescription = signal('');
+  toneAiPrompt = signal('Generate a focused set of candidates around the target sound. Make the candidates distinct enough to audition quickly.');
+  toneAiSetName = signal('');
+  toneAiDescription = signal('');
+  toneAiCount = signal('8');
+  toneSelectedBlocks = signal<Record<string, boolean>>({ amp: true, booster: true, eq1: true });
+  toneAssignGroupByPatchObject = signal<Record<number, string>>({});
   private activeSlotPollInFlight = false;
   private readonly onPopState = (): void => {
     this.currentPage.set(this.resolvePageFromPath());
@@ -552,6 +609,7 @@ export class App implements OnInit, OnDestroy {
     void this.refreshQueueState();
     void this.loadAudioLevelMarker();
     void this.loadRecentAudioSamples();
+    void this.loadToneLabData();
     void this.refreshActiveSlot();
     void this.refreshLivePatchStatus();
     this.startLiveMeter();
@@ -682,6 +740,328 @@ export class App implements OnInit, OnDestroy {
       this.applyLivePatchStatus(payload as LivePatchResponse);
     } catch {
       // Ignore background Live Patch summary failures.
+    }
+  }
+
+  toneBlockOptions(): readonly string[] {
+    return TONE_BLOCK_OPTIONS;
+  }
+
+  isToneBlockSelected(block: string): boolean {
+    return Boolean(this.toneSelectedBlocks()[block]);
+  }
+
+  setToneBlockSelected(block: string, checked: boolean): void {
+    this.toneSelectedBlocks.update((current) => ({ ...current, [block]: checked }));
+  }
+
+  selectedToneBlocks(): string[] {
+    return this.toneBlockOptions().filter((block) => this.isToneBlockSelected(block));
+  }
+
+  setToneSaveName(value: string): void {
+    this.toneSaveName.set(value);
+  }
+
+  setToneSaveDescription(value: string): void {
+    this.toneSaveDescription.set(value);
+  }
+
+  setToneGroupName(value: string): void {
+    this.toneGroupName.set(value);
+  }
+
+  setToneGroupDescription(value: string): void {
+    this.toneGroupDescription.set(value);
+  }
+
+  setToneAiPrompt(value: string): void {
+    this.toneAiPrompt.set(value);
+  }
+
+  setToneAiSetName(value: string): void {
+    this.toneAiSetName.set(value);
+  }
+
+  setToneAiDescription(value: string): void {
+    this.toneAiDescription.set(value);
+  }
+
+  setToneAiCount(value: string): void {
+    this.toneAiCount.set(value);
+  }
+
+  setToneAssignGroupId(patchObjectId: number, value: string): void {
+    this.toneAssignGroupByPatchObject.update((current) => ({ ...current, [patchObjectId]: value }));
+  }
+
+  async loadToneLabData(): Promise<void> {
+    await Promise.all([this.loadTonePatchObjects(), this.loadToneGroups(), this.loadToneSets()]);
+  }
+
+  async loadTonePatchObjects(): Promise<void> {
+    try {
+      const response = await fetch('/api/v1/patch-objects', { method: 'GET', cache: 'no-store' });
+      const payload = (await response.json()) as TonePatchObjectResponse[] | { detail?: unknown };
+      if (!response.ok || !Array.isArray(payload)) {
+        return;
+      }
+      this.tonePatchObjects.set(payload as TonePatchObjectResponse[]);
+    } catch {
+      // Informational panel only.
+    }
+  }
+
+  async loadToneGroups(): Promise<void> {
+    try {
+      const response = await fetch('/api/v1/groups', { method: 'GET', cache: 'no-store' });
+      const payload = (await response.json()) as ToneGroupResponse[] | { detail?: unknown };
+      if (!response.ok || !Array.isArray(payload)) {
+        return;
+      }
+      this.toneGroups.set(payload as ToneGroupResponse[]);
+    } catch {
+      // Informational panel only.
+    }
+  }
+
+  async loadToneSets(): Promise<void> {
+    try {
+      const response = await fetch('/api/v1/sets', { method: 'GET', cache: 'no-store' });
+      const payload = (await response.json()) as TonePatchObjectSetResponse[] | { detail?: unknown };
+      if (!response.ok || !Array.isArray(payload)) {
+        return;
+      }
+      this.toneSets.set(payload as TonePatchObjectSetResponse[]);
+    } catch {
+      // Informational panel only.
+    }
+  }
+
+  async saveLiveAsTonePatchObject(): Promise<void> {
+    const name = this.toneSaveName().trim();
+    const blocks = this.selectedToneBlocks();
+    if (!name) {
+      this.status.set('Tone save requires a name.');
+      return;
+    }
+    if (blocks.length === 0) {
+      this.status.set('Select at least one block before saving from Live Patch.');
+      return;
+    }
+    this.setActionBusy('tone-save-live', true);
+    this.status.set(`Saving Live Patch blocks to ${name}...`);
+    this.responseJson.set('');
+    try {
+      const response = await fetch('/api/v1/patch-objects/save-from-live', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          description: this.toneSaveDescription(),
+          blocks,
+          source_type: 'manual',
+        }),
+      });
+      const payload = (await response.json()) as TonePatchObjectResponse | { detail?: unknown };
+      if (!response.ok) {
+        this.status.set('Live Patch save failed');
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      this.toneSaveName.set('');
+      this.toneSaveDescription.set('');
+      await this.loadTonePatchObjects();
+      await this.refreshLivePatchStatus();
+      this.status.set(`Saved Live Patch selection as ${name}`);
+      this.responseJson.set(JSON.stringify(payload, null, 2));
+    } catch (error: unknown) {
+      this.status.set('Live Patch save failed');
+      this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
+    } finally {
+      this.setActionBusy('tone-save-live', false);
+    }
+  }
+
+  async createToneGroup(): Promise<void> {
+    const name = this.toneGroupName().trim();
+    if (!name) {
+      this.status.set('Group creation requires a name.');
+      return;
+    }
+    this.setActionBusy('tone-create-group', true);
+    this.status.set(`Creating group ${name}...`);
+    this.responseJson.set('');
+    try {
+      const response = await fetch('/api/v1/groups', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description: this.toneGroupDescription() }),
+      });
+      const payload = (await response.json()) as ToneGroupResponse | { detail?: unknown };
+      if (!response.ok) {
+        this.status.set('Group creation failed');
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      this.toneGroupName.set('');
+      this.toneGroupDescription.set('');
+      await this.loadToneGroups();
+      this.status.set(`Created group ${name}`);
+      this.responseJson.set(JSON.stringify(payload, null, 2));
+    } catch (error: unknown) {
+      this.status.set('Group creation failed');
+      this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
+    } finally {
+      this.setActionBusy('tone-create-group', false);
+    }
+  }
+
+  async assignTonePatchObjectToGroup(patchObject: TonePatchObjectResponse): Promise<void> {
+    const groupIdValue = this.toneAssignGroupByPatchObject()[patchObject.id] ?? '';
+    const groupId = Number.parseInt(groupIdValue, 10);
+    if (!Number.isFinite(groupId) || groupId <= 0) {
+      this.status.set(`Select a group before assigning ${patchObject.name}.`);
+      return;
+    }
+    const actionKey = `tone-assign-group:${patchObject.id}`;
+    this.setActionBusy(actionKey, true);
+    this.status.set(`Adding ${patchObject.name} to group...`);
+    this.responseJson.set('');
+    try {
+      const response = await fetch(`/api/v1/groups/${groupId}/patch-objects/${patchObject.id}`, {
+        method: 'POST',
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as { ok?: boolean; detail?: unknown };
+      if (!response.ok) {
+        this.status.set(`Failed adding ${patchObject.name} to group`);
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      this.status.set(`Added ${patchObject.name} to group`);
+      this.responseJson.set(JSON.stringify(payload, null, 2));
+    } catch (error: unknown) {
+      this.status.set(`Failed adding ${patchObject.name} to group`);
+      this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
+    } finally {
+      this.setActionBusy(actionKey, false);
+    }
+  }
+
+  async applyTonePatchObjectToLive(patchObject: TonePatchObjectResponse): Promise<void> {
+    const actionKey = `tone-apply:${patchObject.id}`;
+    this.setActionBusy(actionKey, true);
+    this.status.set(`Applying ${patchObject.name} to Live Patch...`);
+    this.responseJson.set('');
+    try {
+      const response = await fetch('/api/v1/live-patch/apply-patch-object', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patch_object_id: patchObject.id }),
+      });
+      const payload = (await response.json()) as LivePatchResponse | { detail?: unknown };
+      if (!response.ok || !('patch_json' in payload)) {
+        this.status.set(`Failed applying ${patchObject.name}`);
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      this.applyLivePatchStatus(payload as LivePatchResponse);
+      this.status.set(`Applied ${patchObject.name} to Live Patch`);
+      this.responseJson.set(JSON.stringify(payload, null, 2));
+    } catch (error: unknown) {
+      this.status.set(`Failed applying ${patchObject.name}`);
+      this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
+    } finally {
+      this.setActionBusy(actionKey, false);
+    }
+  }
+
+  async generateToneAiSet(): Promise<void> {
+    const setName = this.toneAiSetName().trim();
+    const prompt = this.toneAiPrompt().trim();
+    const blocks = this.selectedToneBlocks();
+    const count = Number.parseInt(this.toneAiCount().trim() || '0', 10);
+    if (!setName) {
+      this.status.set('AI set generation requires a set name.');
+      return;
+    }
+    if (!prompt) {
+      this.status.set('AI set generation requires a prompt.');
+      return;
+    }
+    if (blocks.length === 0) {
+      this.status.set('Select at least one block before AI generation.');
+      return;
+    }
+    if (!Number.isFinite(count) || count < 1 || count > 8) {
+      this.status.set('AI set count must be between 1 and 8.');
+      return;
+    }
+    this.setActionBusy('tone-ai-generate', true);
+    this.status.set(`Generating AI set ${setName}...`);
+    this.responseJson.set('');
+    try {
+      const response = await fetch('/api/v1/sets/ai-generate', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          set_name: setName,
+          description: this.toneAiDescription(),
+          prompt,
+          blocks,
+          count,
+        }),
+      });
+      const payload = (await response.json()) as ToneAiGenerateSetResponse | { detail?: unknown };
+      if (!response.ok || !('set' in payload)) {
+        this.status.set('AI set generation failed');
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      this.toneAiSetName.set('');
+      this.toneAiDescription.set('');
+      await this.loadTonePatchObjects();
+      await this.loadToneSets();
+      this.status.set(`Generated AI set ${setName}`);
+      this.responseJson.set(JSON.stringify(payload, null, 2));
+    } catch (error: unknown) {
+      this.status.set('AI set generation failed');
+      this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
+    } finally {
+      this.setActionBusy('tone-ai-generate', false);
+    }
+  }
+
+  async programToneSetToAmp(toneSet: TonePatchObjectSetResponse, startSlot: number): Promise<void> {
+    const actionKey = `tone-program-set:${toneSet.id}:${startSlot}`;
+    this.setActionBusy(actionKey, true);
+    this.status.set(`Programming ${toneSet.name} to ${startSlot <= 4 ? 'A' : 'B'} bank...`);
+    this.responseJson.set('');
+    try {
+      const response = await fetch(`/api/v1/sets/${toneSet.id}/program-amp`, {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ start_slot: startSlot }),
+      });
+      const payload = (await response.json()) as { programmed_slots?: unknown; detail?: unknown };
+      if (!response.ok) {
+        this.status.set(`Failed programming ${toneSet.name}`);
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      this.status.set(`Programmed ${toneSet.name} starting at ${startSlot <= 4 ? 'A:1' : 'B:1'}`);
+      this.responseJson.set(JSON.stringify(payload, null, 2));
+    } catch (error: unknown) {
+      this.status.set(`Failed programming ${toneSet.name}`);
+      this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
+    } finally {
+      this.setActionBusy(actionKey, false);
     }
   }
 

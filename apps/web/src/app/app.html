@@ -110,6 +110,209 @@
 
       <p class="small mb-3">{{ status() }}</p>
 
+      <section class="row g-3 mb-4">
+        <div class="col-12 col-lg-4">
+          <article class="card h-100">
+            <div class="card-body d-grid gap-2">
+              <div>
+                <h2 class="h6 mb-1">Live Patch Capture</h2>
+                <p class="small text-secondary mb-0">Save a sparse object from the current Live Patch. Present blocks are owned; absent blocks are wildcards.</p>
+              </div>
+              <div>
+                <label class="form-label small mb-1" for="toneSaveName">Name</label>
+                <input id="toneSaveName" type="text" class="form-control" [value]="toneSaveName()" (input)="setToneSaveName($any($event.target).value)" />
+              </div>
+              <div>
+                <label class="form-label small mb-1" for="toneSaveDescription">Description</label>
+                <textarea id="toneSaveDescription" class="form-control" rows="3" [value]="toneSaveDescription()" (input)="setToneSaveDescription($any($event.target).value)"></textarea>
+              </div>
+              <div>
+                <p class="form-label small mb-1">Blocks</p>
+                <div class="tone-block-grid">
+                  @for (block of toneBlockOptions(); track block) {
+                    <label class="form-check small mb-0">
+                      <input class="form-check-input" type="checkbox" [checked]="isToneBlockSelected(block)" (change)="setToneBlockSelected(block, $any($event.target).checked)" />
+                      <span class="form-check-label">{{ block }}</span>
+                    </label>
+                  }
+                </div>
+              </div>
+              <div class="d-flex justify-content-end">
+                <button type="button" class="btn btn-sm btn-success" (click)="saveLiveAsTonePatchObject()" [disabled]="isActionBusy('tone-save-live')">
+                  {{ isActionBusy('tone-save-live') ? 'Saving...' : 'Save From Live Patch' }}
+                </button>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <div class="col-12 col-lg-5">
+          <article class="card h-100">
+            <div class="card-body d-grid gap-2">
+              <div>
+                <h2 class="h6 mb-1">AI Designer</h2>
+                <p class="small text-secondary mb-0">Generate a named set of sparse candidates against the current Live Patch as the base context.</p>
+              </div>
+              <div class="row g-2">
+                <div class="col-12 col-md-8">
+                  <label class="form-label small mb-1" for="toneAiSetName">Set Name</label>
+                  <input id="toneAiSetName" type="text" class="form-control" [value]="toneAiSetName()" (input)="setToneAiSetName($any($event.target).value)" />
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label small mb-1" for="toneAiCount">Count</label>
+                  <input id="toneAiCount" type="number" min="1" max="8" class="form-control" [value]="toneAiCount()" (input)="setToneAiCount($any($event.target).value)" />
+                </div>
+              </div>
+              <div>
+                <label class="form-label small mb-1" for="toneAiDescription">Description</label>
+                <input id="toneAiDescription" type="text" class="form-control" [value]="toneAiDescription()" (input)="setToneAiDescription($any($event.target).value)" />
+              </div>
+              <div>
+                <label class="form-label small mb-1" for="toneAiPrompt">Prompt</label>
+                <textarea id="toneAiPrompt" class="form-control" rows="5" [value]="toneAiPrompt()" (input)="setToneAiPrompt($any($event.target).value)"></textarea>
+              </div>
+              <div class="d-flex justify-content-end">
+                <button type="button" class="btn btn-sm btn-primary" (click)="generateToneAiSet()" [disabled]="isActionBusy('tone-ai-generate')">
+                  {{ isActionBusy('tone-ai-generate') ? 'Generating...' : 'Generate AI Set' }}
+                </button>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <div class="col-12 col-lg-3">
+          <article class="card h-100">
+            <div class="card-body d-grid gap-2">
+              <div>
+                <h2 class="h6 mb-1">Groups</h2>
+                <p class="small text-secondary mb-0">Create named groups for keepers and later curation.</p>
+              </div>
+              <div>
+                <label class="form-label small mb-1" for="toneGroupName">Name</label>
+                <input id="toneGroupName" type="text" class="form-control" [value]="toneGroupName()" (input)="setToneGroupName($any($event.target).value)" />
+              </div>
+              <div>
+                <label class="form-label small mb-1" for="toneGroupDescription">Description</label>
+                <textarea id="toneGroupDescription" class="form-control" rows="3" [value]="toneGroupDescription()" (input)="setToneGroupDescription($any($event.target).value)"></textarea>
+              </div>
+              <div class="d-flex justify-content-end">
+                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="createToneGroup()" [disabled]="isActionBusy('tone-create-group')">
+                  {{ isActionBusy('tone-create-group') ? 'Creating...' : 'Create Group' }}
+                </button>
+              </div>
+              <div class="tone-groups-list">
+                @for (group of toneGroups(); track group.id) {
+                  <div class="small border rounded px-2 py-1 bg-body-tertiary">
+                    <strong>{{ group.name }}</strong>
+                  </div>
+                }
+                @if (toneGroups().length === 0) {
+                  <p class="small text-secondary mb-0">No groups yet.</p>
+                }
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="row g-3 mb-4">
+        <div class="col-12 col-xl-6">
+          <article class="card h-100">
+            <div class="card-body d-grid gap-2">
+              <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                <div>
+                  <h2 class="h6 mb-1">Patch Objects</h2>
+                  <p class="small text-secondary mb-0">Sparse saved ideas and full-scope keepers.</p>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="loadTonePatchObjects()">Refresh</button>
+              </div>
+              <div class="tone-list">
+                @for (patchObject of tonePatchObjects(); track patchObject.id) {
+                  <article class="border rounded p-2 small bg-body-tertiary d-grid gap-2">
+                    <div class="d-flex justify-content-between gap-2 flex-wrap">
+                      <div>
+                        <p class="mb-1"><strong>{{ patchObject.name }}</strong></p>
+                        <p class="mb-0 text-secondary">{{ patchObject.source_type }} · {{ patchObject.blocks.join(', ') }}</p>
+                      </div>
+                      <div class="d-flex gap-2 flex-wrap">
+                        <button type="button" class="btn btn-sm btn-primary" (click)="applyTonePatchObjectToLive(patchObject)" [disabled]="isActionBusy('tone-apply:' + patchObject.id)">
+                          {{ isActionBusy('tone-apply:' + patchObject.id) ? 'Applying...' : 'Apply Live' }}
+                        </button>
+                      </div>
+                    </div>
+                    @if (patchObject.description) {
+                      <p class="mb-0 text-secondary">{{ patchObject.description }}</p>
+                    }
+                    <div class="d-flex gap-2 flex-wrap align-items-center">
+                      <select class="form-select form-select-sm tone-inline-select" [value]="toneAssignGroupByPatchObject()[patchObject.id] || ''" (change)="setToneAssignGroupId(patchObject.id, $any($event.target).value)">
+                        <option value="">Select group</option>
+                        @for (group of toneGroups(); track group.id) {
+                          <option [value]="group.id">{{ group.name }}</option>
+                        }
+                      </select>
+                      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="assignTonePatchObjectToGroup(patchObject)" [disabled]="toneGroups().length === 0 || isActionBusy('tone-assign-group:' + patchObject.id)">
+                        {{ isActionBusy('tone-assign-group:' + patchObject.id) ? 'Adding...' : 'Add To Group' }}
+                      </button>
+                    </div>
+                  </article>
+                }
+                @if (tonePatchObjects().length === 0) {
+                  <p class="small text-secondary mb-0">No patch objects saved yet.</p>
+                }
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <div class="col-12 col-xl-6">
+          <article class="card h-100">
+            <div class="card-body d-grid gap-2">
+              <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                <div>
+                  <h2 class="h6 mb-1">Sets</h2>
+                  <p class="small text-secondary mb-0">Ordered audition batches. Program them to slots using the current Live Patch as the base render context.</p>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="loadToneSets()">Refresh</button>
+              </div>
+              <div class="tone-list">
+                @for (toneSet of toneSets(); track toneSet.id) {
+                  <article class="border rounded p-2 small bg-body-tertiary d-grid gap-2">
+                    <div class="d-flex justify-content-between gap-2 flex-wrap">
+                      <div>
+                        <p class="mb-1"><strong>{{ toneSet.name }}</strong></p>
+                        <p class="mb-0 text-secondary">{{ toneSet.slots.length }} slot{{ toneSet.slots.length === 1 ? '' : 's' }}</p>
+                      </div>
+                      <div class="d-flex gap-2 flex-wrap">
+                        <button type="button" class="btn btn-sm btn-outline-primary" (click)="programToneSetToAmp(toneSet, 1)" [disabled]="isActionBusy('tone-program-set:' + toneSet.id + ':1')">
+                          {{ isActionBusy('tone-program-set:' + toneSet.id + ':1') ? 'Programming...' : 'Program A:1' }}
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" (click)="programToneSetToAmp(toneSet, 5)" [disabled]="isActionBusy('tone-program-set:' + toneSet.id + ':5')">
+                          {{ isActionBusy('tone-program-set:' + toneSet.id + ':5') ? 'Programming...' : 'Program B:1' }}
+                        </button>
+                      </div>
+                    </div>
+                    @if (toneSet.description) {
+                      <p class="mb-0 text-secondary">{{ toneSet.description }}</p>
+                    }
+                    <div class="tone-set-slots">
+                      @for (item of toneSet.slots; track item.slot) {
+                        <div class="border rounded px-2 py-1 bg-white">
+                          <p class="mb-1"><strong>{{ item.slot }}.</strong> {{ item.patch_object_name }}</p>
+                          <p class="mb-0 text-secondary">{{ item.blocks.join(', ') }}</p>
+                        </div>
+                      }
+                    </div>
+                  </article>
+                }
+                @if (toneSets().length === 0) {
+                  <p class="small text-secondary mb-0">No sets yet.</p>
+                }
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
       <section class="mb-4">
         <h2 class="h6 text-uppercase text-secondary mb-2">Channel Bank A</h2>
         <div class="row g-3">

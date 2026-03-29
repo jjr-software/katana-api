@@ -1,19 +1,30 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import datetime
 from typing import Any
+from urllib import error as urllib_error
+from urllib import request as urllib_request
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.amp_queue import amp_job_queue
+from app.api.ai import _extract_refusal_text, _extract_response_text
 from app.deps import get_amp_client, get_db
-from app.katana import AmpClient
+from app.katana import AmpClient, slot_label
 from app.live_patch_state import live_patch_status_payload, upsert_amp_slot_snapshot, upsert_live_patch_state
-from app.models import LivePatchState, PatchObject, PatchObjectGroup, PatchObjectGroupMember
+from app.models import (
+    LivePatchState,
+    PatchObject,
+    PatchObjectGroup,
+    PatchObjectGroupMember,
+    PatchObjectSet,
+    PatchObjectSetSlot,
+)
 from app.patch_objects import (
     ALLOWED_BLOCKS,
     extract_patch_object,
@@ -21,8 +32,31 @@ from app.patch_objects import (
     normalize_patch_object,
     patch_object_block_names,
 )
+from app.settings import Settings, get_settings
 
 router = APIRouter(prefix="/api/v1", tags=["tone"])
+
+AI_SET_SYSTEM_PROMPT = """You are a BOSS Katana Gen 3 tone-set designer.
+
+You are generating sparse patch objects for tone exploration, not full arbitrary prose advice.
+
+Rules:
+- Return JSON only.
+- Generate exactly the requested number of candidates.
+- Each candidate must contain only the requested top-level blocks.
+- A present top-level block means this candidate owns that block.
+- Absent blocks mean do not care.
+- Do not include unrelated blocks.
+- Prefer sparse 1-4 block outputs.
+- Use only controls already shown in the provided live-patch reference blocks.
+- Keep candidates audibly distinct and useful for A/B testing.
+- Give each candidate a short unique name and one short description.
+- If a stage should be off, include that stage block and set `on` to false.
+- Use compact fields when possible, for example `amp.gain`, `booster.drive`, `booster.tone`, `booster.effect_level`, `eq1.position`, `eq1.type`, `eq1.ge10_raw`.
+- For EQ blocks, `ge10_raw` or `peq_raw` arrays are allowed and expected when needed.
+- For color stages, `color_index` may be set to 0, 1, or 2 when relevant.
+- Do not invent unsupported blocks, controls, or arbitrary metadata fields inside the patch objects.
+"""
 
 
 class PatchObjectCreateRequest(BaseModel):
@@ -88,6 +122,72 @@ class StoreLivePatchToSlotRequest(BaseModel):
     slot: int = Field(ge=1, le=8)
 
 
+class PatchObjectSetSlotReadResponse(BaseModel):
+    slot: int
+    patch_object_id: int
+    patch_object_name: str
+    blocks: list[str]
+
+
+class PatchObjectSetReadResponse(BaseModel):
+    id: int
+    name: str
+    description: str
+    source_prompt: str | None = None
+    slots: list[PatchObjectSetSlotReadResponse]
+    created_at: str
+    updated_at: str
+
+
+class PatchObjectSetCreateItem(BaseModel):
+    slot: int = Field(ge=1, le=8)
+    patch_object_id: int
+
+
+class PatchObjectSetCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    description: str = ""
+    source_prompt: str | None = None
+    slots: list[PatchObjectSetCreateItem] = Field(min_length=1, max_length=8)
+
+
+class ProgramPatchObjectSetRequest(BaseModel):
+    start_slot: int = Field(ge=1, le=8)
+
+
+class ProgrammedSlotResponse(BaseModel):
+    slot: int
+    slot_label: str
+    patch_object_id: int
+    patch_object_name: str
+    synced_at: str
+
+
+class ProgramPatchObjectSetResponse(BaseModel):
+    set_id: int
+    set_name: str
+    programmed_slots: list[ProgrammedSlotResponse]
+
+
+class AiGeneratePatchObjectSetRequest(BaseModel):
+    set_name: str = Field(min_length=1, max_length=255)
+    description: str = ""
+    prompt: str = Field(min_length=1, max_length=2000)
+    blocks: list[str] = Field(min_length=1, max_length=8)
+    count: int = Field(default=8, ge=1, le=8)
+
+
+class AiGeneratedCandidate(BaseModel):
+    name: str
+    description: str
+    patch_json: dict
+
+
+class AiGeneratePatchObjectSetResponse(BaseModel):
+    summary: str
+    set: PatchObjectSetReadResponse
+
+
 @router.get("/patch-objects", response_model=list[PatchObjectReadResponse])
 def list_patch_objects(db: Session = Depends(get_db)) -> list[PatchObjectReadResponse]:
     rows = list(db.scalars(select(PatchObject).order_by(PatchObject.id.desc())))
@@ -96,9 +196,7 @@ def list_patch_objects(db: Session = Depends(get_db)) -> list[PatchObjectReadRes
 
 @router.post("/patch-objects", response_model=PatchObjectReadResponse)
 def create_patch_object(payload: PatchObjectCreateRequest, db: Session = Depends(get_db)) -> PatchObjectReadResponse:
-    existing = db.scalar(select(PatchObject).where(PatchObject.name == payload.name))
-    if existing is not None:
-        raise HTTPException(status_code=409, detail={"message": "Patch object already exists", "name": payload.name})
+    _assert_patch_object_name_available(db, payload.name)
     row = PatchObject(
         name=payload.name,
         description=payload.description,
@@ -127,22 +225,9 @@ async def save_patch_object_from_live(
     db: Session = Depends(get_db),
     client: AmpClient = Depends(get_amp_client),
 ) -> PatchObjectReadResponse:
-    existing = db.scalar(select(PatchObject).where(PatchObject.name == payload.name))
-    if existing is not None:
-        raise HTTPException(status_code=409, detail={"message": "Patch object already exists", "name": payload.name})
+    _assert_patch_object_name_available(db, payload.name)
     blocks = _validated_blocks(payload.blocks)
-    live_row = db.get(LivePatchState, 1)
-    if live_row is None:
-        synced_at = datetime.now().isoformat(timespec="seconds")
-        patch = await _read_live_patch_from_amp(client)
-        active = await client.read_active_slot()
-        live_row = upsert_live_patch_state(
-            db,
-            full_patch=patch,
-            active_slot=active.slot,
-            amp_confirmed_at=synced_at,
-            source_type="amp_sync",
-        )
+    live_row = await _resolve_live_patch_row(db, client)
     sparse = extract_patch_object(live_row.patch_json, blocks)
     row = PatchObject(
         name=payload.name,
@@ -210,6 +295,131 @@ def add_patch_object_to_group(group_id: int, patch_object_id: int, db: Session =
     return {"ok": True}
 
 
+@router.get("/sets", response_model=list[PatchObjectSetReadResponse])
+def list_patch_object_sets(db: Session = Depends(get_db)) -> list[PatchObjectSetReadResponse]:
+    rows = list(db.scalars(select(PatchObjectSet).order_by(PatchObjectSet.id.desc())))
+    return [_patch_object_set_response(db, row) for row in rows]
+
+
+@router.post("/sets", response_model=PatchObjectSetReadResponse)
+def create_patch_object_set(payload: PatchObjectSetCreateRequest, db: Session = Depends(get_db)) -> PatchObjectSetReadResponse:
+    row = _create_patch_object_set(
+        db=db,
+        name=payload.name,
+        description=payload.description,
+        source_prompt=payload.source_prompt,
+        slot_items=[{"slot": item.slot, "patch_object_id": item.patch_object_id} for item in payload.slots],
+    )
+    return _patch_object_set_response(db, row)
+
+
+@router.get("/sets/{patch_object_set_id:int}", response_model=PatchObjectSetReadResponse)
+def get_patch_object_set(patch_object_set_id: int, db: Session = Depends(get_db)) -> PatchObjectSetReadResponse:
+    row = db.get(PatchObjectSet, patch_object_set_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail={"message": "Patch object set not found", "patch_object_set_id": patch_object_set_id})
+    return _patch_object_set_response(db, row)
+
+
+@router.post("/sets/{patch_object_set_id:int}/program-amp", response_model=ProgramPatchObjectSetResponse)
+async def program_patch_object_set_to_amp(
+    patch_object_set_id: int,
+    payload: ProgramPatchObjectSetRequest,
+    db: Session = Depends(get_db),
+    client: AmpClient = Depends(get_amp_client),
+) -> ProgramPatchObjectSetResponse:
+    row = db.get(PatchObjectSet, patch_object_set_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail={"message": "Patch object set not found", "patch_object_set_id": patch_object_set_id})
+    slots = _load_patch_object_set_slots(db, row.id)
+    if not slots:
+        raise HTTPException(status_code=400, detail={"message": "Patch object set has no slots", "patch_object_set_id": row.id})
+    max_slot = payload.start_slot + len(slots) - 1
+    if max_slot > 8:
+        raise HTTPException(
+            status_code=400,
+            detail={"message": "Patch object set does not fit starting at this slot", "start_slot": payload.start_slot, "count": len(slots)},
+        )
+    live_row = await _resolve_live_patch_row(db, client)
+    programmed: list[ProgrammedSlotResponse] = []
+    for index, slot_item in enumerate(slots):
+        target_slot = payload.start_slot + index
+        patch_object = db.get(PatchObject, slot_item.patch_object_id)
+        if patch_object is None:
+            raise HTTPException(status_code=404, detail={"message": "Patch object not found", "patch_object_id": slot_item.patch_object_id})
+        rendered = merge_patch_object_into_full_patch(live_row.patch_json, patch_object.patch_json)
+        rendered["patch_name"] = patch_object.name[:16]
+        job = await amp_job_queue.enqueue_slot_write(slot=target_slot, patch=rendered)
+        settled = await _await_terminal_job(job.job_id, timeout_seconds=120.0)
+        if settled.status != "succeeded" or settled.result_slot is None:
+            raise HTTPException(
+                status_code=502,
+                detail={
+                    "message": "Failed to program patch object set slot",
+                    "set_id": row.id,
+                    "target_slot": target_slot,
+                    "error": settled.error,
+                },
+            )
+        result_slot = settled.result_slot
+        upsert_amp_slot_snapshot(
+            db,
+            slot=target_slot,
+            patch_name=result_slot.patch_name,
+            full_patch=result_slot.payload or rendered,
+            amp_confirmed_at=result_slot.synced_at,
+        )
+        programmed.append(
+            ProgrammedSlotResponse(
+                slot=target_slot,
+                slot_label=slot_label(target_slot),
+                patch_object_id=patch_object.id,
+                patch_object_name=patch_object.name,
+                synced_at=result_slot.synced_at,
+            )
+        )
+    return ProgramPatchObjectSetResponse(set_id=row.id, set_name=row.name, programmed_slots=programmed)
+
+
+@router.post("/sets/ai-generate", response_model=AiGeneratePatchObjectSetResponse)
+async def ai_generate_patch_object_set(
+    payload: AiGeneratePatchObjectSetRequest,
+    db: Session = Depends(get_db),
+    client: AmpClient = Depends(get_amp_client),
+    settings: Settings = Depends(get_settings),
+) -> AiGeneratePatchObjectSetResponse:
+    blocks = _validated_blocks(payload.blocks)
+    live_row = await _resolve_live_patch_row(db, client)
+    result = await asyncio.to_thread(_call_openai_patch_set_designer, settings, live_row.patch_json, payload, blocks)
+
+    slot_items: list[dict[str, int]] = []
+    for index, candidate in enumerate(result["candidates"], start=1):
+        normalized = _validated_ai_candidate_patch_json(candidate.patch_json, blocks)
+        patch_object_name = _make_unique_patch_object_name(db, f"{payload.set_name} {index}: {candidate.name}")
+        row = PatchObject(
+            name=patch_object_name,
+            description=candidate.description,
+            patch_json=normalized,
+            source_type="ai",
+            source_prompt=payload.prompt,
+        )
+        db.add(row)
+        db.flush()
+        slot_items.append({"slot": index, "patch_object_id": row.id})
+
+    patch_object_set = _create_patch_object_set(
+        db=db,
+        name=payload.set_name,
+        description=payload.description,
+        source_prompt=payload.prompt,
+        slot_items=slot_items,
+        commit=False,
+    )
+    db.commit()
+    db.refresh(patch_object_set)
+    return AiGeneratePatchObjectSetResponse(summary=str(result["summary"]), set=_patch_object_set_response(db, patch_object_set))
+
+
 @router.get("/live-patch", response_model=LivePatchReadResponse)
 def get_live_patch(db: Session = Depends(get_db)) -> LivePatchReadResponse:
     row = db.get(LivePatchState, 1)
@@ -253,19 +463,9 @@ async def apply_patch_object_to_live_patch(
     patch_object = db.get(PatchObject, payload.patch_object_id)
     if patch_object is None:
         raise HTTPException(status_code=404, detail={"message": "Patch object not found", "patch_object_id": payload.patch_object_id})
-    live_row = db.get(LivePatchState, 1)
-    if live_row is None:
-        synced_at = datetime.now().isoformat(timespec="seconds")
-        patch = await _read_live_patch_from_amp(client)
-        active = await client.read_active_slot()
-        live_row = upsert_live_patch_state(
-            db,
-            full_patch=patch,
-            active_slot=active.slot,
-            amp_confirmed_at=synced_at,
-            source_type="amp_sync",
-        )
+    live_row = await _resolve_live_patch_row(db, client)
     merged = merge_patch_object_into_full_patch(live_row.patch_json, patch_object.patch_json)
+    merged["patch_name"] = patch_object.name[:16]
     applied = await _queued_apply_current_patch(merged)
     applied_at = datetime.now().isoformat(timespec="seconds")
     row = upsert_live_patch_state(
@@ -326,6 +526,43 @@ def _patch_object_response(row: PatchObject) -> PatchObjectReadResponse:
     )
 
 
+def _patch_object_set_response(db: Session, row: PatchObjectSet) -> PatchObjectSetReadResponse:
+    slots = _load_patch_object_set_slots(db, row.id)
+    patch_object_ids = [item.patch_object_id for item in slots]
+    patch_objects = {
+        item.id: item
+        for item in db.scalars(select(PatchObject).where(PatchObject.id.in_(patch_object_ids))).all()
+    } if patch_object_ids else {}
+    return PatchObjectSetReadResponse(
+        id=row.id,
+        name=row.name,
+        description=row.description,
+        source_prompt=row.source_prompt,
+        slots=[
+            PatchObjectSetSlotReadResponse(
+                slot=item.slot,
+                patch_object_id=item.patch_object_id,
+                patch_object_name=patch_objects[item.patch_object_id].name,
+                blocks=patch_object_block_names(patch_objects[item.patch_object_id].patch_json),
+            )
+            for item in slots
+            if item.patch_object_id in patch_objects
+        ],
+        created_at=row.created_at.isoformat(timespec="seconds"),
+        updated_at=row.updated_at.isoformat(timespec="seconds"),
+    )
+
+
+def _load_patch_object_set_slots(db: Session, patch_object_set_id: int) -> list[PatchObjectSetSlot]:
+    return list(
+        db.scalars(
+            select(PatchObjectSetSlot)
+            .where(PatchObjectSetSlot.patch_object_set_id == patch_object_set_id)
+            .order_by(PatchObjectSetSlot.slot.asc())
+        )
+    )
+
+
 def _validated_blocks(blocks: list[str]) -> list[str]:
     out: list[str] = []
     for block in blocks:
@@ -336,6 +573,200 @@ def _validated_blocks(blocks: list[str]) -> list[str]:
     if not out:
         raise HTTPException(status_code=400, detail={"message": "At least one block is required"})
     return out
+
+
+def _assert_patch_object_name_available(db: Session, name: str) -> None:
+    existing = db.scalar(select(PatchObject).where(PatchObject.name == name))
+    if existing is not None:
+        raise HTTPException(status_code=409, detail={"message": "Patch object already exists", "name": name})
+
+
+def _make_unique_patch_object_name(db: Session, base_name: str) -> str:
+    trimmed = base_name.strip()[:255] or "Patch Object"
+    candidate = trimmed
+    suffix = 2
+    while db.scalar(select(PatchObject).where(PatchObject.name == candidate)) is not None:
+        trailer = f" ({suffix})"
+        candidate = f"{trimmed[: max(1, 255 - len(trailer))]}{trailer}"
+        suffix += 1
+    return candidate
+
+
+def _create_patch_object_set(
+    *,
+    db: Session,
+    name: str,
+    description: str,
+    source_prompt: str | None,
+    slot_items: list[dict[str, int]],
+    commit: bool = True,
+) -> PatchObjectSet:
+    existing = db.scalar(select(PatchObjectSet).where(PatchObjectSet.name == name))
+    if existing is not None:
+        raise HTTPException(status_code=409, detail={"message": "Patch object set already exists", "name": name})
+    seen_slots: set[int] = set()
+    for item in slot_items:
+        slot = int(item["slot"])
+        patch_object_id = int(item["patch_object_id"])
+        if slot in seen_slots:
+            raise HTTPException(status_code=400, detail={"message": "Duplicate set slot", "slot": slot})
+        seen_slots.add(slot)
+        if slot < 1 or slot > 8:
+            raise HTTPException(status_code=400, detail={"message": "Set slots must be 1..8", "slot": slot})
+        if db.get(PatchObject, patch_object_id) is None:
+            raise HTTPException(status_code=404, detail={"message": "Patch object not found", "patch_object_id": patch_object_id})
+    row = PatchObjectSet(name=name, description=description, source_prompt=source_prompt)
+    db.add(row)
+    db.flush()
+    for item in slot_items:
+        db.add(
+            PatchObjectSetSlot(
+                patch_object_set_id=row.id,
+                slot=int(item["slot"]),
+                patch_object_id=int(item["patch_object_id"]),
+            )
+        )
+    if commit:
+        db.commit()
+        db.refresh(row)
+    return row
+
+
+def _validated_ai_candidate_patch_json(patch_json: dict[str, Any], selected_blocks: list[str]) -> dict[str, Any]:
+    if not isinstance(patch_json, dict):
+        raise HTTPException(status_code=502, detail={"message": "AI returned invalid patch_json", "patch_json": patch_json})
+    for key in patch_json.keys():
+        if key not in selected_blocks:
+            raise HTTPException(status_code=502, detail={"message": "AI returned block outside requested scope", "block": key})
+    normalized = normalize_patch_object(patch_json)
+    if not normalized:
+        raise HTTPException(status_code=502, detail={"message": "AI returned empty sparse patch object", "patch_json": patch_json})
+    return normalized
+
+
+def _build_ai_patch_set_schema(count: int) -> dict[str, Any]:
+    candidate_schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["name", "description", "patch_json"],
+        "properties": {
+            "name": {"type": "string"},
+            "description": {"type": "string"},
+            "patch_json": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {block: {"type": "object"} for block in ALLOWED_BLOCKS},
+            },
+        },
+    }
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["summary", "candidates"],
+        "properties": {
+            "summary": {"type": "string"},
+            "candidates": {
+                "type": "array",
+                "minItems": count,
+                "maxItems": count,
+                "items": candidate_schema,
+            },
+        },
+    }
+
+
+def _call_openai_patch_set_designer(
+    settings: Settings,
+    live_patch: dict[str, Any],
+    payload: AiGeneratePatchObjectSetRequest,
+    blocks: list[str],
+) -> dict[str, Any]:
+    body = {
+        "model": settings.openai_model,
+        "input": [
+            {
+                "role": "system",
+                "content": [{"type": "input_text", "text": AI_SET_SYSTEM_PROMPT}],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_text",
+                        "text": json.dumps(
+                            {
+                                "set_name": payload.set_name,
+                                "prompt": payload.prompt,
+                                "count": payload.count,
+                                "blocks": blocks,
+                                "live_patch_reference_blocks": extract_patch_object(live_patch, blocks),
+                                "live_patch_patch_name": str(live_patch.get("patch_name", "")),
+                            },
+                            separators=(",", ":"),
+                        ),
+                    }
+                ],
+            },
+        ],
+        "max_output_tokens": 6000,
+        "reasoning": {"effort": "minimal"},
+        "text": {
+            "verbosity": "low",
+            "format": {
+                "type": "json_schema",
+                "name": "katana_patch_object_set",
+                "strict": True,
+                "schema": _build_ai_patch_set_schema(payload.count),
+            },
+        },
+    }
+    req = urllib_request.Request(
+        "https://api.openai.com/v1/responses",
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {settings.openai_api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib_request.urlopen(req, timeout=90) as response:
+            raw = response.read().decode("utf-8")
+    except urllib_error.HTTPError as exc:
+        response_text = exc.read().decode("utf-8", errors="replace")
+        raise HTTPException(
+            status_code=502,
+            detail={"message": "OpenAI request failed", "status": exc.code, "response": response_text},
+        ) from exc
+    except urllib_error.URLError as exc:
+        raise HTTPException(status_code=502, detail={"message": "OpenAI network request failed", "error": str(exc)}) from exc
+
+    response_payload = json.loads(raw)
+    refusal_text = _extract_refusal_text(response_payload)
+    if refusal_text is not None:
+        raise HTTPException(status_code=502, detail={"message": "OpenAI refused set generation request", "refusal": refusal_text})
+    response_text = _extract_response_text(response_payload)
+    try:
+        generated = json.loads(response_text)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=502, detail={"message": "OpenAI returned non-JSON set generation output", "output_text": response_text}) from exc
+
+    candidates_payload = generated.get("candidates")
+    if not isinstance(candidates_payload, list):
+        raise HTTPException(status_code=502, detail={"message": "OpenAI returned invalid set generation payload", "payload": generated})
+    try:
+        candidates = [AiGeneratedCandidate.model_validate(item) for item in candidates_payload]
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={"message": "OpenAI returned invalid candidate payload", "errors": exc.errors(), "payload": generated},
+        ) from exc
+    if len(candidates) != payload.count:
+        raise HTTPException(
+            status_code=502,
+            detail={"message": "OpenAI returned the wrong candidate count", "expected": payload.count, "actual": len(candidates)},
+        )
+    return {"summary": str(generated.get("summary", "")).strip(), "candidates": candidates}
 
 
 async def _queued_current_patch() -> dict[str, Any]:
@@ -352,6 +783,22 @@ async def _queued_apply_current_patch(patch: dict[str, Any]) -> dict[str, Any]:
     if settled.status != "succeeded" or settled.result_applied_patch is None:
         raise HTTPException(status_code=502, detail={"message": "Failed to apply current patch", "error": settled.error})
     return settled.result_applied_patch
+
+
+async def _resolve_live_patch_row(db: Session, client: AmpClient) -> LivePatchState:
+    live_row = db.get(LivePatchState, 1)
+    if live_row is not None:
+        return live_row
+    synced_at = datetime.now().isoformat(timespec="seconds")
+    patch = await _read_live_patch_from_amp(client)
+    active = await client.read_active_slot()
+    return upsert_live_patch_state(
+        db,
+        full_patch=patch,
+        active_slot=active.slot,
+        amp_confirmed_at=synced_at,
+        source_type="amp_sync",
+    )
 
 
 async def _read_live_patch_from_amp(client: AmpClient) -> dict[str, Any]:

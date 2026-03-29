@@ -16,6 +16,33 @@
   gap: 0.75rem;
 }
 
+.tone-block-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.35rem 0.75rem;
+}
+
+.tone-list {
+  display: grid;
+  gap: 0.75rem;
+  max-height: 30rem;
+  overflow: auto;
+}
+
+.tone-groups-list {
+  display: grid;
+}
+
+.tone-inline-select {
+  width: 12rem;
+}
+
+.tone-set-slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.5rem;
+}
+
 .sample-player {
   width: 100%;
 }
