@@ -17,13 +17,14 @@ from app.audio_capture import (
     capture_audio_sample,
 )
 from app.deps import get_db
-from app.models import AudioSample, PatchConfig
+from app.models import AudioSample, PatchConfig, PatchObject
 
 router = APIRouter(prefix="/api/v1/audio", tags=["audio"])
 
 
 class AudioSampleCreateRequest(BaseModel):
     patch_hash: str | None = Field(default=None, min_length=64, max_length=64)
+    patch_object_id: int | None = Field(default=None, ge=1)
     slot: int | None = Field(default=None, ge=1, le=8)
     source: str = Field(default=KATANA_USB_SOURCE, min_length=1, max_length=255)
     duration_sec: float = Field(default=2.0, gt=0.2, le=30.0)
@@ -35,6 +36,8 @@ class AudioSampleResponse(BaseModel):
     id: int
     patch_hash: str | None = None
     patch_name: str | None = None
+    patch_object_id: int | None = None
+    patch_object_name: str | None = None
     slot: int | None = None
     slot_label: str | None = None
     source: str
@@ -65,6 +68,14 @@ async def create_audio_measurement(
                     "patch_hash": payload.patch_hash,
                 },
             )
+    if payload.patch_object_id is not None and db.get(PatchObject, payload.patch_object_id) is None:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "patch_object_id is not in tone library",
+                "patch_object_id": payload.patch_object_id,
+            },
+        )
     sample = await capture_audio_sample(
         source=payload.source,
         duration_sec=payload.duration_sec,
@@ -73,6 +84,7 @@ async def create_audio_measurement(
     )
     row = AudioSample(
         patch_hash=payload.patch_hash,
+        patch_object_id=payload.patch_object_id,
         slot=payload.slot,
         source=sample.metrics.source,
         duration_sec=int(round(sample.metrics.duration_sec)),
@@ -108,12 +120,15 @@ async def create_audio_measurement(
 def list_audio_measurements(
     limit: int = 50,
     patch_hash: str | None = None,
+    patch_object_id: int | None = None,
     db: Session = Depends(get_db),
 ) -> list[AudioSampleResponse]:
     bounded = max(1, min(limit, 200))
     query = select(AudioSample)
     if patch_hash:
         query = query.where(AudioSample.patch_hash == patch_hash)
+    if patch_object_id is not None:
+        query = query.where(AudioSample.patch_object_id == patch_object_id)
     rows = list(db.scalars(query.order_by(AudioSample.id.desc()).limit(bounded)))
     return [_audio_sample_response(row, db) for row in rows]
 
@@ -131,12 +146,19 @@ def _sse_event(payload: dict) -> str:
 
 def _audio_sample_response(row: AudioSample, db: Session) -> AudioSampleResponse:
     patch_name: str | None = None
+    patch_object_name: str | None = None
     if row.patch_hash:
         config = db.get(PatchConfig, row.patch_hash)
         if config is not None:
             patch_name_raw = config.snapshot.get("patch_name")
             if isinstance(patch_name_raw, str) and patch_name_raw.strip():
                 patch_name = patch_name_raw.strip()
+    if row.patch_object_id:
+        patch_object = db.get(PatchObject, row.patch_object_id)
+        if patch_object is not None:
+            patch_object_name = patch_object.name
+            if patch_name is None:
+                patch_name = patch_object.name
     slot_label: str | None = None
     if row.slot is not None and 1 <= row.slot <= 8:
         bank = "A" if row.slot <= 4 else "B"
@@ -146,6 +168,8 @@ def _audio_sample_response(row: AudioSample, db: Session) -> AudioSampleResponse
         id=row.id,
         patch_hash=row.patch_hash,
         patch_name=patch_name,
+        patch_object_id=row.patch_object_id,
+        patch_object_name=patch_object_name,
         slot=row.slot,
         slot_label=slot_label,
         source=row.source,

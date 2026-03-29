@@ -326,6 +326,9 @@
                         <button type="button" class="btn btn-sm btn-outline-secondary" (click)="duplicateTonePatchObject(patchObject)" [disabled]="isActionBusy('tone-duplicate:' + patchObject.id)">
                           {{ isActionBusy('tone-duplicate:' + patchObject.id) ? 'Duplicating...' : 'Duplicate' }}
                         </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openTonePatchObjectSamples(patchObject)">
+                          Samples
+                        </button>
                         <button type="button" class="btn btn-sm btn-primary" (click)="applyTonePatchObjectToLive(patchObject)" [disabled]="isActionBusy('tone-apply:' + patchObject.id)">
                           {{ isActionBusy('tone-apply:' + patchObject.id) ? 'Applying...' : 'Apply Live' }}
                         </button>
@@ -661,11 +664,14 @@
           @for (sample of recentSamples(); track sample.id) {
             <article class="border rounded p-3 bg-body-tertiary">
               <p class="mb-1">
-                <strong>{{ sample.patch_name || sample.slot_label || ('Sample #' + sample.id) }}</strong>
+                <strong>{{ sampleDisplayName(sample) }}</strong>
               </p>
               <p class="small text-secondary mb-2">
                 @if (sample.slot_label) {
                   slot <code>{{ sample.slot_label }}</code> ·
+                }
+                @if (sample.patch_object_name) {
+                  Tone Lab <code>{{ sample.patch_object_name }}</code> ·
                 }
                 recorded <code>{{ sample.created_at }}</code> ·
                 RMS/Peak <code>{{ formatDb(sample.rms_dbfs) }} / {{ formatDb(sample.peak_dbfs) }}</code> ·
@@ -702,9 +708,12 @@
             @for (sample of patchSamplesRows(); track sample.id) {
               <article class="border rounded p-2 small bg-body-tertiary">
                 <p class="mb-1">
-                  <strong>{{ sample.patch_name || sample.slot_label || ('Sample #' + sample.id) }}</strong>
+                  <strong>{{ sampleDisplayName(sample) }}</strong>
                 </p>
                 <p class="mb-2 text-secondary">
+                  @if (sample.patch_object_name) {
+                    Tone Lab <code>{{ sample.patch_object_name }}</code> |
+                  }
                   recorded <code>{{ sample.created_at }}</code> |
                   RMS/Peak <code>{{ formatDb(sample.rms_dbfs) }} / {{ formatDb(sample.peak_dbfs) }}</code> |
                   duration <code>{{ sample.duration_sec }}s</code>

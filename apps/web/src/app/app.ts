@@ -336,6 +336,8 @@ interface AudioSampleResponse {
   id: number;
   patch_hash: string | null;
   patch_name: string | null;
+  patch_object_id: number | null;
+  patch_object_name: string | null;
   slot: number | null;
   slot_label: string | null;
   source: string;
@@ -2030,6 +2032,7 @@ export class App implements OnInit, OnDestroy {
       const currentPatch = currentPatchPayload as CurrentPatchResponse;
       const activeHash = this.readString(currentPatch.patch, 'config_hash_sha256');
       const activeName = this.readString(currentPatch.patch, 'patch_name') ?? 'Active Patch';
+      const exactPatchObjectId = this.livePatchExactDbMatch()?.id ?? null;
       const selectedSlot = this.selectedAmpSlot();
 
       const startedAt = Date.now();
@@ -2044,6 +2047,7 @@ export class App implements OnInit, OnDestroy {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           patch_hash: activeHash || null,
+          patch_object_id: exactPatchObjectId,
           slot: selectedSlot,
           duration_sec: durationSec,
         }),
@@ -2067,6 +2071,8 @@ export class App implements OnInit, OnDestroy {
             sample_id: sample.id,
             active_patch_name: activeName,
             active_patch_hash: sample.patch_hash,
+            active_patch_object_id: sample.patch_object_id,
+            active_patch_object_name: sample.patch_object_name,
             matched_slot: matchedSlot?.slot_label ?? null,
             rms_dbfs: sample.rms_dbfs,
             peak_dbfs: sample.peak_dbfs,
@@ -2233,10 +2239,38 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  async openTonePatchObjectSamples(patchObject: TonePatchObjectResponse): Promise<void> {
+    this.status.set(`Loading samples for ${patchObject.name}...`);
+    this.responseJson.set('');
+    try {
+      const response = await fetch(`/api/v1/audio/measures?limit=50&patch_object_id=${patchObject.id}`, {
+        method: 'GET',
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as AudioSampleResponse[] | { detail?: unknown };
+      if (!response.ok) {
+        this.status.set(`Failed loading samples for ${patchObject.name}`);
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      this.patchSamplesRows.set((payload as AudioSampleResponse[]).filter((item) => !item.is_level_marker));
+      this.patchSamplesModalTitle.set(`Tone Lab · ${patchObject.name} Samples`);
+      this.patchSamplesModalOpen.set(true);
+      this.status.set(`Loaded samples for ${patchObject.name}`);
+    } catch (error: unknown) {
+      this.status.set(`Failed loading samples for ${patchObject.name}`);
+      this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
+    }
+  }
+
   closePatchSamplesModal(): void {
     this.patchSamplesModalOpen.set(false);
     this.patchSamplesModalTitle.set('');
     this.patchSamplesRows.set([]);
+  }
+
+  sampleDisplayName(sample: AudioSampleResponse): string {
+    return sample.patch_object_name || sample.patch_name || sample.slot_label || `Sample #${sample.id}`;
   }
 
   canAskAi(slot: SlotCard): boolean {

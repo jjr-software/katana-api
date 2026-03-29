@@ -72,6 +72,7 @@ class AudioSample(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     patch_hash: Mapped[str | None] = mapped_column(ForeignKey("patch_configs.hash_id", ondelete="SET NULL"), nullable=True, index=True)
+    patch_object_id: Mapped[int | None] = mapped_column(ForeignKey("patch_objects.id", ondelete="SET NULL"), nullable=True, index=True)
     slot: Mapped[int | None] = mapped_column(Integer, nullable=True)
     source: Mapped[str] = mapped_column(String(255), nullable=False)
     duration_sec: Mapped[int] = mapped_column(Integer, nullable=False)
