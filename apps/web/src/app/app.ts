@@ -884,6 +884,26 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  async saveFullLiveAsTonePatchObject(): Promise<void> {
+    const previous = this.selectedToneBlocks();
+    this.toneSelectedBlocks.set(
+      this.toneBlockOptions().reduce<Record<string, boolean>>((acc, block) => {
+        acc[block] = true;
+        return acc;
+      }, {}),
+    );
+    try {
+      await this.saveLiveAsTonePatchObject();
+    } finally {
+      this.toneSelectedBlocks.set(
+        previous.reduce<Record<string, boolean>>((acc, block) => {
+          acc[block] = true;
+          return acc;
+        }, {}),
+      );
+    }
+  }
+
   async createToneGroup(): Promise<void> {
     const name = this.toneGroupName().trim();
     if (!name) {

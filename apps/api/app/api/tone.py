@@ -7,7 +7,7 @@ from typing import Any
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -81,6 +81,10 @@ class PatchObjectReadResponse(BaseModel):
     updated_at: str
 
 
+class PatchObjectDuplicateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+
+
 class SaveFromLiveRequest(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     description: str = ""
@@ -116,6 +120,10 @@ class LivePatchReadResponse(BaseModel):
 
 class ApplyPatchObjectRequest(BaseModel):
     patch_object_id: int
+
+
+class PatchLiveBlockRequest(BaseModel):
+    patch_block: dict
 
 
 class StoreLivePatchToSlotRequest(BaseModel):
@@ -188,9 +196,41 @@ class AiGeneratePatchObjectSetResponse(BaseModel):
     set: PatchObjectSetReadResponse
 
 
+class AiGeneratePatchObjectsRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=2000)
+    count: int = Field(default=4, ge=1, le=8)
+    preferred_blocks: list[str] = Field(default_factory=list, max_length=8)
+    reference_patch_object_id: int | None = None
+    use_live_patch_as_context: bool = True
+    name_prefix: str | None = Field(default=None, max_length=255)
+
+
 @router.get("/patch-objects", response_model=list[PatchObjectReadResponse])
-def list_patch_objects(db: Session = Depends(get_db)) -> list[PatchObjectReadResponse]:
+def list_patch_objects(
+    blocks: list[str] = Query(default=[]),
+    source_type: str | None = None,
+    group_id: int | None = None,
+    q: str | None = None,
+    db: Session = Depends(get_db),
+) -> list[PatchObjectReadResponse]:
     rows = list(db.scalars(select(PatchObject).order_by(PatchObject.id.desc())))
+    filtered: list[PatchObject] = []
+    selected_blocks = _validated_blocks(blocks) if blocks else []
+    allowed_group_members = _group_member_patch_object_ids(db, group_id) if group_id is not None else None
+    query_text = (q or "").strip().lower()
+    for row in rows:
+        if source_type is not None and row.source_type != source_type:
+            continue
+        if allowed_group_members is not None and row.id not in allowed_group_members:
+            continue
+        if selected_blocks and not all(block in row.patch_json for block in selected_blocks):
+            continue
+        if query_text:
+            haystack = f"{row.name}\n{row.description or ''}".lower()
+            if query_text not in haystack:
+                continue
+        filtered.append(row)
+    rows = filtered
     return [_patch_object_response(row) for row in rows]
 
 
@@ -217,6 +257,30 @@ def get_patch_object(patch_object_id: int, db: Session = Depends(get_db)) -> Pat
     if row is None:
         raise HTTPException(status_code=404, detail={"message": "Patch object not found", "patch_object_id": patch_object_id})
     return _patch_object_response(row)
+
+
+@router.post("/patch-objects/{patch_object_id:int}/duplicate", response_model=PatchObjectReadResponse)
+def duplicate_patch_object(
+    patch_object_id: int,
+    payload: PatchObjectDuplicateRequest,
+    db: Session = Depends(get_db),
+) -> PatchObjectReadResponse:
+    row = db.get(PatchObject, patch_object_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail={"message": "Patch object not found", "patch_object_id": patch_object_id})
+    _assert_patch_object_name_available(db, payload.name)
+    duplicate = PatchObject(
+        name=payload.name,
+        description=row.description,
+        patch_json=row.patch_json,
+        source_type=row.source_type,
+        source_prompt=row.source_prompt,
+        parent_patch_object_id=row.id,
+    )
+    db.add(duplicate)
+    db.commit()
+    db.refresh(duplicate)
+    return _patch_object_response(duplicate)
 
 
 @router.post("/patch-objects/save-from-live", response_model=PatchObjectReadResponse)
@@ -295,6 +359,24 @@ def add_patch_object_to_group(group_id: int, patch_object_id: int, db: Session =
     return {"ok": True}
 
 
+@router.delete("/groups/{group_id:int}/patch-objects/{patch_object_id:int}")
+def remove_patch_object_from_group(group_id: int, patch_object_id: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+    membership = db.scalar(
+        select(PatchObjectGroupMember).where(
+            PatchObjectGroupMember.group_id == group_id,
+            PatchObjectGroupMember.patch_object_id == patch_object_id,
+        )
+    )
+    if membership is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"message": "Patch object group membership not found", "group_id": group_id, "patch_object_id": patch_object_id},
+        )
+    db.delete(membership)
+    db.commit()
+    return {"ok": True}
+
+
 @router.get("/sets", response_model=list[PatchObjectSetReadResponse])
 def list_patch_object_sets(db: Session = Depends(get_db)) -> list[PatchObjectSetReadResponse]:
     rows = list(db.scalars(select(PatchObjectSet).order_by(PatchObjectSet.id.desc())))
@@ -318,6 +400,37 @@ def get_patch_object_set(patch_object_set_id: int, db: Session = Depends(get_db)
     row = db.get(PatchObjectSet, patch_object_set_id)
     if row is None:
         raise HTTPException(status_code=404, detail={"message": "Patch object set not found", "patch_object_set_id": patch_object_set_id})
+    return _patch_object_set_response(db, row)
+
+
+@router.put("/sets/{patch_object_set_id:int}/slots/{slot:int}", response_model=PatchObjectSetReadResponse)
+def update_patch_object_set_slot(
+    patch_object_set_id: int,
+    slot: int,
+    payload: ApplyPatchObjectRequest,
+    db: Session = Depends(get_db),
+) -> PatchObjectSetReadResponse:
+    row = db.get(PatchObjectSet, patch_object_set_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail={"message": "Patch object set not found", "patch_object_set_id": patch_object_set_id})
+    if slot < 1 or slot > 8:
+        raise HTTPException(status_code=400, detail={"message": "Set slots must be 1..8", "slot": slot})
+    patch_object = db.get(PatchObject, payload.patch_object_id)
+    if patch_object is None:
+        raise HTTPException(status_code=404, detail={"message": "Patch object not found", "patch_object_id": payload.patch_object_id})
+    existing = db.scalar(
+        select(PatchObjectSetSlot).where(
+            PatchObjectSetSlot.patch_object_set_id == patch_object_set_id,
+            PatchObjectSetSlot.slot == slot,
+        )
+    )
+    if existing is None:
+        existing = PatchObjectSetSlot(patch_object_set_id=patch_object_set_id, slot=slot, patch_object_id=patch_object.id)
+        db.add(existing)
+    else:
+        existing.patch_object_id = patch_object.id
+    db.commit()
+    db.refresh(row)
     return _patch_object_set_response(db, row)
 
 
@@ -377,8 +490,23 @@ async def program_patch_object_set_to_amp(
                 patch_object_name=patch_object.name,
                 synced_at=result_slot.synced_at,
             )
-        )
+    )
     return ProgramPatchObjectSetResponse(set_id=row.id, set_name=row.name, programmed_slots=programmed)
+
+
+@router.post("/sets/{patch_object_set_id:int}/apply", response_model=ProgramPatchObjectSetResponse)
+async def apply_patch_object_set_to_amp(
+    patch_object_set_id: int,
+    payload: ProgramPatchObjectSetRequest,
+    db: Session = Depends(get_db),
+    client: AmpClient = Depends(get_amp_client),
+) -> ProgramPatchObjectSetResponse:
+    return await program_patch_object_set_to_amp(
+        patch_object_set_id=patch_object_set_id,
+        payload=payload,
+        db=db,
+        client=client,
+    )
 
 
 @router.post("/sets/ai-generate", response_model=AiGeneratePatchObjectSetResponse)
@@ -418,6 +546,54 @@ async def ai_generate_patch_object_set(
     db.commit()
     db.refresh(patch_object_set)
     return AiGeneratePatchObjectSetResponse(summary=str(result["summary"]), set=_patch_object_set_response(db, patch_object_set))
+
+
+@router.post("/ai/generate/patch-objects", response_model=list[PatchObjectReadResponse])
+async def ai_generate_patch_objects(
+    payload: AiGeneratePatchObjectsRequest,
+    db: Session = Depends(get_db),
+    client: AmpClient = Depends(get_amp_client),
+    settings: Settings = Depends(get_settings),
+) -> list[PatchObjectReadResponse]:
+    blocks = _validated_blocks(payload.preferred_blocks) if payload.preferred_blocks else ["amp", "booster", "eq1"]
+    if payload.reference_patch_object_id is not None:
+        reference_patch_object = db.get(PatchObject, payload.reference_patch_object_id)
+        if reference_patch_object is None:
+            raise HTTPException(
+                status_code=404,
+                detail={"message": "Reference patch object not found", "patch_object_id": payload.reference_patch_object_id},
+            )
+        context_patch = merge_patch_object_into_full_patch({}, reference_patch_object.patch_json)
+    elif payload.use_live_patch_as_context:
+        context_patch = (await _resolve_live_patch_row(db, client)).patch_json
+    else:
+        context_patch = {}
+
+    result = await asyncio.to_thread(
+        _call_openai_patch_objects_designer,
+        settings,
+        context_patch,
+        payload.prompt,
+        payload.count,
+        blocks,
+    )
+    created: list[PatchObjectReadResponse] = []
+    for index, candidate in enumerate(result["candidates"], start=1):
+        normalized = _validated_ai_candidate_patch_json(candidate.patch_json, blocks)
+        base_name = f"{payload.name_prefix.strip()} {index}: {candidate.name}" if payload.name_prefix else candidate.name
+        row = PatchObject(
+            name=_make_unique_patch_object_name(db, base_name),
+            description=candidate.description,
+            patch_json=normalized,
+            source_type="ai",
+            source_prompt=payload.prompt,
+            parent_patch_object_id=payload.reference_patch_object_id,
+        )
+        db.add(row)
+        db.flush()
+        created.append(_patch_object_response(row))
+    db.commit()
+    return created
 
 
 @router.get("/live-patch", response_model=LivePatchReadResponse)
@@ -474,6 +650,32 @@ async def apply_patch_object_to_live_patch(
         active_slot=live_row.active_slot,
         amp_confirmed_at=applied_at,
         source_type="ai_apply" if patch_object.source_type == "ai" else "manual_apply",
+    )
+    return LivePatchReadResponse(**live_patch_status_payload(db, row))
+
+
+@router.patch("/live-patch/blocks/{block_name}", response_model=LivePatchReadResponse)
+async def patch_live_patch_block(
+    block_name: str,
+    payload: PatchLiveBlockRequest,
+    db: Session = Depends(get_db),
+    client: AmpClient = Depends(get_amp_client),
+) -> LivePatchReadResponse:
+    if block_name not in ALLOWED_BLOCKS:
+        raise HTTPException(status_code=400, detail={"message": "Unknown block", "block": block_name})
+    live_row = await _resolve_live_patch_row(db, client)
+    sparse_patch_object = normalize_patch_object({block_name: payload.patch_block})
+    if block_name not in sparse_patch_object:
+        raise HTTPException(status_code=400, detail={"message": "Block payload did not normalize to a valid patch block", "block": block_name})
+    merged = merge_patch_object_into_full_patch(live_row.patch_json, sparse_patch_object)
+    applied = await _queued_apply_current_patch(merged)
+    applied_at = datetime.now().isoformat(timespec="seconds")
+    row = upsert_live_patch_state(
+        db,
+        full_patch=applied,
+        active_slot=live_row.active_slot,
+        amp_confirmed_at=applied_at,
+        source_type="manual_apply",
     )
     return LivePatchReadResponse(**live_patch_status_payload(db, row))
 
@@ -575,6 +777,15 @@ def _validated_blocks(blocks: list[str]) -> list[str]:
     return out
 
 
+def _group_member_patch_object_ids(db: Session, group_id: int | None) -> set[int] | None:
+    if group_id is None:
+        return None
+    if db.get(PatchObjectGroup, group_id) is None:
+        raise HTTPException(status_code=404, detail={"message": "Group not found", "group_id": group_id})
+    rows = db.scalars(select(PatchObjectGroupMember.patch_object_id).where(PatchObjectGroupMember.group_id == group_id)).all()
+    return {int(item) for item in rows}
+
+
 def _assert_patch_object_name_available(db: Session, name: str) -> None:
     existing = db.scalar(select(PatchObject).where(PatchObject.name == name))
     if existing is not None:
@@ -659,6 +870,110 @@ def _build_ai_patch_set_schema(count: int) -> dict[str, Any]:
             },
         },
     }
+
+
+def _build_ai_patch_object_list_schema(count: int) -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["summary", "candidates"],
+        "properties": {
+            "summary": {"type": "string"},
+            "candidates": {
+                "type": "array",
+                "minItems": count,
+                "maxItems": count,
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["name", "description", "patch_json"],
+                    "properties": {
+                        "name": {"type": "string"},
+                        "description": {"type": "string"},
+                        "patch_json": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {block: {"type": "object"} for block in ALLOWED_BLOCKS},
+                        },
+                    },
+                },
+            },
+        },
+    }
+
+
+def _call_openai_sparse_patch_candidates(
+    *,
+    settings: Settings,
+    live_patch: dict[str, Any],
+    prompt: str,
+    count: int,
+    blocks: list[str],
+    mode: str,
+) -> dict[str, Any]:
+    user_payload = {
+        "mode": mode,
+        "prompt": prompt,
+        "count": count,
+        "blocks": blocks,
+        "live_patch_reference_blocks": extract_patch_object(live_patch, blocks),
+        "live_patch_patch_name": str(live_patch.get("patch_name", "")),
+    }
+    body = {
+        "model": settings.openai_model,
+        "input": [
+            {"role": "system", "content": [{"type": "input_text", "text": AI_SET_SYSTEM_PROMPT}]},
+            {"role": "user", "content": [{"type": "input_text", "text": json.dumps(user_payload, separators=(",", ":"))}]},
+        ],
+        "max_output_tokens": 6000,
+        "reasoning": {"effort": "minimal"},
+        "text": {
+            "verbosity": "low",
+            "format": {
+                "type": "json_schema",
+                "name": "katana_sparse_patch_candidates",
+                "strict": True,
+                "schema": _build_ai_patch_object_list_schema(count),
+            },
+        },
+    }
+    req = urllib_request.Request(
+        "https://api.openai.com/v1/responses",
+        data=json.dumps(body).encode("utf-8"),
+        headers={"Authorization": f"Bearer {settings.openai_api_key}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib_request.urlopen(req, timeout=90) as response:
+            raw = response.read().decode("utf-8")
+    except urllib_error.HTTPError as exc:
+        response_text = exc.read().decode("utf-8", errors="replace")
+        raise HTTPException(status_code=502, detail={"message": "OpenAI request failed", "status": exc.code, "response": response_text}) from exc
+    except urllib_error.URLError as exc:
+        raise HTTPException(status_code=502, detail={"message": "OpenAI network request failed", "error": str(exc)}) from exc
+
+    response_payload = json.loads(raw)
+    refusal_text = _extract_refusal_text(response_payload)
+    if refusal_text is not None:
+        raise HTTPException(status_code=502, detail={"message": "OpenAI refused generation request", "refusal": refusal_text})
+    response_text = _extract_response_text(response_payload)
+    try:
+        generated = json.loads(response_text)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=502, detail={"message": "OpenAI returned non-JSON generation output", "output_text": response_text}) from exc
+    candidates_payload = generated.get("candidates")
+    if not isinstance(candidates_payload, list):
+        raise HTTPException(status_code=502, detail={"message": "OpenAI returned invalid candidate payload", "payload": generated})
+    try:
+        candidates = [AiGeneratedCandidate.model_validate(item) for item in candidates_payload]
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={"message": "OpenAI returned invalid candidate payload", "errors": exc.errors(), "payload": generated},
+        ) from exc
+    if len(candidates) != count:
+        raise HTTPException(status_code=502, detail={"message": "OpenAI returned the wrong candidate count", "expected": count, "actual": len(candidates)})
+    return {"summary": str(generated.get("summary", "")).strip(), "candidates": candidates}
     return {
         "type": "object",
         "additionalProperties": False,
@@ -681,92 +996,31 @@ def _call_openai_patch_set_designer(
     payload: AiGeneratePatchObjectSetRequest,
     blocks: list[str],
 ) -> dict[str, Any]:
-    body = {
-        "model": settings.openai_model,
-        "input": [
-            {
-                "role": "system",
-                "content": [{"type": "input_text", "text": AI_SET_SYSTEM_PROMPT}],
-            },
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "input_text",
-                        "text": json.dumps(
-                            {
-                                "set_name": payload.set_name,
-                                "prompt": payload.prompt,
-                                "count": payload.count,
-                                "blocks": blocks,
-                                "live_patch_reference_blocks": extract_patch_object(live_patch, blocks),
-                                "live_patch_patch_name": str(live_patch.get("patch_name", "")),
-                            },
-                            separators=(",", ":"),
-                        ),
-                    }
-                ],
-            },
-        ],
-        "max_output_tokens": 6000,
-        "reasoning": {"effort": "minimal"},
-        "text": {
-            "verbosity": "low",
-            "format": {
-                "type": "json_schema",
-                "name": "katana_patch_object_set",
-                "strict": True,
-                "schema": _build_ai_patch_set_schema(payload.count),
-            },
-        },
-    }
-    req = urllib_request.Request(
-        "https://api.openai.com/v1/responses",
-        data=json.dumps(body).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {settings.openai_api_key}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
+    return _call_openai_sparse_patch_candidates(
+        settings=settings,
+        live_patch=live_patch,
+        prompt=payload.prompt,
+        count=payload.count,
+        blocks=blocks,
+        mode="set",
     )
-    try:
-        with urllib_request.urlopen(req, timeout=90) as response:
-            raw = response.read().decode("utf-8")
-    except urllib_error.HTTPError as exc:
-        response_text = exc.read().decode("utf-8", errors="replace")
-        raise HTTPException(
-            status_code=502,
-            detail={"message": "OpenAI request failed", "status": exc.code, "response": response_text},
-        ) from exc
-    except urllib_error.URLError as exc:
-        raise HTTPException(status_code=502, detail={"message": "OpenAI network request failed", "error": str(exc)}) from exc
 
-    response_payload = json.loads(raw)
-    refusal_text = _extract_refusal_text(response_payload)
-    if refusal_text is not None:
-        raise HTTPException(status_code=502, detail={"message": "OpenAI refused set generation request", "refusal": refusal_text})
-    response_text = _extract_response_text(response_payload)
-    try:
-        generated = json.loads(response_text)
-    except json.JSONDecodeError as exc:
-        raise HTTPException(status_code=502, detail={"message": "OpenAI returned non-JSON set generation output", "output_text": response_text}) from exc
 
-    candidates_payload = generated.get("candidates")
-    if not isinstance(candidates_payload, list):
-        raise HTTPException(status_code=502, detail={"message": "OpenAI returned invalid set generation payload", "payload": generated})
-    try:
-        candidates = [AiGeneratedCandidate.model_validate(item) for item in candidates_payload]
-    except ValidationError as exc:
-        raise HTTPException(
-            status_code=502,
-            detail={"message": "OpenAI returned invalid candidate payload", "errors": exc.errors(), "payload": generated},
-        ) from exc
-    if len(candidates) != payload.count:
-        raise HTTPException(
-            status_code=502,
-            detail={"message": "OpenAI returned the wrong candidate count", "expected": payload.count, "actual": len(candidates)},
-        )
-    return {"summary": str(generated.get("summary", "")).strip(), "candidates": candidates}
+def _call_openai_patch_objects_designer(
+    settings: Settings,
+    live_patch: dict[str, Any],
+    prompt: str,
+    count: int,
+    blocks: list[str],
+) -> dict[str, Any]:
+    return _call_openai_sparse_patch_candidates(
+        settings=settings,
+        live_patch=live_patch,
+        prompt=prompt,
+        count=count,
+        blocks=blocks,
+        mode="patch_objects",
+    )
 
 
 async def _queued_current_patch() -> dict[str, Any]:
