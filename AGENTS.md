@@ -1723,3 +1723,17 @@
   - AI generation must use structured schema-validated output.
 - Immediate next step:
   - pivot schema/API planning toward set creation, apply-to-amp, and keep/promote workflows before further UI polish.
+
+## Session Update - 2026-03-29 (Live Patch + Single Source Of Truth)
+- Tightened the forward design doc in:
+  - `docs/forward-implementation.md`
+- New hard design corrections captured:
+  - `Live Patch` is first-class and means the amp's current edit buffer / currently sounding state.
+  - Stored amp slots are separate from `Live Patch`; activating a slot loads it into `Live Patch`.
+  - There is no valid concept of a separate staged runtime patch per slot.
+  - Fragment writes can target `Live Patch`, then explicit store commits `Live Patch` to a slot.
+  - Patch-like entities must not store both raw source data and derived rendered patch data as co-equal truth.
+- Schema direction updated:
+  - composed variants store composition only,
+  - captured/imported variants store patch JSON only,
+  - rendered patch output is on-demand or cache-only, not authoritative dual storage.

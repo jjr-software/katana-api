@@ -18,23 +18,29 @@ Full patch JSON remains the canonical deployment format sent to the amp, but it 
 ## 2) Core Design Rules
 1. Full patch JSON is a deployment artifact, not the main unit of thought.
 2. Partial settings must be first-class. A valid saved object may contain only `booster`, only `eq1`, or any intentional multi-stage subset.
-3. Every playable slot assignment must render to one full patch JSON before being pushed to the amp.
-4. Fast 8-slot audition workflow is a first-class product path, not a side feature.
-5. Hashes are implementation detail only:
+3. There is exactly one `Live Patch` on the amp at a time. It is the current edit buffer and the sound being played right now.
+4. Stored amp slots are distinct from `Live Patch`:
+   - activating a slot loads that stored slot patch into `Live Patch`,
+   - fragment edits modify `Live Patch`,
+   - nothing persists to an amp slot without explicit store/commit.
+5. Every playable slot assignment must render to one full patch JSON before being pushed to the amp.
+6. Fast 8-slot audition workflow is a first-class product path, not a side feature.
+7. A persisted entity must have one source of truth only. Do not store both raw source data and its derived rendered form in the same authoritative record.
+8. Hashes are implementation detail only:
    - useful for dedupe,
    - useful for exact-equality checks,
    - not the primary user-facing identity model.
-6. Names are human-facing and must be unique per entity type:
+9. Names are human-facing and must be unique per entity type:
    - fragment names unique among fragments,
    - variant names unique among variants,
    - set names unique among sets,
    - group names unique among groups.
-7. No silent overwrite by name. Name collision must force an explicit user choice:
+10. No silent overwrite by name. Name collision must force an explicit user choice:
    - rename,
    - save as new revision,
    - copy into another group with a new name.
-8. All amp communications still run through queue operations.
-9. AI outputs must be structured and schema-validated before anything is persisted or pushed to hardware.
+11. All amp communications still run through queue operations.
+12. AI outputs must be structured and schema-validated before anything is persisted or pushed to hardware.
 
 ## 3) Domain Model
 ## 3.1 Fragment
@@ -70,16 +76,19 @@ Base rig requirements:
 ## 3.3 Variant
 A `variant` is a fully playable tone candidate.
 
-It is built from:
-- one base rig,
-- zero or more fragments,
-- optional direct stage overrides.
+There are two valid forms:
+- `composed`: built from one base rig, zero or more fragments, and optional direct stage overrides,
+- `captured` or `imported`: stored as one authoritative full patch JSON snapshot.
 
-A variant always renders to one full patch JSON for amp push, but it keeps composition lineage:
-- which base rig it came from,
-- which fragments were applied,
-- which overrides were introduced,
-- whether it came from AI generation, manual edit, or slot capture.
+Rules:
+- a composed variant does not store rendered patch JSON as authoritative data,
+- a captured/imported variant may store full patch JSON because that is its source of truth,
+- rendering happens on demand for composed variants,
+- lineage must still record:
+  - which base rig it came from,
+  - which fragments were applied,
+  - which overrides were introduced,
+  - whether it came from AI generation, manual edit, slot capture, or import.
 
 ## 3.4 Set
 A `set` is an audition batch intended for fast live comparison on the amp.
@@ -116,6 +125,23 @@ Meaning:
 - it may be copied into one or more groups,
 - it may become the parent of later revisions.
 
+## 3.7 Live Patch
+`Live Patch` is a first-class runtime concept and must be prominent in the UI.
+
+It means:
+- the sound currently being played,
+- the current edit buffer on the amp,
+- possibly different from every stored amp slot,
+- possibly different from every saved DB object.
+
+Rules:
+- there is one live patch only,
+- there is no such thing as a separate staged patch per slot,
+- applying a fragment updates `Live Patch`,
+- activating a slot replaces `Live Patch` with that slot's stored patch,
+- storing commits current `Live Patch` into the selected amp slot,
+- saving to the DB is separate again.
+
 ## 4) Identity, Equality, And Similarity
 ## 4.1 Identity
 Primary identity is explicit and human-facing:
@@ -142,6 +168,17 @@ Similarity should be based on JSON-aware comparison and scope awareness, for exa
 This should be computed from structured content, not guessed from names and not reduced to a single global hash concept.
 
 ## 5) Main User Workflows
+## 5.0 Understand Current State
+Target workflow:
+1. User opens the app.
+2. App shows `Live Patch` first.
+3. App separately shows stored amp slot contents.
+4. App states whether `Live Patch` matches:
+   - the active slot,
+   - another amp slot,
+   - a saved DB object,
+   - or nothing known.
+
 ## 5.1 Build An Exploration Set
 Target workflow:
 1. User asks for a family of tones, for example `8 Greenwood-ish booster + eq1 ideas`.
@@ -159,8 +196,8 @@ Target workflow:
 
 ## 5.3 Capture From Live Amp
 Target workflow:
-1. User tweaks a live slot manually.
-2. App syncs the slot from amp.
+1. User tweaks the amp manually.
+2. App syncs `Live Patch` from amp.
 3. User saves the result as:
    - a fragment,
    - a full variant,
@@ -192,6 +229,7 @@ Initial rule:
   - base rig,
   - owned stages,
   - defaults for unspecified stages.
+- if the target is `Live Patch`, the system may apply only the affected fragment/stage writes without persisting a slot.
 
 Fallback path if needed later:
 - stage-specific tool calls for AI to build a candidate incrementally.
@@ -230,9 +268,9 @@ Planned nucleus:
 - `id`
 - `name` (unique)
 - `description`
-- `base_rig_id`
-- `rendered_patch_json`
-- `render_hash` nullable
+- `variant_kind` (`composed`, `captured`, `imported`)
+- `base_rig_id` nullable
+- `patch_json` nullable
 - `is_keeper`
 - `source_type`
 - `source_prompt`
@@ -244,6 +282,18 @@ Planned nucleus:
 - `fragment_id`
 - `position`
 - unique `(variant_id, fragment_id, position)`
+
+### `variant_overrides`
+- `variant_id`
+- `override_json`
+
+### `live_patch_snapshots`
+- `id`
+- `source_type` (`amp_sync`, `ai_apply`, `manual_apply`, `slot_activation`)
+- `patch_json`
+- `active_slot` nullable
+- `matches_saved_variant_id` nullable
+- timestamps
 
 ### `sets`
 - `id`
@@ -281,8 +331,19 @@ Planned nucleus:
 
 Existing tables can survive where useful, but the model must pivot away from patch-hash-first thinking.
 
+Storage rule:
+- `fragments` store fragment data only,
+- `base_rigs` store patch JSON only,
+- `composed variants` store composition data only,
+- `captured/imported variants` store patch JSON only,
+- derived renders and hashes are computed or cached outside the authoritative entity model.
+
 ## 8) API Direction
 Planned target surface:
+- `GET /api/v1/live-patch`
+- `POST /api/v1/live-patch/sync`
+- `POST /api/v1/live-patch/apply-fragment`
+- `POST /api/v1/live-patch/store-to-slot`
 - `POST /api/v1/base-rigs`
 - `GET /api/v1/base-rigs`
 - `POST /api/v1/fragments`
@@ -306,6 +367,7 @@ Amp-facing operations should remain queued. The queue status UI remains valid an
 What changes:
 - hash-based identity is retired as the main organizing principle,
 - desired-vs-actual reconciliation by hash stops being the center of the roadmap,
+- slot-centric staged-state thinking is retired,
 - patch library becomes fragment/variant/set/group library.
 
 What stays:
@@ -316,11 +378,13 @@ What stays:
 
 Migration rule:
 - existing saved patch rows should be treated as importable rendered variants.
+- `Live Patch` must become a first-class runtime object in the web app before more slot-centric UX grows further.
 - no destructive data rewrite should happen until the new domain model is in place.
 
 ## 10) Current Delivery Status
 ## 10.1 Useful Foundation Already Present
 - queued amp operations and queue monitor UI,
+- ability to write partial stage data into the live patch/edit buffer,
 - slot sync and raw JSON inspection,
 - load-full-amp-state flow,
 - web slot card layout and action wiring,
@@ -330,6 +394,8 @@ Migration rule:
 ## 10.2 Misaligned With New Direction
 - hash-first patch identity model,
 - reconciliation-centered roadmap,
+- slot cards being more conceptually central than `Live Patch`,
+- stale assumptions about slot-level staged state,
 - patch-only library mental model,
 - limited support for partial-setting composition and promotion.
 
@@ -337,8 +403,10 @@ Migration rule:
 ## Phase A: Domain Pivot
 Deliver:
 - replace planning and schema direction around fragments, variants, sets, groups, base rigs,
+- introduce `Live Patch` as first-class runtime model and top-level UI object,
 - introduce unique-name rules with explicit collision failure,
-- define render pipeline from partial structures to full patch JSON.
+- define render pipeline from partial structures to full patch JSON,
+- define single-source-of-truth storage constraints for all persisted entities.
 
 Exit criteria:
 - app has a stable internal model that matches tone-discovery workflow.
@@ -347,6 +415,7 @@ Exit criteria:
 Deliver:
 - create/edit sets with 8 ordered slots,
 - queued apply-set-to-amp flow,
+- clear `Live Patch` vs stored slot status after activation and editing,
 - keep/promote-from-slot flow,
 - group assignment for saved winners.
 
@@ -357,7 +426,8 @@ Exit criteria:
 Deliver:
 - fragment CRUD,
 - compose variant from base rig + fragments,
-- capture fragment from live amp sync,
+- apply fragment directly to `Live Patch`,
+- capture fragment from `Live Patch` sync,
 - browse by stage scope and tags.
 
 Exit criteria:
@@ -375,14 +445,16 @@ Exit criteria:
 
 ## 12) Immediate Next Sprint
 1. Replace patch-set/hash-oriented schema plan with concrete `base_rigs`, `fragments`, `variants`, `sets`, and `groups` migrations.
-2. Define the render contract from partial objects to full patch JSON.
-3. Implement minimal `set` creation plus 8-slot assignment API.
-4. Implement queued `apply set to amp`.
-5. Add `keep variant from slot` flow with explicit naming and collision failure.
+2. Define `Live Patch`, stored amp slot, and DB object status model explicitly in API and UI terms.
+3. Define the render contract from partial objects to full patch JSON.
+4. Implement minimal `set` creation plus 8-slot assignment API.
+5. Implement queued `apply set to amp` plus `Live Patch` status reporting.
 
 ## 13) Explicitly Out
 - treating names as optional metadata only,
 - silent overwrite when a requested name already exists,
 - forcing all useful saved work into full patch records,
+- storing both raw source data and derived rendered patch data as co-equal truth in one entity,
+- pretending each slot has its own independent staged runtime patch state,
 - making hash equality the main user-facing concept,
 - free-form AI text as the primary generation interface.
