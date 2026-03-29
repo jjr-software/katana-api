@@ -56,7 +56,6 @@
             <button type="button" class="btn btn-outline-primary btn-sm" (click)="openLiveEditor()">Open Live Editor</button>
             <button type="button" class="btn btn-outline-primary btn-sm" (click)="quickSyncAmpSlots()" [disabled]="isActionBusy('quick-sync')">{{ headerActionLabel('quick-sync', 'Quick Sync Names', 'Syncing...') }}</button>
             <button type="button" class="btn btn-success btn-sm" (click)="loadAmpState()" [disabled]="isActionBusy('load-amp-state')">{{ headerActionLabel('load-amp-state', 'Load Amp State', 'Loading...') }}</button>
-            <button type="button" class="btn btn-outline-success btn-sm" (click)="openPatchSetLoader()" [disabled]="isActionBusy('open-patch-set-loader')">{{ headerActionLabel('open-patch-set-loader', 'Load Patch Set', 'Loading...') }}</button>
             <button type="button" class="btn btn-outline-success btn-sm" (click)="captureAudioLevelMarker()" [disabled]="isActionBusy('capture-level-marker')">{{ headerActionLabel('capture-level-marker', 'Set Level Marker', 'Capturing...') }}</button>
             <button type="button" class="btn btn-outline-dark btn-sm" (click)="measureAllSlotsRms()" [disabled]="isMeasuringSlotsRms()">
               Measure 5s RMS (All Slots)
@@ -509,7 +508,6 @@
                         {{ measureActiveButtonLabel() }}
                       </button>
                     }
-                    <button type="button" class="btn btn-sm btn-outline-primary" (click)="openPatchConfigLoadModal(slot)" [disabled]="!canLoadSlot(slot) || isActionBusy(slotActionKey('load-configs', slot.slot))">{{ slotActionLabel('load-configs', slot.slot, 'Load', 'Loading...') }}</button>
                     @if (canStageSlot(slot)) {
                       <button type="button" class="btn btn-sm btn-outline-warning" (click)="stageSlotToAmp(slot)" [disabled]="isActionBusy(slotActionKey('stage', slot.slot))">{{ slotActionLabel('stage', slot.slot, 'Apply Live', 'Applying...') }}</button>
                     }
@@ -601,7 +599,6 @@
                         {{ measureActiveButtonLabel() }}
                       </button>
                     }
-                    <button type="button" class="btn btn-sm btn-outline-primary" (click)="openPatchConfigLoadModal(slot)" [disabled]="!canLoadSlot(slot) || isActionBusy(slotActionKey('load-configs', slot.slot))">{{ slotActionLabel('load-configs', slot.slot, 'Load', 'Loading...') }}</button>
                     @if (canStageSlot(slot)) {
                       <button type="button" class="btn btn-sm btn-outline-warning" (click)="stageSlotToAmp(slot)" [disabled]="isActionBusy(slotActionKey('stage', slot.slot))">{{ slotActionLabel('stage', slot.slot, 'Apply Live', 'Applying...') }}</button>
                     }
@@ -845,59 +842,6 @@
               }
             </div>
           </article>
-        </div>
-      </section>
-    </div>
-  }
-
-  @if (patchSetModalOpen()) {
-    <div class="raw-modal-backdrop" (click)="closePatchSetModal()">
-      <section class="raw-modal" role="dialog" aria-modal="true" aria-label="Load Patch Set Snapshot" (click)="$event.stopPropagation()">
-        <header class="raw-modal-head">
-          <h3>Load Patch Set Snapshot</h3>
-          <button type="button" class="btn btn-sm btn-light" (click)="closePatchSetModal()">Close</button>
-        </header>
-        <div class="p-3 d-grid gap-2">
-          @for (snapshot of patchSetSnapshots(); track snapshot.id) {
-            <article class="border rounded p-2 small bg-body-tertiary">
-              <p class="mb-1"><strong>{{ snapshot.label }}</strong></p>
-              <p class="mb-2 text-secondary">
-                synced: <code>{{ snapshot.synced_at }}</code> |
-                slots: <code>{{ snapshot.slot_count }}</code> |
-                time: <code>{{ formatMs(snapshot.total_sync_ms) }}</code>
-              </p>
-              <button type="button" class="btn btn-sm btn-primary" (click)="loadPatchSetSnapshot(snapshot)" [disabled]="isActionBusy('load-patch-set-snapshot:' + snapshot.id)">{{ isActionBusy('load-patch-set-snapshot:' + snapshot.id) ? 'Loading...' : 'Load' }}</button>
-            </article>
-          }
-          @if (patchSetSnapshots().length === 0) {
-            <p class="small text-secondary mb-0">No recent full-sync snapshots found.</p>
-          }
-        </div>
-      </section>
-    </div>
-  }
-
-  @if (patchConfigModalOpen()) {
-    <div class="raw-modal-backdrop" (click)="closePatchConfigModal()">
-      <section class="raw-modal" role="dialog" aria-modal="true" aria-label="Load Patch Config" (click)="$event.stopPropagation()">
-        <header class="raw-modal-head">
-          <h3>Load Patch Config · {{ patchConfigTargetLabel() }}</h3>
-          <button type="button" class="btn btn-sm btn-light" (click)="closePatchConfigModal()">Close</button>
-        </header>
-        <div class="p-3 d-grid gap-2">
-          @for (cfg of patchConfigRows(); track cfg.hash_id) {
-            <article class="border rounded p-2 small bg-body-tertiary">
-              <p class="mb-1"><strong>{{ patchConfigName(cfg) }}</strong></p>
-              <p class="mb-2 text-secondary">
-                hash: <code>{{ shortHash(cfg.hash_id) }}</code> |
-                created: <code>{{ cfg.created_at }}</code>
-              </p>
-              <button type="button" class="btn btn-sm btn-primary" (click)="loadPatchConfigIntoTargetSlot(cfg)">Load</button>
-            </article>
-          }
-          @if (patchConfigRows().length === 0) {
-            <p class="small text-secondary mb-0">No patch configs found.</p>
-          }
         </div>
       </section>
     </div>

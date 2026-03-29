@@ -235,20 +235,6 @@ interface BackupJobResponse {
   result: FullAmpDumpResponse | null;
 }
 
-interface BackupSnapshotSummary {
-  id: number;
-  label: string;
-  synced_at: string;
-  amp_state_hash_sha256: string;
-  total_sync_ms: number;
-  slot_count: number;
-  created_at: string;
-}
-
-interface BackupSnapshotListResponse {
-  snapshots: BackupSnapshotSummary[];
-}
-
 interface CurrentPatchResponse {
   created_at: string;
   patch: Record<string, unknown>;
@@ -580,12 +566,6 @@ export class App implements OnInit, OnDestroy {
   editorLiveApplyInFlight = false;
   editorLiveApplyLastAppliedFingerprint = '';
   editorLiveApplyQueuedFingerprint: string | null = null;
-  patchSetModalOpen = signal(false);
-  patchSetSnapshots = signal<BackupSnapshotSummary[]>([]);
-  patchConfigModalOpen = signal(false);
-  patchConfigTargetSlot = signal<number | null>(null);
-  patchConfigTargetLabel = signal('');
-  patchConfigRows = signal<PatchConfigResponse[]>([]);
   tonePatchObjects = signal<TonePatchObjectResponse[]>([]);
   toneGroups = signal<ToneGroupResponse[]>([]);
   toneSets = signal<TonePatchObjectSetResponse[]>([]);
@@ -1797,78 +1777,6 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  async saveSlotToDb(slot: SlotCard): Promise<void> {
-    if (!slot.patch) {
-      this.status.set(`No patch payload loaded for ${slot.slot_label}. Read or Load first.`);
-      return;
-    }
-    const actionKey = this.slotActionKey('save-db', slot.slot);
-    this.setActionBusy(actionKey, true);
-    this.status.set(`Saving ${slot.slot_label} to patch DB...`);
-    this.responseJson.set('');
-    try {
-      const saveResponse = await fetch('/api/v1/patches/configs', {
-        method: 'POST',
-        cache: 'no-store',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          snapshot: slot.patch,
-          measured_rms_dbfs: slot.measured_rms_dbfs,
-          measured_peak_dbfs: slot.measured_peak_dbfs,
-          measured_at: slot.measured_at || null,
-        }),
-      });
-      const savePayload = (await saveResponse.json()) as PatchConfigResponse | { detail?: unknown };
-      if (!saveResponse.ok || !('hash_id' in savePayload)) {
-        this.status.set(`Failed saving ${slot.slot_label} to patch DB`);
-        this.responseJson.set(JSON.stringify(savePayload, null, 2));
-        return;
-      }
-      const saved = savePayload as PatchConfigResponse;
-      this.slots.update((rows) =>
-        rows.map((card) =>
-          card.slot === slot.slot
-            ? {
-                ...card,
-                config_hash_sha256: saved.hash_id,
-                saved_hash_sha256: saved.hash_id,
-                is_saved: true,
-                measured_rms_dbfs: saved.measured_rms_dbfs,
-                measured_peak_dbfs: saved.measured_peak_dbfs,
-                measured_at: saved.measured_at || '',
-              }
-            : card,
-        ),
-      );
-      this.status.set(`Saved ${slot.slot_label} to patch DB`);
-      this.responseJson.set(
-        JSON.stringify(
-          {
-            message: 'Patch saved to DB',
-            slot: slot.slot_label,
-            hash_id: saved.hash_id,
-          },
-          null,
-          2,
-        ),
-      );
-    } catch (error: unknown) {
-      this.status.set(`Failed saving ${slot.slot_label} to patch DB`);
-      this.responseJson.set(
-        JSON.stringify(
-          {
-            message: 'Browser request failed',
-            error: String(error),
-          },
-          null,
-          2,
-        ),
-      );
-    } finally {
-      this.setActionBusy(actionKey, false);
-    }
-  }
-
   async keepSlotToToneLibrary(slot: SlotCard): Promise<void> {
     if (!slot.patch) {
       this.status.set(`No patch payload loaded for ${slot.slot_label}. Read or load it first.`);
@@ -1932,82 +1840,6 @@ export class App implements OnInit, OnDestroy {
     } finally {
       this.setActionBusy(actionKey, false);
     }
-  }
-
-  async openPatchConfigLoadModal(slot: SlotCard): Promise<void> {
-    const actionKey = this.slotActionKey('load-configs', slot.slot);
-    this.setActionBusy(actionKey, true);
-    this.status.set(`Loading patch configs for ${slot.slot_label}...`);
-    this.responseJson.set('');
-    try {
-      const response = await fetch('/api/v1/patches/configs', {
-        method: 'GET',
-        cache: 'no-store',
-      });
-      const payload = (await response.json()) as PatchConfigResponse[] | { detail?: unknown };
-      if (!response.ok) {
-        this.status.set('Failed loading patch configs');
-        this.responseJson.set(JSON.stringify(payload, null, 2));
-        return;
-      }
-      this.patchConfigRows.set(payload as PatchConfigResponse[]);
-      this.patchConfigTargetSlot.set(slot.slot);
-      this.patchConfigTargetLabel.set(slot.slot_label);
-      this.patchConfigModalOpen.set(true);
-      this.status.set(`Select a patch config to load into ${slot.slot_label}`);
-    } catch (error: unknown) {
-      this.status.set(`Failed loading patch configs`);
-      this.responseJson.set(
-        JSON.stringify(
-          {
-            message: 'Browser request failed',
-            error: String(error),
-          },
-          null,
-          2,
-        ),
-      );
-    } finally {
-      this.setActionBusy(actionKey, false);
-    }
-  }
-
-  closePatchConfigModal(): void {
-    this.patchConfigModalOpen.set(false);
-    this.patchConfigTargetSlot.set(null);
-    this.patchConfigTargetLabel.set('');
-  }
-
-  loadPatchConfigIntoTargetSlot(config: PatchConfigResponse): void {
-    const slotNumber = this.patchConfigTargetSlot();
-    if (slotNumber === null) {
-      return;
-    }
-    const snapshot = this.clonePatch(config.snapshot);
-    const patchName = this.readString(snapshot, 'patch_name') ?? '';
-    this.slots.update((rows) =>
-      rows.map((card) => {
-        if (card.slot !== slotNumber) {
-          return card;
-        }
-        return {
-          ...card,
-          patch_name: patchName || card.patch_name,
-          patch: {
-            ...snapshot,
-            config_hash_sha256: config.hash_id,
-          },
-          config_hash_sha256: config.hash_id,
-          saved_hash_sha256: config.hash_id,
-          is_saved: true,
-          measured_rms_dbfs: config.measured_rms_dbfs,
-          measured_peak_dbfs: config.measured_peak_dbfs,
-          measured_at: config.measured_at || '',
-        };
-      }),
-    );
-    this.status.set(`Loaded patch config ${this.shortHash(config.hash_id)} into ${this.patchConfigTargetLabel()}`);
-    this.closePatchConfigModal();
   }
 
   async measureActivePatch(): Promise<void> {
@@ -2814,10 +2646,6 @@ export class App implements OnInit, OnDestroy {
     return this.isActiveSlot(slot);
   }
 
-  canLoadSlot(_slot: SlotCard): boolean {
-    return true;
-  }
-
   canStageSlot(slot: SlotCard): boolean {
     return this.hasFullPatch(slot) && this.isActiveSlot(slot);
   }
@@ -2966,50 +2794,6 @@ export class App implements OnInit, OnDestroy {
     } finally {
       this.setActionBusy('load-amp-state', false);
     }
-  }
-
-  async openPatchSetLoader(): Promise<void> {
-    this.setActionBusy('open-patch-set-loader', true);
-    this.status.set('Loading recent full-sync data...');
-    this.responseJson.set('');
-    try {
-      const response = await fetch('/api/v1/amp/backup/snapshots?limit=20', {
-        method: 'GET',
-        cache: 'no-store',
-      });
-      const payload = (await response.json()) as BackupSnapshotListResponse | { detail?: unknown };
-      if (!response.ok) {
-        this.status.set('Failed loading recent full-sync data');
-        this.responseJson.set(JSON.stringify(payload, null, 2));
-        return;
-      }
-      const result = payload as BackupSnapshotListResponse;
-      this.patchSetSnapshots.set(result.snapshots);
-      this.patchSetModalOpen.set(true);
-      if (result.snapshots.length === 0) {
-        this.status.set('No recent full-sync data found');
-      } else {
-        this.status.set('Select a full-sync snapshot to load into cards');
-      }
-    } catch (error: unknown) {
-      this.status.set('Failed loading recent full-sync data');
-      this.responseJson.set(
-        JSON.stringify(
-          {
-            message: 'Browser request failed',
-            error: String(error),
-          },
-          null,
-          2,
-        ),
-      );
-    } finally {
-      this.setActionBusy('open-patch-set-loader', false);
-    }
-  }
-
-  closePatchSetModal(): void {
-    this.patchSetModalOpen.set(false);
   }
 
   openEditor(slot: SlotCard): void {
@@ -3705,58 +3489,6 @@ export class App implements OnInit, OnDestroy {
     });
   }
 
-  async loadPatchSetSnapshot(snapshot: BackupSnapshotSummary): Promise<void> {
-    const actionKey = `load-patch-set-snapshot:${snapshot.id}`;
-    this.setActionBusy(actionKey, true);
-    this.status.set(`Loading snapshot ${snapshot.label}...`);
-    this.responseJson.set('');
-    try {
-      const response = await fetch(`/api/v1/amp/backup/snapshots/${snapshot.id}/load`, {
-        method: 'POST',
-        cache: 'no-store',
-      });
-      const payload = (await response.json()) as FullAmpDumpResponse | { detail?: unknown };
-      if (!response.ok) {
-        this.status.set('Failed loading snapshot');
-        this.responseJson.set(JSON.stringify(payload, null, 2));
-        return;
-      }
-      const loaded = payload as FullAmpDumpResponse;
-      this.slots.set(this.mergeSnapshotState(loaded));
-      this.ampStateHash.set(loaded.amp_state_hash_sha256);
-      this.lastSyncedAt.set(loaded.synced_at);
-      this.totalSyncMs.set(loaded.total_sync_ms);
-      this.patchSetModalOpen.set(false);
-      this.status.set(`Loaded snapshot ${snapshot.label}`);
-      this.responseJson.set(
-        JSON.stringify(
-          {
-            message: 'Loaded full-sync data into cards',
-            snapshot_id: snapshot.id,
-            synced_at: loaded.synced_at,
-            amp_state_hash_sha256: loaded.amp_state_hash_sha256,
-          },
-          null,
-          2,
-        ),
-      );
-    } catch (error: unknown) {
-      this.status.set('Failed loading snapshot');
-      this.responseJson.set(
-        JSON.stringify(
-          {
-            message: 'Browser request failed',
-            error: String(error),
-          },
-          null,
-          2,
-        ),
-      );
-    } finally {
-      this.setActionBusy(actionKey, false);
-    }
-  }
-
   private async waitForQuickSyncJob(jobId: string): Promise<QuickSyncJobResponse> {
     const maxPolls = 75;
     for (let i = 0; i < maxPolls; i += 1) {
@@ -3829,20 +3561,11 @@ export class App implements OnInit, OnDestroy {
     return hash.slice(0, 12);
   }
 
-  displayHash(slot: SlotCard): string {
-    return slot.config_hash_sha256 ? this.shortHash(slot.config_hash_sha256) : 'n/a';
-  }
-
   displayPatchName(slot: SlotCard): string {
     if (slot.patch_name) {
       return slot.patch_name;
     }
     return 'Unsynced';
-  }
-
-  patchConfigName(config: PatchConfigResponse): string {
-    const name = this.readString(config.snapshot, 'patch_name');
-    return name && name.trim().length > 0 ? name : 'Unnamed Patch';
   }
 
   selectedAmpSlotLabel(): string {
