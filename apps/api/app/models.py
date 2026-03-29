@@ -83,3 +83,62 @@ class AudioSample(Base):
     audio_wav: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     is_level_marker: Mapped[bool] = mapped_column(nullable=False, default=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
+class PatchObject(Base):
+    __tablename__ = "patch_objects"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    patch_json: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    source_type: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    source_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    parent_patch_object_id: Mapped[int | None] = mapped_column(ForeignKey("patch_objects.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class PatchObjectGroup(Base):
+    __tablename__ = "patch_object_groups"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class PatchObjectGroupMember(Base):
+    __tablename__ = "patch_object_group_members"
+    __table_args__ = (UniqueConstraint("group_id", "patch_object_id", name="uq_patch_object_group_members"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("patch_object_groups.id", ondelete="CASCADE"), nullable=False, index=True)
+    patch_object_id: Mapped[int] = mapped_column(ForeignKey("patch_objects.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
+class LivePatchState(Base):
+    __tablename__ = "live_patch_state"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    patch_json: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    active_slot: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    amp_confirmed_at: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    source_type: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    last_known_exact_patch_object_id: Mapped[int | None] = mapped_column(ForeignKey("patch_objects.id", ondelete="SET NULL"), nullable=True, index=True)
+    last_known_exact_slot: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class AmpSlotSnapshot(Base):
+    __tablename__ = "amp_slot_snapshots"
+
+    slot: Mapped[int] = mapped_column(Integer, primary_key=True)
+    patch_name: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    patch_json: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    amp_confirmed_at: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    exact_patch_object_id: Mapped[int | None] = mapped_column(ForeignKey("patch_objects.id", ondelete="SET NULL"), nullable=True, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

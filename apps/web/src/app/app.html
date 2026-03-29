@@ -52,6 +52,7 @@
           </div>
           <div class="d-flex flex-wrap gap-2 mb-2">
             <button type="button" class="btn btn-primary btn-sm" (click)="testAmpConnection()" [disabled]="isActionBusy('test-amp-connection')">{{ headerActionLabel('test-amp-connection', 'Test Amp Connection', 'Testing...') }}</button>
+            <button type="button" class="btn btn-outline-primary btn-sm" (click)="syncLivePatch()" [disabled]="isActionBusy('sync-live-patch')">{{ headerActionLabel('sync-live-patch', 'Sync Live Patch', 'Syncing...') }}</button>
             <button type="button" class="btn btn-outline-primary btn-sm" (click)="quickSyncAmpSlots()" [disabled]="isActionBusy('quick-sync')">{{ headerActionLabel('quick-sync', 'Quick Sync Names', 'Syncing...') }}</button>
             <button type="button" class="btn btn-success btn-sm" (click)="loadAmpState()" [disabled]="isActionBusy('load-amp-state')">{{ headerActionLabel('load-amp-state', 'Load Amp State', 'Loading...') }}</button>
             <button type="button" class="btn btn-outline-success btn-sm" (click)="openPatchSetLoader()" [disabled]="isActionBusy('open-patch-set-loader')">{{ headerActionLabel('open-patch-set-loader', 'Load Patch Set', 'Loading...') }}</button>
@@ -71,6 +72,12 @@
           </div>
           <div class="d-flex flex-wrap gap-3 small text-secondary">
             <span>AMP State Hash: <code>{{ shortHash(ampStateHash()) }}</code></span>
+            <span>Live Confirmed: <code>{{ livePatchConfirmedAt() || 'n/a' }}</code></span>
+            <span>Live Source: <code>{{ livePatchSourceType() || 'n/a' }}</code></span>
+            <span>Live Exact DB: <code>{{ livePatchExactDbName() || 'none' }}</code></span>
+            <span>Live Exact Slot: <code>{{ livePatchExactSlotText() || 'none' }}</code></span>
+            <span>Live Partial DB: <code>{{ livePatchPartialDbCount() }}</code></span>
+            <span>Live Partial Slots: <code>{{ livePatchPartialSlotCount() }}</code></span>
             <span>Last Sync: <code>{{ lastSyncedAt() || 'n/a' }}</code></span>
             <span>Total Sync Time: <code>{{ formatMs(totalSyncMs()) }}</code></span>
             <span>Selected Slot: <code>{{ selectedAmpSlotLabel() }}</code></span>
@@ -581,8 +588,6 @@
                   <code class="text-danger">error</code>
                 } @else if (editorLiveApplyHasApplied()) {
                   <code class="text-info">applied</code>
-                } @else if (editorLiveApplyEnabled() && editorLiveApplyCountdownSec() !== null) {
-                  <code class="text-warning">grace {{ editorLiveApplyGraceLabel() }}</code>
                 } @else if (editorLiveApplyEnabled()) {
                   <code class="text-success">ready</code>
                 } @else {

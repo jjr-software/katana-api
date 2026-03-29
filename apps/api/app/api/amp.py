@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.amp_queue import amp_job_queue
 from app.deps import get_amp_client, get_db
 from app.katana import AmpClient, QuickSlotName, SlotDump, SlotPatchSummary, slot_label
+from app.live_patch_state import upsert_live_patch_state
 from app.models import AmpSyncHistory, PatchConfig, PatchSet, PatchSetMember
 
 router = APIRouter(prefix="/api/v1/amp", tags=["amp"])
@@ -279,7 +280,10 @@ async def device_status(client: AmpClient = Depends(get_amp_client)) -> AmpDevic
 
 
 @router.get("/current-patch", response_model=CurrentPatchResponse)
-async def current_patch() -> CurrentPatchResponse:
+async def current_patch(
+    db: Session = Depends(get_db),
+    client: AmpClient = Depends(get_amp_client),
+) -> CurrentPatchResponse:
     job = await amp_job_queue.enqueue_current_patch()
     settled = await _await_terminal_job(job.job_id, timeout_seconds=60.0)
     if settled.status != "succeeded" or settled.result_current_patch is None:
@@ -292,6 +296,14 @@ async def current_patch() -> CurrentPatchResponse:
             },
         )
 
+    active = await client.read_active_slot()
+    upsert_live_patch_state(
+        db,
+        full_patch=settled.result_current_patch,
+        active_slot=active.slot,
+        amp_confirmed_at=datetime.now().isoformat(timespec="seconds"),
+        source_type="amp_sync",
+    )
     return CurrentPatchResponse(
         created_at=datetime.now().isoformat(timespec="seconds"),
         patch=settled.result_current_patch,
@@ -312,7 +324,11 @@ async def current_slot(client: AmpClient = Depends(get_amp_client)) -> ActiveSlo
 
 
 @router.post("/current-patch/live-apply", response_model=ApplyCurrentPatchResponse)
-async def apply_current_patch_live(payload: ApplyCurrentPatchRequest) -> ApplyCurrentPatchResponse:
+async def apply_current_patch_live(
+    payload: ApplyCurrentPatchRequest,
+    db: Session = Depends(get_db),
+    client: AmpClient = Depends(get_amp_client),
+) -> ApplyCurrentPatchResponse:
     job = await amp_job_queue.enqueue_apply_current_patch(payload.patch)
     settled = await _await_terminal_job(job.job_id, timeout_seconds=120.0)
     if settled.status != "succeeded" or settled.result_applied_patch is None:
@@ -324,8 +340,17 @@ async def apply_current_patch_live(payload: ApplyCurrentPatchRequest) -> ApplyCu
                 "job_id": settled.job_id,
             },
         )
+    applied_at = datetime.now().isoformat(timespec="seconds")
+    active = await client.read_active_slot()
+    upsert_live_patch_state(
+        db,
+        full_patch=settled.result_applied_patch,
+        active_slot=active.slot,
+        amp_confirmed_at=applied_at,
+        source_type="manual_apply",
+    )
     return ApplyCurrentPatchResponse(
-        applied_at=datetime.now().isoformat(timespec="seconds"),
+        applied_at=applied_at,
         patch=settled.result_applied_patch,
     )
 

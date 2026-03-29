@@ -110,7 +110,6 @@ const EQ_PEQ_PARAM_SCHEMA: ReadonlyArray<{ key: string; label: string; index: nu
   { key: 'level', label: 'Level', index: 10, min: -20, max: 20, offset: 20 },
 ];
 const LIVE_RMS_WINDOW_POINTS = 96;
-const EDITOR_LIVE_APPLY_DEBOUNCE_MS = 2000;
 const EDITOR_LIVE_APPLY_MIN_GAP_MS = 120;
 const DEFAULT_TARGET_RMS_DBFS = -31.0;
 const AUTO_LEVEL_TOLERANCE_DB = 0.4;
@@ -266,6 +265,18 @@ interface ActiveSlotResponse {
 interface ApplyCurrentPatchResponse {
   applied_at: string;
   patch: Record<string, unknown>;
+}
+
+interface LivePatchResponse {
+  patch_json: Record<string, unknown>;
+  active_slot: number | null;
+  amp_confirmed_at: string;
+  source_type: string;
+  exact_patch_object: { id: number; name: string } | null;
+  partial_patch_objects: { id: number; name: string }[];
+  exact_amp_slot: { slot: number; patch_name: string } | null;
+  partial_amp_slots: { slot: number; patch_name: string }[];
+  compat_hash_sha256: string;
 }
 
 interface PatchConfigResponse {
@@ -456,6 +467,12 @@ export class App implements OnInit, OnDestroy {
   selectedAmpSlotText = signal('n/a');
   currentAmpPatchHash = signal('');
   currentAmpCommitState = signal<'unknown' | 'committed' | 'uncommitted'>('unknown');
+  livePatchConfirmedAt = signal('');
+  livePatchSourceType = signal('');
+  livePatchExactDbName = signal('');
+  livePatchExactSlotText = signal('');
+  livePatchPartialDbCount = signal(0);
+  livePatchPartialSlotCount = signal(0);
   queueJobs = signal<QueueJobSummary[]>([]);
   queueGeneratedAt = signal('');
   levelMarkerRmsDbfs = signal<number | null>(null);
@@ -536,6 +553,7 @@ export class App implements OnInit, OnDestroy {
     void this.loadAudioLevelMarker();
     void this.loadRecentAudioSamples();
     void this.refreshActiveSlot();
+    void this.refreshLivePatchStatus();
     this.startLiveMeter();
     this.queuePollHandle = setInterval(() => {
       void this.refreshQueueState();
@@ -623,6 +641,47 @@ export class App implements OnInit, OnDestroy {
       ));
     } finally {
       this.setActionBusy('test-amp-connection', false);
+    }
+  }
+
+  async syncLivePatch(): Promise<void> {
+    this.setActionBusy('sync-live-patch', true);
+    this.status.set('Syncing Live Patch from amp...');
+    this.responseJson.set('');
+    try {
+      const response = await fetch('/api/v1/live-patch/sync', {
+        method: 'POST',
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as LivePatchResponse | { detail?: unknown };
+      if (!response.ok || !('patch_json' in payload)) {
+        this.status.set('Live Patch sync failed');
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      this.applyLivePatchStatus(payload as LivePatchResponse);
+      this.status.set('Live Patch synced');
+    } catch (error: unknown) {
+      this.status.set('Live Patch sync failed');
+      this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
+    } finally {
+      this.setActionBusy('sync-live-patch', false);
+    }
+  }
+
+  async refreshLivePatchStatus(): Promise<void> {
+    try {
+      const response = await fetch('/api/v1/live-patch', {
+        method: 'GET',
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as LivePatchResponse | { detail?: unknown };
+      if (!response.ok || !('patch_json' in payload)) {
+        return;
+      }
+      this.applyLivePatchStatus(payload as LivePatchResponse);
+    } catch {
+      // Ignore background Live Patch summary failures.
     }
   }
 
@@ -4033,16 +4092,10 @@ export class App implements OnInit, OnDestroy {
     }
     if (this.editorLiveApplyHandle !== null) {
       clearTimeout(this.editorLiveApplyHandle);
-    }
-    const sinceLastStartMs = Date.now() - this.editorLiveApplyLastStartedAtMs;
-    const gapWaitMs = Math.max(0, EDITOR_LIVE_APPLY_MIN_GAP_MS - sinceLastStartMs);
-    const waitMs = Math.max(EDITOR_LIVE_APPLY_DEBOUNCE_MS, gapWaitMs);
-    this.startEditorLiveApplyCountdown(waitMs);
-    this.editorLiveApplyHandle = setTimeout(() => {
       this.editorLiveApplyHandle = null;
-      this.stopEditorLiveApplyCountdown();
-      void this.flushEditorLiveApplyQueue();
-    }, waitMs);
+    }
+    this.stopEditorLiveApplyCountdown();
+    void this.flushEditorLiveApplyQueue();
   }
 
   private async flushEditorLiveApplyQueue(): Promise<void> {
@@ -4118,13 +4171,26 @@ export class App implements OnInit, OnDestroy {
       this.currentAmpPatchHash.set(hash);
       this.currentAmpCommitState.set('uncommitted');
       this.editorLiveApplyReadbackAt.set(applied.applied_at);
+      void this.refreshLivePatchStatus();
     } catch (error: unknown) {
       this.editorLiveApplyError.set(String(error));
     } finally {
       this.editorLiveApplyInFlight = false;
       this.editorLiveApplyPending.set(false);
       if (this.editorLiveApplyQueuedFingerprint && this.editorLiveApplyQueuedFingerprint !== this.editorLiveApplyLastAppliedFingerprint) {
-        this.scheduleEditorLiveApply();
+        const sinceLastStartMs = Date.now() - this.editorLiveApplyLastStartedAtMs;
+        const gapWaitMs = Math.max(0, EDITOR_LIVE_APPLY_MIN_GAP_MS - sinceLastStartMs);
+        if (gapWaitMs > 0) {
+          if (this.editorLiveApplyHandle !== null) {
+            clearTimeout(this.editorLiveApplyHandle);
+          }
+          this.editorLiveApplyHandle = setTimeout(() => {
+            this.editorLiveApplyHandle = null;
+            void this.flushEditorLiveApplyQueue();
+          }, gapWaitMs);
+        } else {
+          void this.flushEditorLiveApplyQueue();
+        }
       }
     }
   }
@@ -4437,6 +4503,22 @@ export class App implements OnInit, OnDestroy {
       return `{${parts.join(',')}}`;
     }
     return JSON.stringify(value);
+  }
+
+  private applyLivePatchStatus(payload: LivePatchResponse): void {
+    this.livePatchConfirmedAt.set(payload.amp_confirmed_at || '');
+    this.livePatchSourceType.set(payload.source_type || '');
+    this.livePatchExactDbName.set(payload.exact_patch_object?.name || '');
+    this.livePatchExactSlotText.set(
+      payload.exact_amp_slot ? `${payload.exact_amp_slot.slot} · ${payload.exact_amp_slot.patch_name || 'Unnamed'}` : '',
+    );
+    this.livePatchPartialDbCount.set(Array.isArray(payload.partial_patch_objects) ? payload.partial_patch_objects.length : 0);
+    this.livePatchPartialSlotCount.set(Array.isArray(payload.partial_amp_slots) ? payload.partial_amp_slots.length : 0);
+    this.currentAmpPatchHash.set(payload.compat_hash_sha256 || this.currentAmpPatchHash());
+    if (payload.active_slot !== null) {
+      this.selectedAmpSlot.set(payload.active_slot);
+      this.selectedAmpSlotText.set(payload.active_slot <= 4 ? `A:${payload.active_slot}` : `B:${payload.active_slot - 4}`);
+    }
   }
 
   private refreshCurrentCommitStateFromKnownState(): void {
