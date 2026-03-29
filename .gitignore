@@ -2,6 +2,14 @@
 out/
 installer_extracted/
 manual-extract/installer_extracted/
+manual-extract/fresh/BOSS TONE STUDIO for KATANA Gen 3 Installer.exe
+manual-extract/fresh/ktn3_bts_w110.zip
+manual-extract/fresh/app/
+manual-extract/fresh/innoextract/
+manual-extract/fresh/localappdata/Roland/BOSS TONE STUDIO for KATANA Gen 3/B_26.zip
+manual-extract/fresh/localappdata/Roland/BOSS TONE STUDIO for KATANA Gen 3/html/images/
+manual-extract/fresh/localappdata/Roland/BOSS TONE STUDIO for KATANA Gen 3/html/js/fonts/
+manual-extract/fresh/localappdata/Roland/BOSS TONE STUDIO for KATANA Gen 3/html/document/tips/sample/html/images/
 
 # Python bytecode and caches
 __pycache__/

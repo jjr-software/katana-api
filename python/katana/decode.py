@@ -65,7 +65,7 @@ def _repo_root() -> Path:
 
 
 def _default_resource_js_path() -> Path:
-    return _repo_root() / "manual-extract" / "installer_extracted" / "localappdata" / "Roland" / "BOSS TONE STUDIO for KATANA Gen 3" / "html" / "js" / "config" / "resource.js"
+    return _repo_root() / "manual-extract" / "fresh" / "localappdata" / "Roland" / "BOSS TONE STUDIO for KATANA Gen 3" / "html" / "js" / "config" / "resource.js"
 
 
 def _default_cache_path() -> Path:

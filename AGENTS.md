@@ -51,10 +51,10 @@
 - Writes and readbacks were consistent, but audible impact depended on active mode/path.
 
 ## Extracted Source Location (for protocol map)
-- `manual-extract/installer_extracted/localappdata/Roland/BOSS TONE STUDIO for KATANA Gen 3/html/js/config/address_map.js`
-- `manual-extract/installer_extracted/localappdata/Roland/BOSS TONE STUDIO for KATANA Gen 3/html/js/businesslogic/bts/address_const.js`
-- `manual-extract/installer_extracted/localappdata/Roland/BOSS TONE STUDIO for KATANA Gen 3/html/js/common/midi_controller.js`
-- `manual-extract/installer_extracted/localappdata/Roland/BOSS TONE STUDIO for KATANA Gen 3/html/js/config/product_setting.js`
+- `manual-extract/fresh/localappdata/Roland/BOSS TONE STUDIO for KATANA Gen 3/html/js/config/address_map.js`
+- `manual-extract/fresh/localappdata/Roland/BOSS TONE STUDIO for KATANA Gen 3/html/js/businesslogic/bts/address_const.js`
+- `manual-extract/fresh/localappdata/Roland/BOSS TONE STUDIO for KATANA Gen 3/html/js/common/midi_controller.js`
+- `manual-extract/fresh/localappdata/Roland/BOSS TONE STUDIO for KATANA Gen 3/html/js/config/product_setting.js`
 
 ## Practical Note
 - For manual host testing, this pattern worked well:
@@ -391,7 +391,7 @@
   - applied to amp type, booster type, mod/fx type, delay type, reverb type/layer mode, EQ type, send/return mode+position, pedal-fx type, and chain pattern.
 - Added BTS resource parser + local cache:
   - new module: `python/katana/decode.py`
-  - source table: `manual-extract/.../html/js/config/resource.js`
+- source table: `manual-extract/fresh/.../html/js/config/resource.js`
   - cache file: `python/.cache/decode_tables.json`
   - cache invalidates automatically when the source file size/mtime changes.
 
@@ -781,6 +781,16 @@
   - verified backup queue flow returns `succeeded` and full slot payload
 - Repository hygiene fix:
   - flattened `manual-extract/fresh/innoextract` from accidental gitlink into regular tracked files
+
+## Session Update - 2026-03-29 (Manual Extract Trimmed To Readable BTS Source)
+- Reduced tracked `manual-extract/` contents to readable BTS source assets only.
+- Removed tracked installer/application payloads and non-source binary assets:
+  - installer `.exe`, packaged `.zip` files, extracted app `.exe`,
+  - bundled image/font assets,
+  - unrelated `innoextract/` source copy.
+- `python/katana/decode.py` now reads `resource.js` from the tracked readable extract:
+  - `manual-extract/fresh/localappdata/Roland/BOSS TONE STUDIO for KATANA Gen 3/html/js/config/resource.js`
+- Added `.gitignore` guards so bulk extract payloads do not get reintroduced.
 
 ## Session Update - 2026-03-26 (Persistent Sync History)
 - Added durable sync history storage in API DB:
