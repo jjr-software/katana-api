@@ -731,6 +731,57 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  async openLiveEditor(): Promise<void> {
+    this.status.set('Opening Live Patch editor...');
+    this.responseJson.set('');
+    try {
+      const response = await fetch('/api/v1/live-patch', {
+        method: 'GET',
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as LivePatchResponse | { detail?: unknown };
+      if (!response.ok || !('patch_json' in payload)) {
+        this.status.set('Live Patch is not available. Sync it first.');
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      const live = payload as LivePatchResponse;
+      this.applyLivePatchStatus(live);
+      const draft = this.clonePatch(live.patch_json);
+      const draftAmp = this.readObject(draft, 'amp');
+      if (draftAmp) {
+        this.syncAmpDerivedFields(draftAmp);
+      }
+      const draftStages = this.readObject(draft, 'stages');
+      if (draftStages) {
+        for (const stageName of ['booster', 'mod', 'fx', 'delay', 'reverb'] as const) {
+          const stage = this.readObject(draftStages, stageName);
+          if (stage) {
+            this.syncStageDerivedFields(stageName, stage);
+          }
+        }
+      }
+      this.editorSlotNumber.set(live.active_slot);
+      this.editorSlotLabel.set('Live Patch');
+      this.editorTargetIsActive.set(true);
+      this.editorPatchDraft.set(draft);
+      this.editorBaseFingerprint.set(this.patchFingerprint(draft));
+      this.editorBaseConfigHash.set('');
+      this.editorLiveApplyLastAppliedFingerprint = this.patchFingerprint(draft);
+      this.editorLiveApplyQueuedFingerprint = null;
+      this.editorLiveApplyInFlight = false;
+      this.editorLiveApplyEnabled.set(true);
+      this.editorLiveApplyPending.set(false);
+      this.editorLiveApplyError.set('');
+      this.editorLiveApplyReadbackAt.set('');
+      this.editorModalOpen.set(true);
+      this.status.set('Live Patch editor opened');
+    } catch (error: unknown) {
+      this.status.set('Failed opening Live Patch editor');
+      this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
+    }
+  }
+
   async refreshLivePatchStatus(): Promise<void> {
     try {
       const response = await fetch('/api/v1/live-patch', {
@@ -4632,7 +4683,7 @@ export class App implements OnInit, OnDestroy {
       return;
     }
     const draftFingerprint = this.editorDraftFingerprint();
-    if (draftFingerprint === '' || this.editorSlotNumber() === null) {
+    if (draftFingerprint === '') {
       return;
     }
     this.editorLiveApplyQueuedFingerprint = draftFingerprint;
@@ -4664,7 +4715,7 @@ export class App implements OnInit, OnDestroy {
   private async applyEditorPatchLive(expectedFingerprint: string): Promise<void> {
     const draft = this.editorPatchDraft();
     const slotNumber = this.editorSlotNumber();
-    if (!this.editorLiveApplyEnabled() || !this.editorLiveApplyAvailable() || draft === null || slotNumber === null || this.editorLiveApplyInFlight) {
+    if (!this.editorLiveApplyEnabled() || !this.editorLiveApplyAvailable() || draft === null || this.editorLiveApplyInFlight) {
       return;
     }
     const currentFingerprint = this.patchFingerprint(draft);
@@ -4701,22 +4752,25 @@ export class App implements OnInit, OnDestroy {
       }
       const patchName = this.readString(draftSnapshot, 'patch_name') ?? '';
       const hash = this.readString(applied.patch, 'config_hash_sha256') ?? '';
-      this.slots.update((current) =>
-        current.map((card) => {
-          if (card.slot !== slotNumber) {
-            return card;
-          }
-          return {
-            ...card,
-            patch_name: patchName || card.patch_name,
-            patch: this.clonePatch(draftSnapshot),
-            config_hash_sha256: hash,
-            in_sync: true,
-            out_synced: true,
-            is_saved: false,
-          };
-        }),
-      );
+      const targetSlotNumber = slotNumber ?? this.selectedAmpSlot();
+      if (targetSlotNumber !== null) {
+        this.slots.update((current) =>
+          current.map((card) => {
+            if (card.slot !== targetSlotNumber) {
+              return card;
+            }
+            return {
+              ...card,
+              patch_name: patchName || card.patch_name,
+              patch: this.clonePatch(draftSnapshot),
+              config_hash_sha256: hash,
+              in_sync: true,
+              out_synced: true,
+              is_saved: false,
+            };
+          }),
+        );
+      }
       this.currentAmpPatchHash.set(hash);
       this.currentAmpCommitState.set('uncommitted');
       this.editorLiveApplyReadbackAt.set(applied.applied_at);

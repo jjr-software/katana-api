@@ -53,6 +53,7 @@
           <div class="d-flex flex-wrap gap-2 mb-2">
             <button type="button" class="btn btn-primary btn-sm" (click)="testAmpConnection()" [disabled]="isActionBusy('test-amp-connection')">{{ headerActionLabel('test-amp-connection', 'Test Amp Connection', 'Testing...') }}</button>
             <button type="button" class="btn btn-outline-primary btn-sm" (click)="syncLivePatch()" [disabled]="isActionBusy('sync-live-patch')">{{ headerActionLabel('sync-live-patch', 'Sync Live Patch', 'Syncing...') }}</button>
+            <button type="button" class="btn btn-outline-primary btn-sm" (click)="openLiveEditor()">Open Live Editor</button>
             <button type="button" class="btn btn-outline-primary btn-sm" (click)="quickSyncAmpSlots()" [disabled]="isActionBusy('quick-sync')">{{ headerActionLabel('quick-sync', 'Quick Sync Names', 'Syncing...') }}</button>
             <button type="button" class="btn btn-success btn-sm" (click)="loadAmpState()" [disabled]="isActionBusy('load-amp-state')">{{ headerActionLabel('load-amp-state', 'Load Amp State', 'Loading...') }}</button>
             <button type="button" class="btn btn-outline-success btn-sm" (click)="openPatchSetLoader()" [disabled]="isActionBusy('open-patch-set-loader')">{{ headerActionLabel('open-patch-set-loader', 'Load Patch Set', 'Loading...') }}</button>
