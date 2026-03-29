@@ -1753,3 +1753,12 @@
   - App can only know the amp as `last known state` from the last successful read/write confirmation.
   - Fragment scope/ownership is distinct from effect enabled/disabled state.
   - Fragment saves must avoid dead-weight unrelated fields so comparisons stay meaningful.
+
+## Session Update - 2026-03-29 (Full-Scope Patch Objects, Not Base-Rig Feature)
+- Tightened the forward design doc again in:
+  - `docs/forward-implementation.md`
+- Important model correction captured:
+  - `base/default rig` is not a separate feature or entity class.
+  - It is just an ordinary saved patch object whose JSON happens to include all relevant blocks.
+  - Most AI output should be sparse and usually limited to about `1-4` blocks.
+  - Full-scope outputs are the exception, not the default.

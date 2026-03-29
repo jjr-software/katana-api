@@ -58,36 +58,41 @@ Examples:
 
 Fragment requirements:
 - stores only intentional fields, not a full patch blob,
-- records which stages it owns,
-- records which fields are intentionally part of the idea,
+- stores sparse block JSON only,
 - can be tagged by sound, guitarist, genre, or purpose,
 - can include free-text notes and AI provenance.
 
-Fragment scope must be explicit. This is separate from effect enable/disable state:
-- `owned` means this fragment claims authority over that part of the patch,
-- `enabled` means that effect is on in the rendered/live result,
-- a fragment may intentionally own an `off` state,
-- fields outside fragment scope must not be stored as dead weight.
+Fragment storage model:
+- block presence means this fragment owns that block,
+- block absence means this fragment does not define that block,
+- for example `{ "amp": {...} }` is an amp-only fragment,
+- for example `{ "amp": {...}, "eq1": {...}, "booster": {...} }` is a three-block fragment.
 
-## 3.2 Base Rig
-A `base rig` is a known starting point used to render playable variants.
+This is separate from effect enable/disable state:
+- a present block may intentionally set `on: false`,
+- that still means the fragment owns that block,
+- absent blocks are the only `do not care` blocks,
+- fields outside present blocks must not be stored as dead weight.
+
+## 3.2 Full-Scope Patch Object
+A full-scope patch object is the same storage concept as any other patch idea. It just happens to contain all relevant blocks.
 
 Examples:
-- everything off except amp,
-- dry clean platform,
-- edge-of-breakup platform,
-- high-gain platform with noise suppressor baseline.
+- a complete dry clean platform,
+- a complete edge-of-breakup patch,
+- a complete high-gain patch with noise suppressor baseline.
 
-Base rig requirements:
-- stored as full patch JSON,
-- stable and explicit,
-- used to fill in unspecified stages when composing variants.
+Rules:
+- it is not a separate feature or entity class,
+- it uses the same sparse block JSON model as any other saved object,
+- it just has broad scope because more blocks are present,
+- it can be used as the starting point for composition or live apply when needed.
 
 ## 3.3 Variant
 A `variant` is a fully playable tone candidate.
 
 There are two valid forms:
-- `composed`: built from one base rig, zero or more fragments, and optional direct stage overrides,
+- `composed`: built from one full-scope patch object, zero or more fragments, and optional direct stage overrides,
 - `captured` or `imported`: stored as one authoritative full patch JSON snapshot.
 
 Rules:
@@ -95,7 +100,7 @@ Rules:
 - a captured/imported variant may store full patch JSON because that is its source of truth,
 - rendering happens on demand for composed variants,
 - lineage must still record:
-  - which base rig it came from,
+  - which full-scope starting patch it came from,
   - which fragments were applied,
   - which overrides were introduced,
   - whether it came from AI generation, manual edit, slot capture, or import.
@@ -218,7 +223,7 @@ Target workflow:
 ## 5.1 Build An Exploration Set
 Target workflow:
 1. User asks for a family of tones, for example `8 Greenwood-ish booster + eq1 ideas`.
-2. AI generates 8 structured candidates against a chosen base rig.
+2. AI generates 8 structured candidates against a chosen full-scope starting patch when needed.
 3. App creates a new set, for example `Test Set 5`.
 4. App renders 8 full patch payloads and queues apply-to-amp.
 5. User auditions live with GA-FC.
@@ -247,7 +252,7 @@ Target workflow:
 
 ## 5.4 Compose From Existing Building Blocks
 Target workflow:
-1. User picks an existing base rig.
+1. User picks an existing full-scope patch object when one is needed.
 2. User applies one or more saved fragments.
 3. App renders a new variant.
 4. User adds that variant to a set or saves it directly.
@@ -263,6 +268,11 @@ The system should support prompts such as:
 - `Build a Coxon-inspired set with dry amp core and more upper-mid bite`
 - `Generate 4 reverb + delay tails for ambient clean parts`
 
+Default expectation:
+- most AI outputs should cover only 1-4 blocks,
+- full-scope outputs are the exception,
+- partial multi-block ideas are the normal case.
+
 ## 6.2 Structured Output Contract
 Primary path:
 - schema-validated JSON objects for fragments, variants, and sets.
@@ -270,9 +280,10 @@ Primary path:
 Initial rule:
 - prefer structured object generation over free-form patch JSON dumps.
 - prefer generation of compact, intentional partial objects over noisy full-state dumps when the user is exploring only part of the tone.
+- most generated candidates should be sparse 1-4 block objects unless the prompt explicitly asks for a full patch.
 - only render full patch JSON after the app has resolved:
-  - base rig,
-  - owned stages,
+  - a full-scope starting patch when one is required,
+  - present fragment blocks,
   - defaults for unspecified stages.
 - if the target is `Live Patch`, the system may apply only the affected fragment/stage writes without persisting a slot.
 
@@ -291,7 +302,7 @@ This is not for vague explanation only. It should improve candidate generation q
 ## 7) Data Model Direction
 Planned nucleus:
 
-### `base_rigs`
+### `full_patch_objects`
 - `id`
 - `name` (unique)
 - `description`
@@ -302,8 +313,6 @@ Planned nucleus:
 - `id`
 - `name` (unique)
 - `description`
-- `stage_scope` or owned-stage list
-- `field_scope`
 - `fragment_json`
 - `source_type` (`ai`, `manual`, `captured`, `imported`)
 - `source_prompt`
@@ -315,7 +324,7 @@ Planned nucleus:
 - `name` (unique)
 - `description`
 - `variant_kind` (`composed`, `captured`, `imported`)
-- `base_rig_id` nullable
+- `starting_patch_id` nullable
 - `patch_json` nullable
 - `is_keeper`
 - `source_type`
@@ -381,13 +390,13 @@ Existing tables can survive where useful, but the model must pivot away from pat
 
 Storage rule:
 - `fragments` store fragment data only,
-- `base_rigs` store patch JSON only,
+- `full_patch_objects` store patch JSON only,
 - `composed variants` store composition data only,
 - `captured/imported variants` store patch JSON only,
 - derived renders and hashes are computed or cached outside the authoritative entity model.
 
 Fragment rule:
-- fragment storage must preserve only intentional scope,
+- fragment storage must preserve only intentional present blocks,
 - not all visible values from a live patch,
 - not unrelated defaults,
 - not dead weight included only because it happened to be present when captured.
@@ -399,8 +408,8 @@ Planned target surface:
 - `POST /api/v1/live-patch/apply-fragment`
 - `POST /api/v1/live-patch/apply-variant`
 - `POST /api/v1/live-patch/store-to-slot`
-- `POST /api/v1/base-rigs`
-- `GET /api/v1/base-rigs`
+- `POST /api/v1/full-patches`
+- `GET /api/v1/full-patches`
 - `POST /api/v1/fragments`
 - `GET /api/v1/fragments`
 - `POST /api/v1/variants/render`
@@ -461,7 +470,7 @@ Migration rule:
 ## 11) Implementation Roadmap
 ## Phase A: Domain Pivot
 Deliver:
-- replace planning and schema direction around fragments, variants, sets, groups, base rigs,
+- replace planning and schema direction around fragments, variants, sets, groups, and full-scope patch objects,
 - introduce `Live Patch` as first-class runtime model and top-level UI object,
 - introduce unique-name rules with explicit collision failure,
 - define render pipeline from partial structures to full patch JSON,
@@ -484,7 +493,7 @@ Exit criteria:
 ## Phase C: Fragment Workflow
 Deliver:
 - fragment CRUD,
-- compose variant from base rig + fragments,
+- compose variant from a full-scope patch object + fragments,
 - apply fragment directly to `Live Patch`,
 - capture fragment from `Live Patch` sync,
 - browse by stage scope and tags.
@@ -504,13 +513,13 @@ Exit criteria:
 - user can ask for a guitarist/sound/profile and receive structured, playable candidates.
 
 ## 12) Immediate Next Sprint
-1. Define the AI designer contract for fragment/variant generation with explicit scope ownership and validation.
+1. Define the AI designer contract for fragment/variant generation with sparse 1-4 block output as the default.
 2. Define `Live Patch`, stored amp slot, and DB object status model explicitly in API and UI terms.
 3. Define the render/apply contract:
    - partial apply to `Live Patch`,
    - full render when required,
    - explicit store only for amp persistence.
-4. Replace patch-set/hash-oriented schema plan with concrete `base_rigs`, `fragments`, `variants`, `sets`, and `groups` migrations.
+4. Replace patch-set/hash-oriented schema plan with concrete `full_patch_objects`, `fragments`, `variants`, `sets`, and `groups` migrations.
 5. Implement prompt-to-`Live Patch` apply plus visible saved/not-saved indicators before expanding slot workflows further.
 
 ## 13) Explicitly Out
