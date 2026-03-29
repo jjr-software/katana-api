@@ -288,6 +288,7 @@ interface TonePatchObjectResponse {
   source_prompt: string | null;
   parent_patch_object_id: number | null;
   blocks: string[];
+  groups: Array<{ id: number; name: string }>;
   created_at: string;
   updated_at: string;
 }
@@ -516,6 +517,10 @@ export class App implements OnInit, OnDestroy {
   livePatchExactSlotText = signal('');
   livePatchPartialDbCount = signal(0);
   livePatchPartialSlotCount = signal(0);
+  livePatchExactDbMatch = signal<{ id: number; name: string } | null>(null);
+  livePatchPartialDbMatches = signal<Array<{ id: number; name: string }>>([]);
+  livePatchExactSlotMatch = signal<{ slot: number; patch_name: string } | null>(null);
+  livePatchPartialSlotMatches = signal<Array<{ slot: number; patch_name: string }>>([]);
   queueJobs = signal<QueueJobSummary[]>([]);
   queueGeneratedAt = signal('');
   levelMarkerRmsDbfs = signal<number | null>(null);
@@ -584,6 +589,7 @@ export class App implements OnInit, OnDestroy {
   toneSets = signal<TonePatchObjectSetResponse[]>([]);
   toneSaveName = signal('');
   toneSaveDescription = signal('');
+  toneSaveGroupId = signal('');
   toneGroupName = signal('');
   toneGroupDescription = signal('');
   toneAiPrompt = signal('Generate a focused set of candidates around the target sound. Make the candidates distinct enough to audition quickly.');
@@ -596,6 +602,7 @@ export class App implements OnInit, OnDestroy {
   tonePatchQuery = signal('');
   tonePatchSourceFilter = signal('');
   tonePatchGroupFilter = signal('');
+  toneHighlightedPatchObjectId = signal<number | null>(null);
   toneStoreSlot = signal('1');
   toneManualSetName = signal('');
   toneManualSetDescription = signal('');
@@ -814,6 +821,10 @@ export class App implements OnInit, OnDestroy {
     this.toneSaveDescription.set(value);
   }
 
+  setToneSaveGroupId(value: string): void {
+    this.toneSaveGroupId.set(value);
+  }
+
   setToneGroupName(value: string): void {
     this.toneGroupName.set(value);
   }
@@ -856,6 +867,13 @@ export class App implements OnInit, OnDestroy {
 
   setTonePatchGroupFilter(value: string): void {
     this.tonePatchGroupFilter.set(value);
+  }
+
+  clearTonePatchFilters(): void {
+    this.tonePatchQuery.set('');
+    this.tonePatchSourceFilter.set('');
+    this.tonePatchGroupFilter.set('');
+    this.toneHighlightedPatchObjectId.set(null);
   }
 
   setToneStoreSlot(value: string): void {
@@ -958,6 +976,7 @@ export class App implements OnInit, OnDestroy {
   async saveLiveAsTonePatchObject(): Promise<void> {
     const name = this.toneSaveName().trim();
     const blocks = this.selectedToneBlocks();
+    const saveGroupId = Number.parseInt(this.toneSaveGroupId().trim() || '0', 10);
     if (!name) {
       this.status.set('Tone save requires a name.');
       return;
@@ -987,12 +1006,27 @@ export class App implements OnInit, OnDestroy {
         this.responseJson.set(JSON.stringify(payload, null, 2));
         return;
       }
+      const saved = payload as TonePatchObjectResponse;
+      if (Number.isFinite(saveGroupId) && saveGroupId > 0) {
+        const groupResponse = await fetch(`/api/v1/groups/${saveGroupId}/patch-objects/${saved.id}`, {
+          method: 'POST',
+          cache: 'no-store',
+        });
+        const groupPayload = (await groupResponse.json()) as { detail?: unknown };
+        if (!groupResponse.ok) {
+          this.status.set(`Saved ${name}, but failed assigning it to the selected group`);
+          this.responseJson.set(JSON.stringify(groupPayload, null, 2));
+          await this.loadTonePatchObjects();
+          return;
+        }
+      }
       this.toneSaveName.set('');
       this.toneSaveDescription.set('');
+      this.toneSaveGroupId.set('');
       await this.loadTonePatchObjects();
       await this.refreshLivePatchStatus();
       this.status.set(`Saved Live Patch selection as ${name}`);
-      this.responseJson.set(JSON.stringify(payload, null, 2));
+      this.responseJson.set(JSON.stringify(saved, null, 2));
     } catch (error: unknown) {
       this.status.set('Live Patch save failed');
       this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
@@ -1210,6 +1244,51 @@ export class App implements OnInit, OnDestroy {
     } finally {
       this.setActionBusy(actionKey, false);
     }
+  }
+
+  async removeTonePatchObjectFromGroup(patchObject: TonePatchObjectResponse, group: { id: number; name: string }): Promise<void> {
+    const actionKey = `tone-remove-group:${patchObject.id}:${group.id}`;
+    this.setActionBusy(actionKey, true);
+    this.status.set(`Removing ${patchObject.name} from ${group.name}...`);
+    this.responseJson.set('');
+    try {
+      const response = await fetch(`/api/v1/groups/${group.id}/patch-objects/${patchObject.id}`, {
+        method: 'DELETE',
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as { detail?: unknown };
+      if (!response.ok) {
+        this.status.set(`Failed removing ${patchObject.name} from ${group.name}`);
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      await this.loadTonePatchObjects();
+      this.status.set(`Removed ${patchObject.name} from ${group.name}`);
+      this.responseJson.set(JSON.stringify(payload, null, 2));
+    } catch (error: unknown) {
+      this.status.set(`Failed removing ${patchObject.name} from ${group.name}`);
+      this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
+    } finally {
+      this.setActionBusy(actionKey, false);
+    }
+  }
+
+  async focusTonePatchObject(match: { id: number; name: string }): Promise<void> {
+    this.tonePatchQuery.set(match.name);
+    this.tonePatchSourceFilter.set('');
+    this.tonePatchGroupFilter.set('');
+    this.toneHighlightedPatchObjectId.set(match.id);
+    await this.loadTonePatchObjects();
+    globalThis.document?.getElementById('tone-patch-objects')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  async activateMatchedSlot(slot: number): Promise<void> {
+    const card = this.slots().find((item) => item.slot === slot);
+    if (!card) {
+      this.status.set(`Slot ${this.setLabelForSlot(slot)} is not available in the current view.`);
+      return;
+    }
+    await this.activateSlot(card);
   }
 
   async duplicateTonePatchObject(patchObject: TonePatchObjectResponse): Promise<void> {
@@ -5177,10 +5256,14 @@ export class App implements OnInit, OnDestroy {
   private applyLivePatchStatus(payload: LivePatchResponse): void {
     this.livePatchConfirmedAt.set(payload.amp_confirmed_at || '');
     this.livePatchSourceType.set(payload.source_type || '');
+    this.livePatchExactDbMatch.set(payload.exact_patch_object ?? null);
     this.livePatchExactDbName.set(payload.exact_patch_object?.name || '');
+    this.livePatchExactSlotMatch.set(payload.exact_amp_slot ?? null);
     this.livePatchExactSlotText.set(
       payload.exact_amp_slot ? `${payload.exact_amp_slot.slot} · ${payload.exact_amp_slot.patch_name || 'Unnamed'}` : '',
     );
+    this.livePatchPartialDbMatches.set(Array.isArray(payload.partial_patch_objects) ? payload.partial_patch_objects : []);
+    this.livePatchPartialSlotMatches.set(Array.isArray(payload.partial_amp_slots) ? payload.partial_amp_slots : []);
     this.livePatchPartialDbCount.set(Array.isArray(payload.partial_patch_objects) ? payload.partial_patch_objects.length : 0);
     this.livePatchPartialSlotCount.set(Array.isArray(payload.partial_amp_slots) ? payload.partial_amp_slots.length : 0);
     this.currentAmpPatchHash.set(payload.compat_hash_sha256 || this.currentAmpPatchHash());

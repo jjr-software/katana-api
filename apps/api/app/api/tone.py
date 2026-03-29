@@ -68,6 +68,11 @@ class PatchObjectCreateRequest(BaseModel):
     parent_patch_object_id: int | None = None
 
 
+class PatchObjectGroupRefResponse(BaseModel):
+    id: int
+    name: str
+
+
 class PatchObjectReadResponse(BaseModel):
     id: int
     name: str
@@ -77,6 +82,7 @@ class PatchObjectReadResponse(BaseModel):
     source_prompt: str | None = None
     parent_patch_object_id: int | None = None
     blocks: list[str]
+    groups: list[PatchObjectGroupRefResponse]
     created_at: str
     updated_at: str
 
@@ -231,7 +237,8 @@ def list_patch_objects(
                 continue
         filtered.append(row)
     rows = filtered
-    return [_patch_object_response(row) for row in rows]
+    groups_by_patch_object_id = _group_refs_by_patch_object_ids(db, [row.id for row in rows])
+    return [_patch_object_response(db, row, groups=groups_by_patch_object_id.get(row.id, [])) for row in rows]
 
 
 @router.post("/patch-objects", response_model=PatchObjectReadResponse)
@@ -248,7 +255,7 @@ def create_patch_object(payload: PatchObjectCreateRequest, db: Session = Depends
     db.add(row)
     db.commit()
     db.refresh(row)
-    return _patch_object_response(row)
+    return _patch_object_response(db, row)
 
 
 @router.get("/patch-objects/{patch_object_id:int}", response_model=PatchObjectReadResponse)
@@ -256,7 +263,7 @@ def get_patch_object(patch_object_id: int, db: Session = Depends(get_db)) -> Pat
     row = db.get(PatchObject, patch_object_id)
     if row is None:
         raise HTTPException(status_code=404, detail={"message": "Patch object not found", "patch_object_id": patch_object_id})
-    return _patch_object_response(row)
+    return _patch_object_response(db, row)
 
 
 @router.post("/patch-objects/{patch_object_id:int}/duplicate", response_model=PatchObjectReadResponse)
@@ -280,7 +287,7 @@ def duplicate_patch_object(
     db.add(duplicate)
     db.commit()
     db.refresh(duplicate)
-    return _patch_object_response(duplicate)
+    return _patch_object_response(db, duplicate)
 
 
 @router.post("/patch-objects/save-from-live", response_model=PatchObjectReadResponse)
@@ -303,7 +310,7 @@ async def save_patch_object_from_live(
     db.add(row)
     db.commit()
     db.refresh(row)
-    return _patch_object_response(row)
+    return _patch_object_response(db, row)
 
 
 @router.get("/groups", response_model=list[GroupReadResponse])
@@ -591,7 +598,7 @@ async def ai_generate_patch_objects(
         )
         db.add(row)
         db.flush()
-        created.append(_patch_object_response(row))
+        created.append(_patch_object_response(db, row))
     db.commit()
     return created
 
@@ -713,7 +720,12 @@ async def store_live_patch_to_slot(
     return LivePatchReadResponse(**live_patch_status_payload(db, row))
 
 
-def _patch_object_response(row: PatchObject) -> PatchObjectReadResponse:
+def _patch_object_response(
+    db: Session,
+    row: PatchObject,
+    *,
+    groups: list[PatchObjectGroupRefResponse] | None = None,
+) -> PatchObjectReadResponse:
     return PatchObjectReadResponse(
         id=row.id,
         name=row.name,
@@ -723,6 +735,7 @@ def _patch_object_response(row: PatchObject) -> PatchObjectReadResponse:
         source_prompt=row.source_prompt,
         parent_patch_object_id=row.parent_patch_object_id,
         blocks=patch_object_block_names(row.patch_json),
+        groups=groups if groups is not None else _group_refs_by_patch_object_ids(db, [row.id]).get(row.id, []),
         created_at=row.created_at.isoformat(timespec="seconds"),
         updated_at=row.updated_at.isoformat(timespec="seconds"),
     )
@@ -784,6 +797,23 @@ def _group_member_patch_object_ids(db: Session, group_id: int | None) -> set[int
         raise HTTPException(status_code=404, detail={"message": "Group not found", "group_id": group_id})
     rows = db.scalars(select(PatchObjectGroupMember.patch_object_id).where(PatchObjectGroupMember.group_id == group_id)).all()
     return {int(item) for item in rows}
+
+
+def _group_refs_by_patch_object_ids(db: Session, patch_object_ids: list[int]) -> dict[int, list[PatchObjectGroupRefResponse]]:
+    if not patch_object_ids:
+        return {}
+    memberships = list(
+        db.execute(
+            select(PatchObjectGroupMember.patch_object_id, PatchObjectGroup.id, PatchObjectGroup.name)
+            .join(PatchObjectGroup, PatchObjectGroup.id == PatchObjectGroupMember.group_id)
+            .where(PatchObjectGroupMember.patch_object_id.in_(patch_object_ids))
+            .order_by(PatchObjectGroup.name.asc())
+        )
+    )
+    grouped: dict[int, list[PatchObjectGroupRefResponse]] = {patch_object_id: [] for patch_object_id in patch_object_ids}
+    for patch_object_id, group_id, group_name in memberships:
+        grouped.setdefault(int(patch_object_id), []).append(PatchObjectGroupRefResponse(id=int(group_id), name=str(group_name)))
+    return grouped
 
 
 def _assert_patch_object_name_available(db: Session, name: str) -> None:

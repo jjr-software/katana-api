@@ -93,6 +93,30 @@
             <span>Live RMS/Peak: <code>{{ formatDb(liveRmsDbfs()) }} / {{ formatDb(livePeakDbfs()) }}</code></span>
             <span>Live At: <code>{{ liveMeterAt() || 'n/a' }}</code></span>
           </div>
+          <div class="mt-2 d-grid gap-2 small">
+            <div class="d-flex gap-2 flex-wrap align-items-center">
+              <span class="text-secondary">DB Matches:</span>
+              @if (livePatchExactDbMatch(); as exactDb) {
+                <button type="button" class="btn btn-sm btn-outline-success" (click)="focusTonePatchObject(exactDb)">Exact: {{ exactDb.name }}</button>
+              } @else {
+                <span class="text-secondary">No exact saved-object match.</span>
+              }
+              @for (match of livePatchPartialDbMatches().slice(0, 6); track match.id) {
+                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="focusTonePatchObject(match)">Partial: {{ match.name }}</button>
+              }
+            </div>
+            <div class="d-flex gap-2 flex-wrap align-items-center">
+              <span class="text-secondary">Amp Slot Matches:</span>
+              @if (livePatchExactSlotMatch(); as exactSlot) {
+                <button type="button" class="btn btn-sm btn-outline-success" (click)="activateMatchedSlot(exactSlot.slot)">Exact: {{ setLabelForSlot(exactSlot.slot) }} · {{ exactSlot.patch_name || 'Unnamed' }}</button>
+              } @else {
+                <span class="text-secondary">No exact amp-slot match.</span>
+              }
+              @for (slotMatch of livePatchPartialSlotMatches().slice(0, 6); track slotMatch.slot) {
+                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="activateMatchedSlot(slotMatch.slot)">Partial: {{ setLabelForSlot(slotMatch.slot) }} · {{ slotMatch.patch_name || 'Unnamed' }}</button>
+              }
+            </div>
+          </div>
           <div class="mt-2 d-flex align-items-center gap-2">
             <span class="small text-secondary">Live RMS Graph:</span>
             <svg class="rms-graph" viewBox="0 0 1000 64" preserveAspectRatio="none" aria-label="Live RMS graph">
@@ -126,6 +150,15 @@
               <div>
                 <label class="form-label small mb-1" for="toneSaveDescription">Description</label>
                 <textarea id="toneSaveDescription" class="form-control" rows="3" [value]="toneSaveDescription()" (input)="setToneSaveDescription($any($event.target).value)"></textarea>
+              </div>
+              <div>
+                <label class="form-label small mb-1" for="toneSaveGroup">Assign Group</label>
+                <select id="toneSaveGroup" class="form-select" [value]="toneSaveGroupId()" (change)="setToneSaveGroupId($any($event.target).value)">
+                  <option value="">No group</option>
+                  @for (group of toneGroups(); track group.id) {
+                    <option [value]="group.id">{{ group.name }}</option>
+                  }
+                </select>
               </div>
               <div>
                 <p class="form-label small mb-1">Blocks</p>
@@ -246,7 +279,7 @@
 
       <section class="row g-3 mb-4">
         <div class="col-12 col-xl-6">
-          <article class="card h-100">
+          <article class="card h-100" id="tone-patch-objects">
             <div class="card-body d-grid gap-2">
               <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
                 <div>
@@ -279,10 +312,11 @@
               </div>
               <div class="d-flex justify-content-end">
                 <button type="button" class="btn btn-sm btn-outline-secondary" (click)="loadTonePatchObjects()">Apply Filters</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary ms-2" (click)="clearTonePatchFilters(); loadTonePatchObjects()">Clear Filters</button>
               </div>
               <div class="tone-list">
                 @for (patchObject of tonePatchObjects(); track patchObject.id) {
-                  <article class="border rounded p-2 small bg-body-tertiary d-grid gap-2">
+                  <article class="border rounded p-2 small bg-body-tertiary d-grid gap-2" [class.border-primary]="toneHighlightedPatchObjectId() === patchObject.id">
                     <div class="d-flex justify-content-between gap-2 flex-wrap">
                       <div>
                         <p class="mb-1"><strong>{{ patchObject.name }}</strong></p>
@@ -299,6 +333,16 @@
                     </div>
                     @if (patchObject.description) {
                       <p class="mb-0 text-secondary">{{ patchObject.description }}</p>
+                    }
+                    @if (patchObject.groups.length > 0) {
+                      <div class="d-flex gap-2 flex-wrap align-items-center">
+                        @for (group of patchObject.groups; track group.id) {
+                          <span class="badge text-bg-secondary d-inline-flex align-items-center gap-1">
+                            {{ group.name }}
+                            <button type="button" class="btn btn-sm btn-link p-0 text-white text-decoration-none" (click)="removeTonePatchObjectFromGroup(patchObject, group)" [disabled]="isActionBusy('tone-remove-group:' + patchObject.id + ':' + group.id)">×</button>
+                          </span>
+                        }
+                      </div>
                     }
                     <div class="d-flex gap-2 flex-wrap align-items-center">
                       <select class="form-select form-select-sm tone-inline-select" [value]="toneAssignGroupByPatchObject()[patchObject.id] || ''" (change)="setToneAssignGroupId(patchObject.id, $any($event.target).value)">
