@@ -1737,3 +1737,19 @@
   - composed variants store composition only,
   - captured/imported variants store patch JSON only,
   - rendered patch output is on-demand or cache-only, not authoritative dual storage.
+
+## Session Update - 2026-03-29 (AI Designer + Fast Live Apply Priority)
+- Tightened the forward design doc again in:
+  - `docs/forward-implementation.md`
+- New priority/order captured:
+  - AI designer is a core product path and must be reliable.
+  - Best design loop is `AI generate -> save in DB -> apply to Live Patch -> play immediately`.
+  - Amp slot commit is persistence only and should not block tone-design flow.
+  - `Live Patch` status should show whether it is saved to:
+    - an amp slot,
+    - a DB object,
+    - both,
+    - or neither.
+  - App can only know the amp as `last known state` from the last successful read/write confirmation.
+  - Fragment scope/ownership is distinct from effect enabled/disabled state.
+  - Fragment saves must avoid dead-weight unrelated fields so comparisons stay meaningful.

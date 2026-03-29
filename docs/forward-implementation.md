@@ -7,6 +7,7 @@ Status: Authoritative plan (single source)
 Build a tone-discovery platform for Katana, not a hash-first patch vault.
 
 Primary outcomes:
+- make AI-assisted tone design a first-class workflow that reliably produces playable candidates,
 - generate and catalog tone ideas at partial-setting level,
 - compose those ideas into playable 8-slot audition sets,
 - push sets to the amp quickly for GA-FC auditioning,
@@ -40,7 +41,9 @@ Full patch JSON remains the canonical deployment format sent to the amp, but it 
    - save as new revision,
    - copy into another group with a new name.
 11. All amp communications still run through queue operations.
-12. AI outputs must be structured and schema-validated before anything is persisted or pushed to hardware.
+12. AI designer flow is a core product path, not an optional add-on.
+13. AI outputs must be structured and schema-validated before anything is persisted or pushed to hardware.
+14. During tone design, fast apply to `Live Patch` is preferred over slot commit. Committing to amp slots is a persistence operation, not the default design loop.
 
 ## 3) Domain Model
 ## 3.1 Fragment
@@ -56,8 +59,15 @@ Examples:
 Fragment requirements:
 - stores only intentional fields, not a full patch blob,
 - records which stages it owns,
+- records which fields are intentionally part of the idea,
 - can be tagged by sound, guitarist, genre, or purpose,
 - can include free-text notes and AI provenance.
+
+Fragment scope must be explicit. This is separate from effect enable/disable state:
+- `owned` means this fragment claims authority over that part of the patch,
+- `enabled` means that effect is on in the rendered/live result,
+- a fragment may intentionally own an `off` state,
+- fields outside fragment scope must not be stored as dead weight.
 
 ## 3.2 Base Rig
 A `base rig` is a known starting point used to render playable variants.
@@ -142,6 +152,14 @@ Rules:
 - storing commits current `Live Patch` into the selected amp slot,
 - saving to the DB is separate again.
 
+Design priority:
+- the UI should optimize for getting AI suggestions and manual fragment edits into `Live Patch` quickly,
+- persistence indicators should answer whether `Live Patch` is saved:
+  - to an amp slot,
+  - to a DB object,
+  - to both,
+  - or to neither.
+
 ## 4) Identity, Equality, And Similarity
 ## 4.1 Identity
 Primary identity is explicit and human-facing:
@@ -158,6 +176,15 @@ Canonical JSON hashes remain useful for:
 - confirming amp readback matches expected rendered patch JSON.
 
 They must not drive the main UX or conceptual model.
+
+## 4.2.1 Amp State Trust Model
+The app cannot know the amp state continuously. It only knows what it last wrote or last read.
+
+Working rule:
+- treat amp state as authoritative at the moment of successful readback,
+- after app writes, assume that written/read-back state remains current until the next explicit sync or external change,
+- surface this as `last known amp state`, not absolute omniscience,
+- because the normal workflow assumes this app is the only writer, this trust model is acceptable.
 
 ## 4.3 Similarity
 Similarity should be based on JSON-aware comparison and scope awareness, for example:
@@ -178,6 +205,15 @@ Target workflow:
    - another amp slot,
    - a saved DB object,
    - or nothing known.
+5. App also shows when this status was last confirmed from the amp.
+
+## 5.0.1 Fast Live Design Loop
+Target workflow:
+1. User asks AI for candidate ideas.
+2. App applies one candidate directly to `Live Patch`.
+3. User plays immediately.
+4. App swaps another candidate into `Live Patch` without committing any slot.
+5. User saves or stores only when something is worth keeping.
 
 ## 5.1 Build An Exploration Set
 Target workflow:
@@ -186,6 +222,12 @@ Target workflow:
 3. App creates a new set, for example `Test Set 5`.
 4. App renders 8 full patch payloads and queues apply-to-amp.
 5. User auditions live with GA-FC.
+
+Alternate fast path:
+1. User asks for several candidate ideas.
+2. App keeps them only in the DB.
+3. User hot-applies them to `Live Patch` one-by-one without writing amp slots.
+4. Slot commit is used later only for persistence or pedalboard-style audition convenience.
 
 ## 5.2 Keep Winners
 Target workflow:
@@ -212,7 +254,9 @@ Target workflow:
 
 ## 6) AI Interaction Model
 ## 6.1 Required Direction
-AI must help with tone construction in structured form, not just chat about gear.
+AI designer must be one of the strongest parts of the product.
+
+It must help with tone construction in structured form, not just chat about gear.
 
 The system should support prompts such as:
 - `Give me 8 booster + eq1 variants for Greenwood clean attack`
@@ -225,6 +269,7 @@ Primary path:
 
 Initial rule:
 - prefer structured object generation over free-form patch JSON dumps.
+- prefer generation of compact, intentional partial objects over noisy full-state dumps when the user is exploring only part of the tone.
 - only render full patch JSON after the app has resolved:
   - base rig,
   - owned stages,
@@ -258,6 +303,7 @@ Planned nucleus:
 - `name` (unique)
 - `description`
 - `stage_scope` or owned-stage list
+- `field_scope`
 - `fragment_json`
 - `source_type` (`ai`, `manual`, `captured`, `imported`)
 - `source_prompt`
@@ -293,6 +339,8 @@ Planned nucleus:
 - `patch_json`
 - `active_slot` nullable
 - `matches_saved_variant_id` nullable
+- `matches_saved_slot` nullable
+- `amp_confirmed_at`
 - timestamps
 
 ### `sets`
@@ -338,11 +386,18 @@ Storage rule:
 - `captured/imported variants` store patch JSON only,
 - derived renders and hashes are computed or cached outside the authoritative entity model.
 
+Fragment rule:
+- fragment storage must preserve only intentional scope,
+- not all visible values from a live patch,
+- not unrelated defaults,
+- not dead weight included only because it happened to be present when captured.
+
 ## 8) API Direction
 Planned target surface:
 - `GET /api/v1/live-patch`
 - `POST /api/v1/live-patch/sync`
 - `POST /api/v1/live-patch/apply-fragment`
+- `POST /api/v1/live-patch/apply-variant`
 - `POST /api/v1/live-patch/store-to-slot`
 - `POST /api/v1/base-rigs`
 - `GET /api/v1/base-rigs`
@@ -360,6 +415,9 @@ Planned target surface:
 - `POST /api/v1/ai/generate/fragments`
 - `POST /api/v1/ai/generate/variants`
 - `POST /api/v1/ai/generate/set`
+
+Priority interaction path:
+- AI generate -> save to DB -> apply to `Live Patch` -> play -> keep/store if worth it.
 
 Amp-facing operations should remain queued. The queue status UI remains valid and useful.
 
@@ -396,6 +454,7 @@ Migration rule:
 - reconciliation-centered roadmap,
 - slot cards being more conceptually central than `Live Patch`,
 - stale assumptions about slot-level staged state,
+- committing to amp slots too early in the design flow,
 - patch-only library mental model,
 - limited support for partial-setting composition and promotion.
 
@@ -436,6 +495,7 @@ Exit criteria:
 ## Phase D: Structured AI Generation
 Deliver:
 - schema for AI fragment/variant/set generation,
+- prompt-to-live-apply flow in UI,
 - prompt-to-set flow in UI,
 - validation and explainability for generated settings,
 - pedal-flavor/stage-knowledge support data.
@@ -444,11 +504,14 @@ Exit criteria:
 - user can ask for a guitarist/sound/profile and receive structured, playable candidates.
 
 ## 12) Immediate Next Sprint
-1. Replace patch-set/hash-oriented schema plan with concrete `base_rigs`, `fragments`, `variants`, `sets`, and `groups` migrations.
+1. Define the AI designer contract for fragment/variant generation with explicit scope ownership and validation.
 2. Define `Live Patch`, stored amp slot, and DB object status model explicitly in API and UI terms.
-3. Define the render contract from partial objects to full patch JSON.
-4. Implement minimal `set` creation plus 8-slot assignment API.
-5. Implement queued `apply set to amp` plus `Live Patch` status reporting.
+3. Define the render/apply contract:
+   - partial apply to `Live Patch`,
+   - full render when required,
+   - explicit store only for amp persistence.
+4. Replace patch-set/hash-oriented schema plan with concrete `base_rigs`, `fragments`, `variants`, `sets`, and `groups` migrations.
+5. Implement prompt-to-`Live Patch` apply plus visible saved/not-saved indicators before expanding slot workflows further.
 
 ## 13) Explicitly Out
 - treating names as optional metadata only,
