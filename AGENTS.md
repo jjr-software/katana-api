@@ -1708,3 +1708,18 @@
   - staged/live apply preserves the web slot identity and only updates amp-state hashes.
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-29 (Design Pivot: Tone Lab, Not Hash Vault)
+- Rewrote the authoritative forward plan in:
+  - `docs/forward-implementation.md`
+- Design direction changed:
+  - from hash-first full-patch identity and reconciliation,
+  - to fragment-first tone discovery built around `base rigs`, `fragments`, `variants`, `sets`, `groups`, and `keeper` promotion.
+- New planning rules captured:
+  - partial settings are first-class saved objects,
+  - full patch JSON is a rendered deployment artifact,
+  - hashes remain for dedupe/verification only,
+  - names are unique per entity type with no silent overwrite,
+  - AI generation must use structured schema-validated output.
+- Immediate next step:
+  - pivot schema/API planning toward set creation, apply-to-amp, and keep/promote workflows before further UI polish.
