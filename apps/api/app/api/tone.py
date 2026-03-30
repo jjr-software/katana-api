@@ -60,6 +60,7 @@ Rules:
 
 JSON_INTEGER_SCHEMA = {"type": "integer"}
 JSON_BOOLEAN_SCHEMA = {"type": "boolean"}
+JSON_NULL_SCHEMA = {"type": "null"}
 JSON_INT_ARRAY_SCHEMA = {"type": "array", "items": JSON_INTEGER_SCHEMA}
 
 
@@ -880,12 +881,13 @@ def _create_patch_object_set(
 def _validated_ai_candidate_patch_json(patch_json: dict[str, Any], selected_blocks: list[str]) -> dict[str, Any]:
     if not isinstance(patch_json, dict):
         raise HTTPException(status_code=502, detail={"message": "AI returned invalid patch_json", "patch_json": patch_json})
-    for key in patch_json.keys():
+    cleaned = _strip_nulls(patch_json)
+    for key in cleaned.keys():
         if key not in selected_blocks:
             raise HTTPException(status_code=502, detail={"message": "AI returned block outside requested scope", "block": key})
-    normalized = normalize_patch_object(patch_json)
+    normalized = normalize_patch_object(cleaned)
     if not normalized:
-        raise HTTPException(status_code=502, detail={"message": "AI returned empty sparse patch object", "patch_json": patch_json})
+        raise HTTPException(status_code=502, detail={"message": "AI returned empty sparse patch object", "patch_json": cleaned})
     return normalized
 
 
@@ -919,6 +921,7 @@ def _build_ai_patch_json_schema(blocks: list[str]) -> dict[str, Any]:
     return {
         "type": "object",
         "additionalProperties": False,
+        "required": blocks,
         "properties": {block: _build_ai_block_schema(block) for block in blocks},
     }
 
@@ -1025,8 +1028,29 @@ def _object_schema(**properties: Any) -> dict[str, Any]:
     return {
         "type": "object",
         "additionalProperties": False,
-        "properties": properties,
+        "required": list(properties.keys()),
+        "properties": {key: _nullable_schema(value) for key, value in properties.items()},
     }
+
+
+def _nullable_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    return {"anyOf": [schema, JSON_NULL_SCHEMA]}
+
+
+def _strip_nulls(value: Any) -> Any:
+    if isinstance(value, dict):
+        cleaned: dict[str, Any] = {}
+        for key, item in value.items():
+            pruned = _strip_nulls(item)
+            if pruned is None:
+                continue
+            if isinstance(pruned, dict) and not pruned:
+                continue
+            cleaned[key] = pruned
+        return cleaned
+    if isinstance(value, list):
+        return [_strip_nulls(item) for item in value]
+    return value
 
 
 def _call_openai_sparse_patch_candidates(
