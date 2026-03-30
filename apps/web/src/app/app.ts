@@ -989,7 +989,7 @@ export class App implements OnInit, OnDestroy {
     this.toneLoadedPatchObjectId.set('');
     this.toneLoadedPatchName.set('');
     this.toneSelectedBlocks.set({});
-    this.status.set('Selected patch cleared. Save scope is now manual.');
+    this.status.set('Saved patch removed. Save scope is now manual.');
   }
 
   async applyLoadedPatchObject(): Promise<void> {

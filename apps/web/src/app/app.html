@@ -104,8 +104,7 @@
                   <span>{{ livePatchSelectedBlocksSummary() }}</span>
                 </div>
                 <div class="d-flex gap-2 flex-wrap align-items-center">
-                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openToneLoadPatchModal()">Change Patch</button>
-                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="clearLoadedPatch()" [disabled]="!hasLoadedSavedPatch()">Clear Patch</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="clearLoadedPatch()" [disabled]="!hasLoadedSavedPatch()">Remove Saved Patch</button>
                 </div>
               </div>
               <div class="tone-block-grid">
