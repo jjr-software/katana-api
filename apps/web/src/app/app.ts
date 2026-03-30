@@ -498,7 +498,7 @@ export class App implements OnInit, OnDestroy {
   toneSaveGroupId = signal('');
   toneGroupName = signal('');
   toneGroupDescription = signal('');
-  toneAiPrompt = signal('Refine the current live patch or generate distinct sparse candidates around the target sound. Keep the results audibly useful for quick auditioning.');
+  toneAiPrompt = signal('Refine the current editor patch or generate distinct sparse candidates around the target sound. Keep the results audibly useful for quick auditioning.');
   toneAiMode = signal<'refine' | 'ideas' | 'set'>('refine');
   toneAiSetName = signal('');
   toneAiDescription = signal('');
@@ -731,7 +731,7 @@ export class App implements OnInit, OnDestroy {
     this.editorModalOpen.set(true);
     if (replaceBase || this.toneBasePatchSnapshot() === null) {
       this.toneBasePatchSnapshot.set(this.clonePatch(draft));
-      this.toneBasePatchObjectName.set(replaceBase ? (this.toneBasePatchObjectName().trim() || 'Current Live Patch') : 'Current Live Patch');
+      this.toneBasePatchObjectName.set(replaceBase ? (this.toneBasePatchObjectName().trim() || 'Current Editor Patch') : 'Current Editor Patch');
       this.toneBasePatchObjectId.set(replaceBase ? this.toneBasePatchObjectId() : '');
     }
     this.autoSelectToneBlocksFromBase(draft, true);
@@ -970,7 +970,7 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  useCurrentLivePatchAsBase(): void {
+  setCurrentEditorPatchAsBase(): void {
     const current = this.editorPatchDraft() ?? this.livePatchSnapshot();
     if (!current) {
       this.status.set('Sync or load the Live Patch before setting a base patch.');
@@ -978,10 +978,10 @@ export class App implements OnInit, OnDestroy {
     }
     this.toneBasePatchSnapshot.set(this.clonePatch(current));
     this.toneBasePatchObjectId.set('');
-    this.toneBasePatchObjectName.set(this.editorPatchName().trim() || 'Current Live Patch');
+    this.toneBasePatchObjectName.set(this.editorPatchName().trim() || 'Current Editor Patch');
     this.autoSelectToneBlocksFromBase(this.editorPatchDraft() ?? current, true);
     this.toneBaseModalOpen.set(false);
-    this.status.set('Current Live Patch is now the base patch for sparse saves.');
+    this.status.set('The current editor patch is now the base patch for comparison and save scope.');
   }
 
   clearToneBasePatch(): void {
