@@ -72,9 +72,9 @@
                 {{ currentCommitStateLabel() }}
               </code>
             </span>
-            <span>Level Marker RMS/Peak: <code>{{ formatDb(levelMarkerRmsDbfs()) }} / {{ formatDb(levelMarkerPeakDbfs()) }}</code></span>
+            <span>Level Marker RMS: <code>{{ formatDb(levelMarkerRmsDbfs()) }}</code></span>
             <span>Marker At: <code>{{ levelMarkerCapturedAt() || 'n/a' }}</code></span>
-            <span>Live RMS/Peak: <code>{{ formatDb(liveRmsDbfs()) }} / {{ formatDb(livePeakDbfs()) }}</code></span>
+            <span>Live RMS: <code>{{ formatDb(liveRmsDbfs()) }}</code></span>
             <span>Live At: <code>{{ liveMeterAt() || 'n/a' }}</code></span>
           </div>
           <div class="mt-2 d-flex align-items-center gap-2">
@@ -783,12 +783,12 @@
                   <p class="small mb-2 patch-summary"><strong [class.text-success]="isStageOn(slot, 'reverb')" [class.text-danger]="!isStageOn(slot, 'reverb')">Reverb:</strong> {{ reverbSummary(slot) }}</p>
                   @if (isActiveSlot(slot)) {
                     <div class="alert alert-info py-2 px-2 mb-2 small" role="status">
-                      <strong>Live RMS/Peak:</strong>
-                      <code>{{ formatDb(liveRmsDbfs()) }} / {{ formatDb(livePeakDbfs()) }}</code>
+                      <strong>Live RMS:</strong>
+                      <code>{{ formatDb(liveRmsDbfs()) }}</code>
                     </div>
                   }
                   <p class="small mb-1 text-secondary">
-                    10s Max RMS/Peak: <code>{{ formatDb(slot.measured_rms_dbfs) }} / {{ formatDb(slot.measured_peak_dbfs) }}</code>
+                    10s Max RMS: <code>{{ formatDb(slot.measured_rms_dbfs) }}</code>
                   </p>
                   <p class="small mb-1 text-secondary">
                     RMS At: <code>{{ slot.measured_at || 'n/a' }}</code>
@@ -871,12 +871,12 @@
                   <p class="small mb-2 patch-summary"><strong [class.text-success]="isStageOn(slot, 'reverb')" [class.text-danger]="!isStageOn(slot, 'reverb')">Reverb:</strong> {{ reverbSummary(slot) }}</p>
                   @if (isActiveSlot(slot)) {
                     <div class="alert alert-info py-2 px-2 mb-2 small" role="status">
-                      <strong>Live RMS/Peak:</strong>
-                      <code>{{ formatDb(liveRmsDbfs()) }} / {{ formatDb(livePeakDbfs()) }}</code>
+                      <strong>Live RMS:</strong>
+                      <code>{{ formatDb(liveRmsDbfs()) }}</code>
                     </div>
                   }
                   <p class="small mb-1 text-secondary">
-                    10s Max RMS/Peak: <code>{{ formatDb(slot.measured_rms_dbfs) }} / {{ formatDb(slot.measured_peak_dbfs) }}</code>
+                    10s Max RMS: <code>{{ formatDb(slot.measured_rms_dbfs) }}</code>
                   </p>
                   <p class="small mb-1 text-secondary">
                     RMS At: <code>{{ slot.measured_at || 'n/a' }}</code>
@@ -918,7 +918,7 @@
                   Tone Lab <code>{{ sample.patch_object_name }}</code> ·
                 }
                 recorded <code>{{ sample.created_at }}</code> ·
-                RMS/Peak <code>{{ formatDb(sample.rms_dbfs) }} / {{ formatDb(sample.peak_dbfs) }}</code> ·
+                RMS <code>{{ formatDb(sample.rms_dbfs) }}</code> ·
                 duration <code>{{ sample.duration_sec }}s</code>
               </p>
               @if (sample.playback_url) {
@@ -1190,7 +1190,7 @@
                     Tone Lab <code>{{ sample.patch_object_name }}</code> |
                   }
                   recorded <code>{{ sample.created_at }}</code> |
-                  RMS/Peak <code>{{ formatDb(sample.rms_dbfs) }} / {{ formatDb(sample.peak_dbfs) }}</code> |
+                  RMS <code>{{ formatDb(sample.rms_dbfs) }}</code> |
                   duration <code>{{ sample.duration_sec }}s</code>
                 </p>
                 @if (sample.playback_url) {
