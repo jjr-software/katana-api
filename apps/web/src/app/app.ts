@@ -754,12 +754,9 @@ export class App implements OnInit, OnDestroy {
     this.editorLiveApplyError.set('');
     this.editorLiveApplyReadbackAt.set('');
     this.editorModalOpen.set(true);
-    if (replaceLoadedPatch || this.toneLoadedPatchSnapshot() === null) {
-      this.toneLoadedPatchSnapshot.set(this.clonePatch(draft));
-      this.toneLoadedPatchName.set(replaceLoadedPatch ? (this.toneLoadedPatchName().trim() || 'Current Editor Patch') : 'Current Editor Patch');
-      this.toneLoadedPatchObjectId.set(replaceLoadedPatch ? this.toneLoadedPatchObjectId() : '');
+    if (replaceLoadedPatch && this.toneLoadedPatchSnapshot() === null) {
+      this.useCurrentPatchForSelection();
     }
-    this.autoSelectToneBlocksFromLoadedPatch(draft, true);
   }
 
   toneBlockOptions(): readonly string[] {
@@ -956,6 +953,7 @@ export class App implements OnInit, OnDestroy {
         return;
       }
       this.tonePatchObjects.set(payload as TonePatchObjectResponse[]);
+      this.syncSelectedPatchFromExactMatch();
     } catch {
       // Informational panel only.
     }
@@ -993,12 +991,9 @@ export class App implements OnInit, OnDestroy {
       this.status.set('Sync or load the Live Patch before choosing a patch here.');
       return;
     }
-    this.toneLoadedPatchSnapshot.set(this.clonePatch(current));
-    this.toneLoadedPatchObjectId.set('');
-    this.toneLoadedPatchName.set(this.editorPatchName().trim() || 'Current Editor Patch');
-    this.autoSelectToneBlocksFromLoadedPatch(this.editorPatchDraft() ?? current, true);
+    this.useCurrentPatchForSelection();
     this.toneLoadPatchModalOpen.set(false);
-    this.status.set('Current editor patch selected. Save scope has been updated.');
+    this.status.set('Current patch selected.');
   }
 
   clearLoadedPatch(): void {
@@ -1037,10 +1032,9 @@ export class App implements OnInit, OnDestroy {
         this.responseJson.set(JSON.stringify(payload, null, 2));
         return;
       }
-      this.toneLoadedPatchObjectId.set(String(patchObject.id));
-      this.toneLoadedPatchName.set(patchObject.name);
+      this.selectSavedPatch(patchObject);
       this.applyLivePatchStatus(payload as LivePatchResponse);
-      this.loadLivePatchIntoEditorState(payload as LivePatchResponse, true);
+      this.loadLivePatchIntoEditorState(payload as LivePatchResponse, false);
       this.toneLoadPatchModalOpen.set(false);
       this.status.set(`Applied ${patchObject.name}`);
       this.responseJson.set(JSON.stringify(payload, null, 2));
@@ -4960,6 +4954,71 @@ export class App implements OnInit, OnDestroy {
     });
   }
 
+  private useCurrentPatchForSelection(): void {
+    const current = this.editorPatchDraft() ?? this.livePatchSnapshot();
+    if (!current) {
+      return;
+    }
+    this.toneLoadedPatchSnapshot.set(this.clonePatch(current));
+    this.toneLoadedPatchObjectId.set('');
+    this.toneLoadedPatchName.set(this.editorPatchName().trim() || 'Current Patch');
+    this.setToneBlocksFromPatch(current, true);
+  }
+
+  private selectSavedPatch(patchObject: TonePatchObjectResponse): void {
+    this.toneLoadedPatchSnapshot.set(this.clonePatch(patchObject.patch_json));
+    this.toneLoadedPatchObjectId.set(String(patchObject.id));
+    this.toneLoadedPatchName.set(patchObject.name);
+    if (patchObject.blocks.length > 0) {
+      this.setToneBlocksFromNames(patchObject.blocks, true);
+      return;
+    }
+    this.setToneBlocksFromPatch(patchObject.patch_json, true);
+  }
+
+  private syncSelectedPatchFromExactMatch(): void {
+    const exactMatch = this.livePatchExactDbMatch();
+    if (!exactMatch) {
+      return;
+    }
+    const patchObject = this.tonePatchObjects().find((item) => item.id === exactMatch.id) ?? null;
+    if (!patchObject) {
+      return;
+    }
+    const currentSelectedId = this.toneLoadedPatchObjectId().trim();
+    if (currentSelectedId && currentSelectedId !== String(exactMatch.id)) {
+      return;
+    }
+    if (!currentSelectedId && this.toneLoadedPatchSnapshot() !== null) {
+      return;
+    }
+    this.selectSavedPatch(patchObject);
+  }
+
+  private setToneBlocksFromPatch(source: Record<string, unknown>, replaceSelection: boolean): void {
+    const blockNames = this.toneBlockOptions().filter((block) => this.patchDefinesBlock(source, block));
+    this.setToneBlocksFromNames(blockNames, replaceSelection);
+  }
+
+  private setToneBlocksFromNames(blocks: readonly string[], replaceSelection: boolean): void {
+    const selected = new Set(blocks.filter((block) => this.toneBlockOptions().includes(block)));
+    const next: Record<string, boolean> = {};
+    for (const block of this.toneBlockOptions()) {
+      next[block] = selected.has(block);
+    }
+    if (replaceSelection) {
+      this.toneSelectedBlocks.set(next);
+      return;
+    }
+    this.toneSelectedBlocks.update((current) => {
+      const merged = { ...current };
+      for (const block of this.toneBlockOptions()) {
+        merged[block] = Boolean(current[block]) || next[block];
+      }
+      return merged;
+    });
+  }
+
   private applyLoadedPatchBlockToDraft(draft: Record<string, unknown>, loadedPatch: Record<string, unknown>, block: string): void {
     if (block === 'routing' || block === 'amp') {
       const loadedDirect = this.readObject(loadedPatch, block);
@@ -5028,6 +5087,14 @@ export class App implements OnInit, OnDestroy {
     return Object.keys(out).length > 0 ? out : null;
   }
 
+  private patchDefinesBlock(source: Record<string, unknown> | null, block: string): boolean {
+    const comparable = this.comparablePatchBlock(source, block);
+    if (!comparable || typeof comparable !== 'object' || Array.isArray(comparable)) {
+      return false;
+    }
+    return Object.keys(comparable as Record<string, unknown>).length > 0;
+  }
+
   private applyLivePatchStatus(payload: LivePatchResponse): void {
     this.livePatchSnapshot.set(this.clonePatch(payload.patch_json));
     this.livePatchConfirmedAt.set(payload.amp_confirmed_at || '');
@@ -5043,6 +5110,7 @@ export class App implements OnInit, OnDestroy {
     this.livePatchPartialDbCount.set(Array.isArray(payload.partial_patch_objects) ? payload.partial_patch_objects.length : 0);
     this.livePatchPartialSlotCount.set(Array.isArray(payload.partial_amp_slots) ? payload.partial_amp_slots.length : 0);
     this.currentAmpPatchHash.set(payload.compat_hash_sha256 || this.currentAmpPatchHash());
+    this.syncSelectedPatchFromExactMatch();
     if (payload.active_slot !== null) {
       this.selectedAmpSlot.set(payload.active_slot);
       this.selectedAmpSlotText.set(payload.active_slot <= 4 ? `A:${payload.active_slot}` : `B:${payload.active_slot - 4}`);
