@@ -580,7 +580,7 @@ export class App implements OnInit, OnDestroy {
   toneSaveGroupId = signal('');
   toneGroupName = signal('');
   toneGroupDescription = signal('');
-  toneAiPrompt = signal('Generate a focused set of candidates around the target sound. Make the candidates distinct enough to audition quickly.');
+  toneAiPrompt = signal('Refine the current live patch or generate distinct sparse candidates around the target sound. Keep the results audibly useful for quick auditioning.');
   toneAiSetName = signal('');
   toneAiDescription = signal('');
   toneAiCount = signal('8');
@@ -1558,6 +1558,55 @@ export class App implements OnInit, OnDestroy {
       this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
     } finally {
       this.setActionBusy('tone-ai-generate-objects', false);
+    }
+  }
+
+  async refineToneAiLivePatch(): Promise<void> {
+    const prompt = this.toneAiPrompt().trim();
+    const blocks = this.selectedToneBlocks();
+    if (!prompt) {
+      this.status.set('AI refinement requires a prompt.');
+      return;
+    }
+    if (blocks.length === 0) {
+      this.status.set('Select at least one block before AI refinement.');
+      return;
+    }
+    const currentName = this.editorPatchName().trim() || this.livePatchExactDbName().trim() || 'Live Patch';
+    this.setActionBusy('tone-ai-refine', true);
+    this.status.set(`Refining ${currentName} with AI...`);
+    this.responseJson.set('');
+    try {
+      const response = await fetch('/api/v1/ai/generate/patch-objects', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          count: 1,
+          preferred_blocks: blocks,
+          use_live_patch_as_context: true,
+          name_prefix: `${currentName} Refine`,
+        }),
+      });
+      const payload = (await response.json()) as TonePatchObjectResponse[] | { detail?: unknown };
+      if (!response.ok || !Array.isArray(payload) || payload.length === 0) {
+        this.status.set('AI refinement failed');
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      const refined = payload[0] as TonePatchObjectResponse;
+      this.toneHighlightedPatchObjectId.set(refined.id);
+      await this.loadTonePatchObjects();
+      this.toneDesignerModalOpen.set(false);
+      await this.applyTonePatchObjectToLive(refined);
+      this.status.set(`Refined ${currentName} as ${refined.name} and applied it live`);
+      this.responseJson.set(JSON.stringify(refined, null, 2));
+    } catch (error: unknown) {
+      this.status.set('AI refinement failed');
+      this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
+    } finally {
+      this.setActionBusy('tone-ai-refine', false);
     }
   }
 

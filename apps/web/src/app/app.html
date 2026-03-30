@@ -1004,7 +1004,7 @@
           <button type="button" class="btn btn-sm btn-light" (click)="closeToneDesignerModal()">Close</button>
         </header>
         <div class="p-3 d-grid gap-3">
-          <p class="small text-secondary mb-0">Generate sparse candidates against the current Live Patch and its selected save scope.</p>
+          <p class="small text-secondary mb-0">Generate a new audition set, or refine the current Live Patch into one new AI-derived patch object and stage it immediately.</p>
           <div class="row g-2">
             <div class="col-12 col-md-8">
               <label class="form-label small mb-1" for="toneAiSetName">Set Name</label>
@@ -1039,6 +1039,9 @@
             </div>
           </div>
           <div class="d-flex justify-content-end flex-wrap gap-2">
+            <button type="button" class="btn btn-sm btn-outline-success" (click)="refineToneAiLivePatch()" [disabled]="isActionBusy('tone-ai-refine')">
+              {{ isActionBusy('tone-ai-refine') ? 'Refining...' : 'Refine Live Patch' }}
+            </button>
             <button type="button" class="btn btn-sm btn-outline-primary" (click)="generateToneAiPatchObjects()" [disabled]="isActionBusy('tone-ai-generate-objects')">
               {{ isActionBusy('tone-ai-generate-objects') ? 'Generating...' : 'Generate Objects' }}
             </button>
