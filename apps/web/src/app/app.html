@@ -1004,31 +1004,40 @@
           <button type="button" class="btn btn-sm btn-light" (click)="closeToneDesignerModal()">Close</button>
         </header>
         <div class="p-3 d-grid gap-3">
-          <p class="small text-secondary mb-0">Generate a new audition set, or refine the current Live Patch into one new AI-derived patch object and stage it immediately.</p>
+          <p class="small text-secondary mb-0">This tool has three different jobs. The labels below are explicit about what each one does.</p>
+          <div class="border rounded p-2 bg-body-tertiary small text-secondary">
+            <p class="mb-1"><strong>Refine Live Patch</strong>: make one improved variation of the current Live Patch and apply it immediately.</p>
+            <p class="mb-1"><strong>Generate Patch Ideas</strong>: create several saved patch ideas in the local library, but do not bundle them into a set.</p>
+            <p class="mb-0"><strong>Generate Audition Set</strong>: create several saved patch ideas and also bundle them into one named set for later auditioning/programming.</p>
+          </div>
           <div class="row g-2">
             <div class="col-12 col-md-8">
-              <label class="form-label small mb-1" for="toneAiSetName">Set Name</label>
+              <label class="form-label small mb-1" for="toneAiSetName">Audition Set Name</label>
               <input id="toneAiSetName" type="text" class="form-control" [value]="toneAiSetName()" (input)="setToneAiSetName($any($event.target).value)" />
+              <p class="small text-secondary mb-0 mt-1">Used only by <code>Generate Audition Set</code>.</p>
             </div>
             <div class="col-12 col-md-4">
-              <label class="form-label small mb-1" for="toneAiCount">Count</label>
+              <label class="form-label small mb-1" for="toneAiCount">How Many Ideas</label>
               <input id="toneAiCount" type="number" min="1" max="8" class="form-control" [value]="toneAiCount()" (input)="setToneAiCount($any($event.target).value)" />
+              <p class="small text-secondary mb-0 mt-1">Used by set generation and patch-idea generation.</p>
             </div>
           </div>
           <div>
             <label class="form-label small mb-1" for="toneAiDescription">Description</label>
             <input id="toneAiDescription" type="text" class="form-control" [value]="toneAiDescription()" (input)="setToneAiDescription($any($event.target).value)" />
+            <p class="small text-secondary mb-0 mt-1">Used only by <code>Generate Audition Set</code>.</p>
           </div>
           <div>
-            <label class="form-label small mb-1" for="toneAiNamePrefix">Object Name Prefix</label>
+            <label class="form-label small mb-1" for="toneAiNamePrefix">Patch Name Prefix</label>
             <input id="toneAiNamePrefix" type="text" class="form-control" [value]="toneAiNamePrefix()" (input)="setToneAiNamePrefix($any($event.target).value)" />
+            <p class="small text-secondary mb-0 mt-1">Optional. Used only by <code>Generate Patch Ideas</code> to name the saved patch ideas, for example <code>Test Set 5</code>.</p>
           </div>
           <div>
             <label class="form-label small mb-1" for="toneAiPrompt">Prompt</label>
             <textarea id="toneAiPrompt" class="form-control" rows="5" [value]="toneAiPrompt()" (input)="setToneAiPrompt($any($event.target).value)"></textarea>
           </div>
           <div>
-            <p class="form-label small mb-1">Preferred Blocks</p>
+            <p class="form-label small mb-1">Blocks To Work On</p>
             <div class="tone-block-grid">
               @for (block of toneBlockOptions(); track block) {
                 <label class="form-check small mb-0">
@@ -1037,16 +1046,17 @@
                 </label>
               }
             </div>
+            <p class="small text-secondary mb-0 mt-1">These tell the AI which parts of the patch it is allowed to change.</p>
           </div>
           <div class="d-flex justify-content-end flex-wrap gap-2">
             <button type="button" class="btn btn-sm btn-outline-success" (click)="refineToneAiLivePatch()" [disabled]="isActionBusy('tone-ai-refine')">
               {{ isActionBusy('tone-ai-refine') ? 'Refining...' : 'Refine Live Patch' }}
             </button>
             <button type="button" class="btn btn-sm btn-outline-primary" (click)="generateToneAiPatchObjects()" [disabled]="isActionBusy('tone-ai-generate-objects')">
-              {{ isActionBusy('tone-ai-generate-objects') ? 'Generating...' : 'Generate Objects' }}
+              {{ isActionBusy('tone-ai-generate-objects') ? 'Generating...' : 'Generate Patch Ideas' }}
             </button>
             <button type="button" class="btn btn-sm btn-primary" (click)="generateToneAiSet()" [disabled]="isActionBusy('tone-ai-generate')">
-              {{ isActionBusy('tone-ai-generate') ? 'Generating...' : 'Generate AI Set' }}
+              {{ isActionBusy('tone-ai-generate') ? 'Generating...' : 'Generate Audition Set' }}
             </button>
           </div>
         </div>
