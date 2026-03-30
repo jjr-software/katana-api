@@ -581,6 +581,7 @@ export class App implements OnInit, OnDestroy {
   toneGroupName = signal('');
   toneGroupDescription = signal('');
   toneAiPrompt = signal('Refine the current live patch or generate distinct sparse candidates around the target sound. Keep the results audibly useful for quick auditioning.');
+  toneAiMode = signal<'refine' | 'ideas' | 'set'>('refine');
   toneAiSetName = signal('');
   toneAiDescription = signal('');
   toneAiCount = signal('8');
@@ -830,11 +831,16 @@ export class App implements OnInit, OnDestroy {
   }
 
   openToneDesignerModal(): void {
+    this.toneAiMode.set('refine');
     this.toneDesignerModalOpen.set(true);
   }
 
   closeToneDesignerModal(): void {
     this.toneDesignerModalOpen.set(false);
+  }
+
+  setToneAiMode(value: 'refine' | 'ideas' | 'set'): void {
+    this.toneAiMode.set(value);
   }
 
   openToneGroupModal(): void {

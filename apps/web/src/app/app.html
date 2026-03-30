@@ -1004,34 +1004,45 @@
           <button type="button" class="btn btn-sm btn-light" (click)="closeToneDesignerModal()">Close</button>
         </header>
         <div class="p-3 d-grid gap-3">
-          <p class="small text-secondary mb-0">This tool has three different jobs. The labels below are explicit about what each one does.</p>
-          <div class="border rounded p-2 bg-body-tertiary small text-secondary">
-            <p class="mb-1"><strong>Refine Live Patch</strong>: make one improved variation of the current Live Patch and apply it immediately.</p>
-            <p class="mb-1"><strong>Generate Patch Ideas</strong>: create several saved patch ideas in the local library, but do not bundle them into a set.</p>
-            <p class="mb-0"><strong>Generate Audition Set</strong>: create several saved patch ideas and also bundle them into one named set for later auditioning/programming.</p>
+          <div class="d-flex gap-2 flex-wrap">
+            <button type="button" class="btn btn-sm" [class.btn-primary]="toneAiMode() === 'refine'" [class.btn-outline-primary]="toneAiMode() !== 'refine'" (click)="setToneAiMode('refine')">Refine</button>
+            <button type="button" class="btn btn-sm" [class.btn-primary]="toneAiMode() === 'ideas'" [class.btn-outline-primary]="toneAiMode() !== 'ideas'" (click)="setToneAiMode('ideas')">Ideas</button>
+            <button type="button" class="btn btn-sm" [class.btn-primary]="toneAiMode() === 'set'" [class.btn-outline-primary]="toneAiMode() !== 'set'" (click)="setToneAiMode('set')">Audition Set</button>
           </div>
-          <div class="row g-2">
-            <div class="col-12 col-md-8">
-              <label class="form-label small mb-1" for="toneAiSetName">Audition Set Name</label>
-              <input id="toneAiSetName" type="text" class="form-control" [value]="toneAiSetName()" (input)="setToneAiSetName($any($event.target).value)" />
-              <p class="small text-secondary mb-0 mt-1">Used only by <code>Generate Audition Set</code>.</p>
+          @if (toneAiMode() === 'refine') {
+            <p class="small text-secondary mb-0">Make one improved variation of the current Live Patch and apply it immediately.</p>
+          } @else if (toneAiMode() === 'ideas') {
+            <p class="small text-secondary mb-0">Create several saved patch ideas in the local library without bundling them into a set.</p>
+          } @else {
+            <p class="small text-secondary mb-0">Create several saved patch ideas and bundle them into one named audition set.</p>
+          }
+          @if (toneAiMode() === 'ideas' || toneAiMode() === 'set') {
+            <div class="row g-2">
+              @if (toneAiMode() === 'set') {
+                <div class="col-12 col-md-8">
+                  <label class="form-label small mb-1" for="toneAiSetName">Audition Set Name</label>
+                  <input id="toneAiSetName" type="text" class="form-control" [value]="toneAiSetName()" (input)="setToneAiSetName($any($event.target).value)" />
+                </div>
+              }
+              <div class="col-12" [class.col-md-4]="toneAiMode() === 'set'" [class.col-md-6]="toneAiMode() === 'ideas'">
+                <label class="form-label small mb-1" for="toneAiCount">How Many Ideas</label>
+                <input id="toneAiCount" type="number" min="1" max="8" class="form-control" [value]="toneAiCount()" (input)="setToneAiCount($any($event.target).value)" />
+              </div>
             </div>
-            <div class="col-12 col-md-4">
-              <label class="form-label small mb-1" for="toneAiCount">How Many Ideas</label>
-              <input id="toneAiCount" type="number" min="1" max="8" class="form-control" [value]="toneAiCount()" (input)="setToneAiCount($any($event.target).value)" />
-              <p class="small text-secondary mb-0 mt-1">Used by set generation and patch-idea generation.</p>
+          }
+          @if (toneAiMode() === 'set') {
+            <div>
+              <label class="form-label small mb-1" for="toneAiDescription">Set Description</label>
+              <input id="toneAiDescription" type="text" class="form-control" [value]="toneAiDescription()" (input)="setToneAiDescription($any($event.target).value)" />
             </div>
-          </div>
-          <div>
-            <label class="form-label small mb-1" for="toneAiDescription">Description</label>
-            <input id="toneAiDescription" type="text" class="form-control" [value]="toneAiDescription()" (input)="setToneAiDescription($any($event.target).value)" />
-            <p class="small text-secondary mb-0 mt-1">Used only by <code>Generate Audition Set</code>.</p>
-          </div>
-          <div>
-            <label class="form-label small mb-1" for="toneAiNamePrefix">Patch Name Prefix</label>
-            <input id="toneAiNamePrefix" type="text" class="form-control" [value]="toneAiNamePrefix()" (input)="setToneAiNamePrefix($any($event.target).value)" />
-            <p class="small text-secondary mb-0 mt-1">Optional. Used only by <code>Generate Patch Ideas</code> to name the saved patch ideas, for example <code>Test Set 5</code>.</p>
-          </div>
+          }
+          @if (toneAiMode() === 'ideas') {
+            <div>
+              <label class="form-label small mb-1" for="toneAiNamePrefix">Patch Name Prefix</label>
+              <input id="toneAiNamePrefix" type="text" class="form-control" [value]="toneAiNamePrefix()" (input)="setToneAiNamePrefix($any($event.target).value)" />
+              <p class="small text-secondary mb-0 mt-1">Optional, for example <code>Test Set 5</code>.</p>
+            </div>
+          }
           <div>
             <label class="form-label small mb-1" for="toneAiPrompt">Prompt</label>
             <textarea id="toneAiPrompt" class="form-control" rows="5" [value]="toneAiPrompt()" (input)="setToneAiPrompt($any($event.target).value)"></textarea>
@@ -1048,17 +1059,25 @@
             </div>
             <p class="small text-secondary mb-0 mt-1">These tell the AI which parts of the patch it is allowed to change.</p>
           </div>
-          <div class="d-flex justify-content-end flex-wrap gap-2">
-            <button type="button" class="btn btn-sm btn-outline-success" (click)="refineToneAiLivePatch()" [disabled]="isActionBusy('tone-ai-refine')">
-              {{ isActionBusy('tone-ai-refine') ? 'Refining...' : 'Refine Live Patch' }}
-            </button>
-            <button type="button" class="btn btn-sm btn-outline-primary" (click)="generateToneAiPatchObjects()" [disabled]="isActionBusy('tone-ai-generate-objects')">
-              {{ isActionBusy('tone-ai-generate-objects') ? 'Generating...' : 'Generate Patch Ideas' }}
-            </button>
-            <button type="button" class="btn btn-sm btn-primary" (click)="generateToneAiSet()" [disabled]="isActionBusy('tone-ai-generate')">
-              {{ isActionBusy('tone-ai-generate') ? 'Generating...' : 'Generate Audition Set' }}
-            </button>
-          </div>
+          @if (toneAiMode() === 'refine') {
+            <div class="d-flex justify-content-end">
+              <button type="button" class="btn btn-sm btn-success" (click)="refineToneAiLivePatch()" [disabled]="isActionBusy('tone-ai-refine')">
+                {{ isActionBusy('tone-ai-refine') ? 'Refining...' : 'Refine Live Patch' }}
+              </button>
+            </div>
+          } @else if (toneAiMode() === 'ideas') {
+            <div class="d-flex justify-content-end">
+              <button type="button" class="btn btn-sm btn-primary" (click)="generateToneAiPatchObjects()" [disabled]="isActionBusy('tone-ai-generate-objects')">
+                {{ isActionBusy('tone-ai-generate-objects') ? 'Generating...' : 'Generate Patch Ideas' }}
+              </button>
+            </div>
+          } @else {
+            <div class="d-flex justify-content-end">
+              <button type="button" class="btn btn-sm btn-primary" (click)="generateToneAiSet()" [disabled]="isActionBusy('tone-ai-generate')">
+                {{ isActionBusy('tone-ai-generate') ? 'Generating...' : 'Generate Audition Set' }}
+              </button>
+            </div>
+          }
         </div>
       </section>
     </div>
