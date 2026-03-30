@@ -1784,3 +1784,16 @@
   - `save from live` requires explicit block selection,
   - manual UI edits are immediate write-through to `Live Patch`,
   - phase 1 avoids heavier recipe/composition schema until the core loop is working.
+
+## Session Update - 2026-03-30 (Live Meter Auto-Retry On Page Load)
+- Fixed live meter startup behavior in:
+  - `apps/web/src/app/app.ts`
+- Problem:
+  - page load still called `startLiveMeter()`, but any early SSE connection error immediately stopped the meter with no retry, so the UI could land in `Stopped` right after load.
+- Fix:
+  - split disconnect from explicit stop,
+  - keep an internal `liveMeterShouldRun` intent flag,
+  - automatically retry the SSE live meter after transient startup errors,
+  - preserve explicit user stop behavior from the button.
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

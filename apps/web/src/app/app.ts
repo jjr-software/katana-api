@@ -465,6 +465,7 @@ export class App implements OnInit, OnDestroy {
   queuePollHandle: ReturnType<typeof setInterval> | null = null;
   activeSlotPollHandle: ReturnType<typeof setInterval> | null = null;
   liveMeterSource: EventSource | null = null;
+  liveMeterReconnectHandle: ReturnType<typeof setTimeout> | null = null;
   patchSamplesModalOpen = signal(false);
   patchSamplesModalTitle = signal('');
   patchSamplesRows = signal<AudioSampleResponse[]>([]);
@@ -537,6 +538,7 @@ export class App implements OnInit, OnDestroy {
   toneManualSetSlots = signal<Record<number, string>>({});
   toneSetSlotAssignments = signal<Record<string, string>>({});
   private activeSlotPollInFlight = false;
+  private liveMeterShouldRun = false;
   private toastCounter = 0;
   private readonly toastTimers = new Map<number, ReturnType<typeof setTimeout>>();
   private lastStatusToast = '';
@@ -2543,7 +2545,8 @@ export class App implements OnInit, OnDestroy {
   }
 
   startLiveMeter(): void {
-    this.stopLiveMeter();
+    this.liveMeterShouldRun = true;
+    this.disconnectLiveMeter();
     const source = new EventSource('/api/v1/audio/live/sse?window_sec=0.5');
     source.onmessage = (event: MessageEvent<string>) => {
       try {
@@ -2590,7 +2593,8 @@ export class App implements OnInit, OnDestroy {
     };
     source.onerror = () => {
       this.liveMeterConnected.set(false);
-      this.stopLiveMeter();
+      this.disconnectLiveMeter();
+      this.scheduleLiveMeterReconnect();
     };
     this.liveMeterSource = source;
   }
@@ -2604,12 +2608,38 @@ export class App implements OnInit, OnDestroy {
   }
 
   stopLiveMeter(): void {
+    this.liveMeterShouldRun = false;
+    this.clearLiveMeterReconnect();
+    this.disconnectLiveMeter();
+    this.liveFftBinsDb.set([]);
+  }
+
+  private disconnectLiveMeter(): void {
     if (this.liveMeterSource !== null) {
       this.liveMeterSource.close();
       this.liveMeterSource = null;
     }
     this.liveMeterConnected.set(false);
-    this.liveFftBinsDb.set([]);
+  }
+
+  private scheduleLiveMeterReconnect(): void {
+    if (!this.liveMeterShouldRun || this.liveMeterReconnectHandle !== null) {
+      return;
+    }
+    this.liveMeterReconnectHandle = setTimeout(() => {
+      this.liveMeterReconnectHandle = null;
+      if (!this.liveMeterShouldRun || this.liveMeterSource !== null) {
+        return;
+      }
+      this.startLiveMeter();
+    }, 1000);
+  }
+
+  private clearLiveMeterReconnect(): void {
+    if (this.liveMeterReconnectHandle !== null) {
+      clearTimeout(this.liveMeterReconnectHandle);
+      this.liveMeterReconnectHandle = null;
+    }
   }
 
   liveMeterButtonLabel(): string {
