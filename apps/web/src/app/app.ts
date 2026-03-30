@@ -684,25 +684,25 @@ export class App implements OnInit, OnDestroy {
   }
 
   async openLiveEditor(): Promise<void> {
-    this.status.set('Loading Live Patch editor...');
+    this.status.set('Loading current Live Patch from amp...');
     this.responseJson.set('');
     try {
-      const response = await fetch('/api/v1/live-patch', {
-        method: 'GET',
+      const response = await fetch('/api/v1/live-patch/sync', {
+        method: 'POST',
         cache: 'no-store',
       });
       const payload = (await response.json()) as LivePatchResponse | { detail?: unknown };
       if (!response.ok || !('patch_json' in payload)) {
-        this.status.set('Live Patch is not available. Sync it first.');
+        this.status.set('Failed to load current Live Patch from amp.');
         this.responseJson.set(JSON.stringify(payload, null, 2));
         return;
       }
       const live = payload as LivePatchResponse;
       this.applyLivePatchStatus(live);
       this.loadLivePatchIntoEditorState(live, false);
-      this.status.set('Live Patch editor loaded');
+      this.status.set('Loaded current Live Patch from amp');
     } catch (error: unknown) {
-      this.status.set('Failed opening Live Patch editor');
+      this.status.set('Failed to load current Live Patch from amp.');
       this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
     }
   }

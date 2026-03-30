@@ -1797,3 +1797,15 @@
   - preserve explicit user stop behavior from the button.
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-30 (Live Patch Reload Wording + Source)
+- Updated live-editor trigger in:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Clarified behavior:
+  - the UI action now explicitly says `Reload Live Patch From Amp`,
+  - opening the editor now forces `POST /api/v1/live-patch/sync` instead of reading the cached `GET /api/v1/live-patch` row.
+- Outcome:
+  - the editor now reloads the amp's current live edit buffer on demand rather than reopening whatever Live Patch state was last cached in the app database.
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

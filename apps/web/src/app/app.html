@@ -91,7 +91,7 @@
       <section class="mb-4 d-grid gap-3">
             <div class="border rounded p-2 bg-body-tertiary small d-grid gap-2">
               <div class="d-flex gap-2 flex-wrap">
-                <button type="button" class="btn btn-sm btn-outline-primary" (click)="openLiveEditor()">Reset From Live</button>
+                <button type="button" class="btn btn-sm btn-outline-primary" (click)="openLiveEditor()">Reload Live Patch From Amp</button>
                 <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openToneLoadPatchModal()">Load Patch</button>
                 <button type="button" class="btn btn-sm btn-outline-success" (click)="openToneSaveModal()">Save Patch</button>
                 <button type="button" class="btn btn-sm btn-outline-primary" (click)="openToneDesignerModal()">AI Designer</button>
@@ -497,7 +497,7 @@
             } @else {
               <article class="border rounded p-3 bg-body-tertiary">
                 <p class="small text-secondary mb-2">No live editor state is loaded yet.</p>
-                <button type="button" class="btn btn-sm btn-outline-primary" (click)="openLiveEditor()">Load Live Patch</button>
+                <button type="button" class="btn btn-sm btn-outline-primary" (click)="openLiveEditor()">Reload Live Patch From Amp</button>
               </article>
             }
       </section>
