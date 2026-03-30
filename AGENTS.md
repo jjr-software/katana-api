@@ -1826,8 +1826,18 @@
     - plain-English description,
     - block list,
     - raw patch JSON.
-  - User must explicitly choose:
-    - `Yes, Apply This` to save the candidate as a patch object and apply it to Live Patch, or
-    - `No` to reject the proposal.
+- User must explicitly choose:
+  - `Yes, Apply This` to save the candidate as a patch object and apply it to Live Patch, or
+  - `No` to reject the proposal.
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
+
+## Session Update - 2026-03-30 (Removed Main-Page Raw JSON Dump)
+- Updated:
+  - `apps/web/src/app/app.html`
+- Change:
+  - removed the always-visible `responseJson()` dump block from the main page layout.
+- Kept:
+  - AI refine preview JSON inside the approval workflow modal.
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`

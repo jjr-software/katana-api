@@ -871,10 +871,6 @@
   </section>
   }
 
-  @if (responseJson()) {
-    <pre class="card p-3 mt-3 mb-0">{{ responseJson() }}</pre>
-  }
-
   @if (toneSaveModalOpen()) {
     <div class="raw-modal-backdrop" (click)="closeToneSaveModal()">
       <section class="raw-modal" role="dialog" aria-modal="true" aria-label="Save Patch" (click)="$event.stopPropagation()">
