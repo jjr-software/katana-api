@@ -440,7 +440,6 @@ export class App implements OnInit, OnDestroy {
   liveMeterConnected = signal(false);
   liveRmsHistory = signal<number[]>([]);
   recentSamples = signal<AudioSampleResponse[]>([]);
-  isMeasuringSlotsRms = signal(false);
   isMeasuringActivePatch = signal(false);
   measureCountdownSec = signal(0);
   busyActions = signal<Record<string, boolean>>({});
@@ -2675,61 +2674,6 @@ export class App implements OnInit, OnDestroy {
 
   private resolvePageFromPath(): 'dashboard' | 'samples' {
     return window.location.pathname === '/samples' ? 'samples' : 'dashboard';
-  }
-
-  async measureAllSlotsRms(): Promise<void> {
-    if (this.isMeasuringSlotsRms()) {
-      return;
-    }
-    this.isMeasuringSlotsRms.set(true);
-    this.responseJson.set('');
-    const measurements: Array<{ slot: number; slot_label: string; rms_dbfs: number; captured_at: string }> = [];
-    try {
-      for (let slot = 1; slot <= 8; slot += 1) {
-        this.status.set(`Slot ${slot}/8: syncing patch...`);
-        const synced = await this.syncSlotForMeasurement(slot);
-        this.applySyncedSlot(synced.slot);
-        this.lastSyncedAt.set(synced.synced_at);
-        this.totalSyncMs.set(synced.slot.slot_sync_ms);
-        this.ampStateHash.set('');
-
-        this.status.set(`Slot ${slot}/8: measuring RMS (5s)...`);
-        const sample = await this.captureSlotRmsSample(synced.slot);
-        this.setSlotMeasuredRms(synced.slot.slot, sample.rms_dbfs, sample.peak_dbfs, sample.created_at);
-        measurements.push({
-          slot: synced.slot.slot,
-          slot_label: synced.slot.slot_label,
-          rms_dbfs: sample.rms_dbfs,
-          captured_at: sample.created_at,
-        });
-      }
-      await this.loadRecentAudioSamples();
-      this.status.set('Completed 5-second RMS measurement across all slots');
-      this.responseJson.set(
-        JSON.stringify(
-          {
-            message: 'Measured 5-second RMS for all slots',
-            measurements,
-          },
-          null,
-          2,
-        ),
-      );
-    } catch (error: unknown) {
-      this.status.set('5-second RMS slot cycle failed');
-      this.responseJson.set(
-        JSON.stringify(
-          {
-            message: 'Measure all slots RMS failed',
-            error: String(error),
-          },
-          null,
-          2,
-        ),
-      );
-    } finally {
-      this.isMeasuringSlotsRms.set(false);
-    }
   }
 
   canUseSlotActions(slot: SlotCard): boolean {
@@ -5071,12 +5015,6 @@ export class App implements OnInit, OnDestroy {
     }
     if (value === 'write_slot') {
       return 'Commit To AMP';
-    }
-    if (value === 'full_dump') {
-      return 'Load Amp State';
-    }
-    if (value === 'quick_sync_names') {
-      return 'Quick Sync Names';
     }
     if (value === 'full_sync_slots') {
       return 'Full Sync Slots';
