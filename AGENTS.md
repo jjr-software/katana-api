@@ -1809,3 +1809,25 @@
   - the editor now reloads the amp's current live edit buffer on demand rather than reopening whatever Live Patch state was last cached in the app database.
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-03-30 (AI Refine Preview + Explicit Approval Gate)
+- Added non-persistent AI preview endpoint:
+  - `POST /api/v1/ai/preview/patch-objects`
+- Files changed:
+  - `apps/api/app/api/tone.py`
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Refine-mode behavior change:
+  - AI Designer no longer applies a refine candidate immediately.
+  - Refine now previews one proposed sparse patch object first.
+  - UI shows:
+    - summary text,
+    - proposed name,
+    - plain-English description,
+    - block list,
+    - raw patch JSON.
+  - User must explicitly choose:
+    - `Yes, Apply This` to save the candidate as a patch object and apply it to Live Patch, or
+    - `No` to reject the proposal.
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

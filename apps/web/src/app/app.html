@@ -937,7 +937,7 @@
             <button type="button" class="btn btn-sm" [class.btn-primary]="toneAiMode() === 'set'" [class.btn-outline-primary]="toneAiMode() !== 'set'" (click)="setToneAiMode('set')">Audition Set</button>
           </div>
           @if (toneAiMode() === 'refine') {
-            <p class="small text-secondary mb-0">Make one improved variation of the current Live Patch and apply it immediately.</p>
+            <p class="small text-secondary mb-0">Preview one AI refinement for the current Live Patch, inspect the proposal in plain English and JSON, then explicitly approve or reject it before anything is applied.</p>
           } @else if (toneAiMode() === 'ideas') {
             <p class="small text-secondary mb-0">Create several saved patch ideas in the local library without bundling them into a set.</p>
           } @else {
@@ -987,9 +987,39 @@
             <p class="small text-secondary mb-0 mt-1">These tell the AI which parts of the patch it is allowed to change.</p>
           </div>
           @if (toneAiMode() === 'refine') {
+            @if (toneAiPreviewCandidate(); as preview) {
+              <section class="border rounded p-3 bg-body-tertiary d-grid gap-2">
+                <div>
+                  <div class="small text-secondary">Proposal Summary</div>
+                  <div>{{ toneAiPreviewSummary() || 'No summary provided.' }}</div>
+                </div>
+                <div>
+                  <div class="small text-secondary">Proposed Name</div>
+                  <div><strong>{{ preview.name }}</strong></div>
+                </div>
+                <div>
+                  <div class="small text-secondary">English Description</div>
+                  <div>{{ preview.description || 'No description provided.' }}</div>
+                </div>
+                <div>
+                  <div class="small text-secondary">Blocks</div>
+                  <div>{{ preview.blocks.join(', ') }}</div>
+                </div>
+                <div>
+                  <div class="small text-secondary">Patch JSON</div>
+                  <pre class="raw-modal-json mb-0">{{ toneAiPreviewJson() }}</pre>
+                </div>
+                <div class="d-flex justify-content-end gap-2">
+                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="rejectToneAiRefinement()">No</button>
+                  <button type="button" class="btn btn-sm btn-success" (click)="approveToneAiRefinement()" [disabled]="isActionBusy('tone-ai-approve')">
+                    {{ isActionBusy('tone-ai-approve') ? 'Applying...' : 'Yes, Apply This' }}
+                  </button>
+                </div>
+              </section>
+            }
             <div class="d-flex justify-content-end">
               <button type="button" class="btn btn-sm btn-success" (click)="refineToneAiLivePatch()" [disabled]="isActionBusy('tone-ai-refine')">
-                {{ isActionBusy('tone-ai-refine') ? 'Refining...' : 'Refine Live Patch' }}
+                {{ isActionBusy('tone-ai-refine') ? 'Previewing...' : (toneAiPreviewCandidate() ? 'Refresh Preview' : 'Preview Refinement') }}
               </button>
             </div>
           } @else if (toneAiMode() === 'ideas') {

@@ -237,6 +237,18 @@ interface ToneAiGenerateSetResponse {
   set: TonePatchObjectSetResponse;
 }
 
+interface AiPreviewPatchObjectCandidate {
+  name: string;
+  description: string;
+  patch_json: Record<string, unknown>;
+  blocks: string[];
+}
+
+interface AiPreviewPatchObjectsResponse {
+  summary: string;
+  candidates: AiPreviewPatchObjectCandidate[];
+}
+
 interface PatchConfigResponse {
   hash_id: string;
   snapshot: Record<string, unknown>;
@@ -524,6 +536,8 @@ export class App implements OnInit, OnDestroy {
   toneAiDescription = signal('');
   toneAiCount = signal('8');
   toneAiNamePrefix = signal('');
+  toneAiPreviewSummary = signal('');
+  toneAiPreviewCandidate = signal<AiPreviewPatchObjectCandidate | null>(null);
   toneSelectedBlocks = signal<Record<string, boolean>>({ amp: true, booster: true, eq1: true });
   liveEditorShowAllBlocks = signal(false);
   toneLoadedPatchObjectId = signal('');
@@ -673,7 +687,7 @@ export class App implements OnInit, OnDestroy {
         return;
       }
       this.applyLivePatchStatus(payload as LivePatchResponse);
-      this.loadLivePatchIntoEditorState(payload as LivePatchResponse, false);
+      this.loadLivePatchIntoEditorState(payload as LivePatchResponse, false, true);
       this.status.set('Live Patch synced');
     } catch (error: unknown) {
       this.status.set('Live Patch sync failed');
@@ -699,7 +713,7 @@ export class App implements OnInit, OnDestroy {
       }
       const live = payload as LivePatchResponse;
       this.applyLivePatchStatus(live);
-      this.loadLivePatchIntoEditorState(live, false);
+      this.loadLivePatchIntoEditorState(live, false, true);
       this.status.set('Loaded current Live Patch from amp');
     } catch (error: unknown) {
       this.status.set('Failed to load current Live Patch from amp.');
@@ -741,7 +755,7 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  private loadLivePatchIntoEditorState(live: LivePatchResponse, replaceLoadedPatch: boolean): void {
+  private loadLivePatchIntoEditorState(live: LivePatchResponse, replaceLoadedPatch: boolean, resetScopeToAll: boolean = false): void {
     const draft = this.clonePatch(live.patch_json);
     const draftAmp = this.readObject(draft, 'amp');
     if (draftAmp) {
@@ -768,6 +782,9 @@ export class App implements OnInit, OnDestroy {
     this.editorLiveApplyPending.set(false);
     this.editorLiveApplyError.set('');
     this.editorLiveApplyReadbackAt.set('');
+    if (resetScopeToAll) {
+      this.resetLivePatchSelectionScopeToAll();
+    }
     this.editorModalOpen.set(true);
     if (replaceLoadedPatch && this.toneLoadedPatchSnapshot() === null) {
       this.setToneBlocksFromPatch(draft, true);
@@ -788,14 +805,17 @@ export class App implements OnInit, OnDestroy {
 
   openToneDesignerModal(): void {
     this.toneAiMode.set('refine');
+    this.clearToneAiPreview();
     this.toneDesignerModalOpen.set(true);
   }
 
   closeToneDesignerModal(): void {
+    this.clearToneAiPreview();
     this.toneDesignerModalOpen.set(false);
   }
 
   setToneAiMode(value: 'refine' | 'ideas' | 'set'): void {
+    this.clearToneAiPreview();
     this.toneAiMode.set(value);
   }
 
@@ -889,6 +909,14 @@ export class App implements OnInit, OnDestroy {
 
   setToneAiNamePrefix(value: string): void {
     this.toneAiNamePrefix.set(value);
+  }
+
+  toneAiPreviewJson(): string {
+    const preview = this.toneAiPreviewCandidate();
+    if (!preview) {
+      return '';
+    }
+    return JSON.stringify(preview.patch_json, null, 2);
   }
 
   setToneAssignGroupId(patchObjectId: number, value: string): void {
@@ -1525,10 +1553,10 @@ export class App implements OnInit, OnDestroy {
     }
     const currentName = this.livePatchExactDbName().trim() || this.toneLoadedPatchName().trim() || 'Live Patch';
     this.setActionBusy('tone-ai-refine', true);
-    this.status.set(`Refining ${currentName} with AI...`);
+    this.status.set(`Previewing AI refinement for ${currentName}...`);
     this.responseJson.set('');
     try {
-      const response = await fetch('/api/v1/ai/generate/patch-objects', {
+      const response = await fetch('/api/v1/ai/preview/patch-objects', {
         method: 'POST',
         cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
@@ -1540,25 +1568,72 @@ export class App implements OnInit, OnDestroy {
           name_prefix: `${currentName} Refine`,
         }),
       });
-      const payload = (await response.json()) as TonePatchObjectResponse[] | { detail?: unknown };
-      if (!response.ok || !Array.isArray(payload) || payload.length === 0) {
+      const payload = (await response.json()) as AiPreviewPatchObjectsResponse | { detail?: unknown };
+      if (!response.ok || !('candidates' in payload) || !Array.isArray(payload.candidates) || payload.candidates.length === 0) {
         this.status.set('AI refinement failed');
         this.responseJson.set(JSON.stringify(payload, null, 2));
         return;
       }
-      const refined = payload[0] as TonePatchObjectResponse;
-      this.toneHighlightedPatchObjectId.set(refined.id);
-      await this.loadTonePatchObjects();
-      this.toneDesignerModalOpen.set(false);
-      await this.applyTonePatchObjectToLive(refined);
-      this.status.set(`Refined ${currentName} as ${refined.name} and applied it live`);
-      this.responseJson.set(JSON.stringify(refined, null, 2));
+      const preview = payload as AiPreviewPatchObjectsResponse;
+      this.toneAiPreviewSummary.set(preview.summary || '');
+      this.toneAiPreviewCandidate.set(preview.candidates[0] ?? null);
+      this.status.set(`AI refinement preview ready for ${currentName}`);
+      this.responseJson.set(JSON.stringify(preview, null, 2));
     } catch (error: unknown) {
       this.status.set('AI refinement failed');
       this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
     } finally {
       this.setActionBusy('tone-ai-refine', false);
     }
+  }
+
+  async approveToneAiRefinement(): Promise<void> {
+    const preview = this.toneAiPreviewCandidate();
+    if (!preview) {
+      this.status.set('No AI refinement preview is ready.');
+      return;
+    }
+    this.setActionBusy('tone-ai-approve', true);
+    this.status.set(`Approving AI refinement ${preview.name}...`);
+    this.responseJson.set('');
+    try {
+      const createResponse = await fetch('/api/v1/patch-objects', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: preview.name,
+          description: preview.description,
+          patch_json: preview.patch_json,
+          source_type: 'ai',
+          source_prompt: this.toneAiPrompt().trim() || null,
+        }),
+      });
+      const createPayload = (await createResponse.json()) as TonePatchObjectResponse | { detail?: unknown };
+      if (!createResponse.ok || !('id' in createPayload)) {
+        this.status.set('AI refinement approval failed');
+        this.responseJson.set(JSON.stringify(createPayload, null, 2));
+        return;
+      }
+      const created = createPayload as TonePatchObjectResponse;
+      this.toneHighlightedPatchObjectId.set(created.id);
+      await this.loadTonePatchObjects();
+      this.clearToneAiPreview();
+      this.toneDesignerModalOpen.set(false);
+      await this.applyTonePatchObjectToLive(created);
+      this.status.set(`Approved AI refinement ${created.name} and applied it live`);
+      this.responseJson.set(JSON.stringify(created, null, 2));
+    } catch (error: unknown) {
+      this.status.set('AI refinement approval failed');
+      this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
+    } finally {
+      this.setActionBusy('tone-ai-approve', false);
+    }
+  }
+
+  rejectToneAiRefinement(): void {
+    this.clearToneAiPreview();
+    this.status.set('AI refinement rejected');
   }
 
   async programToneSetToAmp(toneSet: TonePatchObjectSetResponse, startSlot: number): Promise<void> {
@@ -4936,6 +5011,11 @@ export class App implements OnInit, OnDestroy {
     return blocks.join(', ');
   }
 
+  private clearToneAiPreview(): void {
+    this.toneAiPreviewSummary.set('');
+    this.toneAiPreviewCandidate.set(null);
+  }
+
   canResetEditorBlockToLoadedPatch(block: string): boolean {
     const loadedPatch = this.toneLoadedPatchSnapshot();
     const currentPatch = this.editorPatchDraft();
@@ -5014,6 +5094,14 @@ export class App implements OnInit, OnDestroy {
   private setToneBlocksFromPatch(source: Record<string, unknown>, replaceSelection: boolean): void {
     const blockNames = this.toneBlockOptions().filter((block) => this.patchDefinesBlock(source, block));
     this.setToneBlocksFromNames(blockNames, replaceSelection);
+  }
+
+  private resetLivePatchSelectionScopeToAll(): void {
+    this.toneLoadedPatchSnapshot.set(null);
+    this.toneLoadedPatchObjectId.set('');
+    this.toneLoadedPatchName.set('');
+    this.liveEditorShowAllBlocks.set(false);
+    this.setToneBlocksFromNames(this.toneBlockOptions(), true);
   }
 
   private setToneBlocksFromNames(blocks: readonly string[], replaceSelection: boolean): void {

@@ -216,6 +216,18 @@ class AiGeneratePatchObjectsRequest(BaseModel):
     name_prefix: str | None = Field(default=None, max_length=255)
 
 
+class AiPreviewPatchObjectCandidateResponse(BaseModel):
+    name: str
+    description: str
+    patch_json: dict
+    blocks: list[str]
+
+
+class AiPreviewPatchObjectsResponse(BaseModel):
+    summary: str
+    candidates: list[AiPreviewPatchObjectCandidateResponse]
+
+
 @router.get("/patch-objects", response_model=list[PatchObjectReadResponse])
 def list_patch_objects(
     blocks: list[str] = Query(default=[]),
@@ -606,6 +618,50 @@ async def ai_generate_patch_objects(
         created.append(_patch_object_response(db, row))
     db.commit()
     return created
+
+
+@router.post("/ai/preview/patch-objects", response_model=AiPreviewPatchObjectsResponse)
+async def ai_preview_patch_objects(
+    payload: AiGeneratePatchObjectsRequest,
+    db: Session = Depends(get_db),
+    client: AmpClient = Depends(get_amp_client),
+    settings: Settings = Depends(get_settings),
+) -> AiPreviewPatchObjectsResponse:
+    blocks = _validated_blocks(payload.preferred_blocks) if payload.preferred_blocks else ["amp", "booster", "eq1"]
+    if payload.reference_patch_object_id is not None:
+        reference_patch_object = db.get(PatchObject, payload.reference_patch_object_id)
+        if reference_patch_object is None:
+            raise HTTPException(
+                status_code=404,
+                detail={"message": "Reference patch object not found", "patch_object_id": payload.reference_patch_object_id},
+            )
+        context_patch = merge_patch_object_into_full_patch({}, reference_patch_object.patch_json)
+    elif payload.use_live_patch_as_context:
+        context_patch = (await _resolve_live_patch_row(db, client)).patch_json
+    else:
+        context_patch = {}
+
+    result = await asyncio.to_thread(
+        _call_openai_patch_objects_designer,
+        settings,
+        context_patch,
+        payload.prompt,
+        payload.count,
+        blocks,
+    )
+    candidates: list[AiPreviewPatchObjectCandidateResponse] = []
+    for index, candidate in enumerate(result["candidates"], start=1):
+        normalized = _validated_ai_candidate_patch_json(candidate.patch_json, blocks)
+        base_name = f"{payload.name_prefix.strip()} {index}: {candidate.name}" if payload.name_prefix else candidate.name
+        candidates.append(
+            AiPreviewPatchObjectCandidateResponse(
+                name=_make_unique_patch_object_name(db, base_name),
+                description=candidate.description,
+                patch_json=normalized,
+                blocks=patch_object_block_names(normalized),
+            )
+        )
+    return AiPreviewPatchObjectsResponse(summary=str(result["summary"]), candidates=candidates)
 
 
 @router.get("/live-patch", response_model=LivePatchReadResponse)
