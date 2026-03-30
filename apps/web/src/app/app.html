@@ -230,7 +230,10 @@
 
                   @if (liveEditorShowsBlock('routing')) {
                   <article class="border rounded p-2">
-                    <h4 class="h6 mb-2">Routing</h4>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <h4 class="h6 mb-0">Routing</h4>
+                      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToBase('routing')" [disabled]="!canResetEditorBlockToBase('routing')">Reset</button>
+                    </div>
                     <div class="row g-2">
                       <div class="col-12 col-md-4">
                         <label class="form-label small mb-1">Chain Pattern</label>
@@ -259,7 +262,10 @@
 
                   @if (liveEditorShowsAnyBlocks(['booster', 'mod', 'fx', 'delay', 'reverb'])) {
                   <article class="border rounded p-2">
-                    <h4 class="h6 mb-2">Colors</h4>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <h4 class="h6 mb-0">Colors</h4>
+                      <span class="small text-secondary">Reset with each stage</span>
+                    </div>
                     <div class="row g-2">
                       @for (stageName of ['booster', 'mod', 'fx', 'delay', 'reverb']; track stageName) {
                         @if (liveEditorShowsBlock($any(stageName))) {
@@ -279,7 +285,10 @@
 
                   @if (liveEditorShowsBlock('amp')) {
                   <article class="border rounded p-2">
-                    <h4 class="h6 mb-2">Amp</h4>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <h4 class="h6 mb-0">Amp</h4>
+                      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToBase('amp')" [disabled]="!canResetEditorBlockToBase('amp')">Reset</button>
+                    </div>
                     <div class="row g-2">
                       <div class="col-6 col-md-4">
                         <label class="form-label small mb-1">Type</label>
@@ -325,10 +334,13 @@
                     <article class="border rounded p-2">
                       <div class="d-flex justify-content-between align-items-center mb-2">
                         <h4 class="h6 mb-0 text-capitalize" [class.text-success]="editorStageOn($any(stageName))" [class.text-danger]="!editorStageOn($any(stageName))">{{ stageName }}</h4>
-                        <label class="form-check-label small d-flex align-items-center gap-1">
-                          <input class="form-check-input m-0" type="checkbox" [checked]="editorStageOn($any(stageName))" (change)="setEditorStageOn($any(stageName), $any($event.target).checked)" />
-                          <span>Enabled</span>
-                        </label>
+                        <div class="d-flex gap-2 align-items-center">
+                          <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToBase($any(stageName))" [disabled]="!canResetEditorBlockToBase($any(stageName))">Reset</button>
+                          <label class="form-check-label small d-flex align-items-center gap-1">
+                            <input class="form-check-input m-0" type="checkbox" [checked]="editorStageOn($any(stageName))" (change)="setEditorStageOn($any(stageName), $any($event.target).checked)" />
+                            <span>Enabled</span>
+                          </label>
+                        </div>
                       </div>
                       <div class="row g-2">
                         <div class="col-12 col-md-6">
@@ -390,10 +402,13 @@
                     <article class="border rounded p-2">
                       <div class="d-flex justify-content-between align-items-center mb-2">
                         <h4 class="h6 mb-0 text-uppercase" [class.text-success]="editorEqOn($any(eqName))" [class.text-danger]="!editorEqOn($any(eqName))">{{ eqName }}</h4>
-                        <label class="form-check-label small d-flex align-items-center gap-1">
-                          <input class="form-check-input m-0" type="checkbox" [checked]="editorEqOn($any(eqName))" (change)="setEditorEqOn($any(eqName), $any($event.target).checked)" />
-                          <span>Enabled</span>
-                        </label>
+                        <div class="d-flex gap-2 align-items-center">
+                          <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToBase($any(eqName))" [disabled]="!canResetEditorBlockToBase($any(eqName))">Reset</button>
+                          <label class="form-check-label small d-flex align-items-center gap-1">
+                            <input class="form-check-input m-0" type="checkbox" [checked]="editorEqOn($any(eqName))" (change)="setEditorEqOn($any(eqName), $any($event.target).checked)" />
+                            <span>Enabled</span>
+                          </label>
+                        </div>
                       </div>
                       <div class="row g-2">
                         <div class="col-6 col-md-4">
@@ -511,10 +526,13 @@
                   <article class="border rounded p-2">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <h4 class="h6 mb-0">NS</h4>
-                      <label class="form-check-label small d-flex align-items-center gap-1">
-                        <input class="form-check-input m-0" type="checkbox" [checked]="editorNsOn()" (change)="setEditorNsOn($any($event.target).checked)" />
-                        <span>Enabled</span>
-                      </label>
+                      <div class="d-flex gap-2 align-items-center">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToBase('ns')" [disabled]="!canResetEditorBlockToBase('ns')">Reset</button>
+                        <label class="form-check-label small d-flex align-items-center gap-1">
+                          <input class="form-check-input m-0" type="checkbox" [checked]="editorNsOn()" (change)="setEditorNsOn($any($event.target).checked)" />
+                          <span>Enabled</span>
+                        </label>
+                      </div>
                     </div>
                     <div class="row g-2">
                       <div class="col-12 col-md-6"><label class="form-label small mb-1">Threshold</label><div class="editor-range-field"><input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorNsNumber('threshold') ?? 0" (input)="setEditorNsNumber('threshold', $any($event.target).value)" /><input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorNsNumber('threshold') ?? 0" (input)="setEditorNsNumber('threshold', $any($event.target).value)" /></div></div>
@@ -527,10 +545,13 @@
                   <article class="border rounded p-2">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <h4 class="h6 mb-0">Send / Return</h4>
-                      <label class="form-check-label small d-flex align-items-center gap-1">
-                        <input class="form-check-input m-0" type="checkbox" [checked]="editorSendReturnOn()" (change)="setEditorSendReturnOn($any($event.target).checked)" />
-                        <span>Enabled</span>
-                      </label>
+                      <div class="d-flex gap-2 align-items-center">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToBase('send_return')" [disabled]="!canResetEditorBlockToBase('send_return')">Reset</button>
+                        <label class="form-check-label small d-flex align-items-center gap-1">
+                          <input class="form-check-input m-0" type="checkbox" [checked]="editorSendReturnOn()" (change)="setEditorSendReturnOn($any($event.target).checked)" />
+                          <span>Enabled</span>
+                        </label>
+                      </div>
                     </div>
                     <div class="row g-2">
                       <div class="col-12 col-md-6"><label class="form-label small mb-1">Position</label><div class="editor-range-field"><input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorSendReturnNumber('position') ?? 0" (input)="setEditorSendReturnNumber('position', $any($event.target).value)" /><input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorSendReturnNumber('position') ?? 0" (input)="setEditorSendReturnNumber('position', $any($event.target).value)" /></div></div>
@@ -545,10 +566,13 @@
                   <article class="border rounded p-2">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <h4 class="h6 mb-0">Solo</h4>
-                      <label class="form-check-label small d-flex align-items-center gap-1">
-                        <input class="form-check-input m-0" type="checkbox" [checked]="editorSoloOn()" (change)="setEditorSoloOn($any($event.target).checked)" />
-                        <span>Enabled</span>
-                      </label>
+                      <div class="d-flex gap-2 align-items-center">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToBase('solo')" [disabled]="!canResetEditorBlockToBase('solo')">Reset</button>
+                        <label class="form-check-label small d-flex align-items-center gap-1">
+                          <input class="form-check-input m-0" type="checkbox" [checked]="editorSoloOn()" (change)="setEditorSoloOn($any($event.target).checked)" />
+                          <span>Enabled</span>
+                        </label>
+                      </div>
                     </div>
                     <div class="row g-2">
                       <div class="col-12 col-md-6"><label class="form-label small mb-1">Level</label><div class="editor-range-field"><input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorSoloLevel() ?? 0" (input)="setEditorSoloLevel($any($event.target).value)" /><input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorSoloLevel() ?? 0" (input)="setEditorSoloLevel($any($event.target).value)" /></div></div>
@@ -560,10 +584,13 @@
                   <article class="border rounded p-2">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <h4 class="h6 mb-0">Pedal FX</h4>
-                      <label class="form-check-label small d-flex align-items-center gap-1">
-                        <input class="form-check-input m-0" type="checkbox" [checked]="editorPedalFxOn()" (change)="setEditorPedalFxOn($any($event.target).checked)" />
-                        <span>Enabled</span>
-                      </label>
+                      <div class="d-flex gap-2 align-items-center">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToBase('pedalfx')" [disabled]="!canResetEditorBlockToBase('pedalfx')">Reset</button>
+                        <label class="form-check-label small d-flex align-items-center gap-1">
+                          <input class="form-check-input m-0" type="checkbox" [checked]="editorPedalFxOn()" (change)="setEditorPedalFxOn($any($event.target).checked)" />
+                          <span>Enabled</span>
+                        </label>
+                      </div>
                     </div>
                     <div class="row g-2">
                       <div class="col-6 col-md-4"><label class="form-label small mb-1">Position</label><input type="number" min="0" max="127" class="form-control form-control-sm" [value]="editorPedalFxNumber('position') ?? 0" (input)="setEditorPedalFxNumber('position', $any($event.target).value)" /></div>

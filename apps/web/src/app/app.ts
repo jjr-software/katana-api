@@ -735,7 +735,7 @@ export class App implements OnInit, OnDestroy {
       this.toneBasePatchObjectName.set(replaceBase ? (this.toneBasePatchObjectName().trim() || 'Current Live Patch') : 'Current Live Patch');
       this.toneBasePatchObjectId.set(replaceBase ? this.toneBasePatchObjectId() : '');
     }
-    this.autoSelectToneBlocksFromBase(draft);
+    this.autoSelectToneBlocksFromBase(draft, true);
   }
 
   toneBlockOptions(): readonly string[] {
@@ -980,7 +980,7 @@ export class App implements OnInit, OnDestroy {
     this.toneBasePatchSnapshot.set(this.clonePatch(current));
     this.toneBasePatchObjectId.set('');
     this.toneBasePatchObjectName.set(this.editorPatchName().trim() || 'Current Live Patch');
-    this.autoSelectToneBlocksFromBase(this.editorPatchDraft() ?? current);
+    this.autoSelectToneBlocksFromBase(this.editorPatchDraft() ?? current, true);
     this.toneBaseModalOpen.set(false);
     this.status.set('Current Live Patch is now the base patch for sparse saves.');
   }
@@ -4412,7 +4412,7 @@ export class App implements OnInit, OnDestroy {
       const slotNumber = this.editorSlotNumber();
       slotNumberForHash = slotNumber;
       nextDraftSnapshot = this.clonePatch(next);
-      this.autoSelectToneBlocksFromBase(nextDraftSnapshot);
+      this.autoSelectToneBlocksFromBase(nextDraftSnapshot, false);
       if (slotNumber !== null) {
         this.slots.update((cards) =>
           cards.map((card) => {
@@ -4872,7 +4872,28 @@ export class App implements OnInit, OnDestroy {
     return blocks.join(', ');
   }
 
-  private autoSelectToneBlocksFromBase(currentPatch: Record<string, unknown>): void {
+  canResetEditorBlockToBase(block: string): boolean {
+    const basePatch = this.toneBasePatchSnapshot();
+    const currentPatch = this.editorPatchDraft();
+    if (!basePatch || !currentPatch) {
+      return false;
+    }
+    const baseBlock = this.comparablePatchBlock(basePatch, block);
+    const currentBlock = this.comparablePatchBlock(currentPatch, block);
+    return this.stableStringify(baseBlock) !== this.stableStringify(currentBlock);
+  }
+
+  resetEditorBlockToBase(block: string): void {
+    const basePatch = this.toneBasePatchSnapshot();
+    if (!basePatch) {
+      return;
+    }
+    this.updateEditorPatch((draft) => {
+      this.applyBaseBlockToDraft(draft, basePatch, block);
+    });
+  }
+
+  private autoSelectToneBlocksFromBase(currentPatch: Record<string, unknown>, replaceSelection: boolean): void {
     const basePatch = this.toneBasePatchSnapshot();
     if (!basePatch) {
       return;
@@ -4883,7 +4904,57 @@ export class App implements OnInit, OnDestroy {
       const currentBlock = this.comparablePatchBlock(currentPatch, block);
       next[block] = this.stableStringify(baseBlock) !== this.stableStringify(currentBlock);
     }
-    this.toneSelectedBlocks.set(next);
+    if (replaceSelection) {
+      this.toneSelectedBlocks.set(next);
+      return;
+    }
+    this.toneSelectedBlocks.update((current) => {
+      const merged = { ...current };
+      for (const block of this.toneBlockOptions()) {
+        merged[block] = Boolean(current[block]) || next[block];
+      }
+      return merged;
+    });
+  }
+
+  private applyBaseBlockToDraft(draft: Record<string, unknown>, basePatch: Record<string, unknown>, block: string): void {
+    if (block === 'routing' || block === 'amp') {
+      const baseDirect = this.readObject(basePatch, block);
+      if (baseDirect) {
+        draft[block] = this.clonePatch(baseDirect);
+      } else {
+        delete draft[block];
+      }
+      return;
+    }
+
+    const baseStages = this.readObject(basePatch, 'stages');
+    const baseStage = this.readObject(baseStages, block);
+    const draftStages = this.readObject(draft, 'stages');
+    if (baseStage) {
+      const ensuredStages = this.ensureObject(draft, 'stages');
+      ensuredStages[block] = this.clonePatch(baseStage);
+    } else if (draftStages) {
+      delete draftStages[block];
+      if (Object.keys(draftStages).length === 0) {
+        delete draft['stages'];
+      }
+    }
+
+    if (block === 'booster' || block === 'mod' || block === 'fx' || block === 'delay' || block === 'reverb') {
+      const baseColors = this.readObject(basePatch, 'colors');
+      const baseColor = this.readObject(baseColors, block);
+      const draftColors = this.readObject(draft, 'colors');
+      if (baseColor) {
+        const ensuredColors = this.ensureObject(draft, 'colors');
+        ensuredColors[block] = this.clonePatch(baseColor);
+      } else if (draftColors) {
+        delete draftColors[block];
+        if (Object.keys(draftColors).length === 0) {
+          delete draft['colors'];
+        }
+      }
+    }
   }
 
   private comparablePatchBlock(source: Record<string, unknown> | null, block: string): unknown {
