@@ -50,6 +50,11 @@
           <div class="d-flex flex-wrap gap-2 mb-2">
             <button type="button" class="btn btn-primary btn-sm" (click)="testAmpConnection()" [disabled]="isActionBusy('test-amp-connection')">{{ headerActionLabel('test-amp-connection', 'Test Amp Connection', 'Testing...') }}</button>
             <button type="button" class="btn btn-outline-primary btn-sm" (click)="syncLivePatch()" [disabled]="isActionBusy('sync-live-patch')">{{ headerActionLabel('sync-live-patch', 'Sync Live Patch', 'Syncing...') }}</button>
+            <button type="button" class="btn btn-outline-primary btn-sm" (click)="openLiveEditor()">Reset From Live</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="openToneBaseModal()">Load Base Patch</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="setCurrentEditorPatchAsBase()">Set Current Editor As Base</button>
+            <button type="button" class="btn btn-outline-success btn-sm" (click)="openToneSaveModal()">Save Patch</button>
+            <button type="button" class="btn btn-outline-primary btn-sm" (click)="openToneDesignerModal()">AI Designer</button>
             <button type="button" class="btn btn-outline-success btn-sm" (click)="captureAudioLevelMarker()" [disabled]="isActionBusy('capture-level-marker')">{{ headerActionLabel('capture-level-marker', 'Set Level Marker', 'Capturing...') }}</button>
             <button
               type="button"
@@ -119,66 +124,54 @@
               }
             </svg>
           </div>
+          <div class="row g-2 mt-1">
+            <div class="col-12 col-lg-3">
+              <article class="border rounded p-2 bg-body-tertiary h-100 small">
+                <p class="text-uppercase text-secondary mb-1">Active Slot</p>
+                <strong>{{ selectedAmpSlotLabel() }}</strong>
+              </article>
+            </div>
+            <div class="col-12 col-lg-4">
+              <article class="border rounded p-2 bg-body-tertiary h-100 small d-grid gap-2">
+                <div>
+                  <p class="text-uppercase text-secondary mb-1">Base Patch</p>
+                  <strong>{{ livePatchBaseName() }}</strong>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openToneBaseModal()">Change Base</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="clearToneBasePatch()" [disabled]="livePatchBaseName() === 'None'">Clear Base</button>
+                </div>
+              </article>
+            </div>
+            <div class="col-12 col-lg-5">
+              <article class="border rounded p-2 bg-body-tertiary h-100 small d-grid gap-2">
+                <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                  <div>
+                    <p class="text-uppercase text-secondary mb-1">Save Scope</p>
+                    <p class="mb-0">{{ livePatchSelectedBlocksSummary() }}</p>
+                  </div>
+                  <label class="form-check small mb-0">
+                    <input class="form-check-input" type="checkbox" [checked]="liveEditorShowAllBlocks()" (change)="setLiveEditorShowAllBlocks($any($event.target).checked)" />
+                    <span class="form-check-label">All</span>
+                  </label>
+                </div>
+                <div class="tone-block-grid">
+                  @for (block of toneBlockOptions(); track block) {
+                    <label class="form-check small mb-0">
+                      <input class="form-check-input" type="checkbox" [checked]="isToneBlockSelected(block)" (change)="setToneBlockSelected(block, $any($event.target).checked)" />
+                      <span class="form-check-label">{{ block }}</span>
+                    </label>
+                  }
+                </div>
+              </article>
+            </div>
+          </div>
         </div>
       </div>
 
       <p class="small mb-3">{{ status() }}</p>
 
-      <section class="mb-4">
-        <article class="card">
-          <div class="card-body d-grid gap-3">
-            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
-              <div>
-                <h2 class="h5 mb-1">Live Patch</h2>
-              </div>
-              <div class="d-flex gap-2 flex-wrap">
-                <button type="button" class="btn btn-sm btn-outline-primary" (click)="openLiveEditor()">Reset From Live</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openToneBaseModal()">Load Base Patch</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="setCurrentEditorPatchAsBase()">Set Current Editor As Base</button>
-                <button type="button" class="btn btn-sm btn-outline-success" (click)="openToneSaveModal()">Save Patch</button>
-                <button type="button" class="btn btn-sm btn-outline-primary" (click)="openToneDesignerModal()">AI Designer</button>
-              </div>
-            </div>
-
-            <div class="row g-3">
-              <div class="col-12 col-lg-4">
-                <article class="border rounded p-3 bg-body-tertiary h-100">
-                  <p class="small text-uppercase text-secondary mb-1">Active Slot</p>
-                  <p class="mb-1"><strong>{{ selectedAmpSlotLabel() }}</strong></p>
-                  <p class="small text-secondary mb-0">Useful context only. The live sound can differ from everything stored in the amp and in the database.</p>
-                </article>
-              </div>
-              <div class="col-12 col-lg-4">
-                <article class="border rounded p-3 bg-body-tertiary h-100">
-                  <p class="small text-uppercase text-secondary mb-1">Base Patch</p>
-                  <p class="mb-1"><strong>{{ livePatchBaseName() }}</strong></p>
-                  <p class="small text-secondary mb-0">Edits are compared against this full patch. Changed blocks are auto-selected for sparse save scope.</p>
-                  <div class="d-flex gap-2 flex-wrap mt-2">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openToneBaseModal()">Change Base</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="clearToneBasePatch()" [disabled]="livePatchBaseName() === 'None'">Clear Base</button>
-                  </div>
-                </article>
-              </div>
-              <div class="col-12 col-lg-4">
-                <article class="border rounded p-3 bg-body-tertiary h-100">
-                  <p class="small text-uppercase text-secondary mb-1">Save Scope</p>
-                  <p class="small mb-2">{{ livePatchSelectedBlocksSummary() }}</p>
-                  <label class="form-check small mb-2">
-                    <input class="form-check-input" type="checkbox" [checked]="liveEditorShowAllBlocks()" (change)="setLiveEditorShowAllBlocks($any($event.target).checked)" />
-                    <span class="form-check-label">All</span>
-                  </label>
-                  <div class="tone-block-grid">
-                    @for (block of toneBlockOptions(); track block) {
-                      <label class="form-check small mb-0">
-                        <input class="form-check-input" type="checkbox" [checked]="isToneBlockSelected(block)" (change)="setToneBlockSelected(block, $any($event.target).checked)" />
-                        <span class="form-check-label">{{ block }}</span>
-                      </label>
-                    }
-                  </div>
-                </article>
-              </div>
-            </div>
-
+      <section class="mb-4 d-grid gap-3">
             @if (editorModalOpen()) {
               @if (editorPatchDraft(); as draft) {
                 <div class="d-grid gap-3">
@@ -600,8 +593,6 @@
                 <button type="button" class="btn btn-sm btn-outline-primary" (click)="openLiveEditor()">Load Live Patch</button>
               </article>
             }
-          </div>
-        </article>
       </section>
 
       <section class="row g-3 mb-4">
