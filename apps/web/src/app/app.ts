@@ -2734,6 +2734,30 @@ export class App implements OnInit, OnDestroy {
     return draftFingerprint !== originalFingerprint;
   }
 
+  editorLivePatchStatusLabel(): string {
+    if (this.editorLiveApplyError()) {
+      return 'Live patch update failed';
+    }
+    if (this.editorLiveApplyPending()) {
+      return 'Updating live patch on amp...';
+    }
+    if (this.editorLiveApplyAvailable()) {
+      return 'Editing live patch on amp';
+    }
+    return 'Live patch not connected';
+  }
+
+  editorSavedPatchStatusLabel(): string {
+    const selectedName = this.toneLoadedPatchName().trim();
+    if (!selectedName) {
+      return 'Not linked to a saved patch';
+    }
+    if (this.editorIsModified()) {
+      return `Changed from ${selectedName}`;
+    }
+    return `Matches ${selectedName}`;
+  }
+
   editorHashLabel(): string {
     const draftHash = this.readString(this.editorPatchDraft(), 'config_hash_sha256') ?? '';
     const originalHash = this.editorOriginalConfigHash();

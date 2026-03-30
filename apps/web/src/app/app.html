@@ -122,14 +122,14 @@
                 }
               </div>
               <div class="d-flex gap-2 flex-wrap align-items-center">
-                <span class="text-secondary">DB Matches:</span>
+                <span class="text-secondary">Saved Patches:</span>
                 @if (livePatchExactDbMatch(); as exactDb) {
-                  <button type="button" class="btn btn-sm btn-outline-success" (click)="focusTonePatchObject(exactDb)">Exact: {{ exactDb.name }}</button>
+                  <button type="button" class="btn btn-sm btn-outline-success" (click)="focusTonePatchObject(exactDb)">Same: {{ exactDb.name }}</button>
                 } @else {
                   <span class="text-secondary">No exact saved patch match.</span>
                 }
                 @for (match of livePatchPartialDbMatches().slice(0, 6); track match.id) {
-                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="focusTonePatchObject(match)">Also: {{ match.name }}</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="focusTonePatchObject(match)">Possible: {{ match.name }}</button>
                 }
               </div>
             </div>
@@ -138,27 +138,16 @@
                 <div class="d-grid gap-3">
                   <article class="border rounded p-2">
                     <p class="small mb-1 text-secondary">
-                      Live Edit State:
-                      @if (editorLiveApplyPending()) {
-                        <code class="text-warning">applying...</code>
-                      } @else if (editorLiveApplyError()) {
-                        <code class="text-danger">error</code>
-                      } @else if (editorLiveApplyHasApplied()) {
-                        <code class="text-info">applied</code>
-                      } @else if (editorLiveApplyAvailable()) {
-                        <code class="text-success">ready</code>
-                      } @else {
-                        <code>local only</code>
-                      }
+                      Live Patch:
+                      <code [class.text-warning]="editorLiveApplyPending()" [class.text-danger]="editorLiveApplyError()" [class.text-success]="!editorLiveApplyPending() && !editorLiveApplyError()">
+                        {{ editorLivePatchStatusLabel() }}
+                      </code>
                     </p>
                     <p class="small mb-0 text-secondary">
-                      Modified:
-                      @if (editorIsModified()) {
-                        <code class="text-warning">yes</code>
-                      } @else {
-                        <code class="text-success">no</code>
-                      }
-                      · Hash: <code>{{ editorHashLabel() }}</code>
+                      Saved Patch:
+                      <code [class.text-warning]="editorIsModified()" [class.text-success]="!editorIsModified() && livePatchLoadedPatchName() !== 'None'">
+                        {{ editorSavedPatchStatusLabel() }}
+                      </code>
                     </p>
                     @if (editorLiveApplyError()) {
                       <p class="small mb-0 text-danger mt-1">{{ editorLiveApplyError() }}</p>
