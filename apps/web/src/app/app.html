@@ -563,7 +563,6 @@
               <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
                 <div>
                   <h2 class="h6 mb-1">Patch Library</h2>
-                  <p class="small text-secondary mb-0">Sparse ideas and full-scope keepers are all patches here.</p>
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
                   <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openToneGroupModal()">New Group</button>
@@ -938,7 +937,7 @@
           <button type="button" class="btn btn-sm btn-light" (click)="closeToneSaveModal()">Close</button>
         </header>
         <div class="p-3 d-grid gap-3">
-          <p class="small text-secondary mb-0">Present blocks are owned. Absent blocks are wildcards. Auto-selection is based on the current patch, but you can override it here.</p>
+          <p class="small text-secondary mb-0">Tick the blocks this patch should include. You can change the selection here.</p>
           <div>
             <label class="form-label small mb-1" for="toneSaveName">Name</label>
             <input id="toneSaveName" type="text" class="form-control" [value]="toneSaveName()" (input)="setToneSaveName($any($event.target).value)" />
@@ -1140,7 +1139,7 @@
           <button type="button" class="btn btn-sm btn-light" (click)="closeToneLoadPatchModal()">Close</button>
         </header>
         <div class="p-3 d-grid gap-3">
-          <p class="small text-secondary mb-0">Choose a saved full patch. It will be applied to Live Patch and used to compare changes when selecting which blocks to save.</p>
+          <p class="small text-secondary mb-0">Choose a saved patch to apply to Live Patch.</p>
           <div>
             <label class="form-label small mb-1" for="toneLoadedPatchObjectId">Saved Patch</label>
             <select id="toneLoadedPatchObjectId" class="form-select" [value]="toneLoadedPatchObjectId()" (change)="setToneLoadedPatchObjectId($any($event.target).value)">
