@@ -120,17 +120,6 @@
                   </label>
                 }
               </div>
-              <div class="d-flex gap-2 flex-wrap align-items-center">
-                <span class="text-secondary">Saved Patches:</span>
-                @if (livePatchExactDbMatch(); as exactDb) {
-                  <button type="button" class="btn btn-sm btn-outline-success" (click)="focusTonePatchObject(exactDb)">Same: {{ exactDb.name }}</button>
-                } @else {
-                  <span class="text-secondary">No exact saved patch match.</span>
-                }
-                @for (match of livePatchPartialDbMatches().slice(0, 6); track match.id) {
-                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="focusTonePatchObject(match)">Possible: {{ match.name }}</button>
-                }
-              </div>
             </div>
             @if (editorModalOpen()) {
               @if (editorPatchDraft(); as draft) {
