@@ -319,7 +319,6 @@ interface SlotCard {
 }
 
 type StageName = 'booster' | 'mod' | 'fx' | 'delay' | 'reverb';
-type ColorStageName = 'booster' | 'mod' | 'fx' | 'delay' | 'reverb';
 type EqStageName = 'eq1' | 'eq2';
 
 interface RawValueField {
@@ -755,7 +754,7 @@ export class App implements OnInit, OnDestroy {
     this.editorLiveApplyReadbackAt.set('');
     this.editorModalOpen.set(true);
     if (replaceLoadedPatch && this.toneLoadedPatchSnapshot() === null) {
-      this.useCurrentPatchForSelection();
+      this.setToneBlocksFromPatch(draft, true);
     }
   }
 
@@ -983,17 +982,6 @@ export class App implements OnInit, OnDestroy {
     } catch {
       // Informational panel only.
     }
-  }
-
-  useCurrentEditorPatch(): void {
-    const current = this.editorPatchDraft() ?? this.livePatchSnapshot();
-    if (!current) {
-      this.status.set('Sync or load the Live Patch before choosing a patch here.');
-      return;
-    }
-    this.useCurrentPatchForSelection();
-    this.toneLoadPatchModalOpen.set(false);
-    this.status.set('Current patch selected.');
   }
 
   clearLoadedPatch(): void {
@@ -1519,7 +1507,7 @@ export class App implements OnInit, OnDestroy {
       this.status.set('Select at least one block before AI refinement.');
       return;
     }
-    const currentName = this.editorPatchName().trim() || this.livePatchExactDbName().trim() || 'Live Patch';
+    const currentName = this.livePatchExactDbName().trim() || this.toneLoadedPatchName().trim() || 'Live Patch';
     this.setActionBusy('tone-ai-refine', true);
     this.status.set(`Refining ${currentName} with AI...`);
     this.responseJson.set('');
@@ -2721,10 +2709,6 @@ export class App implements OnInit, OnDestroy {
     return this.editorTargetIsActive();
   }
 
-  editorPatchName(): string {
-    return this.readString(this.editorPatchDraft(), 'patch_name') ?? '';
-  }
-
   editorIsModified(): boolean {
     const draftFingerprint = this.editorDraftFingerprint();
     const originalFingerprint = this.editorOriginalFingerprint();
@@ -2750,6 +2734,10 @@ export class App implements OnInit, OnDestroy {
   editorSavedPatchStatusLabel(): string {
     const selectedName = this.toneLoadedPatchName().trim();
     if (!selectedName) {
+      const exactMatchName = this.livePatchExactDbName().trim();
+      if (exactMatchName && !this.editorIsModified()) {
+        return `Matches ${exactMatchName}`;
+      }
       return 'Not linked to a saved patch';
     }
     if (this.editorIsModified()) {
@@ -2790,12 +2778,6 @@ export class App implements OnInit, OnDestroy {
       return 'DB ✗';
     }
     return draftHash === slot.saved_hash_sha256 ? 'DB ✓' : 'DB ✗';
-  }
-
-  setEditorPatchName(value: string): void {
-    this.updateEditorPatch((draft) => {
-      draft['patch_name'] = value;
-    });
   }
 
   editorAmpNumber(field: string): number | null {
@@ -2854,31 +2836,6 @@ export class App implements OnInit, OnDestroy {
       const routing = this.ensureObject(draft, 'routing');
       routing[field] = parsed;
     });
-  }
-
-  editorColorIndex(stageName: ColorStageName): number {
-    const colors = this.readObject(this.editorPatchDraft(), 'colors');
-    const stage = this.readObject(colors, stageName);
-    const index = this.readNumber(stage, 'index');
-    return index ?? 0;
-  }
-
-  setEditorColorIndex(stageName: ColorStageName, value: string): void {
-    const parsed = this.clampInteger(this.parseInteger(value), 0, 2);
-    this.updateEditorPatch((draft) => {
-      const colors = this.ensureObject(draft, 'colors');
-      const stage = this.ensureObject(colors, stageName);
-      stage['index'] = parsed;
-      stage['name'] = this.colorName(parsed);
-    });
-  }
-
-  editorColorOptions(): TypeOption[] {
-    return [
-      { value: 0, label: 'Green' },
-      { value: 1, label: 'Red' },
-      { value: 2, label: 'Yellow' },
-    ];
   }
 
   editorDelay2On(): boolean {
@@ -4918,8 +4875,12 @@ export class App implements OnInit, OnDestroy {
     return JSON.stringify(value);
   }
 
+  hasLoadedSavedPatch(): boolean {
+    return this.toneLoadedPatchObjectId().trim().length > 0;
+  }
+
   livePatchLoadedPatchName(): string {
-    return this.toneLoadedPatchName().trim() || 'None';
+    return this.toneLoadedPatchName().trim() || 'None selected';
   }
 
   livePatchSelectedBlocksSummary(): string {
@@ -4976,17 +4937,6 @@ export class App implements OnInit, OnDestroy {
       }
       return merged;
     });
-  }
-
-  private useCurrentPatchForSelection(): void {
-    const current = this.editorPatchDraft() ?? this.livePatchSnapshot();
-    if (!current) {
-      return;
-    }
-    this.toneLoadedPatchSnapshot.set(this.clonePatch(current));
-    this.toneLoadedPatchObjectId.set('');
-    this.toneLoadedPatchName.set(this.editorPatchName().trim() || 'Current Patch');
-    this.setToneBlocksFromPatch(current, true);
   }
 
   private selectSavedPatch(patchObject: TonePatchObjectResponse): void {

@@ -93,20 +93,19 @@
               <div class="d-flex gap-2 flex-wrap">
                 <button type="button" class="btn btn-sm btn-outline-primary" (click)="openLiveEditor()">Reset From Live</button>
                 <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openToneLoadPatchModal()">Load Patch</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="useCurrentEditorPatch()">Use Current Patch</button>
                 <button type="button" class="btn btn-sm btn-outline-success" (click)="openToneSaveModal()">Save Patch</button>
                 <button type="button" class="btn btn-sm btn-outline-primary" (click)="openToneDesignerModal()">AI Designer</button>
               </div>
               <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
                 <div class="d-flex flex-wrap gap-3 align-items-center">
-                  <span class="text-secondary">Patch:</span>
+                  <span class="text-secondary">Selected Saved Patch:</span>
                   <strong>{{ livePatchLoadedPatchName() }}</strong>
                   <span class="text-secondary">Save Scope:</span>
                   <span>{{ livePatchSelectedBlocksSummary() }}</span>
                 </div>
                 <div class="d-flex gap-2 flex-wrap align-items-center">
                   <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openToneLoadPatchModal()">Change Patch</button>
-                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="clearLoadedPatch()" [disabled]="livePatchLoadedPatchName() === 'None'">Clear Patch</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="clearLoadedPatch()" [disabled]="!hasLoadedSavedPatch()">Clear Patch</button>
                 </div>
               </div>
               <div class="tone-block-grid">
@@ -145,24 +144,13 @@
                     </p>
                     <p class="small mb-0 text-secondary">
                       Saved Patch:
-                      <code [class.text-warning]="editorIsModified()" [class.text-success]="!editorIsModified() && livePatchLoadedPatchName() !== 'None'">
+                      <code [class.text-warning]="editorIsModified()" [class.text-success]="!editorIsModified() && hasLoadedSavedPatch()">
                         {{ editorSavedPatchStatusLabel() }}
                       </code>
                     </p>
                     @if (editorLiveApplyError()) {
                       <p class="small mb-0 text-danger mt-1">{{ editorLiveApplyError() }}</p>
                     }
-                  </article>
-
-                  <article class="border rounded p-2">
-                    <h4 class="h6 mb-2">Patch</h4>
-                    <label class="form-label small mb-1">Name</label>
-                    <input
-                      type="text"
-                      class="form-control form-control-sm"
-                      [value]="editorPatchName()"
-                      (input)="setEditorPatchName($any($event.target).value)"
-                    />
                   </article>
 
                   @if (liveEditorShowsBlock('routing')) {
@@ -193,29 +181,6 @@
                           <input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorRoutingNumber('master_key') ?? 0" (input)="setEditorRoutingNumber('master_key', $any($event.target).value)" />
                         </div>
                       </div>
-                    </div>
-                  </article>
-                  }
-
-                  @if (liveEditorShowsAnyBlocks(['booster', 'mod', 'fx', 'delay', 'reverb'])) {
-                  <article class="border rounded p-2">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                      <h4 class="h6 mb-0">Colors</h4>
-                      <span class="small text-secondary">Reset with each stage</span>
-                    </div>
-                    <div class="row g-2">
-                      @for (stageName of ['booster', 'mod', 'fx', 'delay', 'reverb']; track stageName) {
-                        @if (liveEditorShowsBlock($any(stageName))) {
-                        <div class="col-6 col-md-4">
-                          <label class="form-label small mb-1 text-capitalize">{{ stageName }}</label>
-                          <select class="form-select form-select-sm" (change)="setEditorColorIndex($any(stageName), $any($event.target).value)">
-                            @for (opt of editorColorOptions(); track opt.value) {
-                              <option [value]="opt.value" [selected]="editorColorIndex($any(stageName)) === opt.value">{{ opt.label }}</option>
-                            }
-                          </select>
-                        </div>
-                        }
-                      }
                     </div>
                   </article>
                   }
@@ -1139,7 +1104,6 @@
             </select>
           </div>
           <div class="d-flex justify-content-end gap-2 flex-wrap">
-            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="useCurrentEditorPatch()">Use Current Patch</button>
             <button type="button" class="btn btn-sm btn-primary" (click)="applyLoadedPatchObject()" [disabled]="isActionBusy('tone-apply-patch:' + toneLoadedPatchObjectId())">
               {{ isActionBusy('tone-apply-patch:' + toneLoadedPatchObjectId()) ? 'Applying...' : 'Apply Patch' }}
             </button>
