@@ -50,11 +50,6 @@
           <div class="d-flex flex-wrap gap-2 mb-2">
             <button type="button" class="btn btn-primary btn-sm" (click)="testAmpConnection()" [disabled]="isActionBusy('test-amp-connection')">{{ headerActionLabel('test-amp-connection', 'Test Amp Connection', 'Testing...') }}</button>
             <button type="button" class="btn btn-outline-primary btn-sm" (click)="syncLivePatch()" [disabled]="isActionBusy('sync-live-patch')">{{ headerActionLabel('sync-live-patch', 'Sync Live Patch', 'Syncing...') }}</button>
-            <button type="button" class="btn btn-outline-primary btn-sm" (click)="openLiveEditor()">Reset From Live</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="openToneBaseModal()">Load Base Patch</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="setCurrentEditorPatchAsBase()">Set Current Editor As Base</button>
-            <button type="button" class="btn btn-outline-success btn-sm" (click)="openToneSaveModal()">Save Patch</button>
-            <button type="button" class="btn btn-outline-primary btn-sm" (click)="openToneDesignerModal()">AI Designer</button>
             <button type="button" class="btn btn-outline-success btn-sm" (click)="captureAudioLevelMarker()" [disabled]="isActionBusy('capture-level-marker')">{{ headerActionLabel('capture-level-marker', 'Set Level Marker', 'Capturing...') }}</button>
             <button
               type="button"
@@ -69,11 +64,6 @@
           <div class="d-flex flex-wrap gap-3 small text-secondary">
             <span>AMP State Hash: <code>{{ shortHash(ampStateHash()) }}</code></span>
             <span>Live Confirmed: <code>{{ livePatchConfirmedAt() || 'n/a' }}</code></span>
-            <span>Live Source: <code>{{ livePatchSourceType() || 'n/a' }}</code></span>
-            <span>Live Exact DB: <code>{{ livePatchExactDbName() || 'none' }}</code></span>
-            <span>Live Exact Slot: <code>{{ livePatchExactSlotText() || 'none' }}</code></span>
-            <span>Live Partial DB: <code>{{ livePatchPartialDbCount() }}</code></span>
-            <span>Live Partial Slots: <code>{{ livePatchPartialSlotCount() }}</code></span>
             <span>Last Sync: <code>{{ lastSyncedAt() || 'n/a' }}</code></span>
             <span>Total Sync Time: <code>{{ formatMs(totalSyncMs()) }}</code></span>
             <span>
@@ -86,30 +76,6 @@
             <span>Marker At: <code>{{ levelMarkerCapturedAt() || 'n/a' }}</code></span>
             <span>Live RMS/Peak: <code>{{ formatDb(liveRmsDbfs()) }} / {{ formatDb(livePeakDbfs()) }}</code></span>
             <span>Live At: <code>{{ liveMeterAt() || 'n/a' }}</code></span>
-          </div>
-          <div class="mt-2 d-grid gap-2 small">
-            <div class="d-flex gap-2 flex-wrap align-items-center">
-              <span class="text-secondary">DB Matches:</span>
-              @if (livePatchExactDbMatch(); as exactDb) {
-                <button type="button" class="btn btn-sm btn-outline-success" (click)="focusTonePatchObject(exactDb)">Exact: {{ exactDb.name }}</button>
-              } @else {
-                <span class="text-secondary">No exact saved patch match.</span>
-              }
-              @for (match of livePatchPartialDbMatches().slice(0, 6); track match.id) {
-                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="focusTonePatchObject(match)">Partial: {{ match.name }}</button>
-              }
-            </div>
-            <div class="d-flex gap-2 flex-wrap align-items-center">
-              <span class="text-secondary">Amp Slot Matches:</span>
-              @if (livePatchExactSlotMatch(); as exactSlot) {
-                <button type="button" class="btn btn-sm btn-outline-success" (click)="activateMatchedSlot(exactSlot.slot)">Exact: {{ setLabelForSlot(exactSlot.slot) }} · {{ exactSlot.patch_name || 'Unnamed' }}</button>
-              } @else {
-                <span class="text-secondary">No exact amp-slot match.</span>
-              }
-              @for (slotMatch of livePatchPartialSlotMatches().slice(0, 6); track slotMatch.slot) {
-                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="activateMatchedSlot(slotMatch.slot)">Partial: {{ setLabelForSlot(slotMatch.slot) }} · {{ slotMatch.patch_name || 'Unnamed' }}</button>
-              }
-            </div>
           </div>
           <div class="mt-2 d-flex align-items-center gap-2">
             <span class="small text-secondary">Live RMS Graph:</span>
@@ -131,6 +97,13 @@
 
       <section class="mb-4 d-grid gap-3">
             <div class="border rounded p-2 bg-body-tertiary small d-grid gap-2">
+              <div class="d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-sm btn-outline-primary" (click)="openLiveEditor()">Reset From Live</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openToneBaseModal()">Load Base Patch</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="setCurrentEditorPatchAsBase()">Set Current Editor As Base</button>
+                <button type="button" class="btn btn-sm btn-outline-success" (click)="openToneSaveModal()">Save Patch</button>
+                <button type="button" class="btn btn-sm btn-outline-primary" (click)="openToneDesignerModal()">AI Designer</button>
+              </div>
               <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
                 <div class="d-flex flex-wrap gap-3 align-items-center">
                   <span class="text-secondary">Base Patch:</span>
@@ -153,6 +126,17 @@
                     <input class="form-check-input" type="checkbox" [checked]="isToneBlockSelected(block)" (change)="setToneBlockSelected(block, $any($event.target).checked)" />
                     <span class="form-check-label">{{ block }}</span>
                   </label>
+                }
+              </div>
+              <div class="d-flex gap-2 flex-wrap align-items-center">
+                <span class="text-secondary">DB Matches:</span>
+                @if (livePatchExactDbMatch(); as exactDb) {
+                  <button type="button" class="btn btn-sm btn-outline-success" (click)="focusTonePatchObject(exactDb)">Exact: {{ exactDb.name }}</button>
+                } @else {
+                  <span class="text-secondary">No exact saved patch match.</span>
+                }
+                @for (match of livePatchPartialDbMatches().slice(0, 6); track match.id) {
+                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="focusTonePatchObject(match)">Partial: {{ match.name }}</button>
                 }
               </div>
             </div>
