@@ -587,6 +587,7 @@ export class App implements OnInit, OnDestroy {
   toneAiCount = signal('8');
   toneAiNamePrefix = signal('');
   toneSelectedBlocks = signal<Record<string, boolean>>({ amp: true, booster: true, eq1: true });
+  liveEditorShowAllBlocks = signal(false);
   toneBasePatchObjectId = signal('');
   toneBasePatchObjectName = signal('');
   toneBasePatchSnapshot = signal<Record<string, unknown> | null>(null);
@@ -875,8 +876,20 @@ export class App implements OnInit, OnDestroy {
     this.toneSelectedBlocks.update((current) => ({ ...current, [block]: checked }));
   }
 
+  setLiveEditorShowAllBlocks(checked: boolean): void {
+    this.liveEditorShowAllBlocks.set(checked);
+  }
+
   selectedToneBlocks(): string[] {
     return this.toneBlockOptions().filter((block) => this.isToneBlockSelected(block));
+  }
+
+  liveEditorShowsBlock(block: string): boolean {
+    return this.liveEditorShowAllBlocks() || this.isToneBlockSelected(block);
+  }
+
+  liveEditorShowsAnyBlocks(blocks: readonly string[]): boolean {
+    return this.liveEditorShowAllBlocks() || blocks.some((block) => this.isToneBlockSelected(block));
   }
 
   setToneSaveName(value: string): void {
@@ -5206,6 +5219,9 @@ export class App implements OnInit, OnDestroy {
 
   livePatchSelectedBlocksSummary(): string {
     const blocks = this.selectedToneBlocks();
+    if (this.liveEditorShowAllBlocks()) {
+      return blocks.length > 0 ? `${blocks.join(', ')} · editor showing all blocks` : 'Editor showing all blocks';
+    }
     if (blocks.length === 0) {
       return 'No blocks selected yet';
     }

@@ -176,6 +176,10 @@
                 <article class="border rounded p-3 bg-body-tertiary h-100">
                   <p class="small text-uppercase text-secondary mb-1">Save Scope</p>
                   <p class="small mb-2">{{ livePatchSelectedBlocksSummary() }}</p>
+                  <label class="form-check small mb-2">
+                    <input class="form-check-input" type="checkbox" [checked]="liveEditorShowAllBlocks()" (change)="setLiveEditorShowAllBlocks($any($event.target).checked)" />
+                    <span class="form-check-label">All</span>
+                  </label>
                   <div class="tone-block-grid">
                     @for (block of toneBlockOptions(); track block) {
                       <label class="form-check small mb-0">
@@ -231,6 +235,7 @@
                     />
                   </article>
 
+                  @if (liveEditorShowsBlock('routing')) {
                   <article class="border rounded p-2">
                     <h4 class="h6 mb-2">Routing</h4>
                     <div class="row g-2">
@@ -257,11 +262,14 @@
                       </div>
                     </div>
                   </article>
+                  }
 
+                  @if (liveEditorShowsAnyBlocks(['booster', 'mod', 'fx', 'delay', 'reverb'])) {
                   <article class="border rounded p-2">
                     <h4 class="h6 mb-2">Colors</h4>
                     <div class="row g-2">
                       @for (stageName of ['booster', 'mod', 'fx', 'delay', 'reverb']; track stageName) {
+                        @if (liveEditorShowsBlock($any(stageName))) {
                         <div class="col-6 col-md-4">
                           <label class="form-label small mb-1 text-capitalize">{{ stageName }}</label>
                           <select class="form-select form-select-sm" (change)="setEditorColorIndex($any(stageName), $any($event.target).value)">
@@ -270,10 +278,13 @@
                             }
                           </select>
                         </div>
+                        }
                       }
                     </div>
                   </article>
+                  }
 
+                  @if (liveEditorShowsBlock('amp')) {
                   <article class="border rounded p-2">
                     <h4 class="h6 mb-2">Amp</h4>
                     <div class="row g-2">
@@ -302,7 +313,9 @@
                       <div class="col-12 col-md-6"><label class="form-label small mb-1">Presence</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorAmpNumber('presence') ?? 0" (input)="setEditorAmpNumber('presence', $any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorAmpNumber('presence') ?? 0" (input)="setEditorAmpNumber('presence', $any($event.target).value)" /></div></div>
                     </div>
                   </article>
+                  }
 
+                  @if (liveEditorShowsBlock('delay')) {
                   <article class="border rounded p-2">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <h4 class="h6 mb-0">Delay Extras</h4>
@@ -312,8 +325,10 @@
                       </label>
                     </div>
                   </article>
+                  }
 
                   @for (stageName of ['booster', 'mod', 'fx', 'delay', 'reverb']; track stageName) {
+                    @if (liveEditorShowsBlock($any(stageName))) {
                     <article class="border rounded p-2">
                       <div class="d-flex justify-content-between align-items-center mb-2">
                         <h4 class="h6 mb-0 text-capitalize" [class.text-success]="editorStageOn($any(stageName))" [class.text-danger]="!editorStageOn($any(stageName))">{{ stageName }}</h4>
@@ -374,9 +389,11 @@
                         }
                       </div>
                     </article>
+                    }
                   }
 
                   @for (eqName of ['eq1', 'eq2']; track eqName) {
+                    @if (liveEditorShowsBlock($any(eqName))) {
                     <article class="border rounded p-2">
                       <div class="d-flex justify-content-between align-items-center mb-2">
                         <h4 class="h6 mb-0 text-uppercase" [class.text-success]="editorEqOn($any(eqName))" [class.text-danger]="!editorEqOn($any(eqName))">{{ eqName }}</h4>
@@ -494,8 +511,10 @@
                         </div>
                       }
                     </article>
+                    }
                   }
 
+                  @if (liveEditorShowsBlock('ns')) {
                   <article class="border rounded p-2">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <h4 class="h6 mb-0">NS</h4>
@@ -509,7 +528,9 @@
                       <div class="col-12 col-md-6"><label class="form-label small mb-1">Release</label><div class="editor-range-field"><input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorNsNumber('release') ?? 0" (input)="setEditorNsNumber('release', $any($event.target).value)" /><input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorNsNumber('release') ?? 0" (input)="setEditorNsNumber('release', $any($event.target).value)" /></div></div>
                     </div>
                   </article>
+                  }
 
+                  @if (liveEditorShowsBlock('send_return')) {
                   <article class="border rounded p-2">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <h4 class="h6 mb-0">Send / Return</h4>
@@ -525,7 +546,9 @@
                       <div class="col-12 col-md-6"><label class="form-label small mb-1">Return Level</label><div class="editor-range-field"><input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorSendReturnNumber('return_level') ?? 0" (input)="setEditorSendReturnNumber('return_level', $any($event.target).value)" /><input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorSendReturnNumber('return_level') ?? 0" (input)="setEditorSendReturnNumber('return_level', $any($event.target).value)" /></div></div>
                     </div>
                   </article>
+                  }
 
+                  @if (liveEditorShowsBlock('solo')) {
                   <article class="border rounded p-2">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <h4 class="h6 mb-0">Solo</h4>
@@ -538,7 +561,9 @@
                       <div class="col-12 col-md-6"><label class="form-label small mb-1">Level</label><div class="editor-range-field"><input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorSoloLevel() ?? 0" (input)="setEditorSoloLevel($any($event.target).value)" /><input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorSoloLevel() ?? 0" (input)="setEditorSoloLevel($any($event.target).value)" /></div></div>
                     </div>
                   </article>
+                  }
 
+                  @if (liveEditorShowsBlock('pedalfx')) {
                   <article class="border rounded p-2">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <h4 class="h6 mb-0">Pedal FX</h4>
@@ -552,6 +577,7 @@
                       <div class="col-6 col-md-4"><label class="form-label small mb-1">Type</label><input type="number" min="0" max="127" class="form-control form-control-sm" [value]="editorPedalFxNumber('type') ?? 0" (input)="setEditorPedalFxNumber('type', $any($event.target).value)" /></div>
                     </div>
                   </article>
+                  }
                 </div>
               }
             } @else {
