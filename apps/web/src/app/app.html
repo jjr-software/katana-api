@@ -53,13 +53,7 @@
           <div class="d-flex flex-wrap gap-2 mb-2">
             <button type="button" class="btn btn-primary btn-sm" (click)="testAmpConnection()" [disabled]="isActionBusy('test-amp-connection')">{{ headerActionLabel('test-amp-connection', 'Test Amp Connection', 'Testing...') }}</button>
             <button type="button" class="btn btn-outline-primary btn-sm" (click)="syncLivePatch()" [disabled]="isActionBusy('sync-live-patch')">{{ headerActionLabel('sync-live-patch', 'Sync Live Patch', 'Syncing...') }}</button>
-            <button type="button" class="btn btn-outline-primary btn-sm" (click)="openLiveEditor()">Open Live Editor</button>
-            <button type="button" class="btn btn-outline-primary btn-sm" (click)="quickSyncAmpSlots()" [disabled]="isActionBusy('quick-sync')">{{ headerActionLabel('quick-sync', 'Quick Sync Names', 'Syncing...') }}</button>
-            <button type="button" class="btn btn-success btn-sm" (click)="loadAmpState()" [disabled]="isActionBusy('load-amp-state')">{{ headerActionLabel('load-amp-state', 'Load Amp State', 'Loading...') }}</button>
             <button type="button" class="btn btn-outline-success btn-sm" (click)="captureAudioLevelMarker()" [disabled]="isActionBusy('capture-level-marker')">{{ headerActionLabel('capture-level-marker', 'Set Level Marker', 'Capturing...') }}</button>
-            <button type="button" class="btn btn-outline-dark btn-sm" (click)="measureAllSlotsRms()" [disabled]="isMeasuringSlotsRms()">
-              Measure 5s RMS (All Slots)
-            </button>
             <button
               type="button"
               class="btn btn-sm"
@@ -80,7 +74,6 @@
             <span>Live Partial Slots: <code>{{ livePatchPartialSlotCount() }}</code></span>
             <span>Last Sync: <code>{{ lastSyncedAt() || 'n/a' }}</code></span>
             <span>Total Sync Time: <code>{{ formatMs(totalSyncMs()) }}</code></span>
-            <span>Selected Slot: <code>{{ selectedAmpSlotLabel() }}</code></span>
             <span>
               Commit State:
               <code [class.text-success]="currentAmpCommitState() === 'committed'" [class.text-danger]="currentAmpCommitState() === 'uncommitted'">
