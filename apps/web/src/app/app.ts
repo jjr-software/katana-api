@@ -2718,32 +2718,19 @@ export class App implements OnInit, OnDestroy {
     return draftFingerprint !== originalFingerprint;
   }
 
-  editorLivePatchStatusLabel(): string {
-    if (this.editorLiveApplyError()) {
-      return 'Live patch update failed';
-    }
-    if (this.editorLiveApplyPending()) {
-      return 'Updating live patch on amp...';
-    }
-    if (this.editorLiveApplyAvailable()) {
-      return 'Editing live patch on amp';
-    }
-    return 'Live patch not connected';
-  }
-
   editorSavedPatchStatusLabel(): string {
     const selectedName = this.toneLoadedPatchName().trim();
     if (!selectedName) {
       const exactMatchName = this.livePatchExactDbName().trim();
       if (exactMatchName && !this.editorIsModified()) {
-        return `Matches ${exactMatchName}`;
+        return `Saved patch: ${exactMatchName}`;
       }
-      return 'Not linked to a saved patch';
+      return '';
     }
     if (this.editorIsModified()) {
-      return `Changed from ${selectedName}`;
+      return `Unsaved changes from ${selectedName}`;
     }
-    return `Matches ${selectedName}`;
+    return `Saved patch: ${selectedName}`;
   }
 
   editorHashLabel(): string {
