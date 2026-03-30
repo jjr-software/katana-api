@@ -58,6 +58,10 @@ Rules:
 - Do not invent unsupported blocks, controls, or arbitrary metadata fields inside the patch objects.
 """
 
+JSON_INTEGER_SCHEMA = {"type": "integer"}
+JSON_BOOLEAN_SCHEMA = {"type": "boolean"}
+JSON_INT_ARRAY_SCHEMA = {"type": "array", "items": JSON_INTEGER_SCHEMA}
+
 
 class PatchObjectCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=255)
@@ -885,24 +889,7 @@ def _validated_ai_candidate_patch_json(patch_json: dict[str, Any], selected_bloc
     return normalized
 
 
-def _build_ai_patch_set_schema(count: int) -> dict[str, Any]:
-    candidate_schema = {
-        "type": "object",
-        "additionalProperties": False,
-        "required": ["name", "description", "patch_json"],
-        "properties": {
-            "name": {"type": "string"},
-            "description": {"type": "string"},
-            "patch_json": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {block: {"type": "object"} for block in ALLOWED_BLOCKS},
-            },
-        },
-    }
-
-
-def _build_ai_patch_object_list_schema(count: int) -> dict[str, Any]:
+def _build_ai_patch_object_list_schema(count: int, blocks: list[str]) -> dict[str, Any]:
     return {
         "type": "object",
         "additionalProperties": False,
@@ -920,15 +907,125 @@ def _build_ai_patch_object_list_schema(count: int) -> dict[str, Any]:
                     "properties": {
                         "name": {"type": "string"},
                         "description": {"type": "string"},
-                        "patch_json": {
-                            "type": "object",
-                            "additionalProperties": False,
-                            "properties": {block: {"type": "object"} for block in ALLOWED_BLOCKS},
-                        },
+                        "patch_json": _build_ai_patch_json_schema(blocks),
                     },
                 },
             },
         },
+    }
+
+
+def _build_ai_patch_json_schema(blocks: list[str]) -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {block: _build_ai_block_schema(block) for block in blocks},
+    }
+
+
+def _build_ai_block_schema(block_name: str) -> dict[str, Any]:
+    if block_name not in ALLOWED_BLOCKS:
+        raise ValueError(f"Unsupported AI schema block: {block_name}")
+
+    if block_name == "routing":
+        return _object_schema(
+            chain_pattern=JSON_INTEGER_SCHEMA,
+            cabinet_resonance=JSON_INTEGER_SCHEMA,
+            master_key=JSON_INTEGER_SCHEMA,
+        )
+
+    if block_name == "amp":
+        return _object_schema(
+            raw=JSON_INT_ARRAY_SCHEMA,
+            gain=JSON_INTEGER_SCHEMA,
+            volume=JSON_INTEGER_SCHEMA,
+            bass=JSON_INTEGER_SCHEMA,
+            middle=JSON_INTEGER_SCHEMA,
+            treble=JSON_INTEGER_SCHEMA,
+            presence=JSON_INTEGER_SCHEMA,
+            poweramp_variation=JSON_INTEGER_SCHEMA,
+            amp_type=JSON_INTEGER_SCHEMA,
+            resonance=JSON_INTEGER_SCHEMA,
+            preamp_variation=JSON_INTEGER_SCHEMA,
+        )
+
+    if block_name in {"booster", "mod", "fx", "delay", "reverb"}:
+        properties: dict[str, Any] = {
+            "color_index": JSON_INTEGER_SCHEMA,
+            "on": JSON_BOOLEAN_SCHEMA,
+            "raw": JSON_INT_ARRAY_SCHEMA,
+            "type": JSON_INTEGER_SCHEMA,
+        }
+        if block_name == "booster":
+            properties.update(
+                drive=JSON_INTEGER_SCHEMA,
+                bottom=JSON_INTEGER_SCHEMA,
+                tone=JSON_INTEGER_SCHEMA,
+                solo_level=JSON_INTEGER_SCHEMA,
+                effect_level=JSON_INTEGER_SCHEMA,
+                direct_mix=JSON_INTEGER_SCHEMA,
+            )
+        elif block_name == "delay":
+            properties.update(
+                delay2_on=JSON_BOOLEAN_SCHEMA,
+                delay2_raw=JSON_INT_ARRAY_SCHEMA,
+                time_raw=JSON_INT_ARRAY_SCHEMA,
+                feedback=JSON_INTEGER_SCHEMA,
+                high_cut=JSON_INTEGER_SCHEMA,
+                effect_level=JSON_INTEGER_SCHEMA,
+                direct_level=JSON_INTEGER_SCHEMA,
+            )
+        elif block_name == "reverb":
+            properties.update(
+                layer_mode=JSON_INTEGER_SCHEMA,
+                time=JSON_INTEGER_SCHEMA,
+                pre_delay=JSON_INTEGER_SCHEMA,
+                low_cut=JSON_INTEGER_SCHEMA,
+                high_cut=JSON_INTEGER_SCHEMA,
+                effect_level=JSON_INTEGER_SCHEMA,
+                direct_level=JSON_INTEGER_SCHEMA,
+            )
+        return _object_schema(**properties)
+
+    if block_name in {"eq1", "eq2"}:
+        return _object_schema(
+            position=JSON_INTEGER_SCHEMA,
+            on=JSON_BOOLEAN_SCHEMA,
+            type=JSON_INTEGER_SCHEMA,
+            peq_raw=JSON_INT_ARRAY_SCHEMA,
+            ge10_raw=JSON_INT_ARRAY_SCHEMA,
+        )
+
+    if block_name in {"ns", "send_return", "solo"}:
+        return _object_schema(
+            on=JSON_BOOLEAN_SCHEMA,
+            raw=JSON_INT_ARRAY_SCHEMA,
+            threshold=JSON_INTEGER_SCHEMA,
+            release=JSON_INTEGER_SCHEMA,
+            position=JSON_INTEGER_SCHEMA,
+            mode=JSON_INTEGER_SCHEMA,
+            send_level=JSON_INTEGER_SCHEMA,
+            return_level=JSON_INTEGER_SCHEMA,
+            effect_level=JSON_INTEGER_SCHEMA,
+        )
+
+    if block_name == "pedalfx":
+        return _object_schema(
+            raw_com=JSON_INT_ARRAY_SCHEMA,
+            raw=JSON_INT_ARRAY_SCHEMA,
+            position=JSON_INTEGER_SCHEMA,
+            on=JSON_BOOLEAN_SCHEMA,
+            type=JSON_INTEGER_SCHEMA,
+        )
+
+    raise ValueError(f"Unhandled AI schema block: {block_name}")
+
+
+def _object_schema(**properties: Any) -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": properties,
     }
 
 
@@ -963,7 +1060,7 @@ def _call_openai_sparse_patch_candidates(
                 "type": "json_schema",
                 "name": "katana_sparse_patch_candidates",
                 "strict": True,
-                "schema": _build_ai_patch_object_list_schema(count),
+                "schema": _build_ai_patch_object_list_schema(count, blocks),
             },
         },
     }
@@ -1004,20 +1101,6 @@ def _call_openai_sparse_patch_candidates(
     if len(candidates) != count:
         raise HTTPException(status_code=502, detail={"message": "OpenAI returned the wrong candidate count", "expected": count, "actual": len(candidates)})
     return {"summary": str(generated.get("summary", "")).strip(), "candidates": candidates}
-    return {
-        "type": "object",
-        "additionalProperties": False,
-        "required": ["summary", "candidates"],
-        "properties": {
-            "summary": {"type": "string"},
-            "candidates": {
-                "type": "array",
-                "minItems": count,
-                "maxItems": count,
-                "items": candidate_schema,
-            },
-        },
-    }
 
 
 def _call_openai_patch_set_designer(
