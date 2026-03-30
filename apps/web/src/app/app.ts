@@ -995,12 +995,12 @@ export class App implements OnInit, OnDestroy {
   async applyToneBasePatchObject(): Promise<void> {
     const patchObjectId = Number.parseInt(this.toneBasePatchObjectId().trim() || '0', 10);
     if (!Number.isFinite(patchObjectId) || patchObjectId <= 0) {
-      this.status.set('Select a saved patch object to use as the base patch.');
+      this.status.set('Select a saved patch to use as the base patch.');
       return;
     }
     const patchObject = this.tonePatchObjects().find((item) => item.id === patchObjectId) ?? null;
     if (!patchObject) {
-      this.status.set('Selected base patch object is not available in the current list.');
+      this.status.set('Selected base patch is not available in the current list.');
       return;
     }
     const actionKey = `tone-apply-base:${patchObject.id}`;
@@ -1168,7 +1168,7 @@ export class App implements OnInit, OnDestroy {
       .filter((item) => Number.isFinite(item.slot) && item.slot >= 1 && item.slot <= 8 && Number.isFinite(item.patch_object_id) && item.patch_object_id > 0)
       .sort((a, b) => a.slot - b.slot);
     if (slots.length === 0) {
-      this.status.set('Select at least one patch object before creating a set.');
+      this.status.set('Select at least one patch before creating a set.');
       return;
     }
     this.setActionBusy('tone-create-set', true);
@@ -1209,7 +1209,7 @@ export class App implements OnInit, OnDestroy {
   async updateToneSetSlot(toneSet: TonePatchObjectSetResponse, slot: number): Promise<void> {
     const patchObjectId = Number.parseInt(this.toneSetSlotAssignmentValue(toneSet, slot, 0), 10);
     if (!Number.isFinite(patchObjectId) || patchObjectId <= 0) {
-      this.status.set(`Select a patch object before updating ${toneSet.name} slot ${slot}.`);
+      this.status.set(`Select a patch before updating ${toneSet.name} slot ${slot}.`);
       return;
     }
     const actionKey = `tone-update-set-slot:${toneSet.id}:${slot}`;
@@ -1323,7 +1323,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   async duplicateTonePatchObject(patchObject: TonePatchObjectResponse): Promise<void> {
-    const name = window.prompt('Duplicate patch object as:', `${patchObject.name} Copy`);
+    const name = window.prompt('Duplicate patch as:', `${patchObject.name} Copy`);
     if (name === null) {
       return;
     }
@@ -1453,7 +1453,7 @@ export class App implements OnInit, OnDestroy {
     const blocks = this.selectedToneBlocks();
     const count = Number.parseInt(this.toneAiCount().trim() || '0', 10);
     if (!prompt) {
-      this.status.set('AI patch-object generation requires a prompt.');
+      this.status.set('AI patch generation requires a prompt.');
       return;
     }
     if (blocks.length === 0) {
@@ -1465,7 +1465,7 @@ export class App implements OnInit, OnDestroy {
       return;
     }
     this.setActionBusy('tone-ai-generate-objects', true);
-    this.status.set('Generating AI patch objects...');
+    this.status.set('Generating AI patches...');
     this.responseJson.set('');
     try {
       const response = await fetch('/api/v1/ai/generate/patch-objects', {
@@ -1482,16 +1482,16 @@ export class App implements OnInit, OnDestroy {
       });
       const payload = (await response.json()) as TonePatchObjectResponse[] | { detail?: unknown };
       if (!response.ok || !Array.isArray(payload)) {
-        this.status.set('AI patch-object generation failed');
+        this.status.set('AI patch generation failed');
         this.responseJson.set(JSON.stringify(payload, null, 2));
         return;
       }
       await this.loadTonePatchObjects();
       this.toneDesignerModalOpen.set(false);
-      this.status.set(`Generated ${payload.length} AI patch object${payload.length === 1 ? '' : 's'}`);
+      this.status.set(`Generated ${payload.length} AI patch${payload.length === 1 ? '' : 'es'}`);
       this.responseJson.set(JSON.stringify(payload, null, 2));
     } catch (error: unknown) {
-      this.status.set('AI patch-object generation failed');
+      this.status.set('AI patch generation failed');
       this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
     } finally {
       this.setActionBusy('tone-ai-generate-objects', false);

@@ -91,7 +91,7 @@
               @if (livePatchExactDbMatch(); as exactDb) {
                 <button type="button" class="btn btn-sm btn-outline-success" (click)="focusTonePatchObject(exactDb)">Exact: {{ exactDb.name }}</button>
               } @else {
-                <span class="text-secondary">No exact saved-object match.</span>
+                <span class="text-secondary">No exact saved patch match.</span>
               }
               @for (match of livePatchPartialDbMatches().slice(0, 6); track match.id) {
                 <button type="button" class="btn btn-sm btn-outline-secondary" (click)="focusTonePatchObject(match)">Partial: {{ match.name }}</button>
@@ -134,14 +134,14 @@
               <div>
                 <h2 class="h5 mb-1">Live Patch</h2>
                 <p class="small text-secondary mb-0">
-                  This is the main sound-design surface. Local patch objects matter more than what is stored in amp slots; slot state is secondary persistence and auditioning information.
+                  This is the main sound-design surface. Local patches matter more than what is stored in amp slots; slot state is secondary persistence and auditioning information.
                 </p>
               </div>
               <div class="d-flex gap-2 flex-wrap">
                 <button type="button" class="btn btn-sm btn-outline-primary" (click)="openLiveEditor()">Reset From Live</button>
                 <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openToneBaseModal()">Load Base Patch</button>
                 <button type="button" class="btn btn-sm btn-outline-secondary" (click)="setCurrentEditorPatchAsBase()">Set Current Editor As Base</button>
-                <button type="button" class="btn btn-sm btn-outline-success" (click)="openToneSaveModal()">Save Patch Object</button>
+                <button type="button" class="btn btn-sm btn-outline-success" (click)="openToneSaveModal()">Save Patch</button>
                 <button type="button" class="btn btn-sm btn-outline-primary" (click)="openToneDesignerModal()">AI Designer</button>
               </div>
             </div>
@@ -617,7 +617,7 @@
               <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
                 <div>
                   <h2 class="h6 mb-1">Local Patch Library</h2>
-                  <p class="small text-secondary mb-0">Sparse ideas and full-scope keepers are the same object type here.</p>
+                  <p class="small text-secondary mb-0">Sparse ideas and full-scope keepers are all patches here.</p>
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
                   <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openToneGroupModal()">New Group</button>
@@ -697,7 +697,7 @@
                   </article>
                 }
                 @if (tonePatchObjects().length === 0) {
-                  <p class="small text-secondary mb-0">No patch objects saved yet.</p>
+                  <p class="small text-secondary mb-0">No patches saved yet.</p>
                 }
               </div>
             </div>
@@ -996,9 +996,9 @@
 
   @if (toneSaveModalOpen()) {
     <div class="raw-modal-backdrop" (click)="closeToneSaveModal()">
-      <section class="raw-modal" role="dialog" aria-modal="true" aria-label="Save Patch Object" (click)="$event.stopPropagation()">
+      <section class="raw-modal" role="dialog" aria-modal="true" aria-label="Save Patch" (click)="$event.stopPropagation()">
         <header class="raw-modal-head">
-          <h3>Save Patch Object</h3>
+          <h3>Save Patch</h3>
           <button type="button" class="btn btn-sm btn-light" (click)="closeToneSaveModal()">Close</button>
         </header>
         <div class="p-3 d-grid gap-3">
@@ -1034,7 +1034,7 @@
           <div class="d-flex justify-content-end flex-wrap gap-2">
             <button type="button" class="btn btn-sm btn-outline-success" (click)="saveFullLiveAsTonePatchObject()" [disabled]="isActionBusy('tone-save-live')">Save Full Live</button>
             <button type="button" class="btn btn-sm btn-success" (click)="saveLiveAsTonePatchObject()" [disabled]="isActionBusy('tone-save-live')">
-              {{ isActionBusy('tone-save-live') ? 'Saving...' : 'Save Patch Object' }}
+              {{ isActionBusy('tone-save-live') ? 'Saving...' : 'Save Patch' }}
             </button>
           </div>
         </div>
@@ -1204,11 +1204,11 @@
           <button type="button" class="btn btn-sm btn-light" (click)="closeToneBaseModal()">Close</button>
         </header>
         <div class="p-3 d-grid gap-3">
-          <p class="small text-secondary mb-0">Choose a saved full-scope patch object when you want a clean base. It will be applied to Live Patch and become the comparison base for sparse saves.</p>
+          <p class="small text-secondary mb-0">Choose a saved full patch when you want a clean base. It will be applied to Live Patch and become the comparison base for sparse saves.</p>
           <div>
-            <label class="form-label small mb-1" for="toneBasePatchObjectId">Saved Patch Object</label>
+            <label class="form-label small mb-1" for="toneBasePatchObjectId">Saved Patch</label>
             <select id="toneBasePatchObjectId" class="form-select" [value]="toneBasePatchObjectId()" (change)="setToneBasePatchObjectId($any($event.target).value)">
-              <option value="">Select patch object</option>
+              <option value="">Select patch</option>
               @for (patchObject of tonePatchObjects(); track patchObject.id) {
                 <option [value]="patchObject.id">{{ patchObject.name }}</option>
               }
