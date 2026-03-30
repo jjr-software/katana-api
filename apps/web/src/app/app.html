@@ -47,9 +47,6 @@
     <section class="col-12 col-xl-10">
       <div class="card mb-3">
         <div class="card-body py-2">
-          <div class="alert alert-primary py-2 mb-2 small" role="alert">
-            Live Patch is the main editing surface. Amp slots are stored patches for persistence and GA-FC auditioning. Katana limitation: direct read/write still targets the active slot.
-          </div>
           <div class="d-flex flex-wrap gap-2 mb-2">
             <button type="button" class="btn btn-primary btn-sm" (click)="testAmpConnection()" [disabled]="isActionBusy('test-amp-connection')">{{ headerActionLabel('test-amp-connection', 'Test Amp Connection', 'Testing...') }}</button>
             <button type="button" class="btn btn-outline-primary btn-sm" (click)="syncLivePatch()" [disabled]="isActionBusy('sync-live-patch')">{{ headerActionLabel('sync-live-patch', 'Sync Live Patch', 'Syncing...') }}</button>
@@ -133,9 +130,6 @@
             <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
               <div>
                 <h2 class="h5 mb-1">Live Patch</h2>
-                <p class="small text-secondary mb-0">
-                  This is the main sound-design surface. Local patches matter more than what is stored in amp slots; slot state is secondary persistence and auditioning information.
-                </p>
               </div>
               <div class="d-flex gap-2 flex-wrap">
                 <button type="button" class="btn btn-sm btn-outline-primary" (click)="openLiveEditor()">Reset From Live</button>
@@ -625,19 +619,10 @@
                 </div>
               </div>
               <div class="row g-2">
-                <div class="col-12 col-lg-5">
+                <div class="col-12 col-lg-7">
                   <input type="text" class="form-control form-control-sm" placeholder="Search name or description" [value]="tonePatchQuery()" (input)="setTonePatchQuery($any($event.target).value)" />
                 </div>
-                <div class="col-12 col-md-6 col-lg-3">
-                  <select class="form-select form-select-sm" [value]="tonePatchSourceFilter()" (change)="setTonePatchSourceFilter($any($event.target).value)">
-                    <option value="">All sources</option>
-                    <option value="manual">manual</option>
-                    <option value="ai">ai</option>
-                    <option value="captured">captured</option>
-                    <option value="imported">imported</option>
-                  </select>
-                </div>
-                <div class="col-12 col-md-6 col-lg-4">
+                <div class="col-12 col-lg-5">
                   <select class="form-select form-select-sm" [value]="tonePatchGroupFilter()" (change)="setTonePatchGroupFilter($any($event.target).value)">
                     <option value="">All groups</option>
                     @for (group of toneGroups(); track group.id) {
@@ -656,7 +641,7 @@
                     <div class="d-flex justify-content-between gap-2 flex-wrap">
                       <div>
                         <p class="mb-1"><strong>{{ patchObject.name }}</strong></p>
-                        <p class="mb-0 text-secondary">{{ patchObject.source_type }} · {{ patchObject.blocks.join(', ') }}</p>
+                        <p class="mb-0 text-secondary">{{ patchObject.blocks.join(', ') }}</p>
                       </div>
                       <div class="d-flex gap-2 flex-wrap">
                         <button type="button" class="btn btn-sm btn-outline-secondary" (click)="duplicateTonePatchObject(patchObject)" [disabled]="isActionBusy('tone-duplicate:' + patchObject.id)">
@@ -670,7 +655,7 @@
                         </button>
                       </div>
                     </div>
-                    @if (patchObject.description) {
+                    @if (showTonePatchDescription(patchObject)) {
                       <p class="mb-0 text-secondary">{{ patchObject.description }}</p>
                     }
                     @if (patchObject.groups.length > 0) {
@@ -768,7 +753,6 @@
 
       <details class="mb-4">
         <summary class="h6 text-uppercase text-secondary mb-2">Amp Slots / Persistence</summary>
-        <p class="small text-secondary mb-2 mt-2">Stored amp slots are secondary now. Use them when you want persistence on the amp or GA-FC auditioning, not as the main tone-design workspace.</p>
         <section class="mb-4">
         <h2 class="h6 text-uppercase text-secondary mb-2">Channel Bank A</h2>
         <div class="row g-3">

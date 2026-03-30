@@ -511,7 +511,6 @@ export class App implements OnInit, OnDestroy {
   toneBasePatchSnapshot = signal<Record<string, unknown> | null>(null);
   toneAssignGroupByPatchObject = signal<Record<number, string>>({});
   tonePatchQuery = signal('');
-  tonePatchSourceFilter = signal('');
   tonePatchGroupFilter = signal('');
   toneHighlightedPatchObjectId = signal<number | null>(null);
   toneManualSetName = signal('');
@@ -862,17 +861,12 @@ export class App implements OnInit, OnDestroy {
     this.tonePatchQuery.set(value);
   }
 
-  setTonePatchSourceFilter(value: string): void {
-    this.tonePatchSourceFilter.set(value);
-  }
-
   setTonePatchGroupFilter(value: string): void {
     this.tonePatchGroupFilter.set(value);
   }
 
   clearTonePatchFilters(): void {
     this.tonePatchQuery.set('');
-    this.tonePatchSourceFilter.set('');
     this.tonePatchGroupFilter.set('');
     this.toneHighlightedPatchObjectId.set(null);
   }
@@ -921,9 +915,6 @@ export class App implements OnInit, OnDestroy {
       const groupFilter = this.tonePatchGroupFilter().trim();
       if (this.tonePatchQuery().trim()) {
         params.set('q', this.tonePatchQuery().trim());
-      }
-      if (this.tonePatchSourceFilter().trim()) {
-        params.set('source_type', this.tonePatchSourceFilter().trim());
       }
       if (groupFilter) {
         params.set('group_id', groupFilter);
@@ -1306,7 +1297,6 @@ export class App implements OnInit, OnDestroy {
 
   async focusTonePatchObject(match: { id: number; name: string }): Promise<void> {
     this.tonePatchQuery.set(match.name);
-    this.tonePatchSourceFilter.set('');
     this.tonePatchGroupFilter.set('');
     this.toneHighlightedPatchObjectId.set(match.id);
     await this.loadTonePatchObjects();
@@ -5020,5 +5010,13 @@ export class App implements OnInit, OnDestroy {
       return 'Full Sync Slots';
     }
     return value;
+  }
+
+  showTonePatchDescription(patchObject: TonePatchObjectResponse): boolean {
+    const description = patchObject.description.trim();
+    if (!description) {
+      return false;
+    }
+    return !description.startsWith('Migrated from legacy saved patch');
   }
 }

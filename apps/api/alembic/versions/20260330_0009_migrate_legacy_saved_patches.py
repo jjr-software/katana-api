@@ -48,7 +48,7 @@ def upgrade() -> None:
         bind.execute(
             sa.insert(patch_objects).values(
                 name=_unique_name(str(row["name"] or f"Imported Patch {row['id']}"), existing_names),
-                description=_legacy_patch_description(row),
+                description="",
                 patch_json=patch_json,
                 source_type="imported",
                 source_prompt=None,
@@ -77,7 +77,7 @@ def upgrade() -> None:
         bind.execute(
             sa.insert(patch_objects).values(
                 name=_unique_name(_legacy_config_name(snapshot, hash_id), existing_names),
-                description="Migrated from legacy saved patch config",
+                description="",
                 patch_json=patch_json,
                 source_type="imported",
                 source_prompt=None,
@@ -107,21 +107,6 @@ def _unique_name(base: str, existing_names: set[str]) -> str:
 
 def _as_snapshot(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
-
-
-def _legacy_patch_description(row: Any) -> str:
-    parts = ["Migrated from legacy saved patch"]
-    source = row["source"]
-    if isinstance(source, str) and source.strip():
-        parts.append(f"source: {source.strip()}")
-    tags = row["tags"]
-    if isinstance(tags, list):
-        clean_tags = [str(tag).strip() for tag in tags if str(tag).strip()]
-        if clean_tags:
-            parts.append(f"tags: {', '.join(clean_tags)}")
-    return " · ".join(parts)
-
-
 def _legacy_config_name(snapshot: dict[str, Any], hash_id: str) -> str:
     patch_name = snapshot.get("patch_name")
     if isinstance(patch_name, str) and patch_name.strip():
