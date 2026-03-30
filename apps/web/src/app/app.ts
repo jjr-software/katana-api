@@ -2548,7 +2548,6 @@ export class App implements OnInit, OnDestroy {
 
   startLiveMeter(): void {
     this.stopLiveMeter();
-    this.status.set('Starting live audio meter feed...');
     const source = new EventSource('/api/v1/audio/live/sse?window_sec=0.5');
     source.onmessage = (event: MessageEvent<string>) => {
       try {
@@ -2556,7 +2555,6 @@ export class App implements OnInit, OnDestroy {
         const eventType = String(payload['type'] ?? '');
         if (eventType === 'connected') {
           this.liveMeterConnected.set(true);
-          this.status.set('Live audio meter connected');
           return;
         }
         if (eventType !== 'audio_metrics') {
@@ -2596,7 +2594,6 @@ export class App implements OnInit, OnDestroy {
     };
     source.onerror = () => {
       this.liveMeterConnected.set(false);
-      this.status.set('Live audio meter disconnected');
       this.stopLiveMeter();
     };
     this.liveMeterSource = source;
@@ -2605,7 +2602,6 @@ export class App implements OnInit, OnDestroy {
   toggleLiveMeter(): void {
     if (this.liveMeterConnected()) {
       this.stopLiveMeter();
-      this.status.set('Live audio meter stopped');
       return;
     }
     this.startLiveMeter();

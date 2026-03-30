@@ -54,6 +54,12 @@
             <span>Last Sync: <code>{{ lastSyncedAt() || 'n/a' }}</code></span>
             <span>Total Sync Time: <code>{{ formatMs(totalSyncMs()) }}</code></span>
             <span>
+              Live Meter:
+              <code [class.text-success]="liveMeterConnected()" [class.text-secondary]="!liveMeterConnected()">
+                {{ liveMeterConnected() ? 'Connected' : 'Stopped' }}
+              </code>
+            </span>
+            <span>
               Commit State:
               <code [class.text-success]="currentAmpCommitState() === 'committed'" [class.text-danger]="currentAmpCommitState() === 'uncommitted'">
                 {{ currentCommitStateLabel() }}
