@@ -1,4 +1,5 @@
 import { Component, OnDestroy, OnInit, signal } from '@angular/core';
+import { PatchSummaryComponent } from './patch-summary.component';
 import {
   BOOSTER_PARAM_SCHEMA,
   DELAY_PARAM_SCHEMA,
@@ -402,7 +403,7 @@ function defaultSlotCards(): SlotCard[] {
 
 @Component({
   selector: 'app-root',
-  imports: [],
+  imports: [PatchSummaryComponent],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
