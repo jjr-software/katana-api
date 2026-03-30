@@ -92,21 +92,21 @@
             <div class="border rounded p-2 bg-body-tertiary small d-grid gap-2">
               <div class="d-flex gap-2 flex-wrap">
                 <button type="button" class="btn btn-sm btn-outline-primary" (click)="openLiveEditor()">Reset From Live</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openToneBaseModal()">Load Base Patch</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="setCurrentEditorPatchAsBase()">Set Current Editor As Base</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openToneLoadPatchModal()">Load Patch</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="useCurrentEditorPatch()">Use Current Editor Patch</button>
                 <button type="button" class="btn btn-sm btn-outline-success" (click)="openToneSaveModal()">Save Patch</button>
                 <button type="button" class="btn btn-sm btn-outline-primary" (click)="openToneDesignerModal()">AI Designer</button>
               </div>
               <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
                 <div class="d-flex flex-wrap gap-3 align-items-center">
-                  <span class="text-secondary">Base Patch:</span>
-                  <strong>{{ livePatchBaseName() }}</strong>
+                  <span class="text-secondary">Patch:</span>
+                  <strong>{{ livePatchLoadedPatchName() }}</strong>
                   <span class="text-secondary">Save Scope:</span>
                   <span>{{ livePatchSelectedBlocksSummary() }}</span>
                 </div>
                 <div class="d-flex gap-2 flex-wrap align-items-center">
-                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openToneBaseModal()">Change Base</button>
-                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="clearToneBasePatch()" [disabled]="livePatchBaseName() === 'None'">Clear Base</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openToneLoadPatchModal()">Change Patch</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="clearLoadedPatch()" [disabled]="livePatchLoadedPatchName() === 'None'">Clear Patch</button>
                   <label class="form-check small mb-0">
                     <input class="form-check-input" type="checkbox" [checked]="liveEditorShowAllBlocks()" (change)="setLiveEditorShowAllBlocks($any($event.target).checked)" />
                     <span class="form-check-label">All</span>
@@ -180,7 +180,7 @@
                   <article class="border rounded p-2">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <h4 class="h6 mb-0">Routing</h4>
-                      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToBase('routing')" [disabled]="!canResetEditorBlockToBase('routing')">Reset</button>
+                      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch('routing')" [disabled]="!canResetEditorBlockToLoadedPatch('routing')">Reset</button>
                     </div>
                     <div class="row g-2">
                       <div class="col-12 col-md-4">
@@ -235,7 +235,7 @@
                   <article class="border rounded p-2">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <h4 class="h6 mb-0">Amp</h4>
-                      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToBase('amp')" [disabled]="!canResetEditorBlockToBase('amp')">Reset</button>
+                      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch('amp')" [disabled]="!canResetEditorBlockToLoadedPatch('amp')">Reset</button>
                     </div>
                     <div class="row g-2">
                       <div class="col-6 col-md-4">
@@ -283,7 +283,7 @@
                       <div class="d-flex justify-content-between align-items-center mb-2">
                         <h4 class="h6 mb-0 text-capitalize" [class.text-success]="editorStageOn($any(stageName))" [class.text-danger]="!editorStageOn($any(stageName))">{{ stageName }}</h4>
                         <div class="d-flex gap-2 align-items-center">
-                          <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToBase($any(stageName))" [disabled]="!canResetEditorBlockToBase($any(stageName))">Reset</button>
+                          <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch($any(stageName))" [disabled]="!canResetEditorBlockToLoadedPatch($any(stageName))">Reset</button>
                           <label class="form-check-label small d-flex align-items-center gap-1">
                             <input class="form-check-input m-0" type="checkbox" [checked]="editorStageOn($any(stageName))" (change)="setEditorStageOn($any(stageName), $any($event.target).checked)" />
                             <span>Enabled</span>
@@ -351,7 +351,7 @@
                       <div class="d-flex justify-content-between align-items-center mb-2">
                         <h4 class="h6 mb-0 text-uppercase" [class.text-success]="editorEqOn($any(eqName))" [class.text-danger]="!editorEqOn($any(eqName))">{{ eqName }}</h4>
                         <div class="d-flex gap-2 align-items-center">
-                          <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToBase($any(eqName))" [disabled]="!canResetEditorBlockToBase($any(eqName))">Reset</button>
+                          <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch($any(eqName))" [disabled]="!canResetEditorBlockToLoadedPatch($any(eqName))">Reset</button>
                           <label class="form-check-label small d-flex align-items-center gap-1">
                             <input class="form-check-input m-0" type="checkbox" [checked]="editorEqOn($any(eqName))" (change)="setEditorEqOn($any(eqName), $any($event.target).checked)" />
                             <span>Enabled</span>
@@ -475,7 +475,7 @@
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <h4 class="h6 mb-0">NS</h4>
                       <div class="d-flex gap-2 align-items-center">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToBase('ns')" [disabled]="!canResetEditorBlockToBase('ns')">Reset</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch('ns')" [disabled]="!canResetEditorBlockToLoadedPatch('ns')">Reset</button>
                         <label class="form-check-label small d-flex align-items-center gap-1">
                           <input class="form-check-input m-0" type="checkbox" [checked]="editorNsOn()" (change)="setEditorNsOn($any($event.target).checked)" />
                           <span>Enabled</span>
@@ -494,7 +494,7 @@
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <h4 class="h6 mb-0">Send / Return</h4>
                       <div class="d-flex gap-2 align-items-center">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToBase('send_return')" [disabled]="!canResetEditorBlockToBase('send_return')">Reset</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch('send_return')" [disabled]="!canResetEditorBlockToLoadedPatch('send_return')">Reset</button>
                         <label class="form-check-label small d-flex align-items-center gap-1">
                           <input class="form-check-input m-0" type="checkbox" [checked]="editorSendReturnOn()" (change)="setEditorSendReturnOn($any($event.target).checked)" />
                           <span>Enabled</span>
@@ -515,7 +515,7 @@
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <h4 class="h6 mb-0">Solo</h4>
                       <div class="d-flex gap-2 align-items-center">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToBase('solo')" [disabled]="!canResetEditorBlockToBase('solo')">Reset</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch('solo')" [disabled]="!canResetEditorBlockToLoadedPatch('solo')">Reset</button>
                         <label class="form-check-label small d-flex align-items-center gap-1">
                           <input class="form-check-input m-0" type="checkbox" [checked]="editorSoloOn()" (change)="setEditorSoloOn($any($event.target).checked)" />
                           <span>Enabled</span>
@@ -533,7 +533,7 @@
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <h4 class="h6 mb-0">Pedal FX</h4>
                       <div class="d-flex gap-2 align-items-center">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToBase('pedalfx')" [disabled]="!canResetEditorBlockToBase('pedalfx')">Reset</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch('pedalfx')" [disabled]="!canResetEditorBlockToLoadedPatch('pedalfx')">Reset</button>
                         <label class="form-check-label small d-flex align-items-center gap-1">
                           <input class="form-check-input m-0" type="checkbox" [checked]="editorPedalFxOn()" (change)="setEditorPedalFxOn($any($event.target).checked)" />
                           <span>Enabled</span>
@@ -938,7 +938,7 @@
           <button type="button" class="btn btn-sm btn-light" (click)="closeToneSaveModal()">Close</button>
         </header>
         <div class="p-3 d-grid gap-3">
-          <p class="small text-secondary mb-0">Present blocks are owned. Absent blocks are wildcards. Auto-selection is based on the current base patch, but you can override it here.</p>
+          <p class="small text-secondary mb-0">Present blocks are owned. Absent blocks are wildcards. Auto-selection is based on the current patch, but you can override it here.</p>
           <div>
             <label class="form-label small mb-1" for="toneSaveName">Name</label>
             <input id="toneSaveName" type="text" class="form-control" [value]="toneSaveName()" (input)="setToneSaveName($any($event.target).value)" />
@@ -1132,18 +1132,18 @@
     </div>
   }
 
-  @if (toneBaseModalOpen()) {
-    <div class="raw-modal-backdrop" (click)="closeToneBaseModal()">
-      <section class="raw-modal" role="dialog" aria-modal="true" aria-label="Load Base Patch" (click)="$event.stopPropagation()">
+  @if (toneLoadPatchModalOpen()) {
+    <div class="raw-modal-backdrop" (click)="closeToneLoadPatchModal()">
+      <section class="raw-modal" role="dialog" aria-modal="true" aria-label="Load Patch" (click)="$event.stopPropagation()">
         <header class="raw-modal-head">
-          <h3>Load Base Patch</h3>
-          <button type="button" class="btn btn-sm btn-light" (click)="closeToneBaseModal()">Close</button>
+          <h3>Load Patch</h3>
+          <button type="button" class="btn btn-sm btn-light" (click)="closeToneLoadPatchModal()">Close</button>
         </header>
         <div class="p-3 d-grid gap-3">
-          <p class="small text-secondary mb-0">Choose a saved full patch when you want a clean base. It will be applied to Live Patch and become the comparison base for sparse saves.</p>
+          <p class="small text-secondary mb-0">Choose a saved full patch. It will be applied to Live Patch and used to compare changes when selecting which blocks to save.</p>
           <div>
-            <label class="form-label small mb-1" for="toneBasePatchObjectId">Saved Patch</label>
-            <select id="toneBasePatchObjectId" class="form-select" [value]="toneBasePatchObjectId()" (change)="setToneBasePatchObjectId($any($event.target).value)">
+            <label class="form-label small mb-1" for="toneLoadedPatchObjectId">Saved Patch</label>
+            <select id="toneLoadedPatchObjectId" class="form-select" [value]="toneLoadedPatchObjectId()" (change)="setToneLoadedPatchObjectId($any($event.target).value)">
               <option value="">Select patch</option>
               @for (patchObject of tonePatchObjects(); track patchObject.id) {
                 <option [value]="patchObject.id">{{ patchObject.name }}</option>
@@ -1151,9 +1151,9 @@
             </select>
           </div>
           <div class="d-flex justify-content-end gap-2 flex-wrap">
-            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="setCurrentEditorPatchAsBase()">Use Current Editor Patch As Base</button>
-            <button type="button" class="btn btn-sm btn-primary" (click)="applyToneBasePatchObject()" [disabled]="isActionBusy('tone-apply-base:' + toneBasePatchObjectId())">
-              {{ isActionBusy('tone-apply-base:' + toneBasePatchObjectId()) ? 'Applying...' : 'Apply As Base' }}
+            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="useCurrentEditorPatch()">Use Current Editor Patch</button>
+            <button type="button" class="btn btn-sm btn-primary" (click)="applyLoadedPatchObject()" [disabled]="isActionBusy('tone-apply-patch:' + toneLoadedPatchObjectId())">
+              {{ isActionBusy('tone-apply-patch:' + toneLoadedPatchObjectId()) ? 'Applying...' : 'Apply Patch' }}
             </button>
           </div>
         </div>

@@ -482,8 +482,8 @@ export class App implements OnInit, OnDestroy {
   editorSlotLabel = signal('');
   editorPatchDraft = signal<Record<string, unknown> | null>(null);
   editorTargetIsActive = signal(false);
-  editorBaseFingerprint = signal('');
-  editorBaseConfigHash = signal('');
+  editorOriginalFingerprint = signal('');
+  editorOriginalConfigHash = signal('');
   editorLiveApplyPending = signal(false);
   editorLiveApplyError = signal('');
   editorLiveApplyReadbackAt = signal('');
@@ -498,7 +498,7 @@ export class App implements OnInit, OnDestroy {
   toneDesignerModalOpen = signal(false);
   toneGroupModalOpen = signal(false);
   toneSetModalOpen = signal(false);
-  toneBaseModalOpen = signal(false);
+  toneLoadPatchModalOpen = signal(false);
   toneSaveName = signal('');
   toneSaveDescription = signal('');
   toneSaveGroupId = signal('');
@@ -512,9 +512,9 @@ export class App implements OnInit, OnDestroy {
   toneAiNamePrefix = signal('');
   toneSelectedBlocks = signal<Record<string, boolean>>({ amp: true, booster: true, eq1: true });
   liveEditorShowAllBlocks = signal(false);
-  toneBasePatchObjectId = signal('');
-  toneBasePatchObjectName = signal('');
-  toneBasePatchSnapshot = signal<Record<string, unknown> | null>(null);
+  toneLoadedPatchObjectId = signal('');
+  toneLoadedPatchName = signal('');
+  toneLoadedPatchSnapshot = signal<Record<string, unknown> | null>(null);
   toneAssignGroupByPatchObject = signal<Record<number, string>>({});
   tonePatchQuery = signal('');
   tonePatchGroupFilter = signal('');
@@ -726,7 +726,7 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  private loadLivePatchIntoEditorState(live: LivePatchResponse, replaceBase: boolean): void {
+  private loadLivePatchIntoEditorState(live: LivePatchResponse, replaceLoadedPatch: boolean): void {
     const draft = this.clonePatch(live.patch_json);
     const draftAmp = this.readObject(draft, 'amp');
     if (draftAmp) {
@@ -745,8 +745,8 @@ export class App implements OnInit, OnDestroy {
     this.editorSlotLabel.set('Live Patch');
     this.editorTargetIsActive.set(true);
     this.editorPatchDraft.set(draft);
-    this.editorBaseFingerprint.set(this.patchFingerprint(draft));
-    this.editorBaseConfigHash.set('');
+    this.editorOriginalFingerprint.set(this.patchFingerprint(draft));
+    this.editorOriginalConfigHash.set('');
     this.editorLiveApplyLastAppliedFingerprint = this.patchFingerprint(draft);
     this.editorLiveApplyQueuedFingerprint = null;
     this.editorLiveApplyInFlight = false;
@@ -754,12 +754,12 @@ export class App implements OnInit, OnDestroy {
     this.editorLiveApplyError.set('');
     this.editorLiveApplyReadbackAt.set('');
     this.editorModalOpen.set(true);
-    if (replaceBase || this.toneBasePatchSnapshot() === null) {
-      this.toneBasePatchSnapshot.set(this.clonePatch(draft));
-      this.toneBasePatchObjectName.set(replaceBase ? (this.toneBasePatchObjectName().trim() || 'Current Editor Patch') : 'Current Editor Patch');
-      this.toneBasePatchObjectId.set(replaceBase ? this.toneBasePatchObjectId() : '');
+    if (replaceLoadedPatch || this.toneLoadedPatchSnapshot() === null) {
+      this.toneLoadedPatchSnapshot.set(this.clonePatch(draft));
+      this.toneLoadedPatchName.set(replaceLoadedPatch ? (this.toneLoadedPatchName().trim() || 'Current Editor Patch') : 'Current Editor Patch');
+      this.toneLoadedPatchObjectId.set(replaceLoadedPatch ? this.toneLoadedPatchObjectId() : '');
     }
-    this.autoSelectToneBlocksFromBase(draft, true);
+    this.autoSelectToneBlocksFromLoadedPatch(draft, true);
   }
 
   toneBlockOptions(): readonly string[] {
@@ -803,12 +803,12 @@ export class App implements OnInit, OnDestroy {
     this.toneSetModalOpen.set(false);
   }
 
-  openToneBaseModal(): void {
-    this.toneBaseModalOpen.set(true);
+  openToneLoadPatchModal(): void {
+    this.toneLoadPatchModalOpen.set(true);
   }
 
-  closeToneBaseModal(): void {
-    this.toneBaseModalOpen.set(false);
+  closeToneLoadPatchModal(): void {
+    this.toneLoadPatchModalOpen.set(false);
   }
 
   isToneBlockSelected(block: string): boolean {
@@ -847,8 +847,8 @@ export class App implements OnInit, OnDestroy {
     this.toneSaveGroupId.set(value);
   }
 
-  setToneBasePatchObjectId(value: string): void {
-    this.toneBasePatchObjectId.set(value);
+  setToneLoadedPatchObjectId(value: string): void {
+    this.toneLoadedPatchObjectId.set(value);
   }
 
   setToneGroupName(value: string): void {
@@ -987,42 +987,42 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  setCurrentEditorPatchAsBase(): void {
+  useCurrentEditorPatch(): void {
     const current = this.editorPatchDraft() ?? this.livePatchSnapshot();
     if (!current) {
-      this.status.set('Sync or load the Live Patch before setting a base patch.');
+      this.status.set('Sync or load the Live Patch before choosing a patch here.');
       return;
     }
-    this.toneBasePatchSnapshot.set(this.clonePatch(current));
-    this.toneBasePatchObjectId.set('');
-    this.toneBasePatchObjectName.set(this.editorPatchName().trim() || 'Current Editor Patch');
-    this.autoSelectToneBlocksFromBase(this.editorPatchDraft() ?? current, true);
-    this.toneBaseModalOpen.set(false);
-    this.status.set('The current editor patch is now the base patch for comparison and save scope.');
+    this.toneLoadedPatchSnapshot.set(this.clonePatch(current));
+    this.toneLoadedPatchObjectId.set('');
+    this.toneLoadedPatchName.set(this.editorPatchName().trim() || 'Current Editor Patch');
+    this.autoSelectToneBlocksFromLoadedPatch(this.editorPatchDraft() ?? current, true);
+    this.toneLoadPatchModalOpen.set(false);
+    this.status.set('Current editor patch selected. Save scope has been updated.');
   }
 
-  clearToneBasePatch(): void {
-    this.toneBasePatchSnapshot.set(null);
-    this.toneBasePatchObjectId.set('');
-    this.toneBasePatchObjectName.set('');
+  clearLoadedPatch(): void {
+    this.toneLoadedPatchSnapshot.set(null);
+    this.toneLoadedPatchObjectId.set('');
+    this.toneLoadedPatchName.set('');
     this.toneSelectedBlocks.set({});
-    this.status.set('Base patch cleared. Save scope is now manual.');
+    this.status.set('Selected patch cleared. Save scope is now manual.');
   }
 
-  async applyToneBasePatchObject(): Promise<void> {
-    const patchObjectId = Number.parseInt(this.toneBasePatchObjectId().trim() || '0', 10);
+  async applyLoadedPatchObject(): Promise<void> {
+    const patchObjectId = Number.parseInt(this.toneLoadedPatchObjectId().trim() || '0', 10);
     if (!Number.isFinite(patchObjectId) || patchObjectId <= 0) {
-      this.status.set('Select a saved patch to use as the base patch.');
+      this.status.set('Select a saved patch first.');
       return;
     }
     const patchObject = this.tonePatchObjects().find((item) => item.id === patchObjectId) ?? null;
     if (!patchObject) {
-      this.status.set('Selected base patch is not available in the current list.');
+      this.status.set('Selected patch is not available in the current list.');
       return;
     }
-    const actionKey = `tone-apply-base:${patchObject.id}`;
+    const actionKey = `tone-apply-patch:${patchObject.id}`;
     this.setActionBusy(actionKey, true);
-    this.status.set(`Applying ${patchObject.name} as the new Live Patch base...`);
+    this.status.set(`Applying ${patchObject.name}...`);
     this.responseJson.set('');
     try {
       const response = await fetch('/api/v1/live-patch/apply-patch-object', {
@@ -1033,19 +1033,19 @@ export class App implements OnInit, OnDestroy {
       });
       const payload = (await response.json()) as LivePatchResponse | { detail?: unknown };
       if (!response.ok || !('patch_json' in payload)) {
-        this.status.set(`Failed applying ${patchObject.name} as base`);
+        this.status.set(`Failed applying ${patchObject.name}`);
         this.responseJson.set(JSON.stringify(payload, null, 2));
         return;
       }
-      this.toneBasePatchObjectId.set(String(patchObject.id));
-      this.toneBasePatchObjectName.set(patchObject.name);
+      this.toneLoadedPatchObjectId.set(String(patchObject.id));
+      this.toneLoadedPatchName.set(patchObject.name);
       this.applyLivePatchStatus(payload as LivePatchResponse);
       this.loadLivePatchIntoEditorState(payload as LivePatchResponse, true);
-      this.toneBaseModalOpen.set(false);
-      this.status.set(`Applied ${patchObject.name} as the new Live Patch base`);
+      this.toneLoadPatchModalOpen.set(false);
+      this.status.set(`Applied ${patchObject.name}`);
       this.responseJson.set(JSON.stringify(payload, null, 2));
     } catch (error: unknown) {
-      this.status.set(`Failed applying ${patchObject.name} as base`);
+      this.status.set(`Failed applying ${patchObject.name}`);
       this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
     } finally {
       this.setActionBusy(actionKey, false);
@@ -2733,19 +2733,19 @@ export class App implements OnInit, OnDestroy {
 
   editorIsModified(): boolean {
     const draftFingerprint = this.editorDraftFingerprint();
-    const baseline = this.editorBaseFingerprint();
-    if (!draftFingerprint || !baseline) {
+    const originalFingerprint = this.editorOriginalFingerprint();
+    if (!draftFingerprint || !originalFingerprint) {
       return false;
     }
-    return draftFingerprint !== baseline;
+    return draftFingerprint !== originalFingerprint;
   }
 
   editorHashLabel(): string {
     const draftHash = this.readString(this.editorPatchDraft(), 'config_hash_sha256') ?? '';
-    const baselineHash = this.editorBaseConfigHash();
+    const originalHash = this.editorOriginalConfigHash();
     if (this.editorIsModified()) {
-      if (baselineHash) {
-        return `${this.shortHash(baselineHash)} -> pending`;
+      if (originalHash) {
+        return `${this.shortHash(originalHash)} -> pending`;
       }
       return 'pending';
     }
@@ -3463,12 +3463,12 @@ export class App implements OnInit, OnDestroy {
         continue;
       }
       const slotLabel = job.slot !== null ? ` ${this.setLabelForSlot(job.slot)}` : '';
-      const base = `${this.operationLabel(job.operation)}${slotLabel}`;
+      const messageLabel = `${this.operationLabel(job.operation)}${slotLabel}`;
       if (job.status === 'succeeded') {
-        this.pushToast(`${base} completed`, 'success');
+        this.pushToast(`${messageLabel} completed`, 'success');
       } else {
         const suffix = job.error ? `: ${job.error}` : '';
-        this.pushToast(`${base} failed${suffix}`, 'danger');
+        this.pushToast(`${messageLabel} failed${suffix}`, 'danger');
       }
     }
     this.queueJobStatusById = next;
@@ -4455,7 +4455,7 @@ export class App implements OnInit, OnDestroy {
       const slotNumber = this.editorSlotNumber();
       slotNumberForHash = slotNumber;
       nextDraftSnapshot = this.clonePatch(next);
-      this.autoSelectToneBlocksFromBase(nextDraftSnapshot, false);
+      this.autoSelectToneBlocksFromLoadedPatch(nextDraftSnapshot, false);
       if (slotNumber !== null) {
         this.slots.update((cards) =>
           cards.map((card) => {
@@ -4900,8 +4900,8 @@ export class App implements OnInit, OnDestroy {
     return JSON.stringify(value);
   }
 
-  livePatchBaseName(): string {
-    return this.toneBasePatchObjectName().trim() || 'None';
+  livePatchLoadedPatchName(): string {
+    return this.toneLoadedPatchName().trim() || 'None';
   }
 
   livePatchSelectedBlocksSummary(): string {
@@ -4915,37 +4915,37 @@ export class App implements OnInit, OnDestroy {
     return blocks.join(', ');
   }
 
-  canResetEditorBlockToBase(block: string): boolean {
-    const basePatch = this.toneBasePatchSnapshot();
+  canResetEditorBlockToLoadedPatch(block: string): boolean {
+    const loadedPatch = this.toneLoadedPatchSnapshot();
     const currentPatch = this.editorPatchDraft();
-    if (!basePatch || !currentPatch) {
+    if (!loadedPatch || !currentPatch) {
       return false;
     }
-    const baseBlock = this.comparablePatchBlock(basePatch, block);
+    const loadedBlock = this.comparablePatchBlock(loadedPatch, block);
     const currentBlock = this.comparablePatchBlock(currentPatch, block);
-    return this.stableStringify(baseBlock) !== this.stableStringify(currentBlock);
+    return this.stableStringify(loadedBlock) !== this.stableStringify(currentBlock);
   }
 
-  resetEditorBlockToBase(block: string): void {
-    const basePatch = this.toneBasePatchSnapshot();
-    if (!basePatch) {
+  resetEditorBlockToLoadedPatch(block: string): void {
+    const loadedPatch = this.toneLoadedPatchSnapshot();
+    if (!loadedPatch) {
       return;
     }
     this.updateEditorPatch((draft) => {
-      this.applyBaseBlockToDraft(draft, basePatch, block);
+      this.applyLoadedPatchBlockToDraft(draft, loadedPatch, block);
     });
   }
 
-  private autoSelectToneBlocksFromBase(currentPatch: Record<string, unknown>, replaceSelection: boolean): void {
-    const basePatch = this.toneBasePatchSnapshot();
-    if (!basePatch) {
+  private autoSelectToneBlocksFromLoadedPatch(currentPatch: Record<string, unknown>, replaceSelection: boolean): void {
+    const loadedPatch = this.toneLoadedPatchSnapshot();
+    if (!loadedPatch) {
       return;
     }
     const next: Record<string, boolean> = {};
     for (const block of this.toneBlockOptions()) {
-      const baseBlock = this.comparablePatchBlock(basePatch, block);
+      const loadedBlock = this.comparablePatchBlock(loadedPatch, block);
       const currentBlock = this.comparablePatchBlock(currentPatch, block);
-      next[block] = this.stableStringify(baseBlock) !== this.stableStringify(currentBlock);
+      next[block] = this.stableStringify(loadedBlock) !== this.stableStringify(currentBlock);
     }
     if (replaceSelection) {
       this.toneSelectedBlocks.set(next);
@@ -4960,23 +4960,23 @@ export class App implements OnInit, OnDestroy {
     });
   }
 
-  private applyBaseBlockToDraft(draft: Record<string, unknown>, basePatch: Record<string, unknown>, block: string): void {
+  private applyLoadedPatchBlockToDraft(draft: Record<string, unknown>, loadedPatch: Record<string, unknown>, block: string): void {
     if (block === 'routing' || block === 'amp') {
-      const baseDirect = this.readObject(basePatch, block);
-      if (baseDirect) {
-        draft[block] = this.clonePatch(baseDirect);
+      const loadedDirect = this.readObject(loadedPatch, block);
+      if (loadedDirect) {
+        draft[block] = this.clonePatch(loadedDirect);
       } else {
         delete draft[block];
       }
       return;
     }
 
-    const baseStages = this.readObject(basePatch, 'stages');
-    const baseStage = this.readObject(baseStages, block);
+    const loadedStages = this.readObject(loadedPatch, 'stages');
+    const loadedStage = this.readObject(loadedStages, block);
     const draftStages = this.readObject(draft, 'stages');
-    if (baseStage) {
+    if (loadedStage) {
       const ensuredStages = this.ensureObject(draft, 'stages');
-      ensuredStages[block] = this.clonePatch(baseStage);
+      ensuredStages[block] = this.clonePatch(loadedStage);
     } else if (draftStages) {
       delete draftStages[block];
       if (Object.keys(draftStages).length === 0) {
@@ -4985,12 +4985,12 @@ export class App implements OnInit, OnDestroy {
     }
 
     if (block === 'booster' || block === 'mod' || block === 'fx' || block === 'delay' || block === 'reverb') {
-      const baseColors = this.readObject(basePatch, 'colors');
-      const baseColor = this.readObject(baseColors, block);
+      const loadedColors = this.readObject(loadedPatch, 'colors');
+      const loadedColor = this.readObject(loadedColors, block);
       const draftColors = this.readObject(draft, 'colors');
-      if (baseColor) {
+      if (loadedColor) {
         const ensuredColors = this.ensureObject(draft, 'colors');
-        ensuredColors[block] = this.clonePatch(baseColor);
+        ensuredColors[block] = this.clonePatch(loadedColor);
       } else if (draftColors) {
         delete draftColors[block];
         if (Object.keys(draftColors).length === 0) {
