@@ -11,40 +11,27 @@
     </div>
   </header>
 
-  @if (isDashboardPage()) {
-  <section class="row g-3 align-items-start">
-    <aside class="col-xl-2 d-none d-xl-block">
-      <section class="card queue-panel sticky-top">
-        <div class="card-body d-flex flex-column p-2">
-          <p class="small mb-2">
-            <strong>Queue Monitor</strong>
-            <span class="text-secondary ms-2">updated: <code>{{ queueGeneratedAt() || 'n/a' }}</code></span>
-          </p>
-          <div class="queue-list">
-            @for (job of queueJobs(); track job.job_id) {
-              <article class="border rounded p-2 small bg-body-tertiary">
-                <p class="mb-1">
-                  <strong>{{ operationLabel(job.operation) }}</strong>
-                  @if (job.slot !== null) {
-                    <span> (slot {{ job.slot }})</span>
-                  }
-                  · <code>{{ job.status }}</code>
-                </p>
-                <p class="mb-0 text-secondary">
-                  elapsed: <code>{{ formatMs(job.elapsed_ms) }}</code> |
-                  created: <code>{{ job.created_at }}</code>
-                </p>
-              </article>
-            }
-            @if (queueJobs().length === 0) {
-              <p class="mb-0 text-secondary small">No queue jobs yet.</p>
-            }
+  @if (toasts().length > 0) {
+    <div class="toast-stack" aria-live="polite" aria-atomic="true">
+      @for (toast of toasts(); track toast.id) {
+        <div
+          class="toast-item alert alert-dismissible py-2 px-3 mb-0"
+          [class.alert-info]="toast.tone === 'info'"
+          [class.alert-success]="toast.tone === 'success'"
+          [class.alert-danger]="toast.tone === 'danger'"
+          role="status"
+        >
+          <div class="d-flex align-items-start gap-2">
+            <span class="small flex-grow-1">{{ toast.text }}</span>
+            <button type="button" class="btn-close btn-sm" aria-label="Dismiss" (click)="dismissToast(toast.id)"></button>
           </div>
         </div>
-      </section>
-    </aside>
+      }
+    </div>
+  }
 
-    <section class="col-12 col-xl-10">
+  @if (isDashboardPage()) {
+  <section class="d-grid gap-3">
       <div class="card mb-3">
         <div class="card-body py-2">
           <div class="d-flex flex-wrap gap-2 mb-2">
@@ -889,7 +876,6 @@
         </div>
       </section>
       </details>
-    </section>
   </section>
   } @else {
   <section class="card">

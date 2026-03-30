@@ -1,14 +1,17 @@
-.queue-panel {
+.toast-stack {
+  position: fixed;
   top: 1rem;
-  max-height: calc(100vh - 2rem);
-}
-
-.queue-list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
+  right: 1rem;
+  z-index: 1100;
   display: grid;
   gap: 0.5rem;
+  width: min(26rem, calc(100vw - 2rem));
+  pointer-events: none;
+}
+
+.toast-item {
+  pointer-events: auto;
+  box-shadow: 0 0.35rem 1rem rgba(0, 0, 0, 0.15);
 }
 
 .samples-list {
@@ -311,14 +314,14 @@ pre {
   border-left: 1px dashed rgba(108, 117, 125, 0.55);
 }
 
-@media (max-width: 1199.98px) {
-  .queue-panel {
-    position: static;
-    max-height: none;
-  }
-}
-
 @media (max-width: 767.98px) {
+  .toast-stack {
+    top: auto;
+    right: 0.75rem;
+    bottom: 0.75rem;
+    width: calc(100vw - 1.5rem);
+  }
+
   .editor-range-field {
     grid-template-columns: 1fr;
     gap: 0.4rem;

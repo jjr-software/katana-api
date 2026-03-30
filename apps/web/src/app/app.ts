@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, effect, signal } from '@angular/core';
 import { PatchSummaryComponent } from './patch-summary.component';
 import {
   BOOSTER_PARAM_SCHEMA,
@@ -292,6 +292,12 @@ interface QueueStateResponse {
   jobs: QueueJobSummary[];
 }
 
+interface ToastMessage {
+  id: number;
+  text: string;
+  tone: 'info' | 'success' | 'danger';
+}
+
 interface SlotCard {
   slot: number;
   slot_label: string;
@@ -429,8 +435,7 @@ export class App implements OnInit, OnDestroy {
   livePatchPartialDbMatches = signal<Array<{ id: number; name: string }>>([]);
   livePatchExactSlotMatch = signal<{ slot: number; patch_name: string } | null>(null);
   livePatchPartialSlotMatches = signal<Array<{ slot: number; patch_name: string }>>([]);
-  queueJobs = signal<QueueJobSummary[]>([]);
-  queueGeneratedAt = signal('');
+  toasts = signal<ToastMessage[]>([]);
   levelMarkerRmsDbfs = signal<number | null>(null);
   levelMarkerPeakDbfs = signal<number | null>(null);
   levelMarkerCapturedAt = signal('');
@@ -519,9 +524,25 @@ export class App implements OnInit, OnDestroy {
   toneManualSetSlots = signal<Record<number, string>>({});
   toneSetSlotAssignments = signal<Record<string, string>>({});
   private activeSlotPollInFlight = false;
+  private toastCounter = 0;
+  private readonly toastTimers = new Map<number, ReturnType<typeof setTimeout>>();
+  private lastStatusToast = '';
+  private queueJobStatusById = new Map<string, QueueJobSummary['status']>();
+  private queueNotificationsInitialized = false;
   private readonly onPopState = (): void => {
     this.currentPage.set(this.resolvePageFromPath());
   };
+
+  constructor() {
+    effect(() => {
+      const message = this.status();
+      if (!message || message === 'Idle' || message === this.lastStatusToast) {
+        return;
+      }
+      this.lastStatusToast = message;
+      this.pushToast(message, this.toastToneForStatus(message));
+    });
+  }
 
   ngOnInit(): void {
     window.addEventListener('popstate', this.onPopState);
@@ -551,6 +572,10 @@ export class App implements OnInit, OnDestroy {
       clearInterval(this.activeSlotPollHandle);
       this.activeSlotPollHandle = null;
     }
+    for (const timer of this.toastTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.toastTimers.clear();
     this.stopLiveMeter();
   }
 
@@ -3360,11 +3385,98 @@ export class App implements OnInit, OnDestroy {
         return;
       }
       const queue = payload as QueueStateResponse;
-      this.queueJobs.set(queue.jobs);
-      this.queueGeneratedAt.set(queue.generated_at);
+      this.notifyQueueTransitions(queue.jobs);
     } catch {
-      // no-op: queue panel keeps last visible state
+      // no-op: queue notifications resume on next successful poll
     }
+  }
+
+  dismissToast(toastId: number): void {
+    const timer = this.toastTimers.get(toastId);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      this.toastTimers.delete(toastId);
+    }
+    this.toasts.update((current) => current.filter((toast) => toast.id !== toastId));
+  }
+
+  private pushToast(text: string, tone: 'info' | 'success' | 'danger'): void {
+    const message = text.trim();
+    if (!message) {
+      return;
+    }
+    const duplicate = this.toasts().find((toast) => toast.text === message && toast.tone === tone);
+    if (duplicate) {
+      const timer = this.toastTimers.get(duplicate.id);
+      if (timer !== undefined) {
+        clearTimeout(timer);
+      }
+      this.toastTimers.set(
+        duplicate.id,
+        setTimeout(() => this.dismissToast(duplicate.id), 5000),
+      );
+      return;
+    }
+    const id = ++this.toastCounter;
+    this.toasts.update((current) => [...current, { id, text: message, tone }].slice(-5));
+    this.toastTimers.set(
+      id,
+      setTimeout(() => this.dismissToast(id), 5000),
+    );
+  }
+
+  private toastToneForStatus(message: string): 'info' | 'success' | 'danger' {
+    const normalized = message.toLowerCase();
+    if (normalized.includes('failed') || normalized.includes('error')) {
+      return 'danger';
+    }
+    if (
+      normalized.includes('succeeded') ||
+      normalized.includes('synced') ||
+      normalized.includes('saved') ||
+      normalized.includes('created') ||
+      normalized.includes('updated') ||
+      normalized.includes('added') ||
+      normalized.includes('removed') ||
+      normalized.includes('applied') ||
+      normalized.includes('programmed') ||
+      normalized.includes('activated') ||
+      normalized.includes('recorded') ||
+      normalized.includes('captured') ||
+      normalized.includes('connected') ||
+      normalized.includes('committed') ||
+      normalized.includes('loaded')
+    ) {
+      return 'success';
+    }
+    return 'info';
+  }
+
+  private notifyQueueTransitions(jobs: QueueJobSummary[]): void {
+    const next = new Map<string, QueueJobSummary['status']>();
+    for (const job of jobs) {
+      next.set(job.job_id, job.status);
+      if (!this.queueNotificationsInitialized) {
+        continue;
+      }
+      const previousStatus = this.queueJobStatusById.get(job.job_id);
+      if (previousStatus === job.status) {
+        continue;
+      }
+      if (job.status !== 'succeeded' && job.status !== 'failed') {
+        continue;
+      }
+      const slotLabel = job.slot !== null ? ` ${this.setLabelForSlot(job.slot)}` : '';
+      const base = `${this.operationLabel(job.operation)}${slotLabel}`;
+      if (job.status === 'succeeded') {
+        this.pushToast(`${base} completed`, 'success');
+      } else {
+        const suffix = job.error ? `: ${job.error}` : '';
+        this.pushToast(`${base} failed${suffix}`, 'danger');
+      }
+    }
+    this.queueJobStatusById = next;
+    this.queueNotificationsInitialized = true;
   }
 
   slotsForBank(bank: 'A' | 'B'): SlotCard[] {
