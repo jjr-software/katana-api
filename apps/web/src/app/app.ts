@@ -110,6 +110,14 @@ const EQ_PEQ_PARAM_SCHEMA: ReadonlyArray<{ key: string; label: string; index: nu
   { key: 'high_cut', label: 'High Cut', index: 9, min: 0, max: 14, options: buildValueOptions(EQ_PEQ_HIGH_CUT_LABELS) },
   { key: 'level', label: 'Level', index: 10, min: -20, max: 20, offset: 20 },
 ];
+const EQ_PEQ_PARAM_GROUPS: ReadonlyArray<{ id: string; label: string; keys: readonly string[] }> = [
+  { id: 'filters', label: 'Filters', keys: ['low_cut', 'high_cut'] },
+  { id: 'low', label: 'Low', keys: ['low_gain'] },
+  { id: 'low-mid', label: 'Low Mid', keys: ['lowmid_freq', 'lowmid_q', 'lowmid_gain'] },
+  { id: 'high-mid', label: 'High Mid', keys: ['highmid_freq', 'highmid_q', 'highmid_gain'] },
+  { id: 'high', label: 'High', keys: ['high_gain'] },
+  { id: 'level', label: 'Output', keys: ['level'] },
+];
 const LIVE_RMS_WINDOW_POINTS = 96;
 const DEFAULT_TARGET_RMS_DBFS = -31.0;
 const AUTO_LEVEL_TOLERANCE_DB = 0.4;
@@ -343,6 +351,12 @@ interface EqParamField {
   max: number;
   valueLabel: string | null;
   options: ValueOption[] | null;
+}
+
+interface EqParamGroup {
+  id: string;
+  label: string;
+  params: EqParamField[];
 }
 
 interface EqPeqGraphNode {
@@ -2915,6 +2929,17 @@ export class App implements OnInit, OnDestroy {
         options: schema.options ?? null,
       };
     });
+  }
+
+  editorEqPeqParamGroups(eqName: EqStageName): EqParamGroup[] {
+    const paramMap = new Map(this.editorEqPeqParams(eqName).map((param) => [param.key, param]));
+    return EQ_PEQ_PARAM_GROUPS.map((group) => ({
+      id: `${eqName}-${group.id}`,
+      label: group.label,
+      params: group.keys
+        .map((key) => paramMap.get(key) ?? null)
+        .filter((param): param is EqParamField => param !== null),
+    })).filter((group) => group.params.length > 0);
   }
 
   setEditorEqPeqValue(eqName: EqStageName, paramKey: string, value: string): void {

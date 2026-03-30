@@ -340,42 +340,49 @@
                           </div>
                         </div>
                         <div class="row g-2 mt-1">
-                          @for (param of editorEqPeqParams($any(eqName)); track param.id) {
-                            <div class="col-12 col-md-6">
-                              <label class="form-label small mb-1">
-                                {{ param.label }}
-                                @if (param.valueLabel) {
-                                  <span class="text-secondary">{{ param.valueLabel }}</span>
-                                } @else {
-                                  <span class="text-secondary">[{{ param.min }}..{{ param.max }}]</span>
+                          @for (group of editorEqPeqParamGroups($any(eqName)); track group.id) {
+                            <div class="col-12 col-xl-6">
+                              <div class="border rounded p-2 bg-body-tertiary h-100 d-grid gap-2">
+                                <p class="small fw-semibold text-secondary mb-0">{{ group.label }}</p>
+                                @for (param of group.params; track param.id) {
+                                  <div>
+                                    <label class="form-label small mb-1">
+                                      {{ param.label }}
+                                      @if (param.valueLabel) {
+                                        <span class="text-secondary">{{ param.valueLabel }}</span>
+                                      } @else {
+                                        <span class="text-secondary">[{{ param.min }}..{{ param.max }}]</span>
+                                      }
+                                    </label>
+                                    @if (param.options) {
+                                      <select class="form-select form-select-sm" (change)="setEditorEqPeqValue($any(eqName), param.key, $any($event.target).value)">
+                                        @for (opt of param.options; track opt.value) {
+                                          <option [value]="opt.value" [selected]="param.value === opt.value">{{ opt.label }}</option>
+                                        }
+                                      </select>
+                                    } @else {
+                                      <div class="editor-range-field">
+                                        <input
+                                          type="range"
+                                          [min]="param.min"
+                                          [max]="param.max"
+                                          class="form-range editor-range-slider"
+                                          [value]="param.value"
+                                          (input)="setEditorEqPeqValue($any(eqName), param.key, $any($event.target).value)"
+                                        />
+                                        <input
+                                          type="number"
+                                          [min]="param.min"
+                                          [max]="param.max"
+                                          class="form-control form-control-sm editor-range-value"
+                                          [value]="param.value"
+                                          (input)="setEditorEqPeqValue($any(eqName), param.key, $any($event.target).value)"
+                                        />
+                                      </div>
+                                    }
+                                  </div>
                                 }
-                              </label>
-                              @if (param.options) {
-                                <select class="form-select form-select-sm" (change)="setEditorEqPeqValue($any(eqName), param.key, $any($event.target).value)">
-                                  @for (opt of param.options; track opt.value) {
-                                    <option [value]="opt.value" [selected]="param.value === opt.value">{{ opt.label }}</option>
-                                  }
-                                </select>
-                              } @else {
-                                <div class="editor-range-field">
-                                  <input
-                                    type="range"
-                                    [min]="param.min"
-                                    [max]="param.max"
-                                    class="form-range editor-range-slider"
-                                    [value]="param.value"
-                                    (input)="setEditorEqPeqValue($any(eqName), param.key, $any($event.target).value)"
-                                  />
-                                  <input
-                                    type="number"
-                                    [min]="param.min"
-                                    [max]="param.max"
-                                    class="form-control form-control-sm editor-range-value"
-                                    [value]="param.value"
-                                    (input)="setEditorEqPeqValue($any(eqName), param.key, $any($event.target).value)"
-                                  />
-                                </div>
-                              }
+                              </div>
                             </div>
                           }
                         </div>
