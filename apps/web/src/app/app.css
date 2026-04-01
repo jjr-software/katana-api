@@ -78,42 +78,6 @@ pre {
   white-space: pre-wrap;
 }
 
-.raw-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(2, 6, 23, 0.75);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-  z-index: 999;
-}
-
-.raw-modal {
-  width: min(980px, 100%);
-  max-height: 90vh;
-  border: 1px solid #dee2e6;
-  border-radius: 12px;
-  background: #fff;
-  color: #212529;
-  display: flex;
-  flex-direction: column;
-}
-
-.raw-modal-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.7rem 0.8rem;
-  border-bottom: 1px solid #dee2e6;
-}
-
-.raw-modal-head h3 {
-  margin: 0;
-  font-size: 0.95rem;
-}
-
 .raw-modal-json {
   margin: 0;
   border: none;
@@ -122,24 +86,11 @@ pre {
   overflow: auto;
 }
 
-.editor-modal {
-  width: min(1080px, 100%);
-}
-
 .editor-sticky-meter {
   position: sticky;
   top: 0;
   z-index: 2;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
-}
-
-.ai-modal {
-  width: min(980px, 100%);
-}
-
-.ai-modal-body {
-  max-height: calc(90vh - 84px);
-  overflow: auto;
 }
 
 .ai-change-card {
@@ -152,11 +103,6 @@ pre {
 
 .auto-level-log {
   max-height: 20rem;
-  overflow: auto;
-}
-
-.editor-modal-body {
-  max-height: calc(90vh - 130px);
   overflow: auto;
 }
 

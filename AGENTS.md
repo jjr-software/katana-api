@@ -1841,3 +1841,22 @@
   - AI refine preview JSON inside the approval workflow modal.
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-04-01 (Modal System Migrated To ng-bootstrap)
+- Replaced custom overlay modal implementation in web app with `@ng-bootstrap/ng-bootstrap` modal service/templates.
+- All popup flows now use `NgbModal` with `scrollable: true`:
+  - Save Patch
+  - AI Designer
+  - Create Group
+  - Create Set
+  - Load Patch
+  - Patch Samples
+  - Ask AI
+  - AI Auto Level
+- Preserved existing open/close method names and state reset behavior while removing custom backdrop/container CSS.
+- Added web dependencies:
+  - `@ng-bootstrap/ng-bootstrap`
+  - `@angular/localize`
+  - `@popperjs/core`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

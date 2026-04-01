@@ -1,4 +1,5 @@
-import { Component, OnDestroy, OnInit, effect, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, TemplateRef, ViewChild, effect, inject, signal } from '@angular/core';
+import { NgbModal, NgbModalModule, NgbModalOptions, NgbModalRef } from '@ng-bootstrap/ng-bootstrap';
 import { PatchSummaryComponent } from './patch-summary.component';
 import {
   BOOSTER_PARAM_SCHEMA,
@@ -404,6 +405,7 @@ interface StageParam {
 }
 
 type TriState = 'true' | 'false' | 'unknown';
+type ModalKey = 'toneSave' | 'toneDesigner' | 'toneGroup' | 'toneSet' | 'toneLoadPatch' | 'patchSamples' | 'ai' | 'autoLevel';
 
 function defaultSlotCards(): SlotCard[] {
   return Array.from({ length: 8 }, (_, idx) => {
@@ -434,11 +436,22 @@ function defaultSlotCards(): SlotCard[] {
 
 @Component({
   selector: 'app-root',
-  imports: [PatchSummaryComponent],
+  imports: [PatchSummaryComponent, NgbModalModule],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
 export class App implements OnInit, OnDestroy {
+  @ViewChild('toneSaveModalTpl') private toneSaveModalTpl?: TemplateRef<unknown>;
+  @ViewChild('toneDesignerModalTpl') private toneDesignerModalTpl?: TemplateRef<unknown>;
+  @ViewChild('toneGroupModalTpl') private toneGroupModalTpl?: TemplateRef<unknown>;
+  @ViewChild('toneSetModalTpl') private toneSetModalTpl?: TemplateRef<unknown>;
+  @ViewChild('toneLoadPatchModalTpl') private toneLoadPatchModalTpl?: TemplateRef<unknown>;
+  @ViewChild('patchSamplesModalTpl') private patchSamplesModalTpl?: TemplateRef<unknown>;
+  @ViewChild('aiModalTpl') private aiModalTpl?: TemplateRef<unknown>;
+  @ViewChild('autoLevelModalTpl') private autoLevelModalTpl?: TemplateRef<unknown>;
+  private readonly modalService = inject(NgbModal);
+  private readonly modalRefs: Partial<Record<ModalKey, NgbModalRef>> = {};
+
   currentPage = signal<'dashboard' | 'samples'>(this.resolvePageFromPath());
   status = signal('Idle');
   responseJson = signal('');
@@ -478,10 +491,8 @@ export class App implements OnInit, OnDestroy {
   activeSlotPollHandle: ReturnType<typeof setInterval> | null = null;
   liveMeterSource: EventSource | null = null;
   liveMeterReconnectHandle: ReturnType<typeof setTimeout> | null = null;
-  patchSamplesModalOpen = signal(false);
   patchSamplesModalTitle = signal('');
   patchSamplesRows = signal<AudioSampleResponse[]>([]);
-  aiModalOpen = signal(false);
   aiModalMode = signal<'general' | 'level'>('general');
   aiModalSlotNumber = signal<number | null>(null);
   aiModalSlotLabel = signal('');
@@ -493,7 +504,6 @@ export class App implements OnInit, OnDestroy {
   aiModalLoading = signal(false);
   aiModalError = signal('');
   aiModalAdvice = signal<AiPatchAdviceResponse | null>(null);
-  autoLevelModalOpen = signal(false);
   autoLevelSlotNumber = signal<number | null>(null);
   autoLevelSlotLabel = signal('');
   autoLevelPatchName = signal('');
@@ -520,11 +530,6 @@ export class App implements OnInit, OnDestroy {
   tonePatchObjects = signal<TonePatchObjectResponse[]>([]);
   toneGroups = signal<ToneGroupResponse[]>([]);
   toneSets = signal<TonePatchObjectSetResponse[]>([]);
-  toneSaveModalOpen = signal(false);
-  toneDesignerModalOpen = signal(false);
-  toneGroupModalOpen = signal(false);
-  toneSetModalOpen = signal(false);
-  toneLoadPatchModalOpen = signal(false);
   toneSaveName = signal('');
   toneSaveDescription = signal('');
   toneSaveGroupId = signal('');
@@ -562,6 +567,34 @@ export class App implements OnInit, OnDestroy {
     this.currentPage.set(this.resolvePageFromPath());
   };
 
+  private openModal(key: ModalKey, template: TemplateRef<unknown> | undefined, options: NgbModalOptions = {}): void {
+    if (!template) {
+      this.status.set('Modal template is not ready yet.');
+      return;
+    }
+    this.closeModal(key);
+    const modalRef = this.modalService.open(template, {
+      centered: true,
+      scrollable: true,
+      ...options,
+    });
+    this.modalRefs[key] = modalRef;
+    modalRef.result.finally(() => {
+      if (this.modalRefs[key] === modalRef) {
+        delete this.modalRefs[key];
+      }
+    }).catch(() => undefined);
+  }
+
+  private closeModal(key: ModalKey): void {
+    const modalRef = this.modalRefs[key];
+    if (!modalRef) {
+      return;
+    }
+    modalRef.close();
+    delete this.modalRefs[key];
+  }
+
   constructor() {
     effect(() => {
       const message = this.status();
@@ -593,6 +626,7 @@ export class App implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     window.removeEventListener('popstate', this.onPopState);
+    this.modalService.dismissAll();
     if (this.queuePollHandle !== null) {
       clearInterval(this.queuePollHandle);
       this.queuePollHandle = null;
@@ -796,22 +830,22 @@ export class App implements OnInit, OnDestroy {
   }
 
   openToneSaveModal(): void {
-    this.toneSaveModalOpen.set(true);
+    this.openModal('toneSave', this.toneSaveModalTpl, { size: 'lg' });
   }
 
   closeToneSaveModal(): void {
-    this.toneSaveModalOpen.set(false);
+    this.closeModal('toneSave');
   }
 
   openToneDesignerModal(): void {
     this.toneAiMode.set('refine');
     this.clearToneAiPreview();
-    this.toneDesignerModalOpen.set(true);
+    this.openModal('toneDesigner', this.toneDesignerModalTpl, { size: 'xl' });
   }
 
   closeToneDesignerModal(): void {
     this.clearToneAiPreview();
-    this.toneDesignerModalOpen.set(false);
+    this.closeModal('toneDesigner');
   }
 
   setToneAiMode(value: 'refine' | 'ideas' | 'set'): void {
@@ -820,27 +854,27 @@ export class App implements OnInit, OnDestroy {
   }
 
   openToneGroupModal(): void {
-    this.toneGroupModalOpen.set(true);
+    this.openModal('toneGroup', this.toneGroupModalTpl);
   }
 
   closeToneGroupModal(): void {
-    this.toneGroupModalOpen.set(false);
+    this.closeModal('toneGroup');
   }
 
   openToneSetModal(): void {
-    this.toneSetModalOpen.set(true);
+    this.openModal('toneSet', this.toneSetModalTpl, { size: 'xl' });
   }
 
   closeToneSetModal(): void {
-    this.toneSetModalOpen.set(false);
+    this.closeModal('toneSet');
   }
 
   openToneLoadPatchModal(): void {
-    this.toneLoadPatchModalOpen.set(true);
+    this.openModal('toneLoadPatch', this.toneLoadPatchModalTpl);
   }
 
   closeToneLoadPatchModal(): void {
-    this.toneLoadPatchModalOpen.set(false);
+    this.closeModal('toneLoadPatch');
   }
 
   isToneBlockSelected(block: string): boolean {
@@ -1067,7 +1101,7 @@ export class App implements OnInit, OnDestroy {
       this.selectSavedPatch(patchObject);
       this.applyLivePatchStatus(payload as LivePatchResponse);
       this.loadLivePatchIntoEditorState(payload as LivePatchResponse, false);
-      this.toneLoadPatchModalOpen.set(false);
+      this.closeToneLoadPatchModal();
       this.status.set(`Applied ${patchObject.name}`);
       this.responseJson.set(JSON.stringify(payload, null, 2));
     } catch (error: unknown) {
@@ -1128,7 +1162,7 @@ export class App implements OnInit, OnDestroy {
       this.toneSaveName.set('');
       this.toneSaveDescription.set('');
       this.toneSaveGroupId.set('');
-      this.toneSaveModalOpen.set(false);
+      this.closeToneSaveModal();
       await this.loadTonePatchObjects();
       await this.refreshLivePatchStatus();
       this.status.set(`Saved Live Patch selection as ${name}`);
@@ -1185,7 +1219,7 @@ export class App implements OnInit, OnDestroy {
       }
       this.toneGroupName.set('');
       this.toneGroupDescription.set('');
-      this.toneGroupModalOpen.set(false);
+      this.closeToneGroupModal();
       await this.loadToneGroups();
       this.status.set(`Created group ${name}`);
       this.responseJson.set(JSON.stringify(payload, null, 2));
@@ -1237,7 +1271,7 @@ export class App implements OnInit, OnDestroy {
       this.toneManualSetName.set('');
       this.toneManualSetDescription.set('');
       this.toneManualSetSlots.set({});
-      this.toneSetModalOpen.set(false);
+      this.closeToneSetModal();
       await this.loadToneSets();
       this.status.set(`Created set ${name}`);
       this.responseJson.set(JSON.stringify(payload, null, 2));
@@ -1477,7 +1511,7 @@ export class App implements OnInit, OnDestroy {
       }
       this.toneAiSetName.set('');
       this.toneAiDescription.set('');
-      this.toneDesignerModalOpen.set(false);
+      this.closeToneDesignerModal();
       await this.loadTonePatchObjects();
       await this.loadToneSets();
       this.status.set(`Generated AI set ${setName}`);
@@ -1529,7 +1563,7 @@ export class App implements OnInit, OnDestroy {
         return;
       }
       await this.loadTonePatchObjects();
-      this.toneDesignerModalOpen.set(false);
+      this.closeToneDesignerModal();
       this.status.set(`Generated ${payload.length} AI patch${payload.length === 1 ? '' : 'es'}`);
       this.responseJson.set(JSON.stringify(payload, null, 2));
     } catch (error: unknown) {
@@ -1619,7 +1653,7 @@ export class App implements OnInit, OnDestroy {
       this.toneHighlightedPatchObjectId.set(created.id);
       await this.loadTonePatchObjects();
       this.clearToneAiPreview();
-      this.toneDesignerModalOpen.set(false);
+      this.closeToneDesignerModal();
       await this.applyTonePatchObjectToLive(created);
       this.status.set(`Approved AI refinement ${created.name} and applied it live`);
       this.responseJson.set(JSON.stringify(created, null, 2));
@@ -2244,7 +2278,7 @@ export class App implements OnInit, OnDestroy {
       }
       this.patchSamplesRows.set((payload as AudioSampleResponse[]).filter((item) => !item.is_level_marker));
       this.patchSamplesModalTitle.set(`${slot.slot_label} · ${slot.patch_name || 'Unnamed Patch'} Samples`);
-      this.patchSamplesModalOpen.set(true);
+      this.openModal('patchSamples', this.patchSamplesModalTpl, { size: 'lg' });
       this.status.set(`Loaded samples for ${slot.slot_label}`);
     } catch (error: unknown) {
       this.status.set(`Failed loading samples for ${slot.slot_label}`);
@@ -2277,7 +2311,7 @@ export class App implements OnInit, OnDestroy {
       }
       this.patchSamplesRows.set((payload as AudioSampleResponse[]).filter((item) => !item.is_level_marker));
       this.patchSamplesModalTitle.set(`Tone Lab · ${patchObject.name} Samples`);
-      this.patchSamplesModalOpen.set(true);
+      this.openModal('patchSamples', this.patchSamplesModalTpl, { size: 'lg' });
       this.status.set(`Loaded samples for ${patchObject.name}`);
     } catch (error: unknown) {
       this.status.set(`Failed loading samples for ${patchObject.name}`);
@@ -2286,7 +2320,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   closePatchSamplesModal(): void {
-    this.patchSamplesModalOpen.set(false);
+    this.closeModal('patchSamples');
     this.patchSamplesModalTitle.set('');
     this.patchSamplesRows.set([]);
   }
@@ -2318,7 +2352,7 @@ export class App implements OnInit, OnDestroy {
     this.aiModalPrompt.set('Suggest the most useful concrete improvements for this patch. Focus on tone, EQ, gain structure, and clarity.');
     this.aiModalAdvice.set(null);
     this.aiModalError.set('');
-    this.aiModalOpen.set(true);
+    this.openModal('ai', this.aiModalTpl, { size: 'xl' });
   }
 
   openAiLevelModal(slot: SlotCard): void {
@@ -2344,11 +2378,16 @@ export class App implements OnInit, OnDestroy {
         : `${slot.slot_label}: no stored 10s Max RMS yet. The run will measure from the live amp first.`,
       `Default target RMS is ${DEFAULT_TARGET_RMS_DBFS.toFixed(2)} dBFS.`,
     ]);
-    this.autoLevelModalOpen.set(true);
+    this.openModal('autoLevel', this.autoLevelModalTpl, {
+      size: 'xl',
+      backdrop: 'static',
+      keyboard: false,
+      beforeDismiss: () => !this.autoLevelRunning(),
+    });
   }
 
   closeAiModal(): void {
-    this.aiModalOpen.set(false);
+    this.closeModal('ai');
     this.aiModalMode.set('general');
     this.aiModalSlotNumber.set(null);
     this.aiModalSlotLabel.set('');
@@ -2366,7 +2405,7 @@ export class App implements OnInit, OnDestroy {
     if (this.autoLevelRunning()) {
       return;
     }
-    this.autoLevelModalOpen.set(false);
+    this.closeModal('autoLevel');
     this.autoLevelSlotNumber.set(null);
     this.autoLevelSlotLabel.set('');
     this.autoLevelPatchName.set('');
