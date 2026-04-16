@@ -1860,3 +1860,12 @@
   - `@popperjs/core`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-04-16 (Jira Project KW Verified)
+- Verified Jira project `KW` exists in `https://jjrsoftware.atlassian.net`.
+- Confirmed project details from the Jira bridge:
+  - key: `KW`
+  - name: `Katana Web`
+  - project type: `software`
+- Source used:
+  - Jira MCP `post_v1_jira_projects` via session `codex`
