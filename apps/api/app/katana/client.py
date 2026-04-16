@@ -30,6 +30,9 @@ from app.katana.protocol import (
     ADDR_PATCH_SENDRETURN,
     ADDR_PATCH_SOLO_COM,
     ADDR_PATCH_SW,
+    ADDR_LINEOUT_1,
+    ADDR_LINEOUT_2,
+    ADDR_LINEOUT_COM,
     CMDID_EXPORT_ADDR,
     CMDID_PREVIEW_MUTE_ADDR,
     EDITOR_MODE_ON,
@@ -93,6 +96,24 @@ class FullAmpDumpSnapshot:
     amp_state_hash_sha256: str
     total_sync_ms: int
     slots: list[SlotDump]
+
+
+@dataclass(frozen=True)
+class LineOutCustomSnapshot:
+    mic_type: int
+    mic_distance: int
+    mic_position: int
+    ambience_pre_delay: int
+    ambience_level: int
+
+
+@dataclass(frozen=True)
+class LineOutSnapshot:
+    select: int
+    air_feel_mode: int
+    enabled: bool
+    lineout_1: LineOutCustomSnapshot
+    lineout_2: LineOutCustomSnapshot
 
 
 @dataclass(frozen=True)
@@ -342,6 +363,61 @@ class AmpClient:
             busy=False,
             available=True,
             detail="Amp port idle",
+        )
+
+    async def read_line_out_state(self) -> LineOutSnapshot:
+        async with self._port_lock():
+            await self._send_only(EDITOR_MODE_ON)
+            return await self._read_line_out_state_locked()
+
+    async def write_line_out_state(self, payload: dict[str, Any]) -> LineOutSnapshot:
+        async with self._port_lock():
+            await self._send_only(EDITOR_MODE_ON)
+            lineout_com = self._read_compact_raw_block(
+                payload.get("lineout_com"),
+                raw_key="raw",
+                field_names=("select", "air_feel_mode", "enabled"),
+                field_name_prefix="lineout_com",
+            )
+            lineout_1 = self._read_compact_raw_block(
+                payload.get("lineout_1"),
+                raw_key="raw",
+                field_names=("mic_type", "mic_distance", "mic_position", "ambience_pre_delay", "ambience_level"),
+                field_name_prefix="lineout_1",
+            )
+            lineout_2 = self._read_compact_raw_block(
+                payload.get("lineout_2"),
+                raw_key="raw",
+                field_names=("mic_type", "mic_distance", "mic_position", "ambience_pre_delay", "ambience_level"),
+                field_name_prefix="lineout_2",
+            )
+            await self._send_only(build_dt1(ADDR_LINEOUT_COM, lineout_com))
+            await self._send_only(build_dt1(ADDR_LINEOUT_1, lineout_1))
+            await self._send_only(build_dt1(ADDR_LINEOUT_2, lineout_2))
+            return await self._read_line_out_state_locked()
+
+    async def _read_line_out_state_locked(self) -> LineOutSnapshot:
+        lineout_com = await self._read_rq1(ADDR_LINEOUT_COM, 3)
+        lineout_1 = await self._read_rq1(ADDR_LINEOUT_1, 5)
+        lineout_2 = await self._read_rq1(ADDR_LINEOUT_2, 5)
+        return LineOutSnapshot(
+            select=lineout_com[0] if len(lineout_com) >= 1 else 0,
+            air_feel_mode=lineout_com[1] if len(lineout_com) >= 2 else 0,
+            enabled=self._bool_flag(lineout_com[2]) if len(lineout_com) >= 3 else False,
+            lineout_1=LineOutCustomSnapshot(
+                mic_type=lineout_1[0] if len(lineout_1) >= 1 else 0,
+                mic_distance=lineout_1[1] if len(lineout_1) >= 2 else 0,
+                mic_position=lineout_1[2] if len(lineout_1) >= 3 else 0,
+                ambience_pre_delay=lineout_1[3] if len(lineout_1) >= 4 else 0,
+                ambience_level=lineout_1[4] if len(lineout_1) >= 5 else 0,
+            ),
+            lineout_2=LineOutCustomSnapshot(
+                mic_type=lineout_2[0] if len(lineout_2) >= 1 else 0,
+                mic_distance=lineout_2[1] if len(lineout_2) >= 2 else 0,
+                mic_position=lineout_2[2] if len(lineout_2) >= 3 else 0,
+                ambience_pre_delay=lineout_2[3] if len(lineout_2) >= 4 else 0,
+                ambience_level=lineout_2[4] if len(lineout_2) >= 5 else 0,
+            ),
         )
 
     async def _read_selected_patch_payload(self) -> dict[str, Any]:

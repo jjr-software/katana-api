@@ -8,6 +8,9 @@
       <button type="button" class="btn btn-sm" [class.btn-primary]="isSamplesPage()" [class.btn-outline-primary]="!isSamplesPage()" (click)="navigateToPage('samples')">
         Samples
       </button>
+      <button type="button" class="btn btn-sm" [class.btn-primary]="isLineOutPage()" [class.btn-outline-primary]="!isLineOutPage()" (click)="navigateToPage('lineout')">
+        Line Out
+      </button>
     </div>
   </header>
 
@@ -67,21 +70,44 @@
             </span>
             <span>Level Marker RMS: <code>{{ formatDb(levelMarkerRmsDbfs()) }}</code></span>
             <span>Marker At: <code>{{ levelMarkerCapturedAt() || 'n/a' }}</code></span>
-            <span>Live RMS: <code>{{ formatDb(liveRmsDbfs()) }}</code></span>
             <span>Live At: <code>{{ liveMeterAt() || 'n/a' }}</code></span>
           </div>
-          <div class="mt-2 d-flex align-items-center gap-2">
-            <span class="small text-secondary">Live RMS Graph:</span>
-            <svg class="rms-graph" viewBox="0 0 1000 64" preserveAspectRatio="none" aria-label="Live RMS graph">
-              @for (bar of rmsGraphBars(); track $index) {
-                <rect
-                  [attr.x]="bar.x"
-                  [attr.y]="bar.y"
-                  [attr.width]="bar.width"
-                  [attr.height]="bar.height"
-                />
-              }
-            </svg>
+          <div class="mt-2 live-meter-panel">
+            <div class="row g-2">
+              <div class="col-12 col-lg-3">
+                <div class="border rounded p-2 bg-white h-100">
+                  <div class="small text-secondary">Total Level</div>
+                  <div class="d-flex align-items-baseline justify-content-between gap-2">
+                    <span class="fs-5 fw-semibold">{{ formatDb(liveRmsDbfs()) }}</span>
+                    <span class="small text-danger fw-semibold">Max <span class="live-meter-max-value">{{ formatDb(liveRmsMaxDbfs()) }}</span></span>
+                  </div>
+                  <div class="small text-secondary">Current / max hold</div>
+                </div>
+              </div>
+              <div class="col-12 col-lg-9">
+                <div class="border rounded p-2 bg-white">
+                  <div class="small text-secondary mb-2">Frequency Buckets</div>
+                  <div class="live-meter-band-list">
+                    @for (band of liveMeterBandRows(); track band.id) {
+                      <div class="live-meter-band-row">
+                        <div>
+                          <div class="fw-semibold">{{ band.label }}</div>
+                          <div class="small text-secondary">{{ band.rangeLabel }}</div>
+                        </div>
+                        <div class="text-end">
+                          <div class="small text-secondary">Current</div>
+                          <div class="fw-semibold">{{ formatRelativeDb(band.currentDbfs) }}</div>
+                        </div>
+                        <div class="text-end">
+                          <div class="small text-danger">Max</div>
+                          <div class="fw-semibold text-danger live-meter-max-value">{{ formatRelativeDb(band.maxDbfs) }}</div>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -827,6 +853,169 @@
         </div>
       </section>
       </details>
+  </section>
+  } @else if (isLineOutPage()) {
+  <section class="card">
+    <div class="card-body d-grid gap-3">
+      <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+        <div>
+          <h2 class="h5 mb-1">Line Out</h2>
+          <p class="small text-secondary mb-0">Global system-level output simulation. This is separate from patch application.</p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <button type="button" class="btn btn-outline-secondary btn-sm" (click)="loadLineOutState()" [disabled]="lineOutLoading()">
+            {{ lineOutLoading() ? 'Refreshing...' : 'Refresh' }}
+          </button>
+          <button type="button" class="btn btn-outline-primary btn-sm" (click)="saveLineOutState()" [disabled]="lineOutLoading() || lineOutSaving()">
+            {{ lineOutSaving() ? 'Saving...' : 'Save Line Out' }}
+          </button>
+        </div>
+      </div>
+
+      @if (lineOutError()) {
+        <div class="alert alert-danger py-2 mb-0 small" role="alert">{{ lineOutError() }}</div>
+      }
+
+      <div class="row g-3">
+        <div class="col-12 col-lg-4">
+          <article class="border rounded p-3 bg-body-tertiary h-100 d-grid gap-3">
+            <div>
+              <div class="small text-secondary">System</div>
+              <div class="fw-semibold">Line Out Control</div>
+              <div class="small text-secondary">Mode is only editable when the switch is off.</div>
+            </div>
+            <div>
+              <label class="form-label small mb-1">Line Out Switch</label>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" [checked]="lineOutDraft().enabled" (change)="setLineOutEnabled($any($event.target).checked)" />
+                <label class="form-check-label">{{ lineOutDraft().enabled ? 'On' : 'Off' }}</label>
+              </div>
+            </div>
+            <div>
+              <label class="form-label small mb-1">Air Feel Mode</label>
+              <select class="form-select form-select-sm" [disabled]="lineOutDraft().enabled" [value]="lineOutDraft().air_feel_mode" (change)="setLineOutSystemValue('air_feel_mode', $any($event.target).value)">
+                @for (opt of lineOutAirFeelOptions; track opt.value) {
+                  <option [value]="opt.value">{{ opt.label }}</option>
+                }
+              </select>
+            </div>
+            <div>
+              <label class="form-label small mb-1">Custom Memory Select</label>
+              <select class="form-select form-select-sm" [value]="lineOutDraft().select" (change)="setLineOutSystemValue('select', $any($event.target).value)">
+                <option [value]="0">M1</option>
+                <option [value]="1">M2</option>
+              </select>
+            </div>
+            <div class="small text-secondary">
+              Loaded at <code>{{ lineOutReadAt() || 'n/a' }}</code>
+            </div>
+          </article>
+        </div>
+
+        <div class="col-12 col-lg-4">
+          <article class="border rounded p-3 bg-body-tertiary h-100 d-grid gap-3">
+            <div>
+              <div class="small text-secondary">Memory 1</div>
+              <div class="fw-semibold">SYSTEM%LINEOUT(1)</div>
+            </div>
+            <div>
+              <label class="form-label small mb-1">Mic Type</label>
+              <select class="form-select form-select-sm" [value]="lineOutDraft().lineout_1.mic_type" (change)="setLineOutCustomValue('lineout_1', 'mic_type', $any($event.target).value)">
+                @for (opt of lineOutMicTypeOptions; track opt.value) {
+                  <option [value]="opt.value">{{ opt.label }}</option>
+                }
+              </select>
+            </div>
+            <div class="row g-2">
+              <div class="col-12 col-md-6">
+                <label class="form-label small mb-1">Mic Distance</label>
+                <select class="form-select form-select-sm" [value]="lineOutDraft().lineout_1.mic_distance" (change)="setLineOutCustomValue('lineout_1', 'mic_distance', $any($event.target).value)">
+                  @for (opt of lineOutDistanceOptions; track opt.value) {
+                    <option [value]="opt.value">{{ opt.label }}</option>
+                  }
+                </select>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label small mb-1">Mic Position</label>
+                <select class="form-select form-select-sm" [value]="lineOutDraft().lineout_1.mic_position" (change)="setLineOutCustomValue('lineout_1', 'mic_position', $any($event.target).value)">
+                  @for (opt of lineOutPositionOptions; track opt.value) {
+                    <option [value]="opt.value">{{ opt.label }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="form-label small mb-1">Ambience Pre-Delay</label>
+              <div class="editor-range-field">
+                <input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="lineOutDraft().lineout_1.ambience_pre_delay" (input)="setLineOutCustomValue('lineout_1', 'ambience_pre_delay', $any($event.target).value)" />
+                <input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="lineOutDraft().lineout_1.ambience_pre_delay" (input)="setLineOutCustomValue('lineout_1', 'ambience_pre_delay', $any($event.target).value)" />
+              </div>
+            </div>
+            <div>
+              <label class="form-label small mb-1">Ambience Level</label>
+              <div class="editor-range-field">
+                <input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="lineOutDraft().lineout_1.ambience_level" (input)="setLineOutCustomValue('lineout_1', 'ambience_level', $any($event.target).value)" />
+                <input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="lineOutDraft().lineout_1.ambience_level" (input)="setLineOutCustomValue('lineout_1', 'ambience_level', $any($event.target).value)" />
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <div class="col-12 col-lg-4">
+          <article class="border rounded p-3 bg-body-tertiary h-100 d-grid gap-3">
+            <div>
+              <div class="small text-secondary">Memory 2</div>
+              <div class="fw-semibold">SYSTEM%LINEOUT(2)</div>
+            </div>
+            <div>
+              <label class="form-label small mb-1">Mic Type</label>
+              <select class="form-select form-select-sm" [value]="lineOutDraft().lineout_2.mic_type" (change)="setLineOutCustomValue('lineout_2', 'mic_type', $any($event.target).value)">
+                @for (opt of lineOutMicTypeOptions; track opt.value) {
+                  <option [value]="opt.value">{{ opt.label }}</option>
+                }
+              </select>
+            </div>
+            <div class="row g-2">
+              <div class="col-12 col-md-6">
+                <label class="form-label small mb-1">Mic Distance</label>
+                <select class="form-select form-select-sm" [value]="lineOutDraft().lineout_2.mic_distance" (change)="setLineOutCustomValue('lineout_2', 'mic_distance', $any($event.target).value)">
+                  @for (opt of lineOutDistanceOptions; track opt.value) {
+                    <option [value]="opt.value">{{ opt.label }}</option>
+                  }
+                </select>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label small mb-1">Mic Position</label>
+                <select class="form-select form-select-sm" [value]="lineOutDraft().lineout_2.mic_position" (change)="setLineOutCustomValue('lineout_2', 'mic_position', $any($event.target).value)">
+                  @for (opt of lineOutPositionOptions; track opt.value) {
+                    <option [value]="opt.value">{{ opt.label }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="form-label small mb-1">Ambience Pre-Delay</label>
+              <div class="editor-range-field">
+                <input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="lineOutDraft().lineout_2.ambience_pre_delay" (input)="setLineOutCustomValue('lineout_2', 'ambience_pre_delay', $any($event.target).value)" />
+                <input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="lineOutDraft().lineout_2.ambience_pre_delay" (input)="setLineOutCustomValue('lineout_2', 'ambience_pre_delay', $any($event.target).value)" />
+              </div>
+            </div>
+            <div>
+              <label class="form-label small mb-1">Ambience Level</label>
+              <div class="editor-range-field">
+                <input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="lineOutDraft().lineout_2.ambience_level" (input)="setLineOutCustomValue('lineout_2', 'ambience_level', $any($event.target).value)" />
+                <input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="lineOutDraft().lineout_2.ambience_level" (input)="setLineOutCustomValue('lineout_2', 'ambience_level', $any($event.target).value)" />
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+
+      <details>
+        <summary class="small text-secondary">Raw Line Out Response</summary>
+        <pre class="raw-modal-json mt-2 mb-0">{{ responseJson() }}</pre>
+      </details>
+    </div>
   </section>
   } @else {
   <section class="card">

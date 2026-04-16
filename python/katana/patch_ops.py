@@ -17,10 +17,6 @@ ADDR_SW = (0x20, 0x00, 0x08, 0x00)
 ADDR_RVB_1 = (0x20, 0x00, 0x34, 0x0A)
 ADDR_RVB_2 = (0x20, 0x00, 0x36, 0x0A)
 ADDR_RVB_3 = (0x20, 0x00, 0x38, 0x0A)
-ADDR_LINEOUT_1_PRE = (0x10, 0x00, 0x1A, 0x03)
-ADDR_LINEOUT_1_LVL = (0x10, 0x00, 0x1A, 0x04)
-ADDR_LINEOUT_2_PRE = (0x10, 0x00, 0x1C, 0x03)
-ADDR_LINEOUT_2_LVL = (0x10, 0x00, 0x1C, 0x04)
 ADDR_PEDALFX_COM = (0x20, 0x00, 0x48, 0x00)
 ADDR_EQ_EACH_1 = (0x20, 0x00, 0x4C, 0x00)
 ADDR_EQ_EACH_2 = (0x20, 0x00, 0x4E, 0x00)
@@ -169,22 +165,9 @@ async def apply_patch(transport: AmidiTransport, patch: KatanaPatch, slot: int =
     await transport.send_dt1(ADDR_EQ_SWITCH, [0x01, 0x00, 0x00])
     await transport.send_dt1(ADDR_GE10, patch.ge10_raw)
     await transport.send_dt1(ADDR_NS, patch.ns)
-    if patch.dry_default:
-        await apply_dry_defaults(transport)
     if store:
         await transport.write_patch(slot)
         await asyncio.sleep(0.25)
-
-
-async def apply_dry_defaults(transport: AmidiTransport) -> None:
-    await transport.send_dt1(ADDR_SW, [0x01, 0x00, 0x00, 0x00, 0x00, 0x00])
-    await transport.send_dt1(ADDR_RVB_1, [0x00])
-    await transport.send_dt1(ADDR_RVB_2, [0x00])
-    await transport.send_dt1(ADDR_RVB_3, [0x00])
-    await transport.send_dt1(ADDR_LINEOUT_1_PRE, [0x00])
-    await transport.send_dt1(ADDR_LINEOUT_1_LVL, [0x00])
-    await transport.send_dt1(ADDR_LINEOUT_2_PRE, [0x00])
-    await transport.send_dt1(ADDR_LINEOUT_2_LVL, [0x00])
 
 
 async def pull_patch(transport: AmidiTransport) -> KatanaPatch:

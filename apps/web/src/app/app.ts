@@ -96,6 +96,34 @@ interface ValueOption {
   label: string;
 }
 
+interface LiveMeterBandRow {
+  id: string;
+  label: string;
+  rangeLabel: string;
+  currentDbfs: number | null;
+  maxDbfs: number | null;
+}
+
+interface LineOutCustomState {
+  mic_type: number;
+  mic_distance: number;
+  mic_position: number;
+  ambience_pre_delay: number;
+  ambience_level: number;
+}
+
+interface LineOutState {
+  select: number;
+  air_feel_mode: number;
+  enabled: boolean;
+  lineout_1: LineOutCustomState;
+  lineout_2: LineOutCustomState;
+}
+
+interface LineOutResponse extends LineOutState {
+  read_at: string;
+}
+
 const buildValueOptions = (labels: readonly string[]): ValueOption[] => labels.map((label, value) => ({ value, label }));
 
 const EQ_PEQ_PARAM_SCHEMA: ReadonlyArray<{ key: string; label: string; index: number; min: number; max: number; offset?: number; options?: ValueOption[] }> = [
@@ -119,7 +147,25 @@ const EQ_PEQ_PARAM_GROUPS: ReadonlyArray<{ id: string; label: string; keys: read
   { id: 'high', label: 'High', keys: ['high_gain'] },
   { id: 'level', label: 'Output', keys: ['level'] },
 ];
-const LIVE_RMS_WINDOW_POINTS = 96;
+const LINE_OUT_AIR_FEEL_OPTIONS: ReadonlyArray<ValueOption> = [
+  { value: 0, label: 'REC' },
+  { value: 1, label: 'LIVE' },
+  { value: 2, label: 'BLEND' },
+];
+const LINE_OUT_MIC_TYPE_OPTIONS: ReadonlyArray<ValueOption> = buildValueOptions(['DYN57', 'DYN421', 'CND451', 'CND87', 'RBN121']);
+const LINE_OUT_DISTANCE_OPTIONS: ReadonlyArray<ValueOption> = Array.from({ length: 21 }, (_, value) => ({ value, label: `${value} cm` }));
+const LINE_OUT_POSITION_OPTIONS: ReadonlyArray<ValueOption> = Array.from({ length: 11 }, (_, value) => ({ value, label: `${value} cm` }));
+const LIVE_FFT_MIN_FREQ_HZ = 60;
+const LIVE_FFT_MAX_FREQ_HZ = 12_000;
+const LIVE_METER_DEFAULT_RATE = 48_000;
+const LIVE_FFT_BANDS = [
+  { id: 'sub', label: 'Sub', minHz: 60, maxHz: 120 },
+  { id: 'bass', label: 'Bass', minHz: 120, maxHz: 250 },
+  { id: 'low-mid', label: 'Low Mid', minHz: 250, maxHz: 500 },
+  { id: 'mid', label: 'Mid', minHz: 500, maxHz: 2_000 },
+  { id: 'presence', label: 'Presence', minHz: 2_000, maxHz: 6_000 },
+  { id: 'air', label: 'Air', minHz: 6_000, maxHz: 12_000 },
+] as const;
 const DEFAULT_TARGET_RMS_DBFS = -31.0;
 const AUTO_LEVEL_TOLERANCE_DB = 0.4;
 const AUTO_LEVEL_MEASURE_SEC = 2.0;
@@ -452,7 +498,7 @@ export class App implements OnInit, OnDestroy {
   private readonly modalService = inject(NgbModal);
   private readonly modalRefs: Partial<Record<ModalKey, NgbModalRef>> = {};
 
-  currentPage = signal<'dashboard' | 'samples'>(this.resolvePageFromPath());
+  currentPage = signal<'dashboard' | 'lineout' | 'samples'>(this.resolvePageFromPath());
   status = signal('Idle');
   responseJson = signal('');
   slots = signal<SlotCard[]>(defaultSlotCards());
@@ -478,11 +524,22 @@ export class App implements OnInit, OnDestroy {
   levelMarkerPeakDbfs = signal<number | null>(null);
   levelMarkerCapturedAt = signal('');
   liveRmsDbfs = signal<number | null>(null);
-  livePeakDbfs = signal<number | null>(null);
+  liveRmsMaxDbfs = signal<number | null>(null);
   liveFftBinsDb = signal<number[]>([]);
+  liveMeterRate = signal(LIVE_METER_DEFAULT_RATE);
+  liveFrequencyBandMaxDbfs = signal<Array<number | null>>([]);
   liveMeterAt = signal('');
   liveMeterConnected = signal(false);
-  liveRmsHistory = signal<number[]>([]);
+  lineOutState = signal<LineOutResponse | null>(null);
+  lineOutDraft = signal<LineOutState>(this.defaultLineOutState());
+  lineOutReadAt = signal('');
+  lineOutLoading = signal(false);
+  lineOutSaving = signal(false);
+  lineOutError = signal('');
+  readonly lineOutAirFeelOptions = LINE_OUT_AIR_FEEL_OPTIONS;
+  readonly lineOutMicTypeOptions = LINE_OUT_MIC_TYPE_OPTIONS;
+  readonly lineOutDistanceOptions = LINE_OUT_DISTANCE_OPTIONS;
+  readonly lineOutPositionOptions = LINE_OUT_POSITION_OPTIONS;
   recentSamples = signal<AudioSampleResponse[]>([]);
   isMeasuringActivePatch = signal(false);
   measureCountdownSec = signal(0);
@@ -564,7 +621,14 @@ export class App implements OnInit, OnDestroy {
   private queueJobStatusById = new Map<string, QueueJobSummary['status']>();
   private queueNotificationsInitialized = false;
   private readonly onPopState = (): void => {
-    this.currentPage.set(this.resolvePageFromPath());
+    const page = this.resolvePageFromPath();
+    this.currentPage.set(page);
+    if (page === 'lineout') {
+      void this.loadLineOutState();
+    }
+    if (page === 'samples') {
+      void this.loadRecentAudioSamples();
+    }
   };
 
   private openModal(key: ModalKey, template: TemplateRef<unknown> | undefined, options: NgbModalOptions = {}): void {
@@ -612,6 +676,9 @@ export class App implements OnInit, OnDestroy {
     void this.loadAudioLevelMarker();
     void this.loadRecentAudioSamples();
     void this.loadToneLabData();
+    if (this.isLineOutPage()) {
+      void this.loadLineOutState();
+    }
     void this.refreshActiveSlot();
     void this.refreshLivePatchStatus();
     void this.bootstrapLivePatchEditor();
@@ -2639,12 +2706,15 @@ export class App implements OnInit, OnDestroy {
     return payload as AiPatchAdviceResponse;
   }
 
-  navigateToPage(page: 'dashboard' | 'samples'): void {
-    const targetPath = page === 'samples' ? '/samples' : '/';
+  navigateToPage(page: 'dashboard' | 'lineout' | 'samples'): void {
+    const targetPath = page === 'samples' ? '/samples' : page === 'lineout' ? '/line-out' : '/';
     if (window.location.pathname !== targetPath) {
       window.history.pushState({}, '', targetPath);
     }
     this.currentPage.set(page);
+    if (page === 'lineout') {
+      void this.loadLineOutState();
+    }
     if (page === 'samples') {
       void this.loadRecentAudioSamples();
     }
@@ -2658,6 +2728,171 @@ export class App implements OnInit, OnDestroy {
     return this.currentPage() === 'dashboard';
   }
 
+  isLineOutPage(): boolean {
+    return this.currentPage() === 'lineout';
+  }
+
+  async loadLineOutState(): Promise<void> {
+    this.lineOutLoading.set(true);
+    this.lineOutError.set('');
+    try {
+      const response = await fetch('/api/v1/amp/line-out', {
+        method: 'GET',
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as LineOutResponse | { detail?: unknown };
+      if (!response.ok || !('lineout_com' in payload)) {
+        this.lineOutError.set('Failed to load line out state.');
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      const state = payload as LineOutResponse;
+      this.lineOutState.set(state);
+      this.lineOutDraft.set(this.cloneLineOutState(state));
+      this.lineOutReadAt.set(state.read_at);
+      this.status.set('Loaded line out state');
+      this.responseJson.set(JSON.stringify(state, null, 2));
+    } catch (error: unknown) {
+      this.lineOutError.set('Failed to load line out state.');
+      this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
+    } finally {
+      this.lineOutLoading.set(false);
+    }
+  }
+
+  async saveLineOutState(): Promise<void> {
+    const draft = this.lineOutDraft();
+    this.lineOutSaving.set(true);
+    this.lineOutError.set('');
+    try {
+      const response = await fetch('/api/v1/amp/line-out', {
+        method: 'PUT',
+        cache: 'no-store',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(draft),
+      });
+      const payload = (await response.json()) as LineOutResponse | { detail?: unknown };
+      if (!response.ok || !('lineout_com' in payload)) {
+        this.lineOutError.set('Failed to save line out state.');
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      const state = payload as LineOutResponse;
+      this.lineOutState.set(state);
+      this.lineOutDraft.set(this.cloneLineOutState(state));
+      this.lineOutReadAt.set(state.read_at);
+      this.status.set('Saved line out state');
+      this.responseJson.set(JSON.stringify(state, null, 2));
+    } catch (error: unknown) {
+      this.lineOutError.set('Failed to save line out state.');
+      this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
+    } finally {
+      this.lineOutSaving.set(false);
+    }
+  }
+
+  lineOutModeLabel(value: number | null): string {
+    if (value === null || !Number.isFinite(value)) {
+      return 'n/a';
+    }
+    return this.lineOutAirFeelOptions.find((option) => option.value === value)?.label ?? `Mode ${value}`;
+  }
+
+  lineOutMicTypeLabel(value: number | null): string {
+    if (value === null || !Number.isFinite(value)) {
+      return 'n/a';
+    }
+    return this.lineOutMicTypeOptions.find((option) => option.value === value)?.label ?? `Type ${value}`;
+  }
+
+  lineOutCmLabel(value: number | null): string {
+    if (value === null || !Number.isFinite(value)) {
+      return 'n/a';
+    }
+    return `${value} cm`;
+  }
+
+  setLineOutSystemValue(field: 'select' | 'air_feel_mode', value: string): void {
+    const parsed = this.parseInteger(value);
+    if (parsed === null) {
+      return;
+    }
+    this.lineOutDraft.update((current) => ({
+      ...current,
+      [field]: field === 'select'
+        ? this.clampInteger(parsed, 0, 1)
+        : this.clampInteger(parsed, 0, 2),
+    }));
+  }
+
+  setLineOutEnabled(checked: boolean): void {
+    this.lineOutDraft.update((current) => ({
+      ...current,
+      enabled: checked,
+    }));
+  }
+
+  setLineOutCustomValue(section: 'lineout_1' | 'lineout_2', field: keyof LineOutCustomState, value: string): void {
+    const parsed = this.parseInteger(value);
+    if (parsed === null) {
+      return;
+    }
+    this.lineOutDraft.update((current) => ({
+      ...current,
+      [section]: {
+        ...current[section],
+        [field]: this.clampLineOutFieldValue(field, parsed),
+      },
+    }));
+  }
+
+  defaultLineOutState(): LineOutState {
+    return {
+      select: 0,
+      air_feel_mode: 0,
+      enabled: false,
+      lineout_1: {
+        mic_type: 2,
+        mic_distance: 2,
+        mic_position: 2,
+        ambience_pre_delay: 0,
+        ambience_level: 0,
+      },
+      lineout_2: {
+        mic_type: 2,
+        mic_distance: 2,
+        mic_position: 2,
+        ambience_pre_delay: 0,
+        ambience_level: 0,
+      },
+    };
+  }
+
+  private cloneLineOutState(state: LineOutState): LineOutState {
+    return {
+      select: state.select,
+      air_feel_mode: state.air_feel_mode,
+      enabled: state.enabled,
+      lineout_1: { ...state.lineout_1 },
+      lineout_2: { ...state.lineout_2 },
+    };
+  }
+
+  private clampLineOutFieldValue(field: keyof LineOutCustomState, value: number): number {
+    if (field === 'mic_type') {
+      return this.clampInteger(value, 0, 4);
+    }
+    if (field === 'mic_distance') {
+      return this.clampInteger(value, 0, 20);
+    }
+    if (field === 'mic_position') {
+      return this.clampInteger(value, 0, 10);
+    }
+    return this.clampInteger(value, 0, 100);
+  }
+
   startLiveMeter(): void {
     this.liveMeterShouldRun = true;
     this.disconnectLiveMeter();
@@ -2667,6 +2902,10 @@ export class App implements OnInit, OnDestroy {
         const payload = JSON.parse(event.data) as Record<string, unknown>;
         const eventType = String(payload['type'] ?? '');
         if (eventType === 'connected') {
+          const rate = Number(payload['rate']);
+          if (Number.isFinite(rate) && rate > 0) {
+            this.liveMeterRate.set(rate);
+          }
           this.liveMeterConnected.set(true);
           return;
         }
@@ -2674,14 +2913,10 @@ export class App implements OnInit, OnDestroy {
           return;
         }
         const rms = Number(payload['rms_dbfs']);
-        const peak = Number(payload['peak_dbfs']);
         const ts = String(payload['ts'] ?? '');
         if (Number.isFinite(rms)) {
           this.liveRmsDbfs.set(rms);
-          this.pushLiveRmsPoint(rms);
-        }
-        if (Number.isFinite(peak)) {
-          this.livePeakDbfs.set(peak);
+          this.liveRmsMaxDbfs.update((current) => (current === null || rms > current ? rms : current));
         }
         const fftBinsUnknown = payload['fft_bins_db'];
         if (Array.isArray(fftBinsUnknown)) {
@@ -2689,6 +2924,8 @@ export class App implements OnInit, OnDestroy {
             .map((item) => (typeof item === 'number' && Number.isFinite(item) ? item : null))
             .filter((item): item is number => item !== null);
           this.liveFftBinsDb.set(fftBins);
+          const currentBands = this.buildLiveMeterBandRows(fftBins);
+          this.liveFrequencyBandMaxDbfs.update((current) => this.mergeLiveMeterBandMax(current, currentBands));
         }
         this.liveMeterAt.set(ts);
       } catch (error: unknown) {
@@ -2725,7 +2962,7 @@ export class App implements OnInit, OnDestroy {
     this.liveMeterShouldRun = false;
     this.clearLiveMeterReconnect();
     this.disconnectLiveMeter();
-    this.liveFftBinsDb.set([]);
+    this.resetLiveMeterDisplay();
   }
 
   private disconnectLiveMeter(): void {
@@ -2734,6 +2971,15 @@ export class App implements OnInit, OnDestroy {
       this.liveMeterSource = null;
     }
     this.liveMeterConnected.set(false);
+  }
+
+  private resetLiveMeterDisplay(): void {
+    this.liveRmsDbfs.set(null);
+    this.liveRmsMaxDbfs.set(null);
+    this.liveFftBinsDb.set([]);
+    this.liveFrequencyBandMaxDbfs.set([]);
+    this.liveMeterRate.set(LIVE_METER_DEFAULT_RATE);
+    this.liveMeterAt.set('');
   }
 
   private scheduleLiveMeterReconnect(): void {
@@ -2760,72 +3006,91 @@ export class App implements OnInit, OnDestroy {
     return this.liveMeterConnected() ? 'Stop Live Meter' : 'Start Live Meter';
   }
 
-  rmsGraphPoints(): string {
-    const values = this.liveRmsHistory();
-    if (values.length === 0) {
-      return '';
-    }
-    const width = 220;
-    const height = 64;
-    const minDb = -90;
-    const maxDb = 0;
-    if (values.length === 1) {
-      const y = this.rmsToGraphY(values[0], minDb, maxDb, height);
-      return `0,${y.toFixed(1)} ${width},${y.toFixed(1)}`;
-    }
-    const step = width / (values.length - 1);
-    return values
-      .map((value, idx) => {
-        const x = idx * step;
-        const y = this.rmsToGraphY(value, minDb, maxDb, height);
-        return `${x.toFixed(1)},${y.toFixed(1)}`;
-      })
-      .join(' ');
+  liveMeterBandRows(): LiveMeterBandRow[] {
+    const currentBands = this.buildLiveMeterBandRows(this.liveFftBinsDb());
+    const maxBands = this.liveFrequencyBandMaxDbfs();
+    return currentBands.map((band, index) => ({
+      ...band,
+      maxDbfs: index < maxBands.length ? maxBands[index] ?? null : null,
+    }));
   }
 
-  rmsGraphBars(): Array<{ x: number; y: number; width: number; height: number }> {
-    const values = this.liveRmsHistory();
-    if (values.length === 0) {
-      return [];
+  formatRelativeDb(value: number | null): string {
+    if (value === null || !Number.isFinite(value)) {
+      return 'n/a';
     }
-    const graphWidth = 1000;
-    const graphHeight = 64;
-    const minDb = -90;
-    const maxDb = 0;
-    const step = graphWidth / LIVE_RMS_WINDOW_POINTS;
-    const barWidth = Math.max(1, step * 0.7);
-    const startIndex = Math.max(0, LIVE_RMS_WINDOW_POINTS - values.length);
-    return values.map((value, idx) => {
-      const y = this.rmsToGraphY(value, minDb, maxDb, graphHeight);
-      const x = ((startIndex + idx) * step) + ((step - barWidth) / 2);
-      const height = Math.max(1, graphHeight - y);
+    return `${value.toFixed(2)} dB`;
+  }
+
+  private buildLiveMeterBandRows(bins: number[]): LiveMeterBandRow[] {
+    const currentRate = Math.max(1, this.liveMeterRate());
+    const maxFreq = Math.max(LIVE_FFT_MIN_FREQ_HZ + 1, Math.min(LIVE_FFT_MAX_FREQ_HZ, currentRate / 2));
+    return LIVE_FFT_BANDS.map((band) => {
+      const currentValues: number[] = [];
+      const binCount = bins.length;
+      for (let index = 0; index < binCount; index += 1) {
+        const centerFreq = this.liveFftBinCenterHz(index, binCount, LIVE_FFT_MIN_FREQ_HZ, maxFreq);
+        const withinBand = band.id === LIVE_FFT_BANDS[LIVE_FFT_BANDS.length - 1].id
+          ? centerFreq >= band.minHz && centerFreq <= band.maxHz
+          : centerFreq >= band.minHz && centerFreq < band.maxHz;
+        if (!withinBand) {
+          continue;
+        }
+        const value = bins[index];
+        if (!Number.isFinite(value)) {
+          continue;
+        }
+        currentValues.push(value);
+      }
+      if (currentValues.length === 0) {
+        return {
+          id: band.id,
+          label: band.label,
+          rangeLabel: `${band.minHz} Hz - ${band.maxHz} Hz`,
+          currentDbfs: null,
+          maxDbfs: null,
+        };
+      }
+      const meanPower = currentValues.reduce((acc, value) => acc + 10 ** (value / 10), 0) / currentValues.length;
       return {
-        x,
-        y,
-        width: barWidth,
-        height,
+        id: band.id,
+        label: band.label,
+        rangeLabel: `${band.minHz} Hz - ${band.maxHz} Hz`,
+        currentDbfs: Math.max(-60, Math.min(0, Number((10 * Math.log10(meanPower)).toFixed(2)))),
+        maxDbfs: null,
       };
     });
   }
 
-  private pushLiveRmsPoint(value: number): void {
-    this.liveRmsHistory.update((current) => {
-      const next = [...current, value];
-      if (next.length > LIVE_RMS_WINDOW_POINTS) {
-        return next.slice(next.length - LIVE_RMS_WINDOW_POINTS);
+  private liveFftBinCenterHz(index: number, binCount: number, minFreq: number, maxFreq: number): number {
+    const logMin = Math.log10(minFreq);
+    const logMax = Math.log10(maxFreq);
+    const startFreq = 10 ** (logMin + (index / binCount) * (logMax - logMin));
+    const endFreq = 10 ** (logMin + ((index + 1) / binCount) * (logMax - logMin));
+    return Math.sqrt(startFreq * endFreq);
+  }
+
+  private mergeLiveMeterBandMax(previous: Array<number | null>, current: LiveMeterBandRow[]): Array<number | null> {
+    return current.map((band, index) => {
+      if (band.currentDbfs === null || !Number.isFinite(band.currentDbfs)) {
+        return index < previous.length ? previous[index] ?? null : null;
       }
-      return next;
+      const prior = index < previous.length ? previous[index] : null;
+      if (prior === null || !Number.isFinite(prior)) {
+        return band.currentDbfs;
+      }
+      return Math.max(prior, band.currentDbfs);
     });
   }
 
-  private rmsToGraphY(value: number, minDb: number, maxDb: number, height: number): number {
-    const clamped = Math.max(minDb, Math.min(maxDb, value));
-    const normalized = (clamped - minDb) / (maxDb - minDb);
-    return (1 - normalized) * height;
-  }
-
-  private resolvePageFromPath(): 'dashboard' | 'samples' {
-    return window.location.pathname === '/samples' ? 'samples' : 'dashboard';
+  private resolvePageFromPath(): 'dashboard' | 'lineout' | 'samples' {
+    if (window.location.pathname === '/samples') {
+      return 'samples';
+    }
+    if (window.location.pathname === '/line-out') {
+      return 'lineout';
+    }
+    return 'dashboard';
   }
 
   canUseSlotActions(slot: SlotCard): boolean {

@@ -3,13 +3,13 @@ from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.amp_queue import amp_job_queue
 from app.deps import get_amp_client, get_db
-from app.katana import AmpClient, QuickSlotName, SlotDump, SlotPatchSummary, slot_label
+from app.katana import AmpClient, LineOutSnapshot, QuickSlotName, SlotDump, SlotPatchSummary, slot_label
 from app.live_patch_state import upsert_live_patch_state
 from app.models import AmpSyncHistory, PatchConfig, PatchSet, PatchSetMember
 
@@ -34,6 +34,41 @@ class ActiveSlotResponse(BaseModel):
     slot_label: str
     patch_name: str
     read_at: str
+
+
+class LineOutCustomResponse(BaseModel):
+    mic_type: int = Field(ge=0, le=4)
+    mic_distance: int = Field(ge=0, le=20)
+    mic_position: int = Field(ge=0, le=10)
+    ambience_pre_delay: int = Field(ge=0, le=100)
+    ambience_level: int = Field(ge=0, le=100)
+
+
+class LineOutSystemResponse(BaseModel):
+    select: int = Field(ge=0, le=1)
+    air_feel_mode: int = Field(ge=0, le=2)
+    enabled: bool
+
+
+class LineOutStateResponse(BaseModel):
+    read_at: str
+    lineout_com: LineOutSystemResponse
+    lineout_1: LineOutCustomResponse
+    lineout_2: LineOutCustomResponse
+
+
+class LineOutCustomWriteRequest(BaseModel):
+    mic_type: int = Field(ge=0, le=4)
+    mic_distance: int = Field(ge=0, le=20)
+    mic_position: int = Field(ge=0, le=10)
+    ambience_pre_delay: int = Field(ge=0, le=100)
+    ambience_level: int = Field(ge=0, le=100)
+
+
+class LineOutStateWriteRequest(BaseModel):
+    lineout_com: LineOutSystemResponse
+    lineout_1: LineOutCustomWriteRequest
+    lineout_2: LineOutCustomWriteRequest
 
 
 class ApplyCurrentPatchRequest(BaseModel):
@@ -321,6 +356,23 @@ async def current_slot(client: AmpClient = Depends(get_amp_client)) -> ActiveSlo
         patch_name=active.patch_name,
         read_at=read_at,
     )
+
+
+@router.get("/line-out", response_model=LineOutStateResponse)
+async def read_line_out(client: AmpClient = Depends(get_amp_client)) -> LineOutStateResponse:
+    read_at = datetime.now().isoformat(timespec="seconds")
+    state = await client.read_line_out_state()
+    return _line_out_response(state=state, read_at=read_at)
+
+
+@router.put("/line-out", response_model=LineOutStateResponse)
+async def write_line_out(
+    payload: LineOutStateWriteRequest,
+    client: AmpClient = Depends(get_amp_client),
+) -> LineOutStateResponse:
+    read_at = datetime.now().isoformat(timespec="seconds")
+    state = await client.write_line_out_state(payload.model_dump())
+    return _line_out_response(state=state, read_at=read_at)
 
 
 @router.post("/current-patch/live-apply", response_model=ApplyCurrentPatchResponse)
@@ -867,6 +919,31 @@ def _slot_to_dict(
         "slot_sync_ms": slot.slot_sync_ms,
         "curated": curated_by_hash.get(slot.config_hash_sha256, []),
     }
+
+
+def _line_out_response(state: LineOutSnapshot, read_at: str) -> LineOutStateResponse:
+    return LineOutStateResponse(
+        read_at=read_at,
+        lineout_com=LineOutSystemResponse(
+            select=state.select,
+            air_feel_mode=state.air_feel_mode,
+            enabled=state.enabled,
+        ),
+        lineout_1=LineOutCustomResponse(
+            mic_type=state.lineout_1.mic_type,
+            mic_distance=state.lineout_1.mic_distance,
+            mic_position=state.lineout_1.mic_position,
+            ambience_pre_delay=state.lineout_1.ambience_pre_delay,
+            ambience_level=state.lineout_1.ambience_level,
+        ),
+        lineout_2=LineOutCustomResponse(
+            mic_type=state.lineout_2.mic_type,
+            mic_distance=state.lineout_2.mic_distance,
+            mic_position=state.lineout_2.mic_position,
+            ambience_pre_delay=state.lineout_2.ambience_pre_delay,
+            ambience_level=state.lineout_2.ambience_level,
+        ),
+    )
 
 
 def _job_elapsed_ms(job: object) -> int:
