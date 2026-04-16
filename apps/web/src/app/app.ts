@@ -120,8 +120,23 @@ interface LineOutState {
   lineout_2: LineOutCustomState;
 }
 
-interface LineOutResponse extends LineOutState {
+interface LineOutResponse {
   read_at: string;
+  lineout_com: LineOutSystemState;
+  lineout_1: LineOutCustomState;
+  lineout_2: LineOutCustomState;
+}
+
+interface LineOutWriteRequest {
+  lineout_com: LineOutSystemState;
+  lineout_1: LineOutCustomState;
+  lineout_2: LineOutCustomState;
+}
+
+interface LineOutSystemState {
+  select: number;
+  air_feel_mode: number;
+  enabled: boolean;
 }
 
 const buildValueOptions = (labels: readonly string[]): ValueOption[] => labels.map((label, value) => ({ value, label }));
@@ -2748,7 +2763,7 @@ export class App implements OnInit, OnDestroy {
       }
       const state = payload as LineOutResponse;
       this.lineOutState.set(state);
-      this.lineOutDraft.set(this.cloneLineOutState(state));
+      this.lineOutDraft.set(this.lineOutStateToDraft(state));
       this.lineOutReadAt.set(state.read_at);
       this.status.set('Loaded line out state');
       this.responseJson.set(JSON.stringify(state, null, 2));
@@ -2765,13 +2780,14 @@ export class App implements OnInit, OnDestroy {
     this.lineOutSaving.set(true);
     this.lineOutError.set('');
     try {
+      const request = this.lineOutDraftToRequest(draft);
       const response = await fetch('/api/v1/amp/line-out', {
         method: 'PUT',
         cache: 'no-store',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(draft),
+        body: JSON.stringify(request),
       });
       const payload = (await response.json()) as LineOutResponse | { detail?: unknown };
       if (!response.ok || !('lineout_com' in payload)) {
@@ -2781,7 +2797,7 @@ export class App implements OnInit, OnDestroy {
       }
       const state = payload as LineOutResponse;
       this.lineOutState.set(state);
-      this.lineOutDraft.set(this.cloneLineOutState(state));
+      this.lineOutDraft.set(this.lineOutStateToDraft(state));
       this.lineOutReadAt.set(state.read_at);
       this.status.set('Saved line out state');
       this.responseJson.set(JSON.stringify(state, null, 2));
@@ -2875,6 +2891,28 @@ export class App implements OnInit, OnDestroy {
       select: state.select,
       air_feel_mode: state.air_feel_mode,
       enabled: state.enabled,
+      lineout_1: { ...state.lineout_1 },
+      lineout_2: { ...state.lineout_2 },
+    };
+  }
+
+  private lineOutStateToDraft(state: LineOutResponse): LineOutState {
+    return {
+      select: state.lineout_com.select,
+      air_feel_mode: state.lineout_com.air_feel_mode,
+      enabled: state.lineout_com.enabled,
+      lineout_1: { ...state.lineout_1 },
+      lineout_2: { ...state.lineout_2 },
+    };
+  }
+
+  private lineOutDraftToRequest(state: LineOutState): LineOutWriteRequest {
+    return {
+      lineout_com: {
+        select: state.select,
+        air_feel_mode: state.air_feel_mode,
+        enabled: state.enabled,
+      },
       lineout_1: { ...state.lineout_1 },
       lineout_2: { ...state.lineout_2 },
     };
