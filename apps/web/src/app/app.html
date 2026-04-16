@@ -872,6 +872,19 @@
         </div>
       </div>
 
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <span class="badge rounded-pill" [class.text-bg-success]="lineOutDraft().enabled" [class.text-bg-secondary]="!lineOutDraft().enabled">
+          {{ lineOutDraft().enabled ? 'Active' : 'Bypassed' }}
+        </span>
+        <span class="badge rounded-pill text-bg-primary">Mode {{ lineOutModeLabel(lineOutDraft().air_feel_mode) }}</span>
+        <span class="badge rounded-pill text-bg-dark">Memory {{ lineOutMemoryLabel(lineOutDraft().select) }}</span>
+        <span class="badge rounded-pill text-bg-light border text-secondary">Loaded {{ lineOutReadAt() || 'n/a' }}</span>
+      </div>
+
+      <div class="alert alert-info py-2 mb-0 small" role="alert">
+        Turn the switch off to edit Air Feel, set up the active memory, then save. Turn it back on to engage that Line Out state.
+      </div>
+
       @if (lineOutError()) {
         <div class="alert alert-danger py-2 mb-0 small" role="alert">{{ lineOutError() }}</div>
       }
@@ -893,21 +906,43 @@
             </div>
             <div>
               <label class="form-label small mb-1">Air Feel Mode</label>
-              <select class="form-select form-select-sm" [disabled]="lineOutDraft().enabled" [value]="lineOutDraft().air_feel_mode" (change)="setLineOutSystemValue('air_feel_mode', $any($event.target).value)">
+              <div class="btn-group btn-group-sm d-flex lineout-toggle-group" role="group" aria-label="Air Feel Mode">
                 @for (opt of lineOutAirFeelOptions; track opt.value) {
-                  <option [value]="opt.value">{{ opt.label }}</option>
+                  <button
+                    type="button"
+                    class="btn flex-fill"
+                    [class.btn-primary]="lineOutDraft().air_feel_mode === opt.value"
+                    [class.btn-outline-primary]="lineOutDraft().air_feel_mode !== opt.value"
+                    [disabled]="lineOutDraft().enabled"
+                    (click)="setLineOutSystemValue('air_feel_mode', opt.value)">
+                    {{ opt.label }}
+                  </button>
                 }
-              </select>
+              </div>
             </div>
             <div>
               <label class="form-label small mb-1">Custom Memory Select</label>
-              <select class="form-select form-select-sm" [value]="lineOutDraft().select" (change)="setLineOutSystemValue('select', $any($event.target).value)">
-                <option [value]="0">M1</option>
-                <option [value]="1">M2</option>
-              </select>
+              <div class="btn-group btn-group-sm d-flex lineout-toggle-group" role="group" aria-label="Custom Memory Select">
+                <button
+                  type="button"
+                  class="btn flex-fill"
+                  [class.btn-dark]="lineOutDraft().select === 0"
+                  [class.btn-outline-dark]="lineOutDraft().select !== 0"
+                  (click)="setLineOutSystemValue('select', 0)">
+                  M1
+                </button>
+                <button
+                  type="button"
+                  class="btn flex-fill"
+                  [class.btn-dark]="lineOutDraft().select === 1"
+                  [class.btn-outline-dark]="lineOutDraft().select !== 1"
+                  (click)="setLineOutSystemValue('select', 1)">
+                  M2
+                </button>
+              </div>
             </div>
             <div class="small text-secondary">
-              Loaded at <code>{{ lineOutReadAt() || 'n/a' }}</code>
+              Active memory: <code>{{ lineOutMemoryLabel(lineOutDraft().select) }}</code>
             </div>
           </article>
         </div>
@@ -917,6 +952,9 @@
             <div>
               <div class="small text-secondary">Memory 1</div>
               <div class="fw-semibold">SYSTEM%LINEOUT(1)</div>
+              @if (lineOutDraft().select === 0) {
+                <span class="badge rounded-pill text-bg-success mt-2">Active</span>
+              }
             </div>
             <div>
               <label class="form-label small mb-1">Mic Type</label>
@@ -966,6 +1004,9 @@
             <div>
               <div class="small text-secondary">Memory 2</div>
               <div class="fw-semibold">SYSTEM%LINEOUT(2)</div>
+              @if (lineOutDraft().select === 1) {
+                <span class="badge rounded-pill text-bg-success mt-2">Active</span>
+              }
             </div>
             <div>
               <label class="form-label small mb-1">Mic Type</label>

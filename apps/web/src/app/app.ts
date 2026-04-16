@@ -2823,6 +2823,13 @@ export class App implements OnInit, OnDestroy {
     return this.lineOutMicTypeOptions.find((option) => option.value === value)?.label ?? `Type ${value}`;
   }
 
+  lineOutMemoryLabel(value: number | null): string {
+    if (value === null || !Number.isFinite(value)) {
+      return 'n/a';
+    }
+    return value === 0 ? 'M1' : 'M2';
+  }
+
   lineOutCmLabel(value: number | null): string {
     if (value === null || !Number.isFinite(value)) {
       return 'n/a';
@@ -2830,7 +2837,7 @@ export class App implements OnInit, OnDestroy {
     return `${value} cm`;
   }
 
-  setLineOutSystemValue(field: 'select' | 'air_feel_mode', value: string): void {
+  setLineOutSystemValue(field: 'select' | 'air_feel_mode', value: string | number): void {
     const parsed = this.parseInteger(value);
     if (parsed === null) {
       return;

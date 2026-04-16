@@ -32,6 +32,16 @@
   overflow: auto;
 }
 
+.lineout-toggle-group {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.lineout-toggle-group .btn {
+  min-width: 4.5rem;
+  white-space: nowrap;
+}
+
 .tone-groups-list {
   display: grid;
 }
