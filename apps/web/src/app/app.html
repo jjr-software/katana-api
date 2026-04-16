@@ -873,11 +873,11 @@
       </div>
 
       <div class="d-flex flex-wrap gap-2 align-items-center">
-        <span class="badge rounded-pill" [class.text-bg-success]="lineOutDraft().enabled" [class.text-bg-secondary]="!lineOutDraft().enabled">
-          {{ lineOutDraft().enabled ? 'Active' : 'Bypassed' }}
+        <span class="badge rounded-pill" [class.text-bg-success]="lineOutSavedStateTone() === 'success'" [class.text-bg-warning]="lineOutSavedStateTone() === 'warning'" [class.text-bg-secondary]="lineOutSavedStateTone() === 'secondary'">
+          {{ lineOutSavedStateLabel() }}
         </span>
-        <span class="badge rounded-pill text-bg-primary">Mode {{ lineOutModeLabel(lineOutDraft().air_feel_mode) }}</span>
-        <span class="badge rounded-pill text-bg-dark">Memory {{ lineOutMemoryLabel(lineOutDraft().select) }}</span>
+        <span class="badge rounded-pill text-bg-primary">Draft mode {{ lineOutModeLabel(lineOutDraft().air_feel_mode) }}</span>
+        <span class="badge rounded-pill text-bg-dark">Draft memory {{ lineOutMemoryLabel(lineOutDraft().select) }}</span>
         <span class="badge rounded-pill text-bg-light border text-secondary">Loaded {{ lineOutReadAt() || 'n/a' }}</span>
       </div>
 

@@ -2837,6 +2837,25 @@ export class App implements OnInit, OnDestroy {
     return `${value} cm`;
   }
 
+  lineOutSavedStateLabel(): string {
+    const saved = this.lineOutState();
+    if (saved === null) {
+      return 'Draft';
+    }
+    if (!this.lineOutDraftMatchesSavedState()) {
+      return 'Unsaved changes';
+    }
+    return saved.lineout_com.enabled ? 'Saved Active' : 'Saved Bypassed';
+  }
+
+  lineOutSavedStateTone(): 'success' | 'secondary' | 'warning' {
+    const saved = this.lineOutState();
+    if (saved === null) {
+      return 'secondary';
+    }
+    return this.lineOutDraftMatchesSavedState() ? 'success' : 'warning';
+  }
+
   setLineOutSystemValue(field: 'select' | 'air_feel_mode', value: string | number): void {
     const parsed = this.parseInteger(value);
     if (parsed === null) {
@@ -2901,6 +2920,19 @@ export class App implements OnInit, OnDestroy {
       lineout_1: { ...state.lineout_1 },
       lineout_2: { ...state.lineout_2 },
     };
+  }
+
+  private lineOutDraftMatchesSavedState(): boolean {
+    const saved = this.lineOutState();
+    if (saved === null) {
+      return false;
+    }
+    const draft = this.lineOutDraft();
+    return JSON.stringify(this.lineOutDraftToRequest(draft)) === JSON.stringify({
+      lineout_com: saved.lineout_com,
+      lineout_1: saved.lineout_1,
+      lineout_2: saved.lineout_2,
+    });
   }
 
   private lineOutStateToDraft(state: LineOutResponse): LineOutState {
