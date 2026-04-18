@@ -25,6 +25,22 @@
   gap: 0.35rem 0.75rem;
 }
 
+.effects-card-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+}
+
+.effect-card {
+  flex: 1 1 calc((100% - .75rem) / 2);
+}
+
+@media (max-width: 767.98px) {
+  .effect-card {
+    flex-basis: 100%;
+  }
+}
+
 .tone-list {
   display: grid;
   gap: 0.75rem;

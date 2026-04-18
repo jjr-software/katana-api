@@ -1869,3 +1869,15 @@
   - project type: `software`
 - Source used:
   - Jira MCP `post_v1_jira_projects` via session `codex`
+
+## Session Update - 2026-04-18 (Live Editor Effect Cards Two-Column Wrap)
+- Updated live editor effect-block layout to use a wrapped two-column card flow while keeping existing card structure.
+- Files changed:
+  - `apps/web/src/app/app.html`
+  - `apps/web/src/app/app.css`
+- Implementation details:
+  - added `effects-card-wrap` container around effect-related cards,
+  - tagged effect articles with `effect-card`,
+  - applied flex-wrap with two-column basis and small-screen single-column fallback.
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
