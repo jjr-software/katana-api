@@ -820,6 +820,90 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  canPersistLivePatchToAmp(): boolean {
+    return this.livePatchSnapshot() !== null && this.selectedAmpSlot() !== null;
+  }
+
+  async persistLivePatchToAmp(): Promise<void> {
+    const slotNumber = this.selectedAmpSlot();
+    if (slotNumber === null) {
+      this.status.set('Sync Live Patch first so the active slot is known.');
+      return;
+    }
+    if (this.livePatchSnapshot() === null) {
+      this.status.set('Load Live Patch first before persisting it to amp.');
+      return;
+    }
+
+    const actionKey = 'persist-live-patch';
+    this.setActionBusy(actionKey, true);
+    this.status.set(`Persisting Live Patch to ${this.selectedAmpSlotLabel()}...`);
+    this.responseJson.set('');
+    try {
+      const response = await fetch('/api/v1/live-patch/store-to-slot', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slot: slotNumber }),
+      });
+      const payload = (await response.json()) as LivePatchResponse | { detail?: unknown };
+      if (!response.ok || !('patch_json' in payload)) {
+        this.status.set('Live Patch persistence failed');
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+
+      const persisted = payload as LivePatchResponse;
+      this.applyLivePatchStatus(persisted);
+
+      let synced: SlotSyncResponse | null = null;
+      let refreshError: string | null = null;
+      try {
+        synced = await this.syncSlotForMeasurement(slotNumber);
+        this.applySyncedSlot(synced.slot);
+        this.selectedAmpSlot.set(synced.slot.slot);
+        this.selectedAmpSlotText.set(synced.slot.slot_label);
+        this.lastSyncedAt.set(synced.synced_at);
+        this.totalSyncMs.set(synced.slot.slot_sync_ms);
+        this.currentAmpPatchHash.set(synced.slot.config_hash_sha256 || '');
+        this.refreshCurrentCommitStateFromKnownState();
+      } catch (syncError: unknown) {
+        refreshError = String(syncError);
+      }
+
+      if (refreshError) {
+        this.status.set(`Persisted Live Patch to ${this.selectedAmpSlotLabel()}, but refresh failed`);
+        this.responseJson.set(
+          JSON.stringify(
+            {
+              live_patch: persisted,
+              refresh_error: refreshError,
+            },
+            null,
+            2,
+          ),
+        );
+      } else {
+        this.status.set(`Persisted Live Patch to ${this.selectedAmpSlotLabel()}`);
+        this.responseJson.set(
+          JSON.stringify(
+            {
+              live_patch: persisted,
+              slot: synced,
+            },
+            null,
+            2,
+          ),
+        );
+      }
+    } catch (error: unknown) {
+      this.status.set('Live Patch persistence failed');
+      this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
+    } finally {
+      this.setActionBusy(actionKey, false);
+    }
+  }
+
   async openLiveEditor(): Promise<void> {
     this.status.set('Loading current Live Patch from amp...');
     this.responseJson.set('');

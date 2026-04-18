@@ -40,6 +40,14 @@
           <div class="d-flex flex-wrap gap-2 mb-2">
             <button type="button" class="btn btn-primary btn-sm" (click)="testAmpConnection()" [disabled]="isActionBusy('test-amp-connection')">{{ headerActionLabel('test-amp-connection', 'Test Amp Connection', 'Testing...') }}</button>
             <button type="button" class="btn btn-outline-primary btn-sm" (click)="syncLivePatch()" [disabled]="isActionBusy('sync-live-patch')">{{ headerActionLabel('sync-live-patch', 'Sync Live Patch', 'Syncing...') }}</button>
+            <button
+              type="button"
+              class="btn btn-success btn-sm"
+              (click)="persistLivePatchToAmp()"
+              [disabled]="isActionBusy('persist-live-patch') || !canPersistLivePatchToAmp()"
+            >
+              {{ headerActionLabel('persist-live-patch', 'Persist to Amp', 'Persisting...') }}
+            </button>
             <button type="button" class="btn btn-outline-success btn-sm" (click)="captureAudioLevelMarker()" [disabled]="isActionBusy('capture-level-marker')">{{ headerActionLabel('capture-level-marker', 'Set Level Marker', 'Capturing...') }}</button>
             <button
               type="button"
