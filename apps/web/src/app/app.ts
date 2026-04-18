@@ -184,6 +184,10 @@ const LIVE_FFT_BANDS = [
 const DEFAULT_TARGET_RMS_DBFS = -31.0;
 const AUTO_LEVEL_TOLERANCE_DB = 0.4;
 const AUTO_LEVEL_MEASURE_SEC = 2.0;
+const AUTO_LEVEL_MAX_ITERS = 8;
+const AUTO_LEVEL_STEP_SCALE = 2.0;
+const AUTO_LEVEL_MAX_STEP = 8;
+const GLOBAL_NORMALIZE_TARGET_STORAGE_KEY = 'katana.globalNormalizeTargetRms';
 const TONE_BLOCK_OPTIONS = ['routing', 'amp', 'booster', 'mod', 'fx', 'delay', 'reverb', 'eq1', 'eq2', 'ns', 'send_return', 'solo', 'pedalfx'] as const;
 
 interface AmpConnectionTestResponse {
@@ -538,6 +542,7 @@ export class App implements OnInit, OnDestroy {
   levelMarkerRmsDbfs = signal<number | null>(null);
   levelMarkerPeakDbfs = signal<number | null>(null);
   levelMarkerCapturedAt = signal('');
+  globalNormalizeTargetRms = signal(DEFAULT_TARGET_RMS_DBFS.toFixed(2));
   liveRmsDbfs = signal<number | null>(null);
   liveRmsMaxDbfs = signal<number | null>(null);
   liveFftBinsDb = signal<number[]>([]);
@@ -582,8 +587,9 @@ export class App implements OnInit, OnDestroy {
   autoLevelTargetRms = signal('');
   autoLevelCurrentRms = signal<number | null>(null);
   autoLevelIteration = signal(0);
-  autoLevelState = signal<'idle' | 'waiting' | 'measuring' | 'asking' | 'applying' | 'succeeded' | 'failed'>('idle');
+  autoLevelState = signal<'idle' | 'waiting' | 'measuring' | 'adjusting' | 'succeeded' | 'failed'>('idle');
   autoLevelRunning = signal(false);
+  autoLevelMatchBoosterBypass = signal(true);
   autoLevelLogs = signal<string[]>([]);
   editorModalOpen = signal(false);
   editorSlotNumber = signal<number | null>(null);
@@ -687,6 +693,7 @@ export class App implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     window.addEventListener('popstate', this.onPopState);
+    this.loadGlobalNormalizeTargetRms();
     void this.refreshQueueState();
     void this.loadAudioLevelMarker();
     void this.loadRecentAudioSamples();
@@ -2320,6 +2327,51 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  setGlobalNormalizeTargetRms(value: string): void {
+    this.globalNormalizeTargetRms.set(value);
+  }
+
+  commitGlobalNormalizeTargetRms(): void {
+    const parsed = Number.parseFloat(this.globalNormalizeTargetRms());
+    const normalized = Number.isFinite(parsed) ? parsed : DEFAULT_TARGET_RMS_DBFS;
+    const text = normalized.toFixed(2);
+    this.globalNormalizeTargetRms.set(text);
+    try {
+      window.localStorage.setItem(GLOBAL_NORMALIZE_TARGET_STORAGE_KEY, text);
+    } catch {
+      // local storage is best-effort only
+    }
+  }
+
+  useLevelMarkerAsGlobalTarget(): void {
+    const marker = this.levelMarkerRmsDbfs();
+    if (marker === null || !Number.isFinite(marker)) {
+      this.status.set('Level marker is not set yet.');
+      return;
+    }
+    const text = marker.toFixed(2);
+    this.globalNormalizeTargetRms.set(text);
+    this.autoLevelTargetRms.set(text);
+    this.commitGlobalNormalizeTargetRms();
+    this.status.set(`Global normalize target set to ${text} dBFS from marker.`);
+  }
+
+  private loadGlobalNormalizeTargetRms(): void {
+    try {
+      const saved = window.localStorage.getItem(GLOBAL_NORMALIZE_TARGET_STORAGE_KEY);
+      if (!saved) {
+        return;
+      }
+      const parsed = Number.parseFloat(saved);
+      if (!Number.isFinite(parsed)) {
+        return;
+      }
+      this.globalNormalizeTargetRms.set(parsed.toFixed(2));
+    } catch {
+      // local storage is best-effort only
+    }
+  }
+
   async loadRecentAudioSamples(): Promise<void> {
     try {
       const response = await fetch('/api/v1/audio/measures?limit=12', {
@@ -2437,7 +2489,7 @@ export class App implements OnInit, OnDestroy {
     this.openModal('ai', this.aiModalTpl, { size: 'xl' });
   }
 
-  openAiLevelModal(slot: SlotCard): void {
+  openVolumeNormalizeModal(slot: SlotCard): void {
     if (!slot.patch) {
       this.status.set(`No full patch payload loaded for ${slot.slot_label}. Sync this slot first.`);
       return;
@@ -2449,16 +2501,25 @@ export class App implements OnInit, OnDestroy {
     this.autoLevelSlotNumber.set(slot.slot);
     this.autoLevelSlotLabel.set(slot.slot_label);
     this.autoLevelPatchName.set(slot.patch_name || 'Unnamed Patch');
-    this.autoLevelTargetRms.set(DEFAULT_TARGET_RMS_DBFS.toFixed(2));
+    const globalTarget = Number.parseFloat(this.globalNormalizeTargetRms());
+    if (Number.isFinite(globalTarget)) {
+      this.autoLevelTargetRms.set(globalTarget.toFixed(2));
+    } else if (this.levelMarkerRmsDbfs() !== null) {
+      this.autoLevelTargetRms.set(this.levelMarkerRmsDbfs()!.toFixed(2));
+    } else {
+      this.autoLevelTargetRms.set(DEFAULT_TARGET_RMS_DBFS.toFixed(2));
+    }
     this.autoLevelCurrentRms.set(slot.measured_rms_dbfs);
     this.autoLevelIteration.set(0);
     this.autoLevelState.set('idle');
     this.autoLevelRunning.set(false);
+    this.autoLevelMatchBoosterBypass.set(this.patchBoosterOn(slot.patch));
     this.autoLevelLogs.set([
       slot.measured_rms_dbfs !== null
         ? `${slot.slot_label}: current 10s Max RMS is ${slot.measured_rms_dbfs.toFixed(2)} dBFS.`
         : `${slot.slot_label}: no stored 10s Max RMS yet. The run will measure from the live amp first.`,
-      `Default target RMS is ${DEFAULT_TARGET_RMS_DBFS.toFixed(2)} dBFS.`,
+      `Global target RMS is ${this.autoLevelTargetRms()} dBFS.`,
+      'Control order: booster OFF base -> AMP volume, then booster ON trim -> booster level.',
     ]);
     this.openModal('autoLevel', this.autoLevelModalTpl, {
       size: 'xl',
@@ -2559,6 +2620,10 @@ export class App implements OnInit, OnDestroy {
     this.autoLevelTargetRms.set(value);
   }
 
+  setAutoLevelMatchBoosterBypass(checked: boolean): void {
+    this.autoLevelMatchBoosterBypass.set(checked);
+  }
+
   autoLevelStateLabel(): string {
     const state = this.autoLevelState();
     if (state === 'idle') {
@@ -2570,11 +2635,8 @@ export class App implements OnInit, OnDestroy {
     if (state === 'measuring') {
       return 'Measuring';
     }
-    if (state === 'asking') {
-      return 'Consulting AI';
-    }
-    if (state === 'applying') {
-      return 'Applying Proposal';
+    if (state === 'adjusting') {
+      return 'Adjusting Control';
     }
     if (state === 'succeeded') {
       return 'Succeeded';
@@ -2598,7 +2660,7 @@ export class App implements OnInit, OnDestroy {
     }
     const slot = this.slots().find((item) => item.slot === slotNumber) ?? null;
     if (!slot || !slot.patch) {
-      this.pushAutoLevelLog('No slot patch is available for auto-level.');
+      this.pushAutoLevelLog('No slot patch is available for normalization.');
       this.autoLevelState.set('failed');
       return;
     }
@@ -2616,52 +2678,174 @@ export class App implements OnInit, OnDestroy {
     ]);
     this.responseJson.set('');
     try {
+      let workingPatch = this.clonePatch(slot.patch);
+      const boosterInitiallyOn = this.patchBoosterOn(workingPatch);
       await this.waitForPlayingStart(slot.slot_label);
-      const maxIterations = 4;
-      for (let iteration = 1; iteration <= maxIterations; iteration += 1) {
-        this.autoLevelIteration.set(iteration);
-        this.autoLevelState.set('measuring');
-        this.pushAutoLevelLog(`Iteration ${iteration}: measuring ${AUTO_LEVEL_MEASURE_SEC.toFixed(0)}s window...`);
-        const sample = await this.captureActivePatchMeasurement(slot.slot, AUTO_LEVEL_MEASURE_SEC);
-        this.autoLevelCurrentRms.set(sample.rms_dbfs);
-        this.pushAutoLevelLog(`Iteration ${iteration}: measured ${sample.rms_dbfs.toFixed(2)} dBFS.`);
-        const errorDb = sample.rms_dbfs - targetRms;
-        this.pushAutoLevelLog(`Iteration ${iteration}: error ${errorDb.toFixed(2)} dB vs target.`);
-        if (Math.abs(errorDb) <= AUTO_LEVEL_TOLERANCE_DB) {
-          this.autoLevelState.set('succeeded');
-          this.pushAutoLevelLog(
-            `Target reached within ${AUTO_LEVEL_TOLERANCE_DB.toFixed(1)} dB tolerance. Final RMS ${sample.rms_dbfs.toFixed(2)} dBFS.`,
-          );
-          this.status.set(`AI auto-level succeeded for ${slot.slot_label}`);
-          return;
-        }
-        const currentSlot = this.slots().find((item) => item.slot === slot.slot) ?? null;
-        if (!currentSlot || !currentSlot.patch) {
-          throw new Error('Active slot patch disappeared during auto-level run.');
-        }
-        const prompt = this.buildAiTargetRmsPrompt(sample.rms_dbfs, targetRms);
-        this.autoLevelState.set('asking');
-        const direction = errorDb > 0 ? 'quieter' : 'louder';
-        this.pushAutoLevelLog(`Iteration ${iteration}: asking AI for a ${direction} proposal...`);
-        const advice = await this.fetchAiPatchAdvice(slot.slot_label, prompt, currentSlot.patch);
-        for (const change of advice.suggested_changes) {
-          this.pushAutoLevelLog(
-            `AI change: ${change.field} ${this.formatAiValue(change.current_value)} -> ${this.formatAiValue(change.suggested_value)} (${change.rationale})`,
-          );
-        }
-        this.autoLevelState.set('applying');
-        this.pushAutoLevelLog(`Iteration ${iteration}: applying AI proposal...`);
-        await this.applyProposedPatchToSlot(slot.slot, advice.proposed_patch, true);
-        this.pushAutoLevelLog(`Iteration ${iteration}: proposal applied to active patch.`);
+
+      if (boosterInitiallyOn && this.autoLevelMatchBoosterBypass()) {
+        this.pushAutoLevelLog('Booster is ON. Matching booster-OFF base loudness with AMP volume.');
+        const boosterOffPatch = this.clonePatch(workingPatch);
+        this.setPatchBoosterOn(boosterOffPatch, false);
+        workingPatch = await this.applyPatchForNormalization(slot.slot, boosterOffPatch, 'set booster OFF for base match');
+        await this.waitForPlayingStart(slot.slot_label);
+        workingPatch = await this.normalizeControlToTarget(slot.slot, slot.slot_label, workingPatch, targetRms, 'amp_volume');
       }
-      throw new Error(`Failed to reach target ${targetRms.toFixed(2)} dBFS after ${maxIterations} iterations.`);
+
+      if (boosterInitiallyOn) {
+        this.pushAutoLevelLog('Matching booster-ON loudness with booster level trim.');
+        const boosterOnPatch = this.clonePatch(workingPatch);
+        this.setPatchBoosterOn(boosterOnPatch, true);
+        workingPatch = await this.applyPatchForNormalization(slot.slot, boosterOnPatch, 'restore booster ON');
+        await this.waitForPlayingStart(slot.slot_label);
+        workingPatch = await this.normalizeControlToTarget(slot.slot, slot.slot_label, workingPatch, targetRms, 'booster_level');
+      } else {
+        this.pushAutoLevelLog('Booster is OFF. Matching loudness with AMP volume.');
+        workingPatch = await this.normalizeControlToTarget(slot.slot, slot.slot_label, workingPatch, targetRms, 'amp_volume');
+      }
+      const finalSample = await this.captureActivePatchMeasurement(slot.slot, AUTO_LEVEL_MEASURE_SEC);
+      this.autoLevelCurrentRms.set(finalSample.rms_dbfs);
+      this.autoLevelState.set('succeeded');
+      this.pushAutoLevelLog(
+        `Done. Final RMS ${finalSample.rms_dbfs.toFixed(2)} dBFS (target ${targetRms.toFixed(2)} dBFS).`,
+      );
+      this.status.set(`Volume normalization succeeded for ${slot.slot_label}`);
     } catch (error: unknown) {
       this.autoLevelState.set('failed');
       this.pushAutoLevelLog(String(error));
-      this.status.set(`AI auto-level failed for ${this.autoLevelSlotLabel()}`);
+      this.status.set(`Volume normalization failed for ${this.autoLevelSlotLabel()}`);
     } finally {
       this.autoLevelRunning.set(false);
     }
+  }
+
+  private patchBoosterOn(patch: Record<string, unknown>): boolean {
+    const stages = this.readObject(patch, 'stages');
+    const booster = this.readObject(stages, 'booster');
+    return this.readBoolean(booster, 'on');
+  }
+
+  private setPatchBoosterOn(patch: Record<string, unknown>, on: boolean): void {
+    const stages = this.ensureObject(patch, 'stages');
+    const booster = this.ensureObject(stages, 'booster');
+    booster['on'] = on;
+  }
+
+  private readNormalizationControlValue(
+    patch: Record<string, unknown>,
+    control: 'amp_volume' | 'booster_level',
+  ): number | null {
+    if (control === 'amp_volume') {
+      const amp = this.readObject(patch, 'amp');
+      const value = this.readAmpField(amp, 'volume');
+      return value === null ? null : this.clampInteger(Math.trunc(value), 0, 127);
+    }
+    const stages = this.readObject(patch, 'stages');
+    const booster = this.readObject(stages, 'booster');
+    const direct = this.readNumber(booster, 'effect_level');
+    if (direct !== null) {
+      return this.clampInteger(Math.trunc(direct), 0, 127);
+    }
+    if (!booster) {
+      return null;
+    }
+    const raw = booster['raw'];
+    if (!Array.isArray(raw) || raw.length <= 6) {
+      return null;
+    }
+    return this.clampInteger(this.parseUnknownNumber(raw[6]), 0, 127);
+  }
+
+  private writeNormalizationControlValue(
+    patch: Record<string, unknown>,
+    control: 'amp_volume' | 'booster_level',
+    value: number,
+  ): boolean {
+    const clamped = this.clampInteger(value, 0, 127);
+    if (control === 'amp_volume') {
+      const amp = this.ensureObject(patch, 'amp');
+      amp['volume'] = clamped;
+      this.syncAmpDerivedRawField(amp, 'volume', clamped);
+      this.syncAmpDerivedFields(amp);
+      return true;
+    }
+    const stages = this.ensureObject(patch, 'stages');
+    const booster = this.ensureObject(stages, 'booster');
+    booster['effect_level'] = clamped;
+    this.syncNumericRawField(booster, 'raw', 6, clamped);
+    this.syncStageDerivedFields('booster', booster);
+    return true;
+  }
+
+  private normalizationControlLabel(control: 'amp_volume' | 'booster_level'): string {
+    if (control === 'amp_volume') {
+      return 'AMP volume';
+    }
+    return 'Booster level';
+  }
+
+  private async normalizeControlToTarget(
+    slotNumber: number,
+    slotLabel: string,
+    patch: Record<string, unknown>,
+    targetRms: number,
+    control: 'amp_volume' | 'booster_level',
+  ): Promise<Record<string, unknown>> {
+    let workingPatch = this.clonePatch(patch);
+    const controlLabel = this.normalizationControlLabel(control);
+    for (let iteration = 1; iteration <= AUTO_LEVEL_MAX_ITERS; iteration += 1) {
+      this.autoLevelIteration.update((current) => current + 1);
+      this.autoLevelState.set('measuring');
+      this.pushAutoLevelLog(
+        `${controlLabel} pass ${iteration}: measuring ${AUTO_LEVEL_MEASURE_SEC.toFixed(0)}s window...`,
+      );
+      const sample = await this.captureActivePatchMeasurement(slotNumber, AUTO_LEVEL_MEASURE_SEC);
+      this.autoLevelCurrentRms.set(sample.rms_dbfs);
+      const errorDb = targetRms - sample.rms_dbfs;
+      this.pushAutoLevelLog(
+        `${controlLabel} pass ${iteration}: measured ${sample.rms_dbfs.toFixed(2)} dBFS, error ${errorDb.toFixed(2)} dB.`,
+      );
+      if (Math.abs(errorDb) <= AUTO_LEVEL_TOLERANCE_DB) {
+        this.pushAutoLevelLog(
+          `${controlLabel} reached target within ${AUTO_LEVEL_TOLERANCE_DB.toFixed(1)} dB.`,
+        );
+        return workingPatch;
+      }
+      const currentValue = this.readNormalizationControlValue(workingPatch, control);
+      if (currentValue === null) {
+        throw new Error(`${slotLabel}: ${controlLabel} is unavailable in this patch payload.`);
+      }
+      let step = Math.round(errorDb * AUTO_LEVEL_STEP_SCALE);
+      step = Math.max(-AUTO_LEVEL_MAX_STEP, Math.min(AUTO_LEVEL_MAX_STEP, step));
+      if (step === 0) {
+        step = errorDb > 0 ? 1 : -1;
+      }
+      const nextValue = this.clampInteger(currentValue + step, 0, 127);
+      if (nextValue === currentValue) {
+        throw new Error(`${slotLabel}: ${controlLabel} hit limit at ${currentValue}; cannot move toward target.`);
+      }
+      const nextPatch = this.clonePatch(workingPatch);
+      if (!this.writeNormalizationControlValue(nextPatch, control, nextValue)) {
+        throw new Error(`${slotLabel}: failed to update ${controlLabel}.`);
+      }
+      this.autoLevelState.set('adjusting');
+      this.pushAutoLevelLog(`${controlLabel}: ${currentValue} -> ${nextValue}`);
+      workingPatch = await this.applyPatchForNormalization(
+        slotNumber,
+        nextPatch,
+        `${controlLabel} ${currentValue} -> ${nextValue}`,
+      );
+    }
+    throw new Error(`${slotLabel}: ${controlLabel} did not converge within ${AUTO_LEVEL_MAX_ITERS} passes.`);
+  }
+
+  private async applyPatchForNormalization(
+    slotNumber: number,
+    patch: Record<string, unknown>,
+    reason: string,
+  ): Promise<Record<string, unknown>> {
+    this.pushAutoLevelLog(`Applying: ${reason}`);
+    const applied = await this.applyProposedPatchToSlot(slotNumber, patch, true);
+    return this.clonePatch(applied);
   }
 
   applyAiAdviceToPatch(): void {
@@ -4082,7 +4266,11 @@ export class App implements OnInit, OnDestroy {
     return slot.patch !== null;
   }
 
-  private async applyProposedPatchToSlot(slotNumber: number, proposedPatchInput: Record<string, unknown>, applyLive: boolean): Promise<void> {
+  private async applyProposedPatchToSlot(
+    slotNumber: number,
+    proposedPatchInput: Record<string, unknown>,
+    applyLive: boolean,
+  ): Promise<Record<string, unknown>> {
     const proposedPatch = this.clonePatch(proposedPatchInput);
     proposedPatch['config_hash_sha256'] = '';
     const localProposedSnapshot = this.clonePatch(proposedPatch);
@@ -4151,15 +4339,16 @@ export class App implements OnInit, OnDestroy {
       }
       this.aiModalPatch.set(this.clonePatch(appliedPatch));
       this.aiModalPatchName.set(proposedName || this.aiModalPatchName());
-      return;
+      return this.clonePatch(appliedPatch);
     }
     this.aiModalPatch.set(this.clonePatch(proposedPatch));
     this.aiModalPatchName.set(proposedName || this.aiModalPatchName());
+    return this.clonePatch(proposedPatch);
   }
 
   private async waitForPlayingStart(slotLabel: string): Promise<void> {
     if (!this.liveMeterConnected()) {
-      throw new Error('Live meter is not connected. Auto-level requires the live meter.');
+      throw new Error('Live meter is not connected. Normalization requires the live meter.');
     }
     const deadlineMs = Date.now() + 60000;
     const playingThresholdDbfs = -55;

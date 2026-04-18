@@ -1881,3 +1881,26 @@
   - applied flex-wrap with two-column basis and small-screen single-column fallback.
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-04-18 (Deterministic Global Volume Normalization)
+- Replaced AI-driven slot loudness leveling with a deterministic normalization flow tuned for live booster on/off use.
+- Added persistent global target control in the dashboard header:
+  - `Global Target RMS` input (stored in browser localStorage),
+  - `Use Marker` button to copy the current level marker RMS as the global target.
+- Replaced per-slot `AI Level` action with `Normalize` and updated modal wording/process.
+- New normalization process in modal:
+  - waits for live playing,
+  - measures RMS in short windows,
+  - adjusts loudness controls by deterministic steps toward target.
+- Control order implemented:
+  - booster present + bypass match enabled:
+    - normalize booster-OFF base using `AMP volume`,
+    - restore booster-ON and normalize with `booster effect_level`.
+  - booster absent:
+    - normalize with `AMP volume` only.
+- Files changed:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+  - `apps/web/src/app/app.css`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
