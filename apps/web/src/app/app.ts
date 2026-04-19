@@ -1073,6 +1073,10 @@ export class App implements OnInit, OnDestroy {
 
   openToneSaveModal(): void {
     this.toneSaveBlocks.set({ ...this.toneSelectedBlocks() });
+    const currentName = this.readString(this.editorPatchDraft(), 'patch_name') ?? this.toneLoadedPatchName();
+    if (!this.toneSaveName().trim() && currentName) {
+      this.toneSaveName.set(currentName);
+    }
     this.openModal('toneSave', this.toneSaveModalTpl, { size: 'xl' });
   }
 
@@ -1289,9 +1293,10 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  async saveLiveAsTonePatchObject(): Promise<void> {
+  async saveGuiStateAsTonePatchObject(): Promise<void> {
     const name = this.toneSaveName().trim();
     const blocks = this.saveToneBlocks();
+    const editorPatch = this.editorPatchDraft();
     if (!name) {
       this.status.set('Tone save requires a name.');
       return;
@@ -1300,24 +1305,29 @@ export class App implements OnInit, OnDestroy {
       this.status.set('Include at least one block before saving.');
       return;
     }
+    if (!editorPatch) {
+      this.status.set('Load GUI state first before saving it.');
+      return;
+    }
     this.setActionBusy('tone-save-live', true);
-    this.status.set(`Saving blocks to ${name}...`);
+    this.status.set(`Saving GUI state as ${name}...`);
     this.responseJson.set('');
     try {
-      const response = await fetch('/api/v1/patch-objects/save-from-live', {
+      const response = await fetch('/api/v1/patch-objects/save-from-patch', {
         method: 'POST',
         cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name,
           description: this.toneSaveDescription(),
+          patch_json: editorPatch,
           blocks,
           source_type: 'manual',
         }),
       });
       const payload = (await response.json()) as TonePatchObjectResponse | { detail?: unknown };
       if (!response.ok) {
-        this.status.set('Live Patch save failed');
+        this.status.set('GUI state save failed');
         this.responseJson.set(JSON.stringify(payload, null, 2));
         return;
       }
@@ -1326,11 +1336,10 @@ export class App implements OnInit, OnDestroy {
       this.toneSaveDescription.set('');
       this.closeToneSaveModal();
       await this.loadTonePatchObjects();
-      await this.refreshLivePatchStatus();
-      this.status.set(`Saved blocks as ${name}`);
+      this.status.set(`Saved GUI state as ${name}`);
       this.responseJson.set(JSON.stringify(saved, null, 2));
     } catch (error: unknown) {
-      this.status.set('Live Patch save failed');
+      this.status.set('GUI state save failed');
       this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
     } finally {
       this.setActionBusy('tone-save-live', false);

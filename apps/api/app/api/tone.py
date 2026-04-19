@@ -104,6 +104,15 @@ class SaveFromLiveRequest(BaseModel):
     source_prompt: str | None = None
 
 
+class SaveFromPatchRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    description: str = ""
+    patch_json: dict
+    blocks: list[str] = Field(min_length=1)
+    source_type: str = Field(default="manual", min_length=1, max_length=32)
+    source_prompt: str | None = None
+
+
 class SaveFromAmpRequest(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     description: str = ""
@@ -324,6 +333,27 @@ async def save_patch_object_from_live(
     blocks = _validated_blocks(payload.blocks)
     live_row = await _resolve_live_patch_row(db, client)
     sparse = extract_patch_object(live_row.patch_json, blocks)
+    row = PatchObject(
+        name=payload.name,
+        description=payload.description,
+        patch_json=sparse,
+        source_type=payload.source_type,
+        source_prompt=payload.source_prompt,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return _patch_object_response(db, row)
+
+
+@router.post("/patch-objects/save-from-patch", response_model=PatchObjectReadResponse)
+def save_patch_object_from_patch(
+    payload: SaveFromPatchRequest,
+    db: Session = Depends(get_db),
+) -> PatchObjectReadResponse:
+    _assert_patch_object_name_available(db, payload.name)
+    blocks = _validated_blocks(payload.blocks)
+    sparse = extract_patch_object(normalize_patch_object(payload.patch_json), blocks)
     row = PatchObject(
         name=payload.name,
         description=payload.description,
