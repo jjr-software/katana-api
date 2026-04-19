@@ -251,9 +251,6 @@
                     <div class="flex-grow-1">
                       <div class="d-flex justify-content-between gap-2 align-items-start">
                         <div class="fw-semibold">All</div>
-                        <span class="badge rounded-pill" [class.text-bg-success]="liveEditorShowAllBlocks()" [class.text-bg-secondary]="!liveEditorShowAllBlocks()">
-                          {{ liveEditorShowAllBlocks() ? 'Shown' : 'Off' }}
-                        </span>
                       </div>
                       <div class="small text-secondary">Show every block</div>
                     </div>
@@ -292,6 +289,11 @@
                       <div class="flex-grow-1">
                         <div class="d-flex justify-content-between gap-2 align-items-start">
                           <div class="fw-semibold">{{ toneBlockDisplay(block).label }}</div>
+                          @if (editorBlockEnabledLabel(block); as enabledLabel) {
+                            <span class="badge rounded-pill" [class.text-bg-success]="enabledLabel === 'On'" [class.text-bg-secondary]="enabledLabel === 'Off'">
+                              {{ enabledLabel }}
+                            </span>
+                          }
                         </div>
                         <div class="small text-secondary">{{ toneBlockDisplay(block).subtitle }}</div>
                       </div>

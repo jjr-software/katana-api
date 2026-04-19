@@ -1107,6 +1107,35 @@ export class App implements OnInit, OnDestroy {
     return this.canResetEditorBlockToLoadedPatch(block);
   }
 
+  editorBlockEnabledLabel(block: string): 'On' | 'Off' | null {
+    switch (block as ToneBlockKey) {
+      case 'amp': {
+        return this.editorAmpRawValue(9) === 0 ? 'Off' : 'On';
+      }
+      case 'booster':
+      case 'mod':
+      case 'fx':
+      case 'delay':
+      case 'reverb': {
+        return this.editorStageOn(block as StageName) ? 'On' : 'Off';
+      }
+      case 'eq1':
+      case 'eq2': {
+        return this.editorEqOn(block as EqStageName) ? 'On' : 'Off';
+      }
+      case 'ns':
+        return this.editorNsOn() ? 'On' : 'Off';
+      case 'send_return':
+        return this.editorSendReturnOn() ? 'On' : 'Off';
+      case 'solo':
+        return this.editorSoloOn() ? 'On' : 'Off';
+      case 'pedalfx':
+        return this.editorPedalFxOn() ? 'On' : 'Off';
+      default:
+        return null;
+    }
+  }
+
   liveEditorShowsBlock(block: string): boolean {
     return this.liveEditorShowAllBlocks() || this.isToneBlockSelected(block);
   }
