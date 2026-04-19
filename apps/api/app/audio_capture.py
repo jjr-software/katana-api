@@ -93,9 +93,11 @@ def _build_fft_bins_db(samples: list[float], rate: int, bin_count: int = 64) -> 
         return []
     windowed = samples[-fft_size:]
     values: list[complex] = []
+    window_sum = 0.0
     denom = max(1, fft_size - 1)
     for index, sample in enumerate(windowed):
         hann = 0.5 - 0.5 * math.cos((2.0 * math.pi * index) / denom)
+        window_sum += hann
         values.append(complex(sample * hann, 0.0))
     _fft_inplace(values)
 
@@ -109,9 +111,8 @@ def _build_fft_bins_db(samples: list[float], rate: int, bin_count: int = 64) -> 
     if max_freq <= min_freq:
         return []
 
-    max_mag = max(magnitudes)
-    if max_mag <= 1e-12:
-        return [-60.0] * bin_count
+    if window_sum <= 1e-12:
+        return [-120.0] * bin_count
 
     log_min = math.log10(min_freq)
     log_max = math.log10(max_freq)
@@ -125,10 +126,14 @@ def _build_fft_bins_db(samples: list[float], rate: int, bin_count: int = 64) -> 
             end_index = start_index
         bucket_mag = max(magnitudes[start_index - 1:end_index] or [0.0])
         if bucket_mag <= 1e-12:
-            out.append(-60.0)
+            out.append(-120.0)
             continue
-        db = 20.0 * math.log10(bucket_mag / max_mag)
-        out.append(round(max(-60.0, min(0.0, db)), 2))
+        bucket_amp = (2.0 * bucket_mag) / window_sum
+        if bucket_amp <= 1e-12:
+            out.append(-120.0)
+            continue
+        db = 20.0 * math.log10(bucket_amp)
+        out.append(round(max(-120.0, min(0.0, db)), 2))
     return out
 
 
