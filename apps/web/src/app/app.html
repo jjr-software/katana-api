@@ -112,12 +112,6 @@
                 {{ liveMeterConnected() ? 'Connected' : 'Stopped' }}
               </code>
             </span>
-            <span>
-              Commit State:
-              <code [class.text-success]="currentAmpCommitState() === 'committed'" [class.text-danger]="currentAmpCommitState() === 'uncommitted'">
-                {{ currentCommitStateLabel() }}
-              </code>
-            </span>
           </div>
           <div class="d-flex flex-wrap gap-2 mt-2">
             <div class="card shadow-sm" style="flex: 1 1 18rem; min-width: 18rem;">
@@ -182,8 +176,10 @@
               </div>
               <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
                 <div class="d-flex flex-wrap gap-3 align-items-center">
-                  <span class="text-secondary">Loaded Reference Patch:</span>
-                  <strong>{{ livePatchLoadedPatchName() }}</strong>
+                  <span class="text-secondary">Current Slot:</span>
+                  <strong>{{ selectedAmpSlotLabel() }}</strong>
+                  <span class="text-secondary">Current Settings:</span>
+                  <strong>{{ currentSettingsPatchName() }}</strong>
                   <span class="text-secondary">Shown Blocks:</span>
                   <span>{{ livePatchSelectedBlocksSummary() }}</span>
                 </div>

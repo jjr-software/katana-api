@@ -4128,15 +4128,8 @@ export class App implements OnInit, OnDestroy {
     return this.selectedAmpSlotText();
   }
 
-  currentCommitStateLabel(): string {
-    const state = this.currentAmpCommitState();
-    if (state === 'committed') {
-      return 'Committed';
-    }
-    if (state === 'uncommitted') {
-      return 'Uncommitted';
-    }
-    return 'Unknown';
+  currentSettingsPatchName(): string {
+    return this.readString(this.editorPatchDraft(), 'patch_name')?.trim() || this.toneLoadedPatchName().trim() || 'Unnamed Current Settings';
   }
 
   private applySyncedSlot(slot: SlotPatchSummary): void {
@@ -5614,10 +5607,6 @@ export class App implements OnInit, OnDestroy {
 
   hasLoadedSavedPatch(): boolean {
     return this.toneLoadedPatchObjectId().trim().length > 0;
-  }
-
-  livePatchLoadedPatchName(): string {
-    return this.toneLoadedPatchName().trim() || 'No reference patch';
   }
 
   livePatchSelectedBlocksSummary(): string {
