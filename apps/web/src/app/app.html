@@ -1439,4 +1439,42 @@
     </div>
   </ng-template>
 
+  <ng-template #ampStateConflictModalTpl>
+    <div class="modal-header">
+      <h5 class="modal-title">Amp Patch Changed</h5>
+    </div>
+    <div class="modal-body d-grid gap-3">
+      <article class="border rounded p-3 bg-body-tertiary d-grid gap-2">
+        <p class="mb-0">
+          The amp is now on <strong>{{ ampStateConflictCurrentSlotLabel() }}</strong> instead of <strong>{{ ampStateConflictPreviousSlotLabel() }}</strong>.
+          Your GUI draft may no longer match the live amp state.
+        </p>
+        <p class="small text-secondary mb-0">
+          Detected at <code>{{ ampStateConflictDetectedAt() }}</code>. Choose whether the GUI should win, or whether the amp should win.
+        </p>
+        @if (editorLiveApplyError()) {
+          <p class="small mb-0 text-danger">{{ editorLiveApplyError() }}</p>
+        }
+      </article>
+    </div>
+    <div class="modal-footer">
+      <button
+        type="button"
+        class="btn btn-outline-primary"
+        (click)="applyGuiStateAfterAmpChange()"
+        [disabled]="isActionBusy('amp-state-conflict-apply') || isActionBusy('amp-state-conflict-read')"
+      >
+        Apply GUI to AMP
+      </button>
+      <button
+        type="button"
+        class="btn btn-primary"
+        (click)="readAmpStateAfterAmpChange()"
+        [disabled]="isActionBusy('amp-state-conflict-apply') || isActionBusy('amp-state-conflict-read')"
+      >
+        Discard GUI and Read AMP
+      </button>
+    </div>
+  </ng-template>
+
 </main>

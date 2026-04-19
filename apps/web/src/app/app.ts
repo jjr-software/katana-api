@@ -500,7 +500,7 @@ interface StageParam {
 }
 
 type TriState = 'true' | 'false' | 'unknown';
-type ModalKey = 'toneSave' | 'toneDesigner' | 'toneSet' | 'patchSamples' | 'ai' | 'autoLevel';
+type ModalKey = 'toneSave' | 'toneDesigner' | 'toneSet' | 'patchSamples' | 'ai' | 'autoLevel' | 'ampStateConflict';
 
 function defaultSlotCards(): SlotCard[] {
   return Array.from({ length: 8 }, (_, idx) => {
@@ -542,6 +542,7 @@ export class App implements OnInit, OnDestroy {
   @ViewChild('patchSamplesModalTpl') private patchSamplesModalTpl?: TemplateRef<unknown>;
   @ViewChild('aiModalTpl') private aiModalTpl?: TemplateRef<unknown>;
   @ViewChild('autoLevelModalTpl') private autoLevelModalTpl?: TemplateRef<unknown>;
+  @ViewChild('ampStateConflictModalTpl') private ampStateConflictModalTpl?: TemplateRef<unknown>;
   private readonly modalService = inject(NgbModal);
   private readonly modalRefs: Partial<Record<ModalKey, NgbModalRef>> = {};
 
@@ -617,6 +618,9 @@ export class App implements OnInit, OnDestroy {
   autoLevelRunning = signal(false);
   autoLevelMatchBoosterBypass = signal(true);
   autoLevelLogs = signal<string[]>([]);
+  ampStateConflictPreviousSlotLabel = signal('');
+  ampStateConflictCurrentSlotLabel = signal('');
+  ampStateConflictDetectedAt = signal('');
   editorModalOpen = signal(false);
   editorSlotNumber = signal<number | null>(null);
   editorSlotLabel = signal('');
@@ -814,7 +818,7 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  async syncLivePatch(): Promise<void> {
+  async syncLivePatch(): Promise<boolean> {
     this.setActionBusy('sync-live-patch', true);
     this.status.set('Syncing Live Patch from amp...');
     this.responseJson.set('');
@@ -827,14 +831,16 @@ export class App implements OnInit, OnDestroy {
       if (!response.ok || !('patch_json' in payload)) {
         this.status.set('Live Patch sync failed');
         this.responseJson.set(JSON.stringify(payload, null, 2));
-        return;
+        return false;
       }
       this.applyLivePatchStatus(payload as LivePatchResponse);
       this.loadLivePatchIntoEditorState(payload as LivePatchResponse, false, true);
       this.status.set('Live Patch synced');
+      return true;
     } catch (error: unknown) {
       this.status.set('Live Patch sync failed');
       this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
+      return false;
     } finally {
       this.setActionBusy('sync-live-patch', false);
     }
@@ -945,6 +951,37 @@ export class App implements OnInit, OnDestroy {
     } catch (error: unknown) {
       this.status.set('Failed to load current Live Patch from amp.');
       this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
+    }
+  }
+
+  async applyGuiStateAfterAmpChange(): Promise<void> {
+    const actionKey = 'amp-state-conflict-apply';
+    this.setActionBusy(actionKey, true);
+    this.status.set('Re-applying GUI state to amp live...');
+    try {
+      const applied = await this.applyEditorPatchLive(this.editorDraftFingerprint(), true);
+      if (!applied) {
+        this.status.set('GUI to amp apply failed');
+        return;
+      }
+      this.status.set('GUI state re-applied live to amp');
+      this.closeAmpStateConflictModal();
+    } finally {
+      this.setActionBusy(actionKey, false);
+    }
+  }
+
+  async readAmpStateAfterAmpChange(): Promise<void> {
+    const actionKey = 'amp-state-conflict-read';
+    this.setActionBusy(actionKey, true);
+    try {
+      const synced = await this.syncLivePatch();
+      if (!synced) {
+        return;
+      }
+      this.closeAmpStateConflictModal();
+    } finally {
+      this.setActionBusy(actionKey, false);
     }
   }
 
@@ -5138,27 +5175,27 @@ export class App implements OnInit, OnDestroy {
     await this.applyEditorPatchLive(queuedFingerprint);
   }
 
-  private async applyEditorPatchLive(expectedFingerprint: string): Promise<void> {
+  private async applyEditorPatchLive(expectedFingerprint: string, forceFullPatch = false): Promise<boolean> {
     const draft = this.editorPatchDraft();
     const slotNumber = this.editorSlotNumber();
     if (!this.editorLiveApplyAvailable() || draft === null || this.editorLiveApplyInFlight) {
-      return;
+      return false;
     }
     const currentFingerprint = this.patchFingerprint(draft);
     if (currentFingerprint !== expectedFingerprint) {
       this.scheduleEditorLiveApply();
-      return;
+      return false;
     }
-    if (currentFingerprint === this.editorLiveApplyLastAppliedFingerprint) {
-      return;
+    if (!forceFullPatch && currentFingerprint === this.editorLiveApplyLastAppliedFingerprint) {
+      return false;
     }
     const draftSnapshot = this.clonePatch(draft);
-    const changedBlocks = this.editorChangedBlocks(this.livePatchSnapshot(), draftSnapshot);
+    const changedBlocks = forceFullPatch ? [] : this.editorChangedBlocks(this.livePatchSnapshot(), draftSnapshot);
     this.editorLiveApplyInFlight = true;
     this.editorLiveApplyPending.set(true);
     this.editorLiveApplyReadbackAt.set('');
     try {
-      if (changedBlocks.length === 1) {
+      if (!forceFullPatch && changedBlocks.length === 1) {
         const blockName = changedBlocks[0];
         const blockPayload = this.comparablePatchBlock(draftSnapshot, blockName);
         if (blockPayload && typeof blockPayload === 'object' && !Array.isArray(blockPayload)) {
@@ -5171,7 +5208,7 @@ export class App implements OnInit, OnDestroy {
           const payload = (await response.json()) as LivePatchResponse | { detail?: unknown };
           if (!response.ok || !('patch_json' in payload)) {
             this.editorLiveApplyError.set(typeof payload === 'object' ? JSON.stringify(payload) : 'live apply failed');
-            return;
+            return false;
           }
           const applied = payload as LivePatchResponse;
           const appliedFingerprint = this.patchFingerprint(applied.patch_json);
@@ -5184,8 +5221,12 @@ export class App implements OnInit, OnDestroy {
           this.currentAmpCommitState.set('uncommitted');
           this.editorLiveApplyReadbackAt.set(applied.amp_confirmed_at);
           this.editorLiveApplyError.set('');
+          const targetSlotNumber = this.selectedAmpSlot() ?? slotNumber;
+          if (targetSlotNumber !== null) {
+            this.editorSlotNumber.set(targetSlotNumber);
+          }
           this.refreshCurrentCommitStateFromKnownState();
-          return;
+          return true;
         }
       }
       const response = await fetch('/api/v1/amp/current-patch/live-apply', {
@@ -5197,7 +5238,7 @@ export class App implements OnInit, OnDestroy {
       const payload = (await response.json()) as ApplyCurrentPatchResponse | { detail?: unknown };
       if (!response.ok) {
         this.editorLiveApplyError.set(typeof payload === 'object' ? JSON.stringify(payload) : 'live apply failed');
-        return;
+        return false;
       }
       const applied = payload as ApplyCurrentPatchResponse;
       const stagedFingerprint = expectedFingerprint;
@@ -5207,8 +5248,9 @@ export class App implements OnInit, OnDestroy {
       }
       const patchName = this.readString(draftSnapshot, 'patch_name') ?? '';
       const hash = this.readString(applied.patch, 'config_hash_sha256') ?? '';
-      const targetSlotNumber = slotNumber ?? this.selectedAmpSlot();
+      const targetSlotNumber = this.selectedAmpSlot() ?? slotNumber;
       if (targetSlotNumber !== null) {
+        this.editorSlotNumber.set(targetSlotNumber);
         this.slots.update((current) =>
           current.map((card) => {
             if (card.slot !== targetSlotNumber) {
@@ -5230,8 +5272,10 @@ export class App implements OnInit, OnDestroy {
       this.currentAmpCommitState.set('uncommitted');
       this.editorLiveApplyReadbackAt.set(applied.applied_at);
       void this.refreshLivePatchStatus();
+      return true;
     } catch (error: unknown) {
       this.editorLiveApplyError.set(String(error));
+      return false;
     } finally {
       this.editorLiveApplyInFlight = false;
       this.editorLiveApplyPending.set(false);
@@ -5258,6 +5302,30 @@ export class App implements OnInit, OnDestroy {
       const currentBlock = this.comparablePatchBlock(currentPatch, block);
       return this.stableStringify(referenceBlock) !== this.stableStringify(currentBlock);
     });
+  }
+
+  private isAmpStateConflictModalOpen(): boolean {
+    return this.modalRefs.ampStateConflict !== undefined;
+  }
+
+  private openAmpStateConflictModal(previousSlot: number | null, currentSlot: number | null): void {
+    this.ampStateConflictPreviousSlotLabel.set(previousSlot === null ? 'n/a' : this.setLabelForSlot(previousSlot));
+    this.ampStateConflictCurrentSlotLabel.set(currentSlot === null ? 'n/a' : this.setLabelForSlot(currentSlot));
+    this.ampStateConflictDetectedAt.set(new Date().toISOString());
+    this.editorLiveApplyError.set('');
+    this.openModal('ampStateConflict', this.ampStateConflictModalTpl, {
+      centered: true,
+      backdrop: 'static',
+      keyboard: false,
+      size: 'lg',
+    });
+  }
+
+  private closeAmpStateConflictModal(): void {
+    this.closeModal('ampStateConflict');
+    this.ampStateConflictPreviousSlotLabel.set('');
+    this.ampStateConflictCurrentSlotLabel.set('');
+    this.ampStateConflictDetectedAt.set('');
   }
 
   editorLiveApplyHasApplied(): boolean {
@@ -5799,6 +5867,14 @@ export class App implements OnInit, OnDestroy {
       if (previousSlot !== null && active.slot !== previousSlot) {
         this.currentAmpPatchHash.set('');
         this.currentAmpCommitState.set('unknown');
+        this.editorLiveApplyQueuedFingerprint = null;
+        if (!this.isAmpStateConflictModalOpen()) {
+          this.openAmpStateConflictModal(previousSlot, active.slot);
+        } else {
+          this.ampStateConflictPreviousSlotLabel.set(this.setLabelForSlot(previousSlot));
+          this.ampStateConflictCurrentSlotLabel.set(active.slot === null ? 'n/a' : this.setLabelForSlot(active.slot));
+          this.ampStateConflictDetectedAt.set(new Date().toISOString());
+        }
       }
       this.selectedAmpSlot.set(active.slot);
       this.selectedAmpSlotText.set(active.slot_label || 'n/a');
