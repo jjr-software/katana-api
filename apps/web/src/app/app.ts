@@ -567,9 +567,6 @@ export class App implements OnInit, OnDestroy {
   livePatchExactSlotMatch = signal<{ slot: number; patch_name: string } | null>(null);
   livePatchPartialSlotMatches = signal<Array<{ slot: number; patch_name: string }>>([]);
   toasts = signal<ToastMessage[]>([]);
-  levelMarkerRmsDbfs = signal<number | null>(null);
-  levelMarkerPeakDbfs = signal<number | null>(null);
-  levelMarkerCapturedAt = signal('');
   globalNormalizeTargetRms = signal(DEFAULT_TARGET_RMS_DBFS.toFixed(2));
   liveRmsDbfs = signal<number | null>(null);
   liveRmsMaxDbfs = signal<number | null>(null);
@@ -719,7 +716,6 @@ export class App implements OnInit, OnDestroy {
     window.addEventListener('popstate', this.onPopState);
     this.loadGlobalNormalizeTargetRms();
     void this.refreshQueueState();
-    void this.loadAudioLevelMarker();
     void this.loadRecentAudioSamples();
     void this.loadToneLabData();
     if (this.isLineOutPage()) {
@@ -752,7 +748,7 @@ export class App implements OnInit, OnDestroy {
       clearTimeout(timer);
     }
     this.toastTimers.clear();
-    this.stopLiveMeter();
+    this.shutdownLiveMeter();
   }
 
   isActionBusy(key: string): boolean {
@@ -2202,84 +2198,6 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  async captureAudioLevelMarker(): Promise<void> {
-    this.setActionBusy('capture-level-marker', true);
-    this.status.set('Capturing audio level marker...');
-    this.responseJson.set('');
-    try {
-      const response = await fetch('/api/v1/audio/marker/capture', {
-        method: 'POST',
-        cache: 'no-store',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          duration_sec: 2.0,
-        }),
-      });
-      const payload = (await response.json()) as AudioSampleResponse | { detail?: unknown };
-      if (!response.ok) {
-        this.status.set('Audio level marker capture failed');
-        this.responseJson.set(JSON.stringify(payload, null, 2));
-        return;
-      }
-      const marker = payload as AudioSampleResponse;
-      this.levelMarkerRmsDbfs.set(marker.rms_dbfs);
-      this.levelMarkerPeakDbfs.set(marker.peak_dbfs);
-      this.levelMarkerCapturedAt.set(marker.created_at);
-      this.status.set('Audio level marker captured');
-      this.responseJson.set(
-        JSON.stringify(
-          {
-            message: 'Audio level marker captured',
-            rms_dbfs: marker.rms_dbfs,
-            peak_dbfs: marker.peak_dbfs,
-            captured_at: marker.created_at,
-          },
-          null,
-          2,
-        ),
-      );
-    } catch (error: unknown) {
-      this.status.set('Audio level marker capture failed');
-      this.responseJson.set(
-        JSON.stringify(
-          {
-            message: 'Browser request failed',
-            error: String(error),
-          },
-          null,
-          2,
-        ),
-      );
-    } finally {
-      this.setActionBusy('capture-level-marker', false);
-    }
-  }
-
-  async loadAudioLevelMarker(): Promise<void> {
-    try {
-      const response = await fetch('/api/v1/audio/marker', {
-        method: 'GET',
-        cache: 'no-store',
-      });
-      if (response.status === 404) {
-        this.levelMarkerRmsDbfs.set(null);
-        this.levelMarkerPeakDbfs.set(null);
-        this.levelMarkerCapturedAt.set('');
-        return;
-      }
-      const payload = (await response.json()) as AudioSampleResponse | { detail?: unknown };
-      if (!response.ok) {
-        return;
-      }
-      const marker = payload as AudioSampleResponse;
-      this.levelMarkerRmsDbfs.set(marker.rms_dbfs);
-      this.levelMarkerPeakDbfs.set(marker.peak_dbfs);
-      this.levelMarkerCapturedAt.set(marker.created_at);
-    } catch {
-      // marker display is optional; keep current UI state
-    }
-  }
-
   setGlobalNormalizeTargetRms(value: string): void {
     this.globalNormalizeTargetRms.set(value);
   }
@@ -2294,19 +2212,6 @@ export class App implements OnInit, OnDestroy {
     } catch {
       // local storage is best-effort only
     }
-  }
-
-  useLevelMarkerAsGlobalTarget(): void {
-    const marker = this.levelMarkerRmsDbfs();
-    if (marker === null || !Number.isFinite(marker)) {
-      this.status.set('Level marker is not set yet.');
-      return;
-    }
-    const text = marker.toFixed(2);
-    this.globalNormalizeTargetRms.set(text);
-    this.autoLevelTargetRms.set(text);
-    this.commitGlobalNormalizeTargetRms();
-    this.status.set(`Global normalize target set to ${text} dBFS from marker.`);
   }
 
   private loadGlobalNormalizeTargetRms(): void {
@@ -2457,8 +2362,6 @@ export class App implements OnInit, OnDestroy {
     const globalTarget = Number.parseFloat(this.globalNormalizeTargetRms());
     if (Number.isFinite(globalTarget)) {
       this.autoLevelTargetRms.set(globalTarget.toFixed(2));
-    } else if (this.levelMarkerRmsDbfs() !== null) {
-      this.autoLevelTargetRms.set(this.levelMarkerRmsDbfs()!.toFixed(2));
     } else {
       this.autoLevelTargetRms.set(DEFAULT_TARGET_RMS_DBFS.toFixed(2));
     }
@@ -3165,27 +3068,19 @@ export class App implements OnInit, OnDestroy {
     this.liveMeterSource = source;
   }
 
-  toggleLiveMeter(): void {
-    if (this.liveMeterConnected()) {
-      this.stopLiveMeter();
-      return;
-    }
-    this.startLiveMeter();
-  }
-
-  stopLiveMeter(): void {
-    this.liveMeterShouldRun = false;
-    this.clearLiveMeterReconnect();
-    this.disconnectLiveMeter();
-    this.resetLiveMeterDisplay();
-  }
-
   private disconnectLiveMeter(): void {
     if (this.liveMeterSource !== null) {
       this.liveMeterSource.close();
       this.liveMeterSource = null;
     }
     this.liveMeterConnected.set(false);
+  }
+
+  private shutdownLiveMeter(): void {
+    this.liveMeterShouldRun = false;
+    this.clearLiveMeterReconnect();
+    this.disconnectLiveMeter();
+    this.resetLiveMeterDisplay();
   }
 
   private resetLiveMeterDisplay(): void {
@@ -3216,10 +3111,6 @@ export class App implements OnInit, OnDestroy {
       clearTimeout(this.liveMeterReconnectHandle);
       this.liveMeterReconnectHandle = null;
     }
-  }
-
-  liveMeterButtonLabel(): string {
-    return this.liveMeterConnected() ? 'Stop Live Meter' : 'Start Live Meter';
   }
 
   liveMeterBandRows(): LiveMeterBandRow[] {

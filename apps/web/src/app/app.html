@@ -100,16 +100,6 @@
             >
               {{ headerActionLabel('persist-live-patch', 'Store to Amp', 'Storing...') }}
             </button>
-            <button type="button" class="btn btn-outline-success btn-sm" (click)="captureAudioLevelMarker()" [disabled]="isActionBusy('capture-level-marker')">{{ headerActionLabel('capture-level-marker', 'Set Level Marker', 'Capturing...') }}</button>
-            <button
-              type="button"
-              class="btn btn-sm"
-              [class.btn-outline-info]="!liveMeterConnected()"
-              [class.btn-outline-secondary]="liveMeterConnected()"
-              (click)="toggleLiveMeter()"
-            >
-              {{ liveMeterButtonLabel() }}
-            </button>
           </div>
           <div class="d-flex flex-wrap gap-3 small text-secondary">
             <span>AMP State Hash: <code>{{ shortHash(ampStateHash()) }}</code></span>
@@ -130,40 +120,18 @@
             </span>
           </div>
           <div class="d-flex flex-wrap gap-2 mt-2">
-            <div class="card shadow-sm" style="flex: 1 1 11rem; min-width: 11rem;">
-              <div class="card-body py-2 px-3">
-                <div class="small text-secondary mb-1">Level Marker RMS</div>
-                <code class="d-block text-nowrap">{{ formatDb(levelMarkerRmsDbfs()) }}</code>
-              </div>
-            </div>
-            <div class="card shadow-sm" style="flex: 1 1 11rem; min-width: 11rem;">
-              <div class="card-body py-2 px-3">
-                <div class="small text-secondary mb-1">Marker At</div>
-                <code class="d-block text-nowrap">{{ levelMarkerCapturedAt() || 'n/a' }}</code>
-              </div>
-            </div>
             <div class="card shadow-sm" style="flex: 1 1 18rem; min-width: 18rem;">
               <div class="card-body py-2 px-3 d-grid gap-2">
                 <div class="small text-secondary">Global Target RMS</div>
-                <div class="d-flex flex-wrap align-items-center gap-2">
-                  <input
-                    type="number"
-                    step="0.1"
-                    class="form-control form-control-sm"
-                    style="width: 7.5rem;"
-                    [value]="globalNormalizeTargetRms()"
-                    (input)="setGlobalNormalizeTargetRms($any($event.target).value)"
-                    (blur)="commitGlobalNormalizeTargetRms()"
-                  />
-                  <button
-                    type="button"
-                    class="btn btn-outline-success btn-sm"
-                    (click)="useLevelMarkerAsGlobalTarget()"
-                    [disabled]="levelMarkerRmsDbfs() === null"
-                  >
-                    Use Marker
-                  </button>
-                </div>
+                <input
+                  type="number"
+                  step="0.1"
+                  class="form-control form-control-sm"
+                  style="width: 7.5rem;"
+                  [value]="globalNormalizeTargetRms()"
+                  (input)="setGlobalNormalizeTargetRms($any($event.target).value)"
+                  (blur)="commitGlobalNormalizeTargetRms()"
+                />
               </div>
             </div>
             <div class="card shadow-sm" style="flex: 1 1 11rem; min-width: 11rem;">
