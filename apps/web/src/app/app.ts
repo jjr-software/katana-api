@@ -190,7 +190,7 @@ const LIVE_FFT_BANDS = [
   { id: 'air', label: 'Air', minHz: 6_000, maxHz: 12_000 },
 ] as const;
 const DEFAULT_TARGET_RMS_DBFS = -39.0;
-const LIVE_TOTAL_LEVEL_ZOOM_DB = 2.0;
+const LIVE_TOTAL_LEVEL_ZOOM_DB = 3.0;
 const LIVE_METER_WINDOW_SEC = 2.0;
 const LIVE_RMS_HISTORY_LIMIT = 240;
 const LIVE_TOTAL_LEVEL_GRAPH_WIDTH = 1000;
