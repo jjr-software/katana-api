@@ -178,8 +178,11 @@
                 <div class="d-flex flex-wrap gap-3 align-items-center">
                   <span class="text-secondary">Current Slot:</span>
                   <strong>{{ selectedAmpSlotLabel() }}</strong>
-                  <span class="text-secondary">Current Settings:</span>
+                  <span class="text-secondary">Current Settings Name:</span>
                   <strong>{{ currentSettingsPatchName() }}</strong>
+                  @if (currentSettingsSourceQualifier(); as sourceQualifier) {
+                    <span class="text-secondary">({{ sourceQualifier }})</span>
+                  }
                   <span class="text-secondary">Shown Blocks:</span>
                   <span>{{ livePatchSelectedBlocksSummary() }}</span>
                 </div>

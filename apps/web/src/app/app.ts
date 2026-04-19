@@ -4135,6 +4135,10 @@ export class App implements OnInit, OnDestroy {
     return this.readString(this.editorPatchDraft(), 'patch_name')?.trim() || this.toneLoadedPatchName().trim() || 'Unnamed Current Settings';
   }
 
+  currentSettingsSourceQualifier(): string {
+    return this.livePatchSourceType() === 'amp_sync' ? 'AMP only' : '';
+  }
+
   private applySyncedSlot(slot: SlotPatchSummary): void {
     this.slots.update((current) =>
       current.map((card) => {
