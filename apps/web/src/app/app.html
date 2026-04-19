@@ -177,7 +177,7 @@
             <div class="border rounded p-2 bg-body-tertiary small d-grid gap-2">
               <div class="d-flex gap-2 flex-wrap">
                 <button type="button" class="btn btn-sm btn-outline-primary" (click)="openLiveEditor()">Reload Live Patch From Amp</button>
-                <button type="button" class="btn btn-sm btn-outline-success" (click)="openToneSaveModal()">Save GUI State</button>
+                <button type="button" class="btn btn-sm btn-outline-success" (click)="openToneSaveModal()">Save Current Settings</button>
                 <button type="button" class="btn btn-sm btn-outline-primary" (click)="openToneDesignerModal()">AI Designer</button>
               </div>
               <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
@@ -1029,7 +1029,7 @@
 
   <ng-template #toneSaveModalTpl>
     <div class="modal-header">
-      <h5 class="modal-title">Save GUI State</h5>
+      <h5 class="modal-title">Save Current Settings</h5>
       <button type="button" class="btn-close" aria-label="Close" (click)="closeToneSaveModal()"></button>
     </div>
     <div class="modal-body d-grid gap-3">
@@ -1094,7 +1094,7 @@
       <div class="d-flex justify-content-end flex-wrap gap-2">
         <button type="button" class="btn btn-sm btn-outline-success" (click)="saveFullLiveAsTonePatchObject()" [disabled]="isActionBusy('tone-save-full')">Store Full Patch</button>
         <button type="button" class="btn btn-sm btn-success" (click)="saveGuiStateAsTonePatchObject()" [disabled]="isActionBusy('tone-save-gui')">
-          {{ isActionBusy('tone-save-gui') ? 'Saving...' : 'Save GUI State' }}
+          {{ isActionBusy('tone-save-gui') ? 'Saving...' : 'Save Current Settings' }}
         </button>
       </div>
     </div>
@@ -1447,7 +1447,7 @@
       <article class="border rounded p-3 bg-body-tertiary d-grid gap-2">
         <p class="mb-0">
           The amp is now on <strong>{{ ampStateConflictCurrentSlotLabel() }}</strong> instead of <strong>{{ ampStateConflictPreviousSlotLabel() }}</strong>.
-          Your GUI draft may no longer match the live amp state.
+          Your current settings may no longer match the live amp state.
         </p>
         <p class="small text-secondary mb-0">
           Detected at <code>{{ ampStateConflictDetectedAt() }}</code>. Choose whether the GUI should win, or whether the amp should win.
@@ -1463,7 +1463,7 @@
         class="btn btn-outline-success"
         (click)="openToneSaveModal()"
       >
-        Save GUI State to Patch
+        Save Current Settings to Patch
       </button>
       <button
         type="button"
