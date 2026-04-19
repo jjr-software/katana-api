@@ -1055,7 +1055,7 @@ export class App implements OnInit, OnDestroy {
 
   openToneSaveModal(): void {
     this.toneSaveBlocks.set({ ...this.toneSelectedBlocks() });
-    this.openModal('toneSave', this.toneSaveModalTpl, { size: 'lg' });
+    this.openModal('toneSave', this.toneSaveModalTpl, { size: 'xl' });
   }
 
   closeToneSaveModal(): void {
@@ -1120,6 +1120,18 @@ export class App implements OnInit, OnDestroy {
 
   saveToneBlocks(): string[] {
     return this.toneBlockOptions().filter((block) => this.isToneSaveBlockIncluded(block));
+  }
+
+  toneSaveIncludedCount(): number {
+    return this.saveToneBlocks().length;
+  }
+
+  toneSaveExcludedCount(): number {
+    return this.toneBlockOptions().length - this.toneSaveIncludedCount();
+  }
+
+  toneSaveChangedCount(): number {
+    return this.toneBlockOptions().filter((block) => this.editorBlockIsChanged(block)).length;
   }
 
   editorBlockIsChanged(block: string): boolean {
@@ -1307,11 +1319,11 @@ export class App implements OnInit, OnDestroy {
       return;
     }
     if (blocks.length === 0) {
-      this.status.set('Select at least one block before saving.');
+      this.status.set('Include at least one block before saving.');
       return;
     }
     this.setActionBusy('tone-save-live', true);
-    this.status.set(`Saving selected blocks to ${name}...`);
+    this.status.set(`Saving included blocks to ${name}...`);
     this.responseJson.set('');
     try {
       const response = await fetch('/api/v1/patch-objects/save-from-live', {
@@ -1351,7 +1363,7 @@ export class App implements OnInit, OnDestroy {
       this.closeToneSaveModal();
       await this.loadTonePatchObjects();
       await this.refreshLivePatchStatus();
-      this.status.set(`Saved selected blocks as ${name}`);
+      this.status.set(`Saved included blocks as ${name}`);
       this.responseJson.set(JSON.stringify(saved, null, 2));
     } catch (error: unknown) {
       this.status.set('Live Patch save failed');

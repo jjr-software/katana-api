@@ -1106,7 +1106,12 @@
       <button type="button" class="btn-close" aria-label="Close" (click)="closeToneSaveModal()"></button>
     </div>
     <div class="modal-body d-grid gap-3">
-      <p class="small text-secondary mb-0">Choose which blocks will be written into the saved patch. Store Full Patch reads the current amp state and saves every block.</p>
+      <p class="small text-secondary mb-0">Choose which blocks belong in the saved patch. Changed blocks are highlighted so you can see what the save will capture before you commit it.</p>
+      <div class="d-flex flex-wrap gap-2 small">
+        <span class="badge rounded-pill text-bg-primary">Included {{ toneSaveIncludedCount() }}</span>
+        <span class="badge rounded-pill text-bg-secondary">Excluded {{ toneSaveExcludedCount() }}</span>
+        <span class="badge rounded-pill text-bg-warning">Changed {{ toneSaveChangedCount() }}</span>
+      </div>
       <div>
         <label class="form-label small mb-1" for="toneSaveName">Name</label>
         <input id="toneSaveName" type="text" class="form-control" [value]="toneSaveName()" (input)="setToneSaveName($any($event.target).value)" />
@@ -1125,7 +1130,10 @@
         </select>
       </div>
       <div>
-        <p class="form-label small mb-1">Blocks</p>
+        <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+          <p class="form-label small mb-0">Blocks</p>
+          <span class="small text-secondary">{{ toneSaveIncludedCount() }} of {{ toneBlockOptions().length }} included</span>
+        </div>
         <div class="d-flex flex-wrap gap-2">
           @for (block of toneBlockOptions(); track block) {
             <input
@@ -1138,26 +1146,30 @@
             <label
               class="card shadow-sm"
               style="flex: 1 1 12rem; min-width: 12rem; cursor: pointer;"
-              [class.bg-success-subtle]="isToneSaveBlockIncluded(block)"
-              [class.border-success]="isToneSaveBlockIncluded(block)"
+              [class.bg-warning-subtle]="editorBlockIsChanged(block)"
+              [class.border-warning]="editorBlockIsChanged(block)"
+              [class.bg-success-subtle]="!editorBlockIsChanged(block) && isToneSaveBlockIncluded(block)"
+              [class.border-success]="!editorBlockIsChanged(block) && isToneSaveBlockIncluded(block)"
               [for]="toneBlockControlId('save', block)"
             >
               <div class="card-body py-2 px-3 d-flex align-items-start gap-2">
                 <span
                   class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0"
                   style="width: 2.5rem; height: 2.5rem; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em;"
-                  [class.bg-success]="isToneSaveBlockIncluded(block)"
-                  [class.text-white]="isToneSaveBlockIncluded(block)"
-                  [class.bg-body-tertiary]="!isToneSaveBlockIncluded(block)"
-                  [class.text-secondary]="!isToneSaveBlockIncluded(block)"
+                  [class.bg-warning]="editorBlockIsChanged(block)"
+                  [class.text-dark]="editorBlockIsChanged(block)"
+                  [class.bg-success]="!editorBlockIsChanged(block) && isToneSaveBlockIncluded(block)"
+                  [class.text-white]="!editorBlockIsChanged(block) && isToneSaveBlockIncluded(block)"
+                  [class.bg-body-tertiary]="!editorBlockIsChanged(block) && !isToneSaveBlockIncluded(block)"
+                  [class.text-secondary]="!editorBlockIsChanged(block) && !isToneSaveBlockIncluded(block)"
                 >
                   {{ toneBlockDisplay(block).glyph }}
                 </span>
                 <div class="flex-grow-1">
                   <div class="d-flex justify-content-between gap-2 align-items-start">
                     <div class="fw-semibold">{{ toneBlockDisplay(block).label }}</div>
-                    <span class="badge rounded-pill" [class.text-bg-success]="isToneSaveBlockIncluded(block)" [class.text-bg-secondary]="!isToneSaveBlockIncluded(block)">
-                      {{ isToneSaveBlockIncluded(block) ? 'Included' : 'Excluded' }}
+                    <span class="badge rounded-pill" [class.text-bg-warning]="editorBlockIsChanged(block)" [class.text-bg-success]="!editorBlockIsChanged(block) && isToneSaveBlockIncluded(block)" [class.text-bg-secondary]="!editorBlockIsChanged(block) && !isToneSaveBlockIncluded(block)">
+                      {{ editorBlockIsChanged(block) ? 'Changed' : (isToneSaveBlockIncluded(block) ? 'Included' : 'Excluded') }}
                     </span>
                   </div>
                   <div class="small text-secondary">{{ toneBlockDisplay(block).subtitle }}</div>
@@ -1170,7 +1182,7 @@
       <div class="d-flex justify-content-end flex-wrap gap-2">
         <button type="button" class="btn btn-sm btn-outline-success" (click)="saveFullLiveAsTonePatchObject()" [disabled]="isActionBusy('tone-save-live')">Store Full Patch</button>
         <button type="button" class="btn btn-sm btn-success" (click)="saveLiveAsTonePatchObject()" [disabled]="isActionBusy('tone-save-live')">
-          {{ isActionBusy('tone-save-live') ? 'Saving...' : 'Save Selected Blocks' }}
+          {{ isActionBusy('tone-save-live') ? 'Saving...' : 'Save Included Blocks' }}
         </button>
       </div>
     </div>
