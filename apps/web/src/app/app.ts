@@ -4128,6 +4128,18 @@ export class App implements OnInit, OnDestroy {
     return this.selectedAmpSlotText();
   }
 
+  selectedAmpSlotSavedPatchName(): string {
+    const slotNumber = this.selectedAmpSlot();
+    if (slotNumber === null) {
+      return 'n/a';
+    }
+    const slot = this.slots().find((card) => card.slot === slotNumber);
+    if (!slot) {
+      return 'Unknown';
+    }
+    return this.displayPatchName(slot);
+  }
+
   currentSettingsPatchName(): string {
     if (this.editorIsModified()) {
       return 'MODIFIED';
