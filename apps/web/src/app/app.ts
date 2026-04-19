@@ -4129,6 +4129,9 @@ export class App implements OnInit, OnDestroy {
   }
 
   currentSettingsPatchName(): string {
+    if (this.editorIsModified()) {
+      return 'MODIFIED';
+    }
     return this.readString(this.editorPatchDraft(), 'patch_name')?.trim() || this.toneLoadedPatchName().trim() || 'Unnamed Current Settings';
   }
 
