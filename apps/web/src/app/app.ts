@@ -192,9 +192,11 @@ const LIVE_FFT_BANDS = [
 const DEFAULT_TARGET_RMS_DBFS = -31.0;
 const LIVE_TOTAL_LEVEL_ZOOM_DB = 2.0;
 const LIVE_METER_WINDOW_SEC = 2.0;
-const LIVE_RMS_HISTORY_LIMIT = 60;
+const LIVE_RMS_HISTORY_LIMIT = 240;
 const LIVE_TOTAL_LEVEL_GRAPH_WIDTH = 1000;
 const LIVE_TOTAL_LEVEL_GRAPH_HEIGHT = 72;
+const LIVE_TOTAL_LEVEL_BAR_STEP = 14;
+const LIVE_TOTAL_LEVEL_BAR_WIDTH = 10;
 const AUTO_LEVEL_TOLERANCE_DB = 0.4;
 const AUTO_LEVEL_MEASURE_SEC = 2.0;
 const AUTO_LEVEL_MAX_ITERS = 8;
@@ -3416,6 +3418,10 @@ export class App implements OnInit, OnDestroy {
     this.liveFrequencyBandMaxDbfs.set([]);
   }
 
+  clearLiveMeterChart(): void {
+    this.liveRmsHistory.set([]);
+  }
+
   formatRelativeDb(value: number | null): string {
     if (value === null || !Number.isFinite(value)) {
       return 'n/a';
@@ -3456,21 +3462,26 @@ export class App implements OnInit, OnDestroy {
     }
     const graphWidth = LIVE_TOTAL_LEVEL_GRAPH_WIDTH;
     const baselineY = this.liveTotalLevelTargetLineY();
-    const step = graphWidth / values.length;
-    const barWidth = Math.max(2, step * 0.7);
-    return values.map((value, index) => {
-      const y = this.liveTotalLevelValueToGraphY(value);
-      const x = (index * step) + ((step - barWidth) / 2);
-      const top = Math.min(y, baselineY);
-      const height = Math.max(1, Math.abs(y - baselineY));
-      return {
-        x,
-        y: top,
-        width: barWidth,
-        height,
-        tone: value >= this.liveTotalLevelTargetRms() ? 'above' : 'below',
-      };
-    });
+    const latestIndex = values.length - 1;
+    return values
+      .map((value, index) => {
+        const distanceFromLatest = latestIndex - index;
+        const x = graphWidth - LIVE_TOTAL_LEVEL_BAR_WIDTH - (distanceFromLatest * LIVE_TOTAL_LEVEL_BAR_STEP);
+        if (x + LIVE_TOTAL_LEVEL_BAR_WIDTH <= 0) {
+          return null;
+        }
+        const y = this.liveTotalLevelValueToGraphY(value);
+        const top = Math.min(y, baselineY);
+        const height = Math.max(1, Math.abs(y - baselineY));
+        return {
+          x,
+          y: top,
+          width: LIVE_TOTAL_LEVEL_BAR_WIDTH,
+          height,
+          tone: value >= this.liveTotalLevelTargetRms() ? 'above' : 'below',
+        };
+      })
+      .filter((bar): bar is LiveRmsHistoryBar => bar !== null);
   }
 
   private pushLiveRmsPoint(value: number): void {
