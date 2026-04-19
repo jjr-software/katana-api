@@ -218,7 +218,7 @@
                 <div class="d-flex flex-wrap gap-3 align-items-center">
                   <span class="text-secondary">Loaded Reference Patch:</span>
                   <strong>{{ livePatchLoadedPatchName() }}</strong>
-                  <span class="text-secondary">Visible Blocks:</span>
+                  <span class="text-secondary">Shown Blocks:</span>
                   <span>{{ livePatchSelectedBlocksSummary() }}</span>
                 </div>
               </div>
@@ -292,14 +292,6 @@
                       <div class="flex-grow-1">
                         <div class="d-flex justify-content-between gap-2 align-items-start">
                           <div class="fw-semibold">{{ toneBlockDisplay(block).label }}</div>
-                          <span
-                            class="badge rounded-pill"
-                            [class.text-bg-warning]="editorBlockIsChanged(block)"
-                            [class.text-bg-success]="!editorBlockIsChanged(block) && isToneBlockSelected(block)"
-                            [class.text-bg-secondary]="!editorBlockIsChanged(block) && !isToneBlockSelected(block)"
-                          >
-                            {{ editorBlockIsChanged(block) ? 'Changed' : (isToneBlockSelected(block) ? 'Visible' : 'Hidden') }}
-                          </span>
                         </div>
                         <div class="small text-secondary">{{ toneBlockDisplay(block).subtitle }}</div>
                       </div>
