@@ -104,6 +104,14 @@ interface LiveMeterBandRow {
   maxDbfs: number | null;
 }
 
+interface LiveRmsHistoryBar {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  tone: 'above' | 'below';
+}
+
 interface LineOutCustomState {
   mic_type: number;
   mic_distance: number;
@@ -182,6 +190,11 @@ const LIVE_FFT_BANDS = [
   { id: 'air', label: 'Air', minHz: 6_000, maxHz: 12_000 },
 ] as const;
 const DEFAULT_TARGET_RMS_DBFS = -31.0;
+const LIVE_TOTAL_LEVEL_ZOOM_DB = 2.0;
+const LIVE_METER_WINDOW_SEC = 2.0;
+const LIVE_RMS_HISTORY_LIMIT = 60;
+const LIVE_TOTAL_LEVEL_GRAPH_WIDTH = 1000;
+const LIVE_TOTAL_LEVEL_GRAPH_HEIGHT = 72;
 const AUTO_LEVEL_TOLERANCE_DB = 0.4;
 const AUTO_LEVEL_MEASURE_SEC = 2.0;
 const AUTO_LEVEL_MAX_ITERS = 8;
@@ -189,6 +202,29 @@ const AUTO_LEVEL_STEP_SCALE = 2.0;
 const AUTO_LEVEL_MAX_STEP = 8;
 const GLOBAL_NORMALIZE_TARGET_STORAGE_KEY = 'katana.globalNormalizeTargetRms';
 const TONE_BLOCK_OPTIONS = ['routing', 'amp', 'booster', 'mod', 'fx', 'delay', 'reverb', 'eq1', 'eq2', 'ns', 'send_return', 'solo', 'pedalfx'] as const;
+type ToneBlockKey = (typeof TONE_BLOCK_OPTIONS)[number];
+
+interface ToneBlockDisplay {
+  label: string;
+  glyph: string;
+  subtitle: string;
+}
+
+const TONE_BLOCK_DISPLAY: Record<ToneBlockKey, ToneBlockDisplay> = {
+  routing: { label: 'Routing', glyph: 'RT', subtitle: 'Chain order and cab routing' },
+  amp: { label: 'Amp', glyph: 'AMP', subtitle: 'Gain, tone stack, and volume' },
+  booster: { label: 'Booster', glyph: 'BST', subtitle: 'Boost and drive stage' },
+  mod: { label: 'Mod', glyph: 'MOD', subtitle: 'Modulation block' },
+  fx: { label: 'FX', glyph: 'FX', subtitle: 'Secondary effects block' },
+  delay: { label: 'Delay', glyph: 'DLY', subtitle: 'Delay block' },
+  reverb: { label: 'Reverb', glyph: 'RVB', subtitle: 'Space and decay' },
+  eq1: { label: 'EQ1', glyph: 'EQ1', subtitle: 'First EQ block' },
+  eq2: { label: 'EQ2', glyph: 'EQ2', subtitle: 'Second EQ block' },
+  ns: { label: 'Noise Suppressor', glyph: 'NS', subtitle: 'Noise gate and threshold' },
+  send_return: { label: 'Send/Return', glyph: 'S/R', subtitle: 'External loop levels' },
+  solo: { label: 'Solo', glyph: 'SO', subtitle: 'Solo lift and level' },
+  pedalfx: { label: 'Pedal FX', glyph: 'PFX', subtitle: 'Pedal effect stage' },
+} as const;
 
 interface AmpConnectionTestResponse {
   ok: boolean;
@@ -545,6 +581,7 @@ export class App implements OnInit, OnDestroy {
   globalNormalizeTargetRms = signal(DEFAULT_TARGET_RMS_DBFS.toFixed(2));
   liveRmsDbfs = signal<number | null>(null);
   liveRmsMaxDbfs = signal<number | null>(null);
+  liveRmsHistory = signal<number[]>([]);
   liveFftBinsDb = signal<number[]>([]);
   liveMeterRate = signal(LIVE_METER_DEFAULT_RATE);
   liveFrequencyBandMaxDbfs = signal<Array<number | null>>([]);
@@ -1000,6 +1037,18 @@ export class App implements OnInit, OnDestroy {
 
   toneBlockOptions(): readonly string[] {
     return TONE_BLOCK_OPTIONS;
+  }
+
+  toneBlockDisplay(block: string): ToneBlockDisplay {
+    return TONE_BLOCK_DISPLAY[block as ToneBlockKey] ?? {
+      label: block,
+      glyph: block.slice(0, 3).toUpperCase(),
+      subtitle: '',
+    };
+  }
+
+  toneBlockControlId(scope: 'live' | 'save' | 'ai', block: string): string {
+    return `tone-block-${scope}-${block}`;
   }
 
   openToneSaveModal(): void {
@@ -3241,7 +3290,7 @@ export class App implements OnInit, OnDestroy {
   startLiveMeter(): void {
     this.liveMeterShouldRun = true;
     this.disconnectLiveMeter();
-    const source = new EventSource('/api/v1/audio/live/sse?window_sec=0.5');
+    const source = new EventSource(`/api/v1/audio/live/sse?window_sec=${LIVE_METER_WINDOW_SEC}`);
     source.onmessage = (event: MessageEvent<string>) => {
       try {
         const payload = JSON.parse(event.data) as Record<string, unknown>;
@@ -3262,6 +3311,7 @@ export class App implements OnInit, OnDestroy {
         if (Number.isFinite(rms)) {
           this.liveRmsDbfs.set(rms);
           this.liveRmsMaxDbfs.update((current) => (current === null || rms > current ? rms : current));
+          this.pushLiveRmsPoint(rms);
         }
         const fftBinsUnknown = payload['fft_bins_db'];
         if (Array.isArray(fftBinsUnknown)) {
@@ -3321,6 +3371,7 @@ export class App implements OnInit, OnDestroy {
   private resetLiveMeterDisplay(): void {
     this.liveRmsDbfs.set(null);
     this.liveRmsMaxDbfs.set(null);
+    this.liveRmsHistory.set([]);
     this.liveFftBinsDb.set([]);
     this.liveFrequencyBandMaxDbfs.set([]);
     this.liveMeterRate.set(LIVE_METER_DEFAULT_RATE);
@@ -3360,11 +3411,87 @@ export class App implements OnInit, OnDestroy {
     }));
   }
 
+  resetLiveMeterMaxValues(): void {
+    this.liveRmsMaxDbfs.set(null);
+    this.liveFrequencyBandMaxDbfs.set([]);
+  }
+
   formatRelativeDb(value: number | null): string {
     if (value === null || !Number.isFinite(value)) {
       return 'n/a';
     }
     return `${value.toFixed(2)} dB`;
+  }
+
+  liveTotalLevelTargetRms(): number {
+    const parsed = Number.parseFloat(this.globalNormalizeTargetRms());
+    return Number.isFinite(parsed) ? parsed : DEFAULT_TARGET_RMS_DBFS;
+  }
+
+  liveTotalLevelWindowMin(): number {
+    return this.liveTotalLevelTargetRms() - LIVE_TOTAL_LEVEL_ZOOM_DB;
+  }
+
+  liveTotalLevelWindowMax(): number {
+    return this.liveTotalLevelTargetRms() + LIVE_TOTAL_LEVEL_ZOOM_DB;
+  }
+
+  liveTotalLevelDelta(value: number | null): string {
+    if (value === null || !Number.isFinite(value)) {
+      return 'n/a';
+    }
+    const delta = value - this.liveTotalLevelTargetRms();
+    const sign = delta > 0 ? '+' : '';
+    return `${sign}${delta.toFixed(2)} dB`;
+  }
+
+  liveTotalLevelTargetLineY(): number {
+    return this.liveTotalLevelValueToGraphY(this.liveTotalLevelTargetRms());
+  }
+
+  liveTotalLevelBars(): LiveRmsHistoryBar[] {
+    const values = this.liveRmsHistory();
+    if (values.length === 0) {
+      return [];
+    }
+    const graphWidth = LIVE_TOTAL_LEVEL_GRAPH_WIDTH;
+    const baselineY = this.liveTotalLevelTargetLineY();
+    const step = graphWidth / values.length;
+    const barWidth = Math.max(2, step * 0.7);
+    return values.map((value, index) => {
+      const y = this.liveTotalLevelValueToGraphY(value);
+      const x = (index * step) + ((step - barWidth) / 2);
+      const top = Math.min(y, baselineY);
+      const height = Math.max(1, Math.abs(y - baselineY));
+      return {
+        x,
+        y: top,
+        width: barWidth,
+        height,
+        tone: value >= this.liveTotalLevelTargetRms() ? 'above' : 'below',
+      };
+    });
+  }
+
+  private pushLiveRmsPoint(value: number): void {
+    this.liveRmsHistory.update((current) => {
+      const next = [...current, value];
+      if (next.length > LIVE_RMS_HISTORY_LIMIT) {
+        return next.slice(next.length - LIVE_RMS_HISTORY_LIMIT);
+      }
+      return next;
+    });
+  }
+
+  private liveTotalLevelValueToGraphY(value: number): number {
+    const min = this.liveTotalLevelWindowMin();
+    const max = this.liveTotalLevelWindowMax();
+    if (max <= min) {
+      return LIVE_TOTAL_LEVEL_GRAPH_HEIGHT / 2;
+    }
+    const clamped = Math.max(min, Math.min(max, value));
+    const normalized = (clamped - min) / (max - min);
+    return (1 - normalized) * LIVE_TOTAL_LEVEL_GRAPH_HEIGHT;
   }
 
   private buildLiveMeterBandRows(bins: number[]): LiveMeterBandRow[] {
@@ -3748,7 +3875,7 @@ export class App implements OnInit, OnDestroy {
     const width = 512;
     const graphFloor = 88;
     const graphHeight = 76;
-    const minDb = -60;
+    const minDb = -120;
     const maxDb = 0;
     const step = width / bins.length;
     const barWidth = Math.max(2, step * 0.72);

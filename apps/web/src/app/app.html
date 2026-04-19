@@ -76,59 +76,124 @@
                 {{ currentCommitStateLabel() }}
               </code>
             </span>
-            <span>Level Marker RMS: <code>{{ formatDb(levelMarkerRmsDbfs()) }}</code></span>
-            <span>Marker At: <code>{{ levelMarkerCapturedAt() || 'n/a' }}</code></span>
-            <span class="d-inline-flex align-items-center gap-2">
-              <label class="mb-0">Global Target RMS</label>
-              <input
-                type="number"
-                step="0.1"
-                class="form-control form-control-sm"
-                style="width: 7.5rem;"
-                [value]="globalNormalizeTargetRms()"
-                (input)="setGlobalNormalizeTargetRms($any($event.target).value)"
-                (blur)="commitGlobalNormalizeTargetRms()"
-              />
-              <button
-                type="button"
-                class="btn btn-outline-success btn-sm"
-                (click)="useLevelMarkerAsGlobalTarget()"
-                [disabled]="levelMarkerRmsDbfs() === null"
-              >
-                Use Marker
-              </button>
-            </span>
-            <span>Live At: <code>{{ liveMeterAt() || 'n/a' }}</code></span>
+          </div>
+          <div class="d-flex flex-wrap gap-2 mt-2">
+            <div class="card shadow-sm" style="flex: 1 1 11rem; min-width: 11rem;">
+              <div class="card-body py-2 px-3">
+                <div class="small text-secondary mb-1">Level Marker RMS</div>
+                <code class="d-block text-nowrap">{{ formatDb(levelMarkerRmsDbfs()) }}</code>
+              </div>
+            </div>
+            <div class="card shadow-sm" style="flex: 1 1 11rem; min-width: 11rem;">
+              <div class="card-body py-2 px-3">
+                <div class="small text-secondary mb-1">Marker At</div>
+                <code class="d-block text-nowrap">{{ levelMarkerCapturedAt() || 'n/a' }}</code>
+              </div>
+            </div>
+            <div class="card shadow-sm" style="flex: 1 1 18rem; min-width: 18rem;">
+              <div class="card-body py-2 px-3 d-grid gap-2">
+                <div class="small text-secondary">Global Target RMS</div>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                  <input
+                    type="number"
+                    step="0.1"
+                    class="form-control form-control-sm"
+                    style="width: 7.5rem;"
+                    [value]="globalNormalizeTargetRms()"
+                    (input)="setGlobalNormalizeTargetRms($any($event.target).value)"
+                    (blur)="commitGlobalNormalizeTargetRms()"
+                  />
+                  <button
+                    type="button"
+                    class="btn btn-outline-success btn-sm"
+                    (click)="useLevelMarkerAsGlobalTarget()"
+                    [disabled]="levelMarkerRmsDbfs() === null"
+                  >
+                    Use Marker
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="card shadow-sm" style="flex: 1 1 11rem; min-width: 11rem;">
+              <div class="card-body py-2 px-3">
+                <div class="small text-secondary mb-1">Live At</div>
+                <code class="d-block text-nowrap">{{ liveMeterAt() || 'n/a' }}</code>
+              </div>
+            </div>
           </div>
           <div class="mt-2 live-meter-panel">
-            <div class="row g-2">
-              <div class="col-12 col-lg-3">
-                <div class="border rounded p-2 bg-white h-100">
+            <div class="d-flex justify-content-end">
+              <button type="button" class="btn btn-outline-secondary btn-sm" (click)="resetLiveMeterMaxValues()">Reset Max Hold</button>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+              <div class="card shadow-sm live-meter-total-card">
+                <div class="card-body py-2 px-3">
                   <div class="small text-secondary">Total Level</div>
                   <div class="d-flex align-items-baseline justify-content-between gap-2">
                     <span class="fs-5 fw-semibold">{{ formatDb(liveRmsDbfs()) }}</span>
                     <span class="small text-danger fw-semibold">Max <span class="live-meter-max-value">{{ formatDb(liveRmsMaxDbfs()) }}</span></span>
                   </div>
-                  <div class="small text-secondary">Current / max hold</div>
+                  <div class="d-flex justify-content-between align-items-center gap-2 small text-secondary">
+                    <span>Target {{ formatDb(liveTotalLevelTargetRms()) }}</span>
+                    <span>2s RMS chunks, zoom {{ liveTotalLevelWindowMin().toFixed(2) }} to {{ liveTotalLevelWindowMax().toFixed(2) }} dBFS</span>
+                  </div>
+                  <div class="d-flex justify-content-between align-items-center gap-2 small text-secondary mt-1">
+                    <span>Current {{ liveTotalLevelDelta(liveRmsDbfs()) }}</span>
+                    <span>Max Hold {{ liveTotalLevelDelta(liveRmsMaxDbfs()) }}</span>
+                  </div>
+                  <div class="live-total-level-graph-wrap mt-2">
+                    <svg
+                      class="live-total-level-graph"
+                      [attr.viewBox]="'0 0 1000 72'"
+                      preserveAspectRatio="none"
+                      aria-label="Running total level history"
+                    >
+                      <line
+                        class="live-total-level-grid-line"
+                        x1="0"
+                        [attr.y1]="liveTotalLevelTargetLineY()"
+                        x2="1000"
+                        [attr.y2]="liveTotalLevelTargetLineY()"
+                      />
+                      @for (bar of liveTotalLevelBars(); track $index) {
+                        <rect
+                          [attr.x]="bar.x"
+                          [attr.y]="bar.y"
+                          [attr.width]="bar.width"
+                          [attr.height]="bar.height"
+                          [attr.class]="bar.tone === 'above' ? 'live-total-level-bar live-total-level-bar-above' : 'live-total-level-bar live-total-level-bar-below'"
+                        />
+                      }
+                    </svg>
+                  </div>
+                  <div class="live-total-level-axis mt-2">
+                    <span>{{ liveTotalLevelWindowMin().toFixed(2) }} dBFS</span>
+                    <span class="live-total-level-axis-target">Target</span>
+                    <span>{{ liveTotalLevelWindowMax().toFixed(2) }} dBFS</span>
+                  </div>
                 </div>
               </div>
-              <div class="col-12 col-lg-9">
-                <div class="border rounded p-2 bg-white">
+              <div class="card shadow-sm flex-grow-1">
+                <div class="card-body py-2 px-3">
                   <div class="small text-secondary mb-2">Frequency Buckets</div>
                   <div class="live-meter-band-list">
                     @for (band of liveMeterBandRows(); track band.id) {
-                      <div class="live-meter-band-row">
-                        <div>
-                          <div class="fw-semibold">{{ band.label }}</div>
-                          <div class="small text-secondary">{{ band.rangeLabel }}</div>
-                        </div>
-                        <div class="text-end">
-                          <div class="small text-secondary">Current</div>
-                          <div class="fw-semibold">{{ formatRelativeDb(band.currentDbfs) }}</div>
-                        </div>
-                        <div class="text-end">
-                          <div class="small text-danger">Max</div>
-                          <div class="fw-semibold text-danger live-meter-max-value">{{ formatRelativeDb(band.maxDbfs) }}</div>
+                      <div class="card shadow-sm live-meter-band-card">
+                        <div class="card-body py-2 px-3">
+                          <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                            <div>
+                              <div class="fw-semibold">{{ band.label }}</div>
+                              <div class="small text-secondary">{{ band.rangeLabel }}</div>
+                            </div>
+                            <div class="text-end">
+                              <div class="small text-secondary">Current</div>
+                              <div class="fw-semibold">{{ formatRelativeDb(band.currentDbfs) }}</div>
+                            </div>
+                          </div>
+                          <div class="d-flex justify-content-between align-items-center gap-2">
+                            <div class="small text-danger">Max</div>
+                            <div class="fw-semibold text-danger live-meter-max-value">{{ formatRelativeDb(band.maxDbfs) }}</div>
+                          </div>
                         </div>
                       </div>
                     }
@@ -161,15 +226,79 @@
                   <button type="button" class="btn btn-sm btn-outline-secondary" (click)="clearLoadedPatch()" [disabled]="!hasLoadedSavedPatch()">Remove Saved Patch</button>
                 </div>
               </div>
-              <div class="tone-block-grid">
-                <label class="form-check small mb-0">
-                  <input class="form-check-input" type="checkbox" [checked]="liveEditorShowAllBlocks()" (change)="setLiveEditorShowAllBlocks($any($event.target).checked)" />
-                  <span class="form-check-label">All</span>
+              <div class="d-flex flex-wrap gap-2">
+                <input
+                  class="btn-check"
+                  type="checkbox"
+                  [id]="toneBlockControlId('live', 'all')"
+                  [checked]="liveEditorShowAllBlocks()"
+                  (change)="setLiveEditorShowAllBlocks($any($event.target).checked)"
+                />
+                <label
+                  class="card shadow-sm"
+                  style="flex: 1 1 12rem; min-width: 12rem; cursor: pointer;"
+                  [class.bg-success-subtle]="liveEditorShowAllBlocks()"
+                  [class.border-success]="liveEditorShowAllBlocks()"
+                  [for]="toneBlockControlId('live', 'all')"
+                >
+                  <div class="card-body py-2 px-3 d-flex align-items-start gap-2">
+                    <span
+                      class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0"
+                      style="width: 2.5rem; height: 2.5rem; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em;"
+                      [class.bg-success]="liveEditorShowAllBlocks()"
+                      [class.text-white]="liveEditorShowAllBlocks()"
+                      [class.bg-body-tertiary]="!liveEditorShowAllBlocks()"
+                      [class.text-secondary]="!liveEditorShowAllBlocks()"
+                    >
+                      ALL
+                    </span>
+                    <div class="flex-grow-1">
+                      <div class="d-flex justify-content-between gap-2 align-items-start">
+                        <div class="fw-semibold">All</div>
+                        <span class="badge rounded-pill" [class.text-bg-success]="liveEditorShowAllBlocks()" [class.text-bg-secondary]="!liveEditorShowAllBlocks()">
+                          {{ liveEditorShowAllBlocks() ? 'Selected' : 'Off' }}
+                        </span>
+                      </div>
+                      <div class="small text-secondary">Show every block</div>
+                    </div>
+                  </div>
                 </label>
                 @for (block of toneBlockOptions(); track block) {
-                  <label class="form-check small mb-0">
-                    <input class="form-check-input" type="checkbox" [checked]="isToneBlockSelected(block)" (change)="setToneBlockSelected(block, $any($event.target).checked)" />
-                    <span class="form-check-label">{{ block }}</span>
+                  <input
+                    class="btn-check"
+                    type="checkbox"
+                    [id]="toneBlockControlId('live', block)"
+                    [checked]="isToneBlockSelected(block)"
+                    (change)="setToneBlockSelected(block, $any($event.target).checked)"
+                  />
+                  <label
+                    class="card shadow-sm"
+                    style="flex: 1 1 12rem; min-width: 12rem; cursor: pointer;"
+                    [class.bg-success-subtle]="isToneBlockSelected(block)"
+                    [class.border-success]="isToneBlockSelected(block)"
+                  [for]="toneBlockControlId('live', block)"
+                  >
+                    <div class="card-body py-2 px-3 d-flex align-items-start gap-2">
+                      <span
+                        class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0"
+                        style="width: 2.5rem; height: 2.5rem; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em;"
+                        [class.bg-success]="isToneBlockSelected(block)"
+                        [class.text-white]="isToneBlockSelected(block)"
+                        [class.bg-body-tertiary]="!isToneBlockSelected(block)"
+                        [class.text-secondary]="!isToneBlockSelected(block)"
+                      >
+                        {{ toneBlockDisplay(block).glyph }}
+                      </span>
+                      <div class="flex-grow-1">
+                        <div class="d-flex justify-content-between gap-2 align-items-start">
+                          <div class="fw-semibold">{{ toneBlockDisplay(block).label }}</div>
+                          <span class="badge rounded-pill" [class.text-bg-success]="isToneBlockSelected(block)" [class.text-bg-secondary]="!isToneBlockSelected(block)">
+                            {{ isToneBlockSelected(block) ? 'Selected' : 'Off' }}
+                          </span>
+                        </div>
+                        <div class="small text-secondary">{{ toneBlockDisplay(block).subtitle }}</div>
+                      </div>
+                    </div>
                   </label>
                 }
               </div>
@@ -1157,11 +1286,43 @@
       </div>
       <div>
         <p class="form-label small mb-1">Blocks</p>
-        <div class="tone-block-grid">
+        <div class="d-flex flex-wrap gap-2">
           @for (block of toneBlockOptions(); track block) {
-            <label class="form-check small mb-0">
-              <input class="form-check-input" type="checkbox" [checked]="isToneBlockSelected(block)" (change)="setToneBlockSelected(block, $any($event.target).checked)" />
-              <span class="form-check-label">{{ block }}</span>
+            <input
+              class="btn-check"
+              type="checkbox"
+              [id]="toneBlockControlId('save', block)"
+              [checked]="isToneBlockSelected(block)"
+              (change)="setToneBlockSelected(block, $any($event.target).checked)"
+            />
+            <label
+              class="card shadow-sm"
+              style="flex: 1 1 12rem; min-width: 12rem; cursor: pointer;"
+              [class.bg-success-subtle]="isToneBlockSelected(block)"
+              [class.border-success]="isToneBlockSelected(block)"
+              [for]="toneBlockControlId('save', block)"
+            >
+              <div class="card-body py-2 px-3 d-flex align-items-start gap-2">
+                <span
+                  class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0"
+                  style="width: 2.5rem; height: 2.5rem; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em;"
+                  [class.bg-success]="isToneBlockSelected(block)"
+                  [class.text-white]="isToneBlockSelected(block)"
+                  [class.bg-body-tertiary]="!isToneBlockSelected(block)"
+                  [class.text-secondary]="!isToneBlockSelected(block)"
+                >
+                  {{ toneBlockDisplay(block).glyph }}
+                </span>
+                <div class="flex-grow-1">
+                  <div class="d-flex justify-content-between gap-2 align-items-start">
+                    <div class="fw-semibold">{{ toneBlockDisplay(block).label }}</div>
+                    <span class="badge rounded-pill" [class.text-bg-success]="isToneBlockSelected(block)" [class.text-bg-secondary]="!isToneBlockSelected(block)">
+                      {{ isToneBlockSelected(block) ? 'Selected' : 'Off' }}
+                    </span>
+                  </div>
+                  <div class="small text-secondary">{{ toneBlockDisplay(block).subtitle }}</div>
+                </div>
+              </div>
             </label>
           }
         </div>
@@ -1226,11 +1387,43 @@
       </div>
       <div>
         <p class="form-label small mb-1">Blocks To Work On</p>
-        <div class="tone-block-grid">
+        <div class="d-flex flex-wrap gap-2">
           @for (block of toneBlockOptions(); track block) {
-            <label class="form-check small mb-0">
-              <input class="form-check-input" type="checkbox" [checked]="isToneBlockSelected(block)" (change)="setToneBlockSelected(block, $any($event.target).checked)" />
-              <span class="form-check-label">{{ block }}</span>
+            <input
+              class="btn-check"
+              type="checkbox"
+              [id]="toneBlockControlId('ai', block)"
+              [checked]="isToneBlockSelected(block)"
+              (change)="setToneBlockSelected(block, $any($event.target).checked)"
+            />
+            <label
+              class="card shadow-sm"
+              style="flex: 1 1 12rem; min-width: 12rem; cursor: pointer;"
+              [class.bg-success-subtle]="isToneBlockSelected(block)"
+              [class.border-success]="isToneBlockSelected(block)"
+              [for]="toneBlockControlId('ai', block)"
+            >
+              <div class="card-body py-2 px-3 d-flex align-items-start gap-2">
+                <span
+                  class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0"
+                  style="width: 2.5rem; height: 2.5rem; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em;"
+                  [class.bg-success]="isToneBlockSelected(block)"
+                  [class.text-white]="isToneBlockSelected(block)"
+                  [class.bg-body-tertiary]="!isToneBlockSelected(block)"
+                  [class.text-secondary]="!isToneBlockSelected(block)"
+                >
+                  {{ toneBlockDisplay(block).glyph }}
+                </span>
+                <div class="flex-grow-1">
+                  <div class="d-flex justify-content-between gap-2 align-items-start">
+                    <div class="fw-semibold">{{ toneBlockDisplay(block).label }}</div>
+                    <span class="badge rounded-pill" [class.text-bg-success]="isToneBlockSelected(block)" [class.text-bg-secondary]="!isToneBlockSelected(block)">
+                      {{ isToneBlockSelected(block) ? 'Selected' : 'Off' }}
+                    </span>
+                  </div>
+                  <div class="small text-secondary">{{ toneBlockDisplay(block).subtitle }}</div>
+                </div>
+              </div>
             </label>
           }
         </div>
