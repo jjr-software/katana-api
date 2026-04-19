@@ -297,6 +297,18 @@ interface LivePatchResponse {
   compat_hash_sha256: string;
 }
 
+interface QuickAmpSlotName {
+  slot: number;
+  slot_label: string;
+  patch_name: string;
+}
+
+interface QuickAmpSlotNamesResponse {
+  synced_at: string;
+  total_sync_ms: number;
+  slots: QuickAmpSlotName[];
+}
+
 interface TonePatchObjectResponse {
   id: number;
   name: string;
@@ -567,6 +579,7 @@ export class App implements OnInit, OnDestroy {
   livePatchPartialDbMatches = signal<Array<{ id: number; name: string }>>([]);
   livePatchExactSlotMatch = signal<{ slot: number; patch_name: string } | null>(null);
   livePatchPartialSlotMatches = signal<Array<{ slot: number; patch_name: string }>>([]);
+  ampSlotSavedNames = signal<Record<number, string>>({});
   toasts = signal<ToastMessage[]>([]);
   globalNormalizeTargetRms = signal(DEFAULT_TARGET_RMS_DBFS.toFixed(2));
   liveRmsDbfs = signal<number | null>(null);
@@ -905,6 +918,7 @@ export class App implements OnInit, OnDestroy {
 
       const persisted = payload as LivePatchResponse;
       this.applyLivePatchStatus(persisted);
+      void this.refreshAmpSlotSavedNames();
 
       let synced: SlotSyncResponse | null = null;
       let refreshError: string | null = null;
@@ -971,6 +985,7 @@ export class App implements OnInit, OnDestroy {
       const live = payload as LivePatchResponse;
       this.applyLivePatchStatus(live);
       this.loadLivePatchIntoEditorState(live, false, true);
+      void this.refreshAmpSlotSavedNames();
       this.status.set('Loaded current Live Patch from amp');
     } catch (error: unknown) {
       this.status.set('Failed to load current Live Patch from amp.');
@@ -1038,6 +1053,7 @@ export class App implements OnInit, OnDestroy {
       const live = payload as LivePatchResponse;
       this.applyLivePatchStatus(live);
       this.loadLivePatchIntoEditorState(live, false);
+      void this.refreshAmpSlotSavedNames();
     } catch {
       // Silent bootstrap path.
     }
@@ -4154,11 +4170,11 @@ export class App implements OnInit, OnDestroy {
     if (slotNumber === null) {
       return 'n/a';
     }
-    const slot = this.slots().find((card) => card.slot === slotNumber);
-    if (!slot) {
-      return 'Unknown';
+    const savedName = this.ampSlotSavedNames()[slotNumber] ?? '';
+    if (savedName.trim()) {
+      return savedName.trim();
     }
-    return this.displayPatchName(slot);
+    return 'Loading...';
   }
 
   currentSettingsPatchName(): string {
@@ -5886,6 +5902,26 @@ export class App implements OnInit, OnDestroy {
     this.currentAmpCommitState.set(currentHash === selectedHash ? 'committed' : 'uncommitted');
   }
 
+  private async refreshAmpSlotSavedNames(): Promise<void> {
+    try {
+      const response = await fetch('/api/v1/amp/slots/quick', {
+        method: 'GET',
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as QuickAmpSlotNamesResponse | { detail?: unknown };
+      if (!response.ok || !('slots' in payload)) {
+        return;
+      }
+      const next: Record<number, string> = {};
+      for (const slot of payload.slots) {
+        next[slot.slot] = slot.patch_name || '';
+      }
+      this.ampSlotSavedNames.set(next);
+    } catch {
+      // Best-effort only.
+    }
+  }
+
   private async refreshActiveSlot(): Promise<void> {
     if (this.activeSlotPollInFlight) {
       return;
@@ -5916,6 +5952,9 @@ export class App implements OnInit, OnDestroy {
       }
       this.selectedAmpSlot.set(active.slot);
       this.selectedAmpSlotText.set(active.slot_label || 'n/a');
+      if (previousSlot === null || active.slot !== previousSlot) {
+        void this.refreshAmpSlotSavedNames();
+      }
       this.refreshCurrentCommitStateFromKnownState();
     } catch {
       // Active-slot probe is informational; leave current UI state unchanged on failure.
