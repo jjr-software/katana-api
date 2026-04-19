@@ -55,6 +55,7 @@ Rules:
 - Use compact fields when possible, for example `amp.gain`, `booster.drive`, `booster.tone`, `booster.effect_level`, `eq1.position`, `eq1.type`, `eq1.ge10_raw`.
 - For EQ blocks, `ge10_raw` or `peq_raw` arrays are allowed and expected when needed.
 - For color stages, `color_index` may be set to 0, 1, or 2 when relevant.
+- Patch-level assign blocks such as `gafc_exp1.function` are valid when requested.
 - Do not invent unsupported blocks, controls, or arbitrary metadata fields inside the patch objects.
 """
 
@@ -1136,6 +1137,15 @@ def _build_ai_block_schema(block_name: str) -> dict[str, Any]:
             position=JSON_INTEGER_SCHEMA,
             on=JSON_BOOLEAN_SCHEMA,
             type=JSON_INTEGER_SCHEMA,
+        )
+
+    if block_name == "gafc_exp1":
+        return _object_schema(
+            function=JSON_INTEGER_SCHEMA,
+            raw=JSON_INT_ARRAY_SCHEMA,
+            detail_raw=JSON_INT_ARRAY_SCHEMA,
+            min_raw=JSON_INT_ARRAY_SCHEMA,
+            max_raw=JSON_INT_ARRAY_SCHEMA,
         )
 
     raise ValueError(f"Unhandled AI schema block: {block_name}")

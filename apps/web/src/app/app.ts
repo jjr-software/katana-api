@@ -83,6 +83,18 @@ const DELAY_TYPE_NAMES = [
 ];
 const AMP_TYPE_NAMES = ['Acoustic', 'Clean', 'Pushed', 'Crunch', 'Lead', 'Brown'];
 const REVERB_TYPE_NAMES = ['Plate Reverb', 'Room Reverb', 'Hall Reverb', 'Spring Reverb', 'Modulate Reverb'];
+const GAFC_EXP1_FUNCTION_OPTIONS: ReadonlyArray<ValueOption> = [
+  { value: 0, label: 'Volume' },
+  { value: 1, label: 'Foot Volume' },
+  { value: 2, label: 'Pedal FX' },
+  { value: 3, label: 'Pedal FX + FV' },
+  { value: 4, label: 'Booster' },
+  { value: 5, label: 'Mod' },
+  { value: 6, label: 'FX' },
+  { value: 7, label: 'Delay' },
+  { value: 8, label: 'Delay 2' },
+  { value: 9, label: 'Reverb' },
+];
 const EQ_TYPE_NAMES = ['Parametric EQ', 'GE-10'];
 const EQ_POSITION_NAMES = ['Input', 'Post Amp'];
 const EQ_GE10_BAND_LABELS = ['31', '62', '125', '250', '500', '1k', '2k', '4k', '8k', '16k', 'Level'];
@@ -203,7 +215,7 @@ const AUTO_LEVEL_MAX_ITERS = 8;
 const AUTO_LEVEL_STEP_SCALE = 2.0;
 const AUTO_LEVEL_MAX_STEP = 8;
 const GLOBAL_NORMALIZE_TARGET_STORAGE_KEY = 'katana.globalNormalizeTargetRms';
-const TONE_BLOCK_OPTIONS = ['routing', 'amp', 'booster', 'mod', 'fx', 'delay', 'reverb', 'eq1', 'eq2', 'ns', 'send_return', 'solo', 'pedalfx'] as const;
+const TONE_BLOCK_OPTIONS = ['routing', 'amp', 'booster', 'mod', 'fx', 'delay', 'reverb', 'eq1', 'eq2', 'ns', 'send_return', 'solo', 'pedalfx', 'gafc_exp1'] as const;
 type ToneBlockKey = (typeof TONE_BLOCK_OPTIONS)[number];
 
 interface ToneBlockDisplay {
@@ -226,6 +238,7 @@ const TONE_BLOCK_DISPLAY: Record<ToneBlockKey, ToneBlockDisplay> = {
   send_return: { label: 'Send/Return', glyph: 'S/R', subtitle: 'External loop levels' },
   solo: { label: 'Solo', glyph: 'SO', subtitle: 'Solo lift and level' },
   pedalfx: { label: 'Pedal FX', glyph: 'PFX', subtitle: 'Pedal effect stage' },
+  gafc_exp1: { label: 'GA-FC EXP1', glyph: 'EXP1', subtitle: 'Patch-level expression assignment' },
 } as const;
 
 interface AmpConnectionTestResponse {
@@ -3865,6 +3878,32 @@ export class App implements OnInit, OnDestroy {
     });
   }
 
+  editorGafcExp1Function(): number | null {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const block = this.readObject(stages, 'gafc_exp1');
+    return this.readNumber(block, 'function');
+  }
+
+  setEditorGafcExp1Function(value: string): void {
+    const parsed = this.parseInteger(value);
+    this.updateEditorPatch((draft) => {
+      const stages = this.ensureObject(draft, 'stages');
+      const block = this.ensureObject(stages, 'gafc_exp1');
+      block['function'] = parsed;
+      this.syncNumericRawField(block, 'raw', 0, parsed);
+    });
+  }
+
+  editorGafcExp1FunctionOptions(): readonly ValueOption[] {
+    return GAFC_EXP1_FUNCTION_OPTIONS;
+  }
+
+  editorGafcExp1Raw(field: 'detail_raw' | 'min_raw' | 'max_raw'): number[] | null {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const block = this.readObject(stages, 'gafc_exp1');
+    return this.readNumericArray(block, field);
+  }
+
   editorStageOn(stageName: StageName): boolean {
     const stages = this.readObject(this.editorPatchDraft(), 'stages');
     const stage = this.readObject(stages, stageName);
@@ -5038,6 +5077,17 @@ export class App implements OnInit, OnDestroy {
     return null;
   }
 
+  private readNumericArray(source: Record<string, unknown> | null, key: string): number[] | null {
+    if (!source) {
+      return null;
+    }
+    const value = source[key];
+    if (!Array.isArray(value)) {
+      return null;
+    }
+    return value.map((item) => this.parseUnknownNumber(item));
+  }
+
   private readAmpField(amp: Record<string, unknown> | null, field: string): number | null {
     const direct = this.readNumber(amp, field);
     if (direct !== null) {
@@ -5629,6 +5679,29 @@ export class App implements OnInit, OnDestroy {
         }
         if (Object.keys(out).length > 0) {
           stagesOut['pedalfx'] = out;
+        }
+      }
+
+      const gafcExp1 = this.readObject(stages, 'gafc_exp1');
+      if (gafcExp1) {
+        const out: Record<string, unknown> = {};
+        if (gafcExp1['function'] !== undefined) {
+          out['function'] = gafcExp1['function'];
+        }
+        if (Array.isArray(gafcExp1['raw'])) {
+          out['raw'] = gafcExp1['raw'];
+        }
+        if (Array.isArray(gafcExp1['detail_raw'])) {
+          out['detail_raw'] = gafcExp1['detail_raw'];
+        }
+        if (Array.isArray(gafcExp1['min_raw'])) {
+          out['min_raw'] = gafcExp1['min_raw'];
+        }
+        if (Array.isArray(gafcExp1['max_raw'])) {
+          out['max_raw'] = gafcExp1['max_raw'];
+        }
+        if (Object.keys(out).length > 0) {
+          stagesOut['gafc_exp1'] = out;
         }
       }
 

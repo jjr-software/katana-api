@@ -700,6 +700,39 @@
                     </div>
                   </article>
                   }
+
+                  @if (liveEditorShowsBlock('gafc_exp1')) {
+                  <article class="border rounded p-2 effect-card" [class.bg-warning-subtle]="editorBlockIsChanged('gafc_exp1')" [class.border-warning]="editorBlockIsChanged('gafc_exp1')">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <div class="d-flex align-items-center gap-2">
+                        <h4 class="h6 mb-0">GA-FC EXP1</h4>
+                        @if (editorBlockIsChanged('gafc_exp1')) {
+                          <span class="badge rounded-pill text-bg-warning">MODIFIED</span>
+                        }
+                      </div>
+                      <div class="d-flex gap-2 align-items-center">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch('gafc_exp1')" [disabled]="!canResetEditorBlockToLoadedPatch('gafc_exp1')">Reset</button>
+                      </div>
+                    </div>
+                    <div class="row g-2">
+                      <div class="col-12 col-md-6">
+                        <label class="form-label small mb-1">Function</label>
+                        <select class="form-select form-select-sm" [value]="editorGafcExp1Function() ?? 0" (change)="setEditorGafcExp1Function($any($event.target).value)">
+                          @for (option of editorGafcExp1FunctionOptions(); track option.value) {
+                            <option [value]="option.value">{{ option.label }}</option>
+                          }
+                        </select>
+                      </div>
+                      <div class="col-12">
+                        <div class="small text-secondary font-monospace text-break">
+                          <div>detail_raw: {{ editorGafcExp1Raw('detail_raw')?.join(', ') || 'n/a' }}</div>
+                          <div>min_raw: {{ editorGafcExp1Raw('min_raw')?.join(', ') || 'n/a' }}</div>
+                          <div>max_raw: {{ editorGafcExp1Raw('max_raw')?.join(', ') || 'n/a' }}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                  }
                   </div>
                 </div>
               }

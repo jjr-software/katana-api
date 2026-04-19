@@ -22,6 +22,10 @@ from app.katana.protocol import (
     ADDR_PATCH_FX_DETAIL_1,
     ADDR_PATCH_FX_4,
     ADDR_PATCH_FX_DETAIL_4,
+    ADDR_PATCH_GAFC_EXP1_DETAIL,
+    ADDR_PATCH_GAFC_EXP1_FUNC,
+    ADDR_PATCH_GAFC_EXP1_MAX,
+    ADDR_PATCH_GAFC_EXP1_MIN,
     ADDR_PATCH_NS,
     ADDR_PATCH_OTHER,
     ADDR_PATCH_PEDALFX,
@@ -437,6 +441,10 @@ class AmpClient:
         solo_com = await self._read_rq1(ADDR_PATCH_SOLO_COM, 2)
         pedalfx_com = await self._read_rq1(ADDR_PATCH_PEDALFX_COM, 3)
         pedalfx = await self._read_rq1(ADDR_PATCH_PEDALFX, 15)
+        gafc_exp1_func = await self._read_rq1(ADDR_PATCH_GAFC_EXP1_FUNC, 1)
+        gafc_exp1_detail = await self._read_rq1(ADDR_PATCH_GAFC_EXP1_DETAIL, 34)
+        gafc_exp1_min = await self._read_rq1(ADDR_PATCH_GAFC_EXP1_MIN, 49)
+        gafc_exp1_max = await self._read_rq1(ADDR_PATCH_GAFC_EXP1_MAX, 49)
         eq_each_1 = await self._read_rq1(ADDR_PATCH_EQ_EACH_1, 3)
         eq_each_2 = await self._read_rq1(ADDR_PATCH_EQ_EACH_2, 3)
         eq_peq_1 = await self._read_rq1(ADDR_PATCH_EQ_PEQ_1, 11)
@@ -576,6 +584,13 @@ class AmpClient:
                     "type": pedalfx_com[2] if len(pedalfx_com) >= 3 else None,
                     "raw_com": pedalfx_com,
                     "raw": pedalfx,
+                },
+                "gafc_exp1": {
+                    "function": gafc_exp1_func[0] if len(gafc_exp1_func) >= 1 else None,
+                    "raw": gafc_exp1_func,
+                    "detail_raw": gafc_exp1_detail,
+                    "min_raw": gafc_exp1_min,
+                    "max_raw": gafc_exp1_max,
                 },
             },
         }
@@ -805,6 +820,56 @@ class AmpClient:
                         field_names=(),
                         field_name_prefix="stages.pedalfx.raw",
                         expected_size=15,
+                    ),
+                )
+            )
+        gafc_exp1_obj = stages_obj.get("gafc_exp1")
+        if isinstance(gafc_exp1_obj, dict):
+            await self._send_only(
+                build_dt1(
+                    ADDR_PATCH_GAFC_EXP1_FUNC,
+                    self._read_compact_raw_block(
+                        gafc_exp1_obj,
+                        raw_key="raw",
+                        field_names=("function",),
+                        field_name_prefix="stages.gafc_exp1",
+                        expected_size=1,
+                    ),
+                )
+            )
+            await self._send_only(
+                build_dt1(
+                    ADDR_PATCH_GAFC_EXP1_DETAIL,
+                    self._read_compact_raw_block(
+                        gafc_exp1_obj,
+                        raw_key="detail_raw",
+                        field_names=(),
+                        field_name_prefix="stages.gafc_exp1.detail_raw",
+                        expected_size=34,
+                    ),
+                )
+            )
+            await self._send_only(
+                build_dt1(
+                    ADDR_PATCH_GAFC_EXP1_MIN,
+                    self._read_compact_raw_block(
+                        gafc_exp1_obj,
+                        raw_key="min_raw",
+                        field_names=(),
+                        field_name_prefix="stages.gafc_exp1.min_raw",
+                        expected_size=49,
+                    ),
+                )
+            )
+            await self._send_only(
+                build_dt1(
+                    ADDR_PATCH_GAFC_EXP1_MAX,
+                    self._read_compact_raw_block(
+                        gafc_exp1_obj,
+                        raw_key="max_raw",
+                        field_names=(),
+                        field_name_prefix="stages.gafc_exp1.max_raw",
+                        expected_size=49,
                     ),
                 )
             )

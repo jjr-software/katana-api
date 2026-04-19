@@ -55,6 +55,7 @@ Rules:
 - You may suggest multiple useful numeric control changes when they clearly work together.
 - Prefer concrete Katana changes over vague tone adjectives.
 - Focus on guitar tone shaping: EQ, gain, level, booster/mod/fx/delay/reverb, noise suppressor, routing, send/return, solo, pedal FX.
+- Patch-level assign blocks such as `gafc_exp1.function` are valid when they are already present in the patch.
 - Use dotted object paths only, for example `amp.volume` or `stages.booster.effect_level`.
 - Stage shorthand is allowed for known stage names, for example `mod.on` or `booster.effect_level`; these map to `stages.mod.on` and `stages.booster.effect_level`.
 - Do not use array indexing, bracket syntax, or `raw` fields.
@@ -119,7 +120,7 @@ def _canonical_field_path(target: dict, field_path: str) -> str:
         )
     if (
         len(path) >= 2
-        and path[0] in {"booster", "mod", "fx", "delay", "reverb", "eq1", "eq2", "ns", "send_return", "solo", "pedalfx"}
+        and path[0] in {"booster", "mod", "fx", "delay", "reverb", "eq1", "eq2", "ns", "send_return", "solo", "pedalfx", "gafc_exp1"}
         and isinstance(target.get("stages"), dict)
     ):
         return ".".join(["stages", *path])

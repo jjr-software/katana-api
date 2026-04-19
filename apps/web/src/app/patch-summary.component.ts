@@ -14,6 +14,7 @@ const PATCH_BLOCK_LABELS: Record<string, string> = {
   send_return: 'send/return',
   solo: 'solo',
   pedalfx: 'pedalfx',
+  gafc_exp1: 'GA-FC EXP1',
 };
 
 @Component({
