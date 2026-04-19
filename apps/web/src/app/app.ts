@@ -1230,13 +1230,6 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  clearLoadedPatch(): void {
-    this.toneLoadedPatchSnapshot.set(null);
-    this.toneLoadedPatchObjectId.set('');
-    this.toneLoadedPatchName.set('');
-    this.status.set('Loaded reference patch cleared.');
-  }
-
   async saveLiveAsTonePatchObject(): Promise<void> {
     const name = this.toneSaveName().trim();
     const blocks = this.saveToneBlocks();
