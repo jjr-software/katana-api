@@ -94,6 +94,10 @@
 .live-meter-total-card {
   flex: 1 1 12rem;
   min-width: 12rem;
+  position: sticky;
+  top: 0.75rem;
+  align-self: flex-start;
+  z-index: 3;
 }
 
 .live-total-level-graph-wrap {
