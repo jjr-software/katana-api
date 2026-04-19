@@ -98,7 +98,7 @@
               (click)="persistLivePatchToAmp()"
               [disabled]="isActionBusy('persist-live-patch') || !canPersistLivePatchToAmp()"
             >
-              {{ headerActionLabel('persist-live-patch', 'Persist to Amp', 'Persisting...') }}
+              {{ headerActionLabel('persist-live-patch', 'Store to Amp', 'Storing...') }}
             </button>
             <button type="button" class="btn btn-outline-success btn-sm" (click)="captureAudioLevelMarker()" [disabled]="isActionBusy('capture-level-marker')">{{ headerActionLabel('capture-level-marker', 'Set Level Marker', 'Capturing...') }}</button>
             <button
@@ -217,13 +217,13 @@
               </div>
               <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
                 <div class="d-flex flex-wrap gap-3 align-items-center">
-                  <span class="text-secondary">Selected Saved Patch:</span>
+                  <span class="text-secondary">Loaded Reference Patch:</span>
                   <strong>{{ livePatchLoadedPatchName() }}</strong>
-                  <span class="text-secondary">Save Scope:</span>
+                  <span class="text-secondary">Visible Blocks:</span>
                   <span>{{ livePatchSelectedBlocksSummary() }}</span>
                 </div>
                 <div class="d-flex gap-2 flex-wrap align-items-center">
-                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="clearLoadedPatch()" [disabled]="!hasLoadedSavedPatch()">Remove Saved Patch</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="clearLoadedPatch()" [disabled]="!hasLoadedSavedPatch()">Clear Loaded Patch</button>
                 </div>
               </div>
               <div class="d-flex flex-wrap gap-2">
@@ -256,7 +256,7 @@
                       <div class="d-flex justify-content-between gap-2 align-items-start">
                         <div class="fw-semibold">All</div>
                         <span class="badge rounded-pill" [class.text-bg-success]="liveEditorShowAllBlocks()" [class.text-bg-secondary]="!liveEditorShowAllBlocks()">
-                          {{ liveEditorShowAllBlocks() ? 'Selected' : 'Off' }}
+                          {{ liveEditorShowAllBlocks() ? 'Shown' : 'Off' }}
                         </span>
                       </div>
                       <div class="small text-secondary">Show every block</div>
@@ -274,26 +274,35 @@
                   <label
                     class="card shadow-sm"
                     style="flex: 1 1 12rem; min-width: 12rem; cursor: pointer;"
-                    [class.bg-success-subtle]="isToneBlockSelected(block)"
-                    [class.border-success]="isToneBlockSelected(block)"
+                    [class.bg-warning-subtle]="editorBlockIsChanged(block)"
+                    [class.border-warning]="editorBlockIsChanged(block)"
+                    [class.bg-success-subtle]="!editorBlockIsChanged(block) && isToneBlockSelected(block)"
+                    [class.border-success]="!editorBlockIsChanged(block) && isToneBlockSelected(block)"
                   [for]="toneBlockControlId('live', block)"
                   >
                     <div class="card-body py-2 px-3 d-flex align-items-start gap-2">
                       <span
                         class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0"
                         style="width: 2.5rem; height: 2.5rem; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em;"
-                        [class.bg-success]="isToneBlockSelected(block)"
-                        [class.text-white]="isToneBlockSelected(block)"
-                        [class.bg-body-tertiary]="!isToneBlockSelected(block)"
-                        [class.text-secondary]="!isToneBlockSelected(block)"
+                        [class.bg-warning]="editorBlockIsChanged(block)"
+                        [class.text-dark]="editorBlockIsChanged(block)"
+                        [class.bg-success]="!editorBlockIsChanged(block) && isToneBlockSelected(block)"
+                        [class.text-white]="!editorBlockIsChanged(block) && isToneBlockSelected(block)"
+                        [class.bg-body-tertiary]="!editorBlockIsChanged(block) && !isToneBlockSelected(block)"
+                        [class.text-secondary]="!editorBlockIsChanged(block) && !isToneBlockSelected(block)"
                       >
                         {{ toneBlockDisplay(block).glyph }}
                       </span>
                       <div class="flex-grow-1">
                         <div class="d-flex justify-content-between gap-2 align-items-start">
                           <div class="fw-semibold">{{ toneBlockDisplay(block).label }}</div>
-                          <span class="badge rounded-pill" [class.text-bg-success]="isToneBlockSelected(block)" [class.text-bg-secondary]="!isToneBlockSelected(block)">
-                            {{ isToneBlockSelected(block) ? 'Selected' : 'Off' }}
+                          <span
+                            class="badge rounded-pill"
+                            [class.text-bg-warning]="editorBlockIsChanged(block)"
+                            [class.text-bg-success]="!editorBlockIsChanged(block) && isToneBlockSelected(block)"
+                            [class.text-bg-secondary]="!editorBlockIsChanged(block) && !isToneBlockSelected(block)"
+                          >
+                            {{ editorBlockIsChanged(block) ? 'Changed' : (isToneBlockSelected(block) ? 'Visible' : 'Hidden') }}
                           </span>
                         </div>
                         <div class="small text-secondary">{{ toneBlockDisplay(block).subtitle }}</div>
@@ -322,7 +331,7 @@
                   }
 
                   @if (liveEditorShowsBlock('routing')) {
-                  <article class="border rounded p-2">
+                  <article class="border rounded p-2" [class.bg-warning-subtle]="editorBlockIsChanged('routing')" [class.border-warning]="editorBlockIsChanged('routing')">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <h4 class="h6 mb-0">Routing</h4>
                       <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch('routing')" [disabled]="!canResetEditorBlockToLoadedPatch('routing')">Reset</button>
@@ -354,7 +363,7 @@
                   }
 
                   @if (liveEditorShowsBlock('amp')) {
-                  <article class="border rounded p-2">
+                  <article class="border rounded p-2" [class.bg-warning-subtle]="editorBlockIsChanged('amp')" [class.border-warning]="editorBlockIsChanged('amp')">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <h4 class="h6 mb-0">Amp</h4>
                       <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch('amp')" [disabled]="!canResetEditorBlockToLoadedPatch('amp')">Reset</button>
@@ -402,9 +411,14 @@
 
                   @for (stageName of ['booster', 'mod', 'fx', 'delay', 'reverb']; track stageName) {
                     @if (liveEditorShowsBlock($any(stageName))) {
-                    <article class="border rounded p-2 effect-card">
+                    <article class="border rounded p-2 effect-card" [class.bg-warning-subtle]="editorBlockIsChanged($any(stageName))" [class.border-warning]="editorBlockIsChanged($any(stageName))">
                       <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h4 class="h6 mb-0 text-capitalize" [class.text-success]="editorStageOn($any(stageName))" [class.text-danger]="!editorStageOn($any(stageName))">{{ stageName }}</h4>
+                        <div class="d-flex align-items-center gap-2">
+                          <h4 class="h6 mb-0 text-capitalize" [class.text-success]="editorStageOn($any(stageName))" [class.text-danger]="!editorStageOn($any(stageName))">{{ stageName }}</h4>
+                          <span class="badge rounded-pill" [class.text-bg-success]="editorStageOn($any(stageName))" [class.text-bg-secondary]="!editorStageOn($any(stageName))">
+                            {{ editorStageOn($any(stageName)) ? 'On' : 'Off' }}
+                          </span>
+                        </div>
                         <div class="d-flex gap-2 align-items-center">
                           <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch($any(stageName))" [disabled]="!canResetEditorBlockToLoadedPatch($any(stageName))">Reset</button>
                           <label class="form-check-label small d-flex align-items-center gap-1">
@@ -470,9 +484,14 @@
 
                   @for (eqName of ['eq1', 'eq2']; track eqName) {
                     @if (liveEditorShowsBlock($any(eqName))) {
-                    <article class="border rounded p-2 effect-card">
+                    <article class="border rounded p-2 effect-card" [class.bg-warning-subtle]="editorBlockIsChanged($any(eqName))" [class.border-warning]="editorBlockIsChanged($any(eqName))">
                       <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h4 class="h6 mb-0 text-uppercase" [class.text-success]="editorEqOn($any(eqName))" [class.text-danger]="!editorEqOn($any(eqName))">{{ eqName }}</h4>
+                        <div class="d-flex align-items-center gap-2">
+                          <h4 class="h6 mb-0 text-uppercase" [class.text-success]="editorEqOn($any(eqName))" [class.text-danger]="!editorEqOn($any(eqName))">{{ eqName }}</h4>
+                          <span class="badge rounded-pill" [class.text-bg-success]="editorEqOn($any(eqName))" [class.text-bg-secondary]="!editorEqOn($any(eqName))">
+                            {{ editorEqOn($any(eqName)) ? 'On' : 'Off' }}
+                          </span>
+                        </div>
                         <div class="d-flex gap-2 align-items-center">
                           <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch($any(eqName))" [disabled]="!canResetEditorBlockToLoadedPatch($any(eqName))">Reset</button>
                           <label class="form-check-label small d-flex align-items-center gap-1">
@@ -601,7 +620,7 @@
                   }
 
                   @if (liveEditorShowsBlock('ns')) {
-                  <article class="border rounded p-2 effect-card">
+                  <article class="border rounded p-2 effect-card" [class.bg-warning-subtle]="editorBlockIsChanged('ns')" [class.border-warning]="editorBlockIsChanged('ns')">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <h4 class="h6 mb-0">NS</h4>
                       <div class="d-flex gap-2 align-items-center">
@@ -620,7 +639,7 @@
                   }
 
                   @if (liveEditorShowsBlock('send_return')) {
-                  <article class="border rounded p-2 effect-card">
+                  <article class="border rounded p-2 effect-card" [class.bg-warning-subtle]="editorBlockIsChanged('send_return')" [class.border-warning]="editorBlockIsChanged('send_return')">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <h4 class="h6 mb-0">Send / Return</h4>
                       <div class="d-flex gap-2 align-items-center">
@@ -641,7 +660,7 @@
                   }
 
                   @if (liveEditorShowsBlock('solo')) {
-                  <article class="border rounded p-2 effect-card">
+                  <article class="border rounded p-2 effect-card" [class.bg-warning-subtle]="editorBlockIsChanged('solo')" [class.border-warning]="editorBlockIsChanged('solo')">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <h4 class="h6 mb-0">Solo</h4>
                       <div class="d-flex gap-2 align-items-center">
@@ -659,7 +678,7 @@
                   }
 
                   @if (liveEditorShowsBlock('pedalfx')) {
-                  <article class="border rounded p-2 effect-card">
+                  <article class="border rounded p-2 effect-card" [class.bg-warning-subtle]="editorBlockIsChanged('pedalfx')" [class.border-warning]="editorBlockIsChanged('pedalfx')">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <h4 class="h6 mb-0">Pedal FX</h4>
                       <div class="d-flex gap-2 align-items-center">
@@ -1266,7 +1285,7 @@
       <button type="button" class="btn-close" aria-label="Close" (click)="closeToneSaveModal()"></button>
     </div>
     <div class="modal-body d-grid gap-3">
-      <p class="small text-secondary mb-0">Tick the blocks this patch should include. You can change the selection here.</p>
+      <p class="small text-secondary mb-0">Choose which blocks will be written into the saved patch. Store Full Patch reads the current amp state and saves every block.</p>
       <div>
         <label class="form-label small mb-1" for="toneSaveName">Name</label>
         <input id="toneSaveName" type="text" class="form-control" [value]="toneSaveName()" (input)="setToneSaveName($any($event.target).value)" />
@@ -1292,32 +1311,32 @@
               class="btn-check"
               type="checkbox"
               [id]="toneBlockControlId('save', block)"
-              [checked]="isToneBlockSelected(block)"
-              (change)="setToneBlockSelected(block, $any($event.target).checked)"
+              [checked]="isToneSaveBlockIncluded(block)"
+              (change)="setToneSaveBlockIncluded(block, $any($event.target).checked)"
             />
             <label
               class="card shadow-sm"
               style="flex: 1 1 12rem; min-width: 12rem; cursor: pointer;"
-              [class.bg-success-subtle]="isToneBlockSelected(block)"
-              [class.border-success]="isToneBlockSelected(block)"
+              [class.bg-success-subtle]="isToneSaveBlockIncluded(block)"
+              [class.border-success]="isToneSaveBlockIncluded(block)"
               [for]="toneBlockControlId('save', block)"
             >
               <div class="card-body py-2 px-3 d-flex align-items-start gap-2">
                 <span
                   class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0"
                   style="width: 2.5rem; height: 2.5rem; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em;"
-                  [class.bg-success]="isToneBlockSelected(block)"
-                  [class.text-white]="isToneBlockSelected(block)"
-                  [class.bg-body-tertiary]="!isToneBlockSelected(block)"
-                  [class.text-secondary]="!isToneBlockSelected(block)"
+                  [class.bg-success]="isToneSaveBlockIncluded(block)"
+                  [class.text-white]="isToneSaveBlockIncluded(block)"
+                  [class.bg-body-tertiary]="!isToneSaveBlockIncluded(block)"
+                  [class.text-secondary]="!isToneSaveBlockIncluded(block)"
                 >
                   {{ toneBlockDisplay(block).glyph }}
                 </span>
                 <div class="flex-grow-1">
                   <div class="d-flex justify-content-between gap-2 align-items-start">
                     <div class="fw-semibold">{{ toneBlockDisplay(block).label }}</div>
-                    <span class="badge rounded-pill" [class.text-bg-success]="isToneBlockSelected(block)" [class.text-bg-secondary]="!isToneBlockSelected(block)">
-                      {{ isToneBlockSelected(block) ? 'Selected' : 'Off' }}
+                    <span class="badge rounded-pill" [class.text-bg-success]="isToneSaveBlockIncluded(block)" [class.text-bg-secondary]="!isToneSaveBlockIncluded(block)">
+                      {{ isToneSaveBlockIncluded(block) ? 'Included' : 'Excluded' }}
                     </span>
                   </div>
                   <div class="small text-secondary">{{ toneBlockDisplay(block).subtitle }}</div>
@@ -1328,9 +1347,9 @@
         </div>
       </div>
       <div class="d-flex justify-content-end flex-wrap gap-2">
-        <button type="button" class="btn btn-sm btn-outline-success" (click)="saveFullLiveAsTonePatchObject()" [disabled]="isActionBusy('tone-save-live')">Save Full Live</button>
+        <button type="button" class="btn btn-sm btn-outline-success" (click)="saveFullLiveAsTonePatchObject()" [disabled]="isActionBusy('tone-save-live')">Store Full Patch</button>
         <button type="button" class="btn btn-sm btn-success" (click)="saveLiveAsTonePatchObject()" [disabled]="isActionBusy('tone-save-live')">
-          {{ isActionBusy('tone-save-live') ? 'Saving...' : 'Save Patch' }}
+          {{ isActionBusy('tone-save-live') ? 'Saving...' : 'Save Selected Blocks' }}
         </button>
       </div>
     </div>
@@ -1418,7 +1437,7 @@
                   <div class="d-flex justify-content-between gap-2 align-items-start">
                     <div class="fw-semibold">{{ toneBlockDisplay(block).label }}</div>
                     <span class="badge rounded-pill" [class.text-bg-success]="isToneBlockSelected(block)" [class.text-bg-secondary]="!isToneBlockSelected(block)">
-                      {{ isToneBlockSelected(block) ? 'Selected' : 'Off' }}
+                      {{ isToneBlockSelected(block) ? 'Visible' : 'Hidden' }}
                     </span>
                   </div>
                   <div class="small text-secondary">{{ toneBlockDisplay(block).subtitle }}</div>

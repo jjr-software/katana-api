@@ -104,6 +104,13 @@ class SaveFromLiveRequest(BaseModel):
     source_prompt: str | None = None
 
 
+class SaveFromAmpRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    description: str = ""
+    source_type: str = Field(default="manual", min_length=1, max_length=32)
+    source_prompt: str | None = None
+
+
 class GroupCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     description: str = ""
@@ -317,6 +324,30 @@ async def save_patch_object_from_live(
     blocks = _validated_blocks(payload.blocks)
     live_row = await _resolve_live_patch_row(db, client)
     sparse = extract_patch_object(live_row.patch_json, blocks)
+    row = PatchObject(
+        name=payload.name,
+        description=payload.description,
+        patch_json=sparse,
+        source_type=payload.source_type,
+        source_prompt=payload.source_prompt,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return _patch_object_response(db, row)
+
+
+@router.post("/patch-objects/save-from-amp", response_model=PatchObjectReadResponse)
+async def save_patch_object_from_amp(
+    payload: SaveFromAmpRequest,
+    db: Session = Depends(get_db),
+    client: AmpClient = Depends(get_amp_client),
+) -> PatchObjectReadResponse:
+    _assert_patch_object_name_available(db, payload.name)
+    current = await client.read_current_patch()
+    sparse = extract_patch_object(current.payload, ALLOWED_BLOCKS)
+    if not sparse:
+      raise HTTPException(status_code=502, detail={"message": "Amp current patch did not contain any supported blocks"})
     row = PatchObject(
         name=payload.name,
         description=payload.description,

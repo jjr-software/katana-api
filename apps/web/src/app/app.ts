@@ -661,6 +661,7 @@ export class App implements OnInit, OnDestroy {
   toneAiPreviewSummary = signal('');
   toneAiPreviewCandidate = signal<AiPreviewPatchObjectCandidate | null>(null);
   toneSelectedBlocks = signal<Record<string, boolean>>({ amp: true, booster: true, eq1: true });
+  toneSaveBlocks = signal<Record<string, boolean>>({});
   liveEditorShowAllBlocks = signal(false);
   toneLoadedPatchObjectId = signal('');
   toneLoadedPatchName = signal('');
@@ -876,7 +877,7 @@ export class App implements OnInit, OnDestroy {
 
     const actionKey = 'persist-live-patch';
     this.setActionBusy(actionKey, true);
-    this.status.set(`Persisting Live Patch to ${this.selectedAmpSlotLabel()}...`);
+    this.status.set(`Storing full patch to ${this.selectedAmpSlotLabel()}...`);
     this.responseJson.set('');
     try {
       const response = await fetch('/api/v1/live-patch/store-to-slot', {
@@ -911,7 +912,7 @@ export class App implements OnInit, OnDestroy {
       }
 
       if (refreshError) {
-        this.status.set(`Persisted Live Patch to ${this.selectedAmpSlotLabel()}, but refresh failed`);
+        this.status.set(`Stored full patch to ${this.selectedAmpSlotLabel()}, but refresh failed`);
         this.responseJson.set(
           JSON.stringify(
             {
@@ -923,7 +924,7 @@ export class App implements OnInit, OnDestroy {
           ),
         );
       } else {
-        this.status.set(`Persisted Live Patch to ${this.selectedAmpSlotLabel()}`);
+        this.status.set(`Stored full patch to ${this.selectedAmpSlotLabel()}`);
         this.responseJson.set(
           JSON.stringify(
             {
@@ -1054,6 +1055,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   openToneSaveModal(): void {
+    this.toneSaveBlocks.set({ ...this.toneSelectedBlocks() });
     this.openModal('toneSave', this.toneSaveModalTpl, { size: 'lg' });
   }
 
@@ -1109,12 +1111,28 @@ export class App implements OnInit, OnDestroy {
     this.toneSelectedBlocks.update((current) => ({ ...current, [block]: checked }));
   }
 
+  isToneSaveBlockIncluded(block: string): boolean {
+    return Boolean(this.toneSaveBlocks()[block]);
+  }
+
+  setToneSaveBlockIncluded(block: string, checked: boolean): void {
+    this.toneSaveBlocks.update((current) => ({ ...current, [block]: checked }));
+  }
+
   setLiveEditorShowAllBlocks(checked: boolean): void {
     this.liveEditorShowAllBlocks.set(checked);
   }
 
   selectedToneBlocks(): string[] {
     return this.toneBlockOptions().filter((block) => this.isToneBlockSelected(block));
+  }
+
+  saveToneBlocks(): string[] {
+    return this.toneBlockOptions().filter((block) => this.isToneSaveBlockIncluded(block));
+  }
+
+  editorBlockIsChanged(block: string): boolean {
+    return this.canResetEditorBlockToLoadedPatch(block);
   }
 
   liveEditorShowsBlock(block: string): boolean {
@@ -1290,8 +1308,7 @@ export class App implements OnInit, OnDestroy {
     this.toneLoadedPatchSnapshot.set(null);
     this.toneLoadedPatchObjectId.set('');
     this.toneLoadedPatchName.set('');
-    this.toneSelectedBlocks.set({});
-    this.status.set('Saved patch removed. Save scope is now manual.');
+    this.status.set('Loaded reference patch cleared.');
   }
 
   async applyLoadedPatchObject(): Promise<void> {
@@ -1302,7 +1319,7 @@ export class App implements OnInit, OnDestroy {
     }
     const patchObject = this.tonePatchObjects().find((item) => item.id === patchObjectId) ?? null;
     if (!patchObject) {
-      this.status.set('Selected patch is not available in the current list.');
+      this.status.set('Loaded reference patch is not available in the current list.');
       return;
     }
     const actionKey = `tone-apply-patch:${patchObject.id}`;
@@ -1338,18 +1355,18 @@ export class App implements OnInit, OnDestroy {
 
   async saveLiveAsTonePatchObject(): Promise<void> {
     const name = this.toneSaveName().trim();
-    const blocks = this.selectedToneBlocks();
+    const blocks = this.saveToneBlocks();
     const saveGroupId = Number.parseInt(this.toneSaveGroupId().trim() || '0', 10);
     if (!name) {
       this.status.set('Tone save requires a name.');
       return;
     }
     if (blocks.length === 0) {
-      this.status.set('Select at least one block before saving from Live Patch.');
+      this.status.set('Select at least one block before saving.');
       return;
     }
     this.setActionBusy('tone-save-live', true);
-    this.status.set(`Saving Live Patch blocks to ${name}...`);
+    this.status.set(`Saving selected blocks to ${name}...`);
     this.responseJson.set('');
     try {
       const response = await fetch('/api/v1/patch-objects/save-from-live', {
@@ -1389,7 +1406,7 @@ export class App implements OnInit, OnDestroy {
       this.closeToneSaveModal();
       await this.loadTonePatchObjects();
       await this.refreshLivePatchStatus();
-      this.status.set(`Saved Live Patch selection as ${name}`);
+      this.status.set(`Saved selected blocks as ${name}`);
       this.responseJson.set(JSON.stringify(saved, null, 2));
     } catch (error: unknown) {
       this.status.set('Live Patch save failed');
@@ -1400,22 +1417,59 @@ export class App implements OnInit, OnDestroy {
   }
 
   async saveFullLiveAsTonePatchObject(): Promise<void> {
-    const previous = this.selectedToneBlocks();
-    this.toneSelectedBlocks.set(
-      this.toneBlockOptions().reduce<Record<string, boolean>>((acc, block) => {
-        acc[block] = true;
-        return acc;
-      }, {}),
-    );
+    const name = this.toneSaveName().trim();
+    const saveGroupId = Number.parseInt(this.toneSaveGroupId().trim() || '0', 10);
+    if (!name) {
+      this.status.set('Tone save requires a name.');
+      return;
+    }
+    this.setActionBusy('tone-save-live', true);
+    this.status.set(`Storing full amp patch as ${name}...`);
+    this.responseJson.set('');
     try {
-      await this.saveLiveAsTonePatchObject();
+      const response = await fetch('/api/v1/patch-objects/save-from-amp', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          description: this.toneSaveDescription(),
+          source_type: 'manual',
+        }),
+      });
+      const payload = (await response.json()) as TonePatchObjectResponse | { detail?: unknown };
+      if (!response.ok) {
+        this.status.set('Full patch store failed');
+        this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      const saved = payload as TonePatchObjectResponse;
+      if (Number.isFinite(saveGroupId) && saveGroupId > 0) {
+        const groupResponse = await fetch(`/api/v1/groups/${saveGroupId}/patch-objects/${saved.id}`, {
+          method: 'POST',
+          cache: 'no-store',
+        });
+        const groupPayload = (await groupResponse.json()) as { detail?: unknown };
+        if (!groupResponse.ok) {
+          this.status.set(`Stored ${name}, but failed assigning it to the selected group`);
+          this.responseJson.set(JSON.stringify(groupPayload, null, 2));
+          await this.loadTonePatchObjects();
+          return;
+        }
+      }
+      this.toneSaveName.set('');
+      this.toneSaveDescription.set('');
+      this.toneSaveGroupId.set('');
+      this.closeToneSaveModal();
+      await this.loadTonePatchObjects();
+      await this.refreshLivePatchStatus();
+      this.status.set(`Stored full amp patch as ${name}`);
+      this.responseJson.set(JSON.stringify(saved, null, 2));
+    } catch (error: unknown) {
+      this.status.set('Full patch store failed');
+      this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
     } finally {
-      this.toneSelectedBlocks.set(
-        previous.reduce<Record<string, boolean>>((acc, block) => {
-          acc[block] = true;
-          return acc;
-        }, {}),
-      );
+      this.setActionBusy('tone-save-live', false);
     }
   }
 
@@ -5789,7 +5843,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   livePatchLoadedPatchName(): string {
-    return this.toneLoadedPatchName().trim() || 'None selected';
+    return this.toneLoadedPatchName().trim() || 'No reference patch';
   }
 
   livePatchSelectedBlocksSummary(): string {
@@ -5798,7 +5852,7 @@ export class App implements OnInit, OnDestroy {
       return blocks.length > 0 ? `${blocks.join(', ')} · editor showing all blocks` : 'Editor showing all blocks';
     }
     if (blocks.length === 0) {
-      return 'No blocks selected yet';
+      return 'No blocks visible yet';
     }
     return blocks.join(', ');
   }
