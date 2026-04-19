@@ -1309,7 +1309,7 @@ export class App implements OnInit, OnDestroy {
       this.status.set('Load GUI state first before saving it.');
       return;
     }
-    this.setActionBusy('tone-save-live', true);
+    this.setActionBusy('tone-save-gui', true);
     this.status.set(`Saving GUI state as ${name}...`);
     this.responseJson.set('');
     try {
@@ -1342,7 +1342,7 @@ export class App implements OnInit, OnDestroy {
       this.status.set('GUI state save failed');
       this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
     } finally {
-      this.setActionBusy('tone-save-live', false);
+      this.setActionBusy('tone-save-gui', false);
     }
   }
 
@@ -1352,7 +1352,7 @@ export class App implements OnInit, OnDestroy {
       this.status.set('Tone save requires a name.');
       return;
     }
-    this.setActionBusy('tone-save-live', true);
+    this.setActionBusy('tone-save-full', true);
     this.status.set(`Storing full amp patch as ${name}...`);
     this.responseJson.set('');
     try {
@@ -1384,7 +1384,7 @@ export class App implements OnInit, OnDestroy {
       this.status.set('Full patch store failed');
       this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
     } finally {
-      this.setActionBusy('tone-save-live', false);
+      this.setActionBusy('tone-save-full', false);
     }
   }
 
