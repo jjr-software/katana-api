@@ -5153,10 +5153,41 @@ export class App implements OnInit, OnDestroy {
       return;
     }
     const draftSnapshot = this.clonePatch(draft);
+    const changedBlocks = this.editorChangedBlocks(this.livePatchSnapshot(), draftSnapshot);
     this.editorLiveApplyInFlight = true;
     this.editorLiveApplyPending.set(true);
     this.editorLiveApplyReadbackAt.set('');
     try {
+      if (changedBlocks.length === 1) {
+        const blockName = changedBlocks[0];
+        const blockPayload = this.comparablePatchBlock(draftSnapshot, blockName);
+        if (blockPayload && typeof blockPayload === 'object' && !Array.isArray(blockPayload)) {
+          const response = await fetch(`/api/v1/live-patch/blocks/${blockName}`, {
+            method: 'PATCH',
+            cache: 'no-store',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ patch_block: blockPayload }),
+          });
+          const payload = (await response.json()) as LivePatchResponse | { detail?: unknown };
+          if (!response.ok || !('patch_json' in payload)) {
+            this.editorLiveApplyError.set(typeof payload === 'object' ? JSON.stringify(payload) : 'live apply failed');
+            return;
+          }
+          const applied = payload as LivePatchResponse;
+          const appliedFingerprint = this.patchFingerprint(applied.patch_json);
+          this.editorPatchDraft.set(this.clonePatch(applied.patch_json));
+          this.editorLiveApplyLastAppliedFingerprint = appliedFingerprint;
+          if (this.editorLiveApplyQueuedFingerprint === expectedFingerprint) {
+            this.editorLiveApplyQueuedFingerprint = null;
+          }
+          this.applyLivePatchStatus(applied);
+          this.currentAmpCommitState.set('uncommitted');
+          this.editorLiveApplyReadbackAt.set(applied.amp_confirmed_at);
+          this.editorLiveApplyError.set('');
+          this.refreshCurrentCommitStateFromKnownState();
+          return;
+        }
+      }
       const response = await fetch('/api/v1/amp/current-patch/live-apply', {
         method: 'POST',
         cache: 'no-store',
@@ -5216,6 +5247,17 @@ export class App implements OnInit, OnDestroy {
       return '';
     }
     return this.patchFingerprint(draft);
+  }
+
+  private editorChangedBlocks(referencePatch: Record<string, unknown> | null, currentPatch: Record<string, unknown>): string[] {
+    if (!referencePatch) {
+      return [];
+    }
+    return this.toneBlockOptions().filter((block) => {
+      const referenceBlock = this.comparablePatchBlock(referencePatch, block);
+      const currentBlock = this.comparablePatchBlock(currentPatch, block);
+      return this.stableStringify(referenceBlock) !== this.stableStringify(currentBlock);
+    });
   }
 
   editorLiveApplyHasApplied(): boolean {
