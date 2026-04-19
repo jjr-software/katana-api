@@ -52,6 +52,7 @@ htmlcov/
 .env.*
 *.local
 .python-version
+.codex
 
 # IDE/editor state
 .vscode/
