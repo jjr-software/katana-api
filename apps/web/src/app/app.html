@@ -714,21 +714,12 @@
                   <h2 class="h6 mb-1">Patch Library</h2>
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
-                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openToneGroupModal()">New Group</button>
                   <button type="button" class="btn btn-sm btn-outline-secondary" (click)="loadTonePatchObjects()">Refresh</button>
                 </div>
               </div>
               <div class="row g-2">
                 <div class="col-12 col-lg-7">
                   <input type="text" class="form-control form-control-sm" placeholder="Search name or description" [value]="tonePatchQuery()" (input)="setTonePatchQuery($any($event.target).value)" />
-                </div>
-                <div class="col-12 col-lg-5">
-                  <select class="form-select form-select-sm" [value]="tonePatchGroupFilter()" (change)="setTonePatchGroupFilter($any($event.target).value)">
-                    <option value="">All groups</option>
-                    @for (group of toneGroups(); track group.id) {
-                      <option [value]="group.id">{{ group.name }}</option>
-                    }
-                  </select>
                 </div>
               </div>
               <div class="d-flex justify-content-end">
@@ -757,27 +748,6 @@
                     @if (showTonePatchDescription(patchObject)) {
                       <p class="mb-0 text-secondary">{{ patchObject.description }}</p>
                     }
-                    @if (patchObject.groups.length > 0) {
-                      <div class="d-flex gap-2 flex-wrap align-items-center">
-                        @for (group of patchObject.groups; track group.id) {
-                          <span class="badge text-bg-secondary d-inline-flex align-items-center gap-1">
-                            {{ group.name }}
-                            <button type="button" class="btn btn-sm btn-link p-0 text-white text-decoration-none" (click)="removeTonePatchObjectFromGroup(patchObject, group)" [disabled]="isActionBusy('tone-remove-group:' + patchObject.id + ':' + group.id)">×</button>
-                          </span>
-                        }
-                      </div>
-                    }
-                    <div class="d-flex gap-2 flex-wrap align-items-center">
-                      <select class="form-select form-select-sm tone-inline-select" [value]="toneAssignGroupByPatchObject()[patchObject.id] || ''" (change)="setToneAssignGroupId(patchObject.id, $any($event.target).value)">
-                        <option value="">Select group</option>
-                        @for (group of toneGroups(); track group.id) {
-                          <option [value]="group.id">{{ group.name }}</option>
-                        }
-                      </select>
-                      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="assignTonePatchObjectToGroup(patchObject)" [disabled]="toneGroups().length === 0 || isActionBusy('tone-assign-group:' + patchObject.id)">
-                        {{ isActionBusy('tone-assign-group:' + patchObject.id) ? 'Adding...' : 'Add To Group' }}
-                      </button>
-                    </div>
                   </article>
                 }
                 @if (tonePatchObjects().length === 0) {
@@ -1119,15 +1089,6 @@
         <textarea id="toneSaveDescription" class="form-control" rows="3" [value]="toneSaveDescription()" (input)="setToneSaveDescription($any($event.target).value)"></textarea>
       </div>
       <div>
-        <label class="form-label small mb-1" for="toneSaveGroup">Assign Group</label>
-        <select id="toneSaveGroup" class="form-select" [value]="toneSaveGroupId()" (change)="setToneSaveGroupId($any($event.target).value)">
-          <option value="">No group</option>
-          @for (group of toneGroups(); track group.id) {
-            <option [value]="group.id">{{ group.name }}</option>
-          }
-        </select>
-      </div>
-      <div>
         <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
           <p class="form-label small mb-0">Blocks</p>
         </div>
@@ -1324,28 +1285,6 @@
           </button>
         </div>
       }
-    </div>
-  </ng-template>
-
-  <ng-template #toneGroupModalTpl>
-    <div class="modal-header">
-      <h5 class="modal-title">Create Group</h5>
-      <button type="button" class="btn-close" aria-label="Close" (click)="closeToneGroupModal()"></button>
-    </div>
-    <div class="modal-body d-grid gap-3">
-      <div>
-        <label class="form-label small mb-1" for="toneGroupName">Name</label>
-        <input id="toneGroupName" type="text" class="form-control" [value]="toneGroupName()" (input)="setToneGroupName($any($event.target).value)" />
-      </div>
-      <div>
-        <label class="form-label small mb-1" for="toneGroupDescription">Description</label>
-        <textarea id="toneGroupDescription" class="form-control" rows="3" [value]="toneGroupDescription()" (input)="setToneGroupDescription($any($event.target).value)"></textarea>
-      </div>
-      <div class="d-flex justify-content-end">
-        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="createToneGroup()" [disabled]="isActionBusy('tone-create-group')">
-          {{ isActionBusy('tone-create-group') ? 'Creating...' : 'Create Group' }}
-        </button>
-      </div>
     </div>
   </ng-template>
 

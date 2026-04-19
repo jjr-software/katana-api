@@ -311,14 +311,6 @@ interface TonePatchObjectResponse {
   updated_at: string;
 }
 
-interface ToneGroupResponse {
-  id: number;
-  name: string;
-  description: string;
-  created_at: string;
-  updated_at: string;
-}
-
 interface TonePatchObjectSetSlotResponse {
   slot: number;
   patch_object_id: number;
@@ -508,7 +500,7 @@ interface StageParam {
 }
 
 type TriState = 'true' | 'false' | 'unknown';
-type ModalKey = 'toneSave' | 'toneDesigner' | 'toneGroup' | 'toneSet' | 'patchSamples' | 'ai' | 'autoLevel';
+type ModalKey = 'toneSave' | 'toneDesigner' | 'toneSet' | 'patchSamples' | 'ai' | 'autoLevel';
 
 function defaultSlotCards(): SlotCard[] {
   return Array.from({ length: 8 }, (_, idx) => {
@@ -546,7 +538,6 @@ function defaultSlotCards(): SlotCard[] {
 export class App implements OnInit, OnDestroy {
   @ViewChild('toneSaveModalTpl') private toneSaveModalTpl?: TemplateRef<unknown>;
   @ViewChild('toneDesignerModalTpl') private toneDesignerModalTpl?: TemplateRef<unknown>;
-  @ViewChild('toneGroupModalTpl') private toneGroupModalTpl?: TemplateRef<unknown>;
   @ViewChild('toneSetModalTpl') private toneSetModalTpl?: TemplateRef<unknown>;
   @ViewChild('patchSamplesModalTpl') private patchSamplesModalTpl?: TemplateRef<unknown>;
   @ViewChild('aiModalTpl') private aiModalTpl?: TemplateRef<unknown>;
@@ -644,13 +635,9 @@ export class App implements OnInit, OnDestroy {
   editorLiveApplyQueuedFingerprint: string | null = null;
   livePatchSnapshot = signal<Record<string, unknown> | null>(null);
   tonePatchObjects = signal<TonePatchObjectResponse[]>([]);
-  toneGroups = signal<ToneGroupResponse[]>([]);
   toneSets = signal<TonePatchObjectSetResponse[]>([]);
   toneSaveName = signal('');
   toneSaveDescription = signal('');
-  toneSaveGroupId = signal('');
-  toneGroupName = signal('');
-  toneGroupDescription = signal('');
   toneAiPrompt = signal('Refine the current editor patch or generate distinct sparse candidates around the target sound. Keep the results audibly useful for quick auditioning.');
   toneAiMode = signal<'refine' | 'ideas' | 'set'>('refine');
   toneAiSetName = signal('');
@@ -665,9 +652,7 @@ export class App implements OnInit, OnDestroy {
   toneLoadedPatchObjectId = signal('');
   toneLoadedPatchName = signal('');
   toneLoadedPatchSnapshot = signal<Record<string, unknown> | null>(null);
-  toneAssignGroupByPatchObject = signal<Record<number, string>>({});
   tonePatchQuery = signal('');
-  tonePatchGroupFilter = signal('');
   toneHighlightedPatchObjectId = signal<number | null>(null);
   toneManualSetName = signal('');
   toneManualSetDescription = signal('');
@@ -1078,14 +1063,6 @@ export class App implements OnInit, OnDestroy {
     this.toneAiMode.set(value);
   }
 
-  openToneGroupModal(): void {
-    this.openModal('toneGroup', this.toneGroupModalTpl);
-  }
-
-  closeToneGroupModal(): void {
-    this.closeModal('toneGroup');
-  }
-
   openToneSetModal(): void {
     this.openModal('toneSet', this.toneSetModalTpl, { size: 'xl' });
   }
@@ -1146,18 +1123,6 @@ export class App implements OnInit, OnDestroy {
     this.toneSaveDescription.set(value);
   }
 
-  setToneSaveGroupId(value: string): void {
-    this.toneSaveGroupId.set(value);
-  }
-
-  setToneGroupName(value: string): void {
-    this.toneGroupName.set(value);
-  }
-
-  setToneGroupDescription(value: string): void {
-    this.toneGroupDescription.set(value);
-  }
-
   setToneAiPrompt(value: string): void {
     this.toneAiPrompt.set(value);
   }
@@ -1186,21 +1151,12 @@ export class App implements OnInit, OnDestroy {
     return JSON.stringify(preview.patch_json, null, 2);
   }
 
-  setToneAssignGroupId(patchObjectId: number, value: string): void {
-    this.toneAssignGroupByPatchObject.update((current) => ({ ...current, [patchObjectId]: value }));
-  }
-
   setTonePatchQuery(value: string): void {
     this.tonePatchQuery.set(value);
   }
 
-  setTonePatchGroupFilter(value: string): void {
-    this.tonePatchGroupFilter.set(value);
-  }
-
   clearTonePatchFilters(): void {
     this.tonePatchQuery.set('');
-    this.tonePatchGroupFilter.set('');
     this.toneHighlightedPatchObjectId.set(null);
   }
 
@@ -1239,44 +1195,23 @@ export class App implements OnInit, OnDestroy {
   }
 
   async loadToneLabData(): Promise<void> {
-    await Promise.all([this.loadTonePatchObjects(), this.loadToneGroups(), this.loadToneSets()]);
+    await Promise.all([this.loadTonePatchObjects(), this.loadToneSets()]);
   }
 
   async loadTonePatchObjects(): Promise<void> {
     try {
       const params = new URLSearchParams();
-      const groupFilter = this.tonePatchGroupFilter().trim();
       if (this.tonePatchQuery().trim()) {
         params.set('q', this.tonePatchQuery().trim());
-      }
-      if (groupFilter) {
-        params.set('group_id', groupFilter);
       }
       const suffix = params.toString() ? `?${params.toString()}` : '';
       const response = await fetch(`/api/v1/patch-objects${suffix}`, { method: 'GET', cache: 'no-store' });
       const payload = (await response.json()) as TonePatchObjectResponse[] | { detail?: unknown };
       if (!response.ok || !Array.isArray(payload)) {
-        if (response.status === 404 && groupFilter) {
-          this.tonePatchGroupFilter.set('');
-          await this.loadTonePatchObjects();
-        }
         return;
       }
       this.tonePatchObjects.set(payload as TonePatchObjectResponse[]);
       this.syncSelectedPatchFromExactMatch();
-    } catch {
-      // Informational panel only.
-    }
-  }
-
-  async loadToneGroups(): Promise<void> {
-    try {
-      const response = await fetch('/api/v1/groups', { method: 'GET', cache: 'no-store' });
-      const payload = (await response.json()) as ToneGroupResponse[] | { detail?: unknown };
-      if (!response.ok || !Array.isArray(payload)) {
-        return;
-      }
-      this.toneGroups.set(payload as ToneGroupResponse[]);
     } catch {
       // Informational panel only.
     }
@@ -1305,7 +1240,6 @@ export class App implements OnInit, OnDestroy {
   async saveLiveAsTonePatchObject(): Promise<void> {
     const name = this.toneSaveName().trim();
     const blocks = this.saveToneBlocks();
-    const saveGroupId = Number.parseInt(this.toneSaveGroupId().trim() || '0', 10);
     if (!name) {
       this.status.set('Tone save requires a name.');
       return;
@@ -1336,22 +1270,8 @@ export class App implements OnInit, OnDestroy {
         return;
       }
       const saved = payload as TonePatchObjectResponse;
-      if (Number.isFinite(saveGroupId) && saveGroupId > 0) {
-        const groupResponse = await fetch(`/api/v1/groups/${saveGroupId}/patch-objects/${saved.id}`, {
-          method: 'POST',
-          cache: 'no-store',
-        });
-        const groupPayload = (await groupResponse.json()) as { detail?: unknown };
-        if (!groupResponse.ok) {
-          this.status.set(`Saved ${name}, but failed assigning it to the selected group`);
-          this.responseJson.set(JSON.stringify(groupPayload, null, 2));
-          await this.loadTonePatchObjects();
-          return;
-        }
-      }
       this.toneSaveName.set('');
       this.toneSaveDescription.set('');
-      this.toneSaveGroupId.set('');
       this.closeToneSaveModal();
       await this.loadTonePatchObjects();
       await this.refreshLivePatchStatus();
@@ -1367,7 +1287,6 @@ export class App implements OnInit, OnDestroy {
 
   async saveFullLiveAsTonePatchObject(): Promise<void> {
     const name = this.toneSaveName().trim();
-    const saveGroupId = Number.parseInt(this.toneSaveGroupId().trim() || '0', 10);
     if (!name) {
       this.status.set('Tone save requires a name.');
       return;
@@ -1393,22 +1312,8 @@ export class App implements OnInit, OnDestroy {
         return;
       }
       const saved = payload as TonePatchObjectResponse;
-      if (Number.isFinite(saveGroupId) && saveGroupId > 0) {
-        const groupResponse = await fetch(`/api/v1/groups/${saveGroupId}/patch-objects/${saved.id}`, {
-          method: 'POST',
-          cache: 'no-store',
-        });
-        const groupPayload = (await groupResponse.json()) as { detail?: unknown };
-        if (!groupResponse.ok) {
-          this.status.set(`Stored ${name}, but failed assigning it to the selected group`);
-          this.responseJson.set(JSON.stringify(groupPayload, null, 2));
-          await this.loadTonePatchObjects();
-          return;
-        }
-      }
       this.toneSaveName.set('');
       this.toneSaveDescription.set('');
-      this.toneSaveGroupId.set('');
       this.closeToneSaveModal();
       await this.loadTonePatchObjects();
       await this.refreshLivePatchStatus();
@@ -1419,42 +1324,6 @@ export class App implements OnInit, OnDestroy {
       this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
     } finally {
       this.setActionBusy('tone-save-live', false);
-    }
-  }
-
-  async createToneGroup(): Promise<void> {
-    const name = this.toneGroupName().trim();
-    if (!name) {
-      this.status.set('Group creation requires a name.');
-      return;
-    }
-    this.setActionBusy('tone-create-group', true);
-    this.status.set(`Creating group ${name}...`);
-    this.responseJson.set('');
-    try {
-      const response = await fetch('/api/v1/groups', {
-        method: 'POST',
-        cache: 'no-store',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, description: this.toneGroupDescription() }),
-      });
-      const payload = (await response.json()) as ToneGroupResponse | { detail?: unknown };
-      if (!response.ok) {
-        this.status.set('Group creation failed');
-        this.responseJson.set(JSON.stringify(payload, null, 2));
-        return;
-      }
-      this.toneGroupName.set('');
-      this.toneGroupDescription.set('');
-      this.closeToneGroupModal();
-      await this.loadToneGroups();
-      this.status.set(`Created group ${name}`);
-      this.responseJson.set(JSON.stringify(payload, null, 2));
-    } catch (error: unknown) {
-      this.status.set('Group creation failed');
-      this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
-    } finally {
-      this.setActionBusy('tone-create-group', false);
     }
   }
 
@@ -1549,68 +1418,8 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  async assignTonePatchObjectToGroup(patchObject: TonePatchObjectResponse): Promise<void> {
-    const groupIdValue = this.toneAssignGroupByPatchObject()[patchObject.id] ?? '';
-    const groupId = Number.parseInt(groupIdValue, 10);
-    if (!Number.isFinite(groupId) || groupId <= 0) {
-      this.status.set(`Select a group before assigning ${patchObject.name}.`);
-      return;
-    }
-    const actionKey = `tone-assign-group:${patchObject.id}`;
-    this.setActionBusy(actionKey, true);
-    this.status.set(`Adding ${patchObject.name} to group...`);
-    this.responseJson.set('');
-    try {
-      const response = await fetch(`/api/v1/groups/${groupId}/patch-objects/${patchObject.id}`, {
-        method: 'POST',
-        cache: 'no-store',
-      });
-      const payload = (await response.json()) as { ok?: boolean; detail?: unknown };
-      if (!response.ok) {
-        this.status.set(`Failed adding ${patchObject.name} to group`);
-        this.responseJson.set(JSON.stringify(payload, null, 2));
-        return;
-      }
-      this.status.set(`Added ${patchObject.name} to group`);
-      this.responseJson.set(JSON.stringify(payload, null, 2));
-    } catch (error: unknown) {
-      this.status.set(`Failed adding ${patchObject.name} to group`);
-      this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
-    } finally {
-      this.setActionBusy(actionKey, false);
-    }
-  }
-
-  async removeTonePatchObjectFromGroup(patchObject: TonePatchObjectResponse, group: { id: number; name: string }): Promise<void> {
-    const actionKey = `tone-remove-group:${patchObject.id}:${group.id}`;
-    this.setActionBusy(actionKey, true);
-    this.status.set(`Removing ${patchObject.name} from ${group.name}...`);
-    this.responseJson.set('');
-    try {
-      const response = await fetch(`/api/v1/groups/${group.id}/patch-objects/${patchObject.id}`, {
-        method: 'DELETE',
-        cache: 'no-store',
-      });
-      const payload = (await response.json()) as { detail?: unknown };
-      if (!response.ok) {
-        this.status.set(`Failed removing ${patchObject.name} from ${group.name}`);
-        this.responseJson.set(JSON.stringify(payload, null, 2));
-        return;
-      }
-      await this.loadTonePatchObjects();
-      this.status.set(`Removed ${patchObject.name} from ${group.name}`);
-      this.responseJson.set(JSON.stringify(payload, null, 2));
-    } catch (error: unknown) {
-      this.status.set(`Failed removing ${patchObject.name} from ${group.name}`);
-      this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
-    } finally {
-      this.setActionBusy(actionKey, false);
-    }
-  }
-
   async focusTonePatchObject(match: { id: number; name: string }): Promise<void> {
     this.tonePatchQuery.set(match.name);
-    this.tonePatchGroupFilter.set('');
     this.toneHighlightedPatchObjectId.set(match.id);
     await this.loadTonePatchObjects();
     globalThis.document?.getElementById('tone-patch-objects')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -2243,7 +2052,6 @@ export class App implements OnInit, OnDestroy {
       this.status.set('Keep requires a non-empty name.');
       return;
     }
-    const groupId = Number.parseInt(this.toneSaveGroupId().trim() || '0', 10);
     const actionKey = this.slotActionKey('keep-tone', slot.slot);
     this.setActionBusy(actionKey, true);
     this.status.set(`Keeping ${slot.slot_label} in Tone Lab...`);
@@ -2268,18 +2076,6 @@ export class App implements OnInit, OnDestroy {
         return;
       }
       const created = payload as TonePatchObjectResponse;
-      if (Number.isFinite(groupId) && groupId > 0) {
-        const groupResponse = await fetch(`/api/v1/groups/${groupId}/patch-objects/${created.id}`, {
-          method: 'POST',
-          cache: 'no-store',
-        });
-        const groupPayload = (await groupResponse.json()) as { detail?: unknown };
-        if (!groupResponse.ok) {
-          this.status.set(`Kept ${slot.slot_label}, but failed assigning it to the selected group`);
-          this.responseJson.set(JSON.stringify(groupPayload, null, 2));
-          return;
-        }
-      }
       this.toneHighlightedPatchObjectId.set(created.id);
       await this.loadTonePatchObjects();
       this.status.set(`Kept ${slot.slot_label} as ${trimmed}`);
