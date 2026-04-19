@@ -1109,9 +1109,6 @@ export class App implements OnInit, OnDestroy {
 
   editorBlockEnabledLabel(block: string): 'On' | 'Off' | null {
     switch (block as ToneBlockKey) {
-      case 'amp': {
-        return this.editorAmpRawValue(9) === 0 ? 'Off' : 'On';
-      }
       case 'booster':
       case 'mod':
       case 'fx':
