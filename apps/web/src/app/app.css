@@ -85,6 +85,24 @@
   gap: 0.75rem;
 }
 
+.dashboard-workspace {
+  display: grid;
+  grid-template-columns: minmax(18rem, 24rem) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.dashboard-sticky-rail {
+  position: sticky;
+  top: 0.75rem;
+  align-self: start;
+  z-index: 4;
+}
+
+.dashboard-main {
+  min-width: 0;
+}
+
 .live-meter-band-list {
   display: flex;
   flex-wrap: wrap;
@@ -92,12 +110,7 @@
 }
 
 .live-meter-total-card {
-  flex: 1 1 12rem;
-  min-width: 12rem;
-  position: sticky;
-  top: 0.75rem;
-  align-self: flex-start;
-  z-index: 3;
+  min-width: 0;
 }
 
 .live-total-level-graph-wrap {
@@ -152,6 +165,16 @@
 .live-meter-max-value {
   border-bottom: 2px solid #dc3545;
   padding-bottom: 0.05rem;
+}
+
+@media (max-width: 991.98px) {
+  .dashboard-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dashboard-sticky-rail {
+    position: static;
+  }
 }
 
 pre {

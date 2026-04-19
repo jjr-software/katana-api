@@ -34,7 +34,62 @@
   }
 
   @if (isDashboardPage()) {
-  <section class="d-grid gap-3">
+  <section class="dashboard-workspace">
+    <aside class="dashboard-sticky-rail">
+      <div class="card shadow-sm live-meter-total-card">
+        <div class="card-body py-2 px-3">
+          <div class="d-flex justify-content-end gap-2 mb-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="clearLiveMeterChart()">Clear Chart</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="resetLiveMeterMaxValues()">Reset Max Hold</button>
+          </div>
+          <div class="small text-secondary">Total Level</div>
+          <div class="d-flex align-items-baseline justify-content-between gap-2">
+            <span class="fs-5 fw-semibold">{{ formatDb(liveRmsDbfs()) }}</span>
+            <span class="small text-danger fw-semibold">Max <span class="live-meter-max-value">{{ formatDb(liveRmsMaxDbfs()) }}</span></span>
+          </div>
+          <div class="d-flex justify-content-between align-items-center gap-2 small text-secondary">
+            <span>Target {{ formatDb(liveTotalLevelTargetRms()) }}</span>
+            <span>2s RMS chunks</span>
+          </div>
+          <div class="d-flex justify-content-between align-items-center gap-2 small text-secondary mt-1">
+            <span>Current {{ liveTotalLevelDelta(liveRmsDbfs()) }}</span>
+            <span>Max Hold {{ liveTotalLevelDelta(liveRmsMaxDbfs()) }}</span>
+          </div>
+          <div class="live-total-level-graph-wrap mt-2">
+            <svg
+              class="live-total-level-graph"
+              [attr.viewBox]="'0 0 1000 72'"
+              preserveAspectRatio="none"
+              aria-label="Running total level history"
+            >
+              <line
+                class="live-total-level-grid-line"
+                x1="0"
+                [attr.y1]="liveTotalLevelTargetLineY()"
+                x2="1000"
+                [attr.y2]="liveTotalLevelTargetLineY()"
+              />
+              @for (bar of liveTotalLevelBars(); track $index) {
+                <rect
+                  [attr.x]="bar.x"
+                  [attr.y]="bar.y"
+                  [attr.width]="bar.width"
+                  [attr.height]="bar.height"
+                  [attr.class]="bar.tone === 'above' ? 'live-total-level-bar live-total-level-bar-above' : 'live-total-level-bar live-total-level-bar-below'"
+                />
+              }
+            </svg>
+          </div>
+          <div class="live-total-level-axis mt-2">
+            <span>{{ liveTotalLevelWindowMin().toFixed(2) }} dBFS</span>
+            <span class="live-total-level-axis-target">Target</span>
+            <span>{{ liveTotalLevelWindowMax().toFixed(2) }} dBFS</span>
+          </div>
+          <div class="small text-secondary mt-2">Zoom {{ liveTotalLevelWindowMin().toFixed(2) }} to {{ liveTotalLevelWindowMax().toFixed(2) }} dBFS</div>
+        </div>
+      </div>
+    </aside>
+    <section class="dashboard-main d-grid gap-3">
       <div class="card mb-3">
         <div class="card-body py-2">
           <div class="d-flex flex-wrap gap-2 mb-2">
@@ -122,83 +177,30 @@
             </div>
           </div>
           <div class="mt-2 live-meter-panel">
-            <div class="d-flex justify-content-end gap-2">
-              <button type="button" class="btn btn-outline-secondary btn-sm" (click)="clearLiveMeterChart()">Clear Chart</button>
-              <button type="button" class="btn btn-outline-secondary btn-sm" (click)="resetLiveMeterMaxValues()">Reset Max Hold</button>
-            </div>
-            <div class="d-flex flex-wrap gap-2">
-              <div class="card shadow-sm live-meter-total-card">
-                <div class="card-body py-2 px-3">
-                  <div class="small text-secondary">Total Level</div>
-                  <div class="d-flex align-items-baseline justify-content-between gap-2">
-                    <span class="fs-5 fw-semibold">{{ formatDb(liveRmsDbfs()) }}</span>
-                    <span class="small text-danger fw-semibold">Max <span class="live-meter-max-value">{{ formatDb(liveRmsMaxDbfs()) }}</span></span>
-                  </div>
-                  <div class="d-flex justify-content-between align-items-center gap-2 small text-secondary">
-                    <span>Target {{ formatDb(liveTotalLevelTargetRms()) }}</span>
-                    <span>2s RMS chunks, zoom {{ liveTotalLevelWindowMin().toFixed(2) }} to {{ liveTotalLevelWindowMax().toFixed(2) }} dBFS</span>
-                  </div>
-                  <div class="d-flex justify-content-between align-items-center gap-2 small text-secondary mt-1">
-                    <span>Current {{ liveTotalLevelDelta(liveRmsDbfs()) }}</span>
-                    <span>Max Hold {{ liveTotalLevelDelta(liveRmsMaxDbfs()) }}</span>
-                  </div>
-                  <div class="live-total-level-graph-wrap mt-2">
-                    <svg
-                      class="live-total-level-graph"
-                      [attr.viewBox]="'0 0 1000 72'"
-                      preserveAspectRatio="none"
-                      aria-label="Running total level history"
-                    >
-                      <line
-                        class="live-total-level-grid-line"
-                        x1="0"
-                        [attr.y1]="liveTotalLevelTargetLineY()"
-                        x2="1000"
-                        [attr.y2]="liveTotalLevelTargetLineY()"
-                      />
-                      @for (bar of liveTotalLevelBars(); track $index) {
-                        <rect
-                          [attr.x]="bar.x"
-                          [attr.y]="bar.y"
-                          [attr.width]="bar.width"
-                          [attr.height]="bar.height"
-                          [attr.class]="bar.tone === 'above' ? 'live-total-level-bar live-total-level-bar-above' : 'live-total-level-bar live-total-level-bar-below'"
-                        />
-                      }
-                    </svg>
-                  </div>
-                  <div class="live-total-level-axis mt-2">
-                    <span>{{ liveTotalLevelWindowMin().toFixed(2) }} dBFS</span>
-                    <span class="live-total-level-axis-target">Target</span>
-                    <span>{{ liveTotalLevelWindowMax().toFixed(2) }} dBFS</span>
-                  </div>
-                </div>
-              </div>
-              <div class="card shadow-sm flex-grow-1">
-                <div class="card-body py-2 px-3">
-                  <div class="small text-secondary mb-2">Frequency Buckets</div>
-                  <div class="live-meter-band-list">
-                    @for (band of liveMeterBandRows(); track band.id) {
-                      <div class="card shadow-sm live-meter-band-card">
-                        <div class="card-body py-2 px-3">
-                          <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-                            <div>
-                              <div class="fw-semibold">{{ band.label }}</div>
-                              <div class="small text-secondary">{{ band.rangeLabel }}</div>
-                            </div>
-                            <div class="text-end">
-                              <div class="small text-secondary">Current</div>
-                              <div class="fw-semibold">{{ formatRelativeDb(band.currentDbfs) }}</div>
-                            </div>
+            <div class="card shadow-sm flex-grow-1">
+              <div class="card-body py-2 px-3">
+                <div class="small text-secondary mb-2">Frequency Buckets</div>
+                <div class="live-meter-band-list">
+                  @for (band of liveMeterBandRows(); track band.id) {
+                    <div class="card shadow-sm live-meter-band-card">
+                      <div class="card-body py-2 px-3">
+                        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                          <div>
+                            <div class="fw-semibold">{{ band.label }}</div>
+                            <div class="small text-secondary">{{ band.rangeLabel }}</div>
                           </div>
-                          <div class="d-flex justify-content-between align-items-center gap-2">
-                            <div class="small text-danger">Max</div>
-                            <div class="fw-semibold text-danger live-meter-max-value">{{ formatRelativeDb(band.maxDbfs) }}</div>
+                          <div class="text-end">
+                            <div class="small text-secondary">Current</div>
+                            <div class="fw-semibold">{{ formatRelativeDb(band.currentDbfs) }}</div>
                           </div>
                         </div>
+                        <div class="d-flex justify-content-between align-items-center gap-2">
+                          <div class="small text-danger">Max</div>
+                          <div class="fw-semibold text-danger live-meter-max-value">{{ formatRelativeDb(band.maxDbfs) }}</div>
+                        </div>
                       </div>
-                    }
-                  </div>
+                    </div>
+                  }
                 </div>
               </div>
             </div>
@@ -1013,6 +1015,7 @@
         </div>
       </section>
       </details>
+    </section>
   </section>
   } @else if (isLineOutPage()) {
   <section class="card">
