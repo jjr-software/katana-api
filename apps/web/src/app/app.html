@@ -34,8 +34,7 @@
   }
 
   @if (isDashboardPage()) {
-  <section class="dashboard-workspace">
-    <aside class="dashboard-sticky-rail">
+  <section class="d-grid gap-3 dashboard-page">
       <div class="card shadow-sm live-meter-total-card">
         <div class="card-body py-2 px-3">
           <div class="d-flex justify-content-end gap-2 mb-2">
@@ -88,8 +87,6 @@
           <div class="small text-secondary mt-2">Zoom {{ liveTotalLevelWindowMin().toFixed(2) }} to {{ liveTotalLevelWindowMax().toFixed(2) }} dBFS</div>
         </div>
       </div>
-    </aside>
-    <section class="dashboard-main d-grid gap-3">
       <div class="card mb-3">
         <div class="card-body py-2">
           <div class="d-flex flex-wrap gap-2 mb-2">
@@ -1016,7 +1013,6 @@
       </section>
       </details>
     </section>
-  </section>
   } @else if (isLineOutPage()) {
   <section class="card">
     <div class="card-body d-grid gap-3">
