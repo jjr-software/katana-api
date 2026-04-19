@@ -850,6 +850,30 @@ export class App implements OnInit, OnDestroy {
     return this.livePatchSnapshot() !== null && this.selectedAmpSlot() !== null;
   }
 
+  canReapplyCurrentSettingsToAmp(): boolean {
+    return this.editorPatchDraft() !== null && this.editorLiveApplyAvailable();
+  }
+
+  async reapplyCurrentSettingsToAmp(): Promise<void> {
+    const actionKey = 'reapply-current-settings';
+    this.setActionBusy(actionKey, true);
+    this.status.set('Reapplying current settings to amp...');
+    this.responseJson.set('');
+    try {
+      const applied = await this.applyEditorPatchLive(this.editorDraftFingerprint(), true);
+      if (!applied) {
+        this.status.set('Reapply current settings failed');
+        return;
+      }
+      this.status.set('Current settings reapplied to amp');
+    } catch (error: unknown) {
+      this.status.set('Reapply current settings failed');
+      this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
+    } finally {
+      this.setActionBusy(actionKey, false);
+    }
+  }
+
   async persistLivePatchToAmp(): Promise<void> {
     const slotNumber = this.selectedAmpSlot();
     if (slotNumber === null) {

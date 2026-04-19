@@ -93,6 +93,14 @@
             <button type="button" class="btn btn-outline-primary btn-sm" (click)="syncLivePatch()" [disabled]="isActionBusy('sync-live-patch')">{{ headerActionLabel('sync-live-patch', 'Sync Live Patch', 'Syncing...') }}</button>
             <button
               type="button"
+              class="btn btn-outline-warning btn-sm"
+              (click)="reapplyCurrentSettingsToAmp()"
+              [disabled]="isActionBusy('reapply-current-settings') || !canReapplyCurrentSettingsToAmp()"
+            >
+              {{ headerActionLabel('reapply-current-settings', 'Reapply settings to amp', 'Reapplying...') }}
+            </button>
+            <button
+              type="button"
               class="btn btn-success btn-sm"
               (click)="persistLivePatchToAmp()"
               [disabled]="isActionBusy('persist-live-patch') || !canPersistLivePatchToAmp()"
