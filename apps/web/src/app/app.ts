@@ -508,7 +508,7 @@ interface StageParam {
 }
 
 type TriState = 'true' | 'false' | 'unknown';
-type ModalKey = 'toneSave' | 'toneDesigner' | 'toneGroup' | 'toneSet' | 'toneLoadPatch' | 'patchSamples' | 'ai' | 'autoLevel';
+type ModalKey = 'toneSave' | 'toneDesigner' | 'toneGroup' | 'toneSet' | 'patchSamples' | 'ai' | 'autoLevel';
 
 function defaultSlotCards(): SlotCard[] {
   return Array.from({ length: 8 }, (_, idx) => {
@@ -548,7 +548,6 @@ export class App implements OnInit, OnDestroy {
   @ViewChild('toneDesignerModalTpl') private toneDesignerModalTpl?: TemplateRef<unknown>;
   @ViewChild('toneGroupModalTpl') private toneGroupModalTpl?: TemplateRef<unknown>;
   @ViewChild('toneSetModalTpl') private toneSetModalTpl?: TemplateRef<unknown>;
-  @ViewChild('toneLoadPatchModalTpl') private toneLoadPatchModalTpl?: TemplateRef<unknown>;
   @ViewChild('patchSamplesModalTpl') private patchSamplesModalTpl?: TemplateRef<unknown>;
   @ViewChild('aiModalTpl') private aiModalTpl?: TemplateRef<unknown>;
   @ViewChild('autoLevelModalTpl') private autoLevelModalTpl?: TemplateRef<unknown>;
@@ -1095,14 +1094,6 @@ export class App implements OnInit, OnDestroy {
     this.closeModal('toneSet');
   }
 
-  openToneLoadPatchModal(): void {
-    this.openModal('toneLoadPatch', this.toneLoadPatchModalTpl);
-  }
-
-  closeToneLoadPatchModal(): void {
-    this.closeModal('toneLoadPatch');
-  }
-
   isToneBlockSelected(block: string): boolean {
     return Boolean(this.toneSelectedBlocks()[block]);
   }
@@ -1153,10 +1144,6 @@ export class App implements OnInit, OnDestroy {
 
   setToneSaveGroupId(value: string): void {
     this.toneSaveGroupId.set(value);
-  }
-
-  setToneLoadedPatchObjectId(value: string): void {
-    this.toneLoadedPatchObjectId.set(value);
   }
 
   setToneGroupName(value: string): void {
@@ -1309,48 +1296,6 @@ export class App implements OnInit, OnDestroy {
     this.toneLoadedPatchObjectId.set('');
     this.toneLoadedPatchName.set('');
     this.status.set('Loaded reference patch cleared.');
-  }
-
-  async applyLoadedPatchObject(): Promise<void> {
-    const patchObjectId = Number.parseInt(this.toneLoadedPatchObjectId().trim() || '0', 10);
-    if (!Number.isFinite(patchObjectId) || patchObjectId <= 0) {
-      this.status.set('Select a saved patch first.');
-      return;
-    }
-    const patchObject = this.tonePatchObjects().find((item) => item.id === patchObjectId) ?? null;
-    if (!patchObject) {
-      this.status.set('Loaded reference patch is not available in the current list.');
-      return;
-    }
-    const actionKey = `tone-apply-patch:${patchObject.id}`;
-    this.setActionBusy(actionKey, true);
-    this.status.set(`Applying ${patchObject.name}...`);
-    this.responseJson.set('');
-    try {
-      const response = await fetch('/api/v1/live-patch/apply-patch-object', {
-        method: 'POST',
-        cache: 'no-store',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ patch_object_id: patchObject.id }),
-      });
-      const payload = (await response.json()) as LivePatchResponse | { detail?: unknown };
-      if (!response.ok || !('patch_json' in payload)) {
-        this.status.set(`Failed applying ${patchObject.name}`);
-        this.responseJson.set(JSON.stringify(payload, null, 2));
-        return;
-      }
-      this.selectSavedPatch(patchObject);
-      this.applyLivePatchStatus(payload as LivePatchResponse);
-      this.loadLivePatchIntoEditorState(payload as LivePatchResponse, false);
-      this.closeToneLoadPatchModal();
-      this.status.set(`Applied ${patchObject.name}`);
-      this.responseJson.set(JSON.stringify(payload, null, 2));
-    } catch (error: unknown) {
-      this.status.set(`Failed applying ${patchObject.name}`);
-      this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
-    } finally {
-      this.setActionBusy(actionKey, false);
-    }
   }
 
   async saveLiveAsTonePatchObject(): Promise<void> {
