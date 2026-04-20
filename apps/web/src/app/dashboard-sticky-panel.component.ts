@@ -203,6 +203,69 @@ const LIVE_FFT_BANDS = buildLiveMeterBands(LIVE_GE10_BAND_CENTERS_HZ, ['31', '62
       top: .75rem;
       z-index: 4;
     }
+
+    .freq-buckets-card {
+      overflow: hidden;
+    }
+
+    .freq-buckets-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+      gap: 0.5rem;
+      align-items: start;
+    }
+
+    .freq-bucket {
+      display: grid;
+      gap: 0.35rem;
+      min-width: 0;
+    }
+
+    .min-w-0 {
+      min-width: 0;
+    }
+
+    .freq-bucket-meter {
+      position: relative;
+      height: 4.25rem;
+      border: 1px solid rgba(33, 37, 41, 0.12);
+      border-radius: 0.55rem;
+      overflow: hidden;
+      background:
+        linear-gradient(to top, rgba(33, 37, 41, 0.08) 1px, transparent 1px) 0 0 / 100% 50%,
+        linear-gradient(180deg, rgba(13, 110, 253, 0.05) 0%, rgba(13, 110, 253, 0.015) 100%),
+        #f8f9fa;
+    }
+
+    .freq-bucket-gridlines {
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(to top, rgba(33, 37, 41, 0.08) 1px, transparent 1px) 0 0 / 100% 50%,
+        linear-gradient(to top, rgba(33, 37, 41, 0.08) 1px, transparent 1px) 0 0 / 100% 100%;
+      opacity: 0.75;
+    }
+
+    .freq-bucket-fill {
+      position: absolute;
+      left: 0.32rem;
+      right: 0.32rem;
+      bottom: 0;
+      border-radius: 0.3rem 0.3rem 0 0;
+      background: linear-gradient(180deg, #7cc4ff 0%, #0d6efd 100%);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+      z-index: 1;
+    }
+
+    .freq-bucket-hold {
+      position: absolute;
+      left: 0.18rem;
+      right: 0.18rem;
+      height: 0;
+      border-top: 2px solid #dc3545;
+      box-shadow: 0 0 0 1px rgba(220, 53, 69, 0.12);
+      z-index: 2;
+    }
   `],
   template: `
     @if (model(); as vm) {
@@ -290,39 +353,29 @@ const LIVE_FFT_BANDS = buildLiveMeterBands(LIVE_GE10_BAND_CENTERS_HZ, ['31', '62
             </div>
 
             <div class="mt-2">
-              <div class="card shadow-sm">
+              <div class="card shadow-sm freq-buckets-card">
                 <div class="card-body py-2 px-3">
-                  <div class="small text-secondary mb-2">Frequency Buckets</div>
-                  <div class="d-flex flex-wrap gap-2">
+                  <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                    <div class="small text-secondary">Frequency Buckets</div>
+                    <div class="small text-secondary">Current / Max hold</div>
+                  </div>
+                  <div class="freq-buckets-grid">
                     @for (band of liveMeterBandRows(); track band.id) {
-                      <div class="card shadow-sm" style="flex: 1 1 14rem; min-width: 14rem;">
-                        <div class="card-body py-2 px-3">
-                          <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-                            <div>
-                              <div class="fw-semibold">{{ band.label }}</div>
-                              <div class="small text-secondary">{{ band.rangeLabel }}</div>
-                            </div>
-                            <div class="text-end">
-                              <div class="small text-secondary">Current</div>
-                              <div class="fw-semibold">{{ formatRelativeDb(band.currentDbfs) }}</div>
-                            </div>
+                      <div class="freq-bucket">
+                        <div class="d-flex justify-content-between align-items-baseline gap-2">
+                          <div class="min-w-0">
+                            <div class="fw-semibold">{{ band.label }}</div>
+                            <div class="small text-secondary text-truncate">{{ band.rangeLabel }}</div>
                           </div>
-                          <div class="d-flex justify-content-between align-items-center gap-2">
-                            <div class="small text-danger">Max</div>
-                            <div class="fw-semibold text-danger border-bottom border-danger pb-1">{{ formatRelativeDb(band.maxDbfs) }}</div>
+                          <div class="text-end flex-shrink-0">
+                            <div class="fw-semibold">{{ formatRelativeDb(band.currentDbfs) }}</div>
+                            <div class="small text-danger">{{ formatRelativeDb(band.maxDbfs) }}</div>
                           </div>
-                          <div class="d-grid mt-2" style="grid-template-columns: 2.75rem minmax(0, 1fr); gap: .5rem; align-items: stretch;">
-                            <div class="d-flex flex-column justify-content-between align-items-end small text-secondary" style="min-height: 7.25rem; padding: .15rem 0; line-height: 1;">
-                              <span>0 dB</span>
-                              <span>-30 dB</span>
-                              <span>-60 dB</span>
-                            </div>
-                            <div class="position-relative" style="min-height: 7.25rem; border: 1px solid rgba(33, 37, 41, 0.12); border-radius: .6rem; overflow: hidden; background: linear-gradient(180deg, rgba(13, 110, 253, 0.05) 0%, rgba(13, 110, 253, 0.015) 100%), #f8f9fa;">
-                              <div class="position-absolute top-0 start-0 end-0 bottom-0" style="background: linear-gradient(to top, rgba(33, 37, 41, 0.08) 1px, transparent 1px) 0 0 / 100% 50%, linear-gradient(to top, rgba(33, 37, 41, 0.08) 1px, transparent 1px) 0 0 / 100% 100%; opacity: .9;"></div>
-                              <div class="position-absolute" [style.left.rem]="0.45" [style.right.rem]="0.45" [style.bottom.%]="0" [style.height.%]="band.currentPercent" style="border-radius: .35rem .35rem 0 0; background: linear-gradient(180deg, #63b3ff 0%, #0d6efd 100%); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);"></div>
-                              <div class="position-absolute" [style.left.rem]="0.2" [style.right.rem]="0.2" [style.bottom.%]="band.maxPercent" style="height: 0; border-top: 2px solid #dc3545; box-shadow: 0 0 0 1px rgba(220, 53, 69, 0.12);"></div>
-                            </div>
-                          </div>
+                        </div>
+                        <div class="freq-bucket-meter mt-1">
+                          <div class="freq-bucket-gridlines"></div>
+                          <div class="freq-bucket-fill" [style.height.%]="band.currentPercent"></div>
+                          <div class="freq-bucket-hold" [style.bottom.%]="band.maxPercent"></div>
                         </div>
                       </div>
                     }
