@@ -1,6 +1,12 @@
-import { Component, OnDestroy, OnInit, TemplateRef, ViewChild, effect, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, TemplateRef, ViewChild, computed, effect, inject, signal } from '@angular/core';
 import { NgbModal, NgbModalModule, NgbModalOptions, NgbModalRef } from '@ng-bootstrap/ng-bootstrap';
 import { PatchSummaryComponent } from './patch-summary.component';
+import {
+  DashboardStickyPanelComponent,
+  type DashboardStickyPanelBand,
+  type DashboardStickyPanelBar,
+  type DashboardStickyPanelViewModel,
+} from './dashboard-sticky-panel.component';
 import {
   BOOSTER_PARAM_SCHEMA,
   DELAY_PARAM_SCHEMA,
@@ -609,7 +615,7 @@ function defaultSlotCards(): SlotCard[] {
 
 @Component({
   selector: 'app-root',
-  imports: [PatchSummaryComponent, NgbModalModule],
+  imports: [DashboardStickyPanelComponent, PatchSummaryComponent, NgbModalModule],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
@@ -745,6 +751,50 @@ export class App implements OnInit, OnDestroy {
   private lastStatusToast = '';
   private queueJobStatusById = new Map<string, QueueJobSummary['status']>();
   private queueNotificationsInitialized = false;
+  readonly stickyPanelVm = computed<DashboardStickyPanelViewModel>(() => ({
+    testAmpLabel: this.headerActionLabel('test-amp-connection', 'Test Amp Connection', 'Testing...'),
+    testAmpDisabled: this.isActionBusy('test-amp-connection'),
+    syncLivePatchLabel: this.headerActionLabel('sync-live-patch', 'Sync Live Patch', 'Syncing...'),
+    syncLivePatchDisabled: this.isActionBusy('sync-live-patch'),
+    reapplyLabel: this.headerActionLabel('reapply-current-settings', 'Reapply settings to amp', 'Reapplying...'),
+    reapplyDisabled: this.isActionBusy('reapply-current-settings') || !this.canReapplyCurrentSettingsToAmp(),
+    storeToAmpLabel: this.headerActionLabel('persist-live-patch', 'Store to Amp', 'Storing...'),
+    storeToAmpDisabled: this.isActionBusy('persist-live-patch') || !this.canPersistLivePatchToAmp(),
+    loadPatchLabel: 'Load Patch',
+    saveCurrentSettingsLabel: 'Save Current Settings',
+    aiDesignerLabel: 'AI Designer',
+    clearLabel: 'Clear',
+    currentSlotLabel: this.selectedAmpSlotLabel(),
+    currentSettingsName: this.currentSettingsPatchName(),
+    currentSettingsSourceQualifier: this.currentSettingsSourceQualifier() || null,
+    ampSlotSavedName: this.selectedAmpSlotSavedName(),
+    shownBlocks: this.livePatchSelectedBlocksSummary(),
+    ampStateHashShort: this.shortHash(this.ampStateHash()),
+    livePatchConfirmedAt: this.livePatchConfirmedAt(),
+    lastSyncedAt: this.lastSyncedAt(),
+    totalSyncMsText: this.formatMs(this.totalSyncMs()),
+    liveMeterConnected: this.liveMeterConnected(),
+    liveMeterAt: this.liveMeterAt(),
+    liveRmsDbfsText: this.formatDb(this.liveRmsDbfs()),
+    liveRmsMaxDbfsText: this.formatDb(this.liveRmsMaxDbfs()),
+    totalLevelTargetText: this.formatDb(this.liveTotalLevelTargetRms()),
+    totalLevelCurrentDeltaText: this.liveTotalLevelDelta(this.liveRmsDbfs()),
+    totalLevelMaxHoldDeltaText: this.liveTotalLevelDelta(this.liveRmsMaxDbfs()),
+    totalLevelWindowMinText: this.formatDb(this.liveTotalLevelWindowMin()),
+    totalLevelWindowMaxText: this.formatDb(this.liveTotalLevelWindowMax()),
+    totalLevelTargetLineY: this.liveTotalLevelTargetLineY(),
+    totalLevelBars: this.liveTotalLevelBars().map((bar): DashboardStickyPanelBar => ({ ...bar })),
+    globalNormalizeTargetRms: this.globalNormalizeTargetRms(),
+    liveMeterBands: this.liveMeterBandRows().map((band): DashboardStickyPanelBand => ({
+      id: band.id,
+      label: band.label,
+      rangeLabel: band.rangeLabel,
+      currentText: this.formatRelativeDb(band.currentDbfs),
+      maxText: this.formatRelativeDb(band.maxDbfs),
+      currentPercent: band.currentPercent,
+      maxPercent: band.maxPercent,
+    })),
+  }));
   private readonly onPopState = (): void => {
     const page = this.resolvePageFromPath();
     this.currentPage.set(page);
