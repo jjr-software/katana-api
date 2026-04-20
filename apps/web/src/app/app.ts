@@ -153,6 +153,23 @@ const GAFC_EXP1_ASSIGNMENT_SCHEMA: ReadonlyArray<GafcExp1AssignmentSpec> = [
 const EQ_TYPE_NAMES = ['Parametric EQ', 'GE-10'];
 const EQ_POSITION_NAMES = ['Input', 'Post Amp'];
 const EQ_GE10_BAND_LABELS = ['31', '62', '125', '250', '500', '1k', '2k', '4k', '8k', '16k', 'Level'];
+const PEDAL_FX_POSITION_OPTIONS: ReadonlyArray<ValueOption> = [
+  { value: 0, label: 'Input' },
+  { value: 1, label: 'Post Amp' },
+];
+const PEDAL_FX_TYPE_OPTIONS: ReadonlyArray<ValueOption> = [
+  { value: 0, label: 'Pedal Wah' },
+  { value: 1, label: 'Pedal Bend' },
+  { value: 2, label: 'WAH 95E' },
+];
+const PEDAL_FX_WAH_TYPE_OPTIONS: ReadonlyArray<ValueOption> = [
+  { value: 0, label: 'Cry Wah' },
+  { value: 1, label: 'VO Wah' },
+  { value: 2, label: 'Fat Wah' },
+  { value: 3, label: 'Light Wah' },
+  { value: 4, label: '7-String Wah' },
+  { value: 5, label: 'Reso Wah' },
+];
 const EQ_PEQ_LOW_CUT_LABELS = ['Flat', '20 Hz', '25 Hz', '31.5 Hz', '40 Hz', '50 Hz', '63 Hz', '80 Hz', '100 Hz', '125 Hz', '160 Hz', '200 Hz', '250 Hz', '315 Hz', '400 Hz', '500 Hz', '630 Hz', '800 Hz'];
 const EQ_PEQ_MID_FREQ_LABELS = ['20 Hz', '25 Hz', '31.5 Hz', '40 Hz', '50 Hz', '63 Hz', '80 Hz', '100 Hz', '125 Hz', '160 Hz', '200 Hz', '250 Hz', '315 Hz', '400 Hz', '500 Hz', '630 Hz', '800 Hz', '1.00 kHz', '1.25 kHz', '1.60 kHz', '2.00 kHz', '2.50 kHz', '3.15 kHz', '4.00 kHz', '5.00 kHz', '6.30 kHz', '8.00 kHz', '10.0 kHz'];
 const EQ_PEQ_Q_LABELS = ['0.5', '1', '2', '4', '8', '16'];
@@ -3968,21 +3985,203 @@ export class App implements OnInit, OnDestroy {
     });
   }
 
-  editorPedalFxNumber(field: 'position' | 'type'): number | null {
-    const stages = this.readObject(this.editorPatchDraft(), 'stages');
-    const block = this.readObject(stages, 'pedalfx');
-    return this.readNumber(block, field);
+  editorPedalFxPositionOptions(): readonly ValueOption[] {
+    return PEDAL_FX_POSITION_OPTIONS;
   }
 
-  setEditorPedalFxNumber(field: 'position' | 'type', value: string): void {
-    const parsed = this.parseInteger(value);
-    const rawIndexByField = { position: 0, type: 2 } as const;
+  editorPedalFxTypeOptions(): readonly ValueOption[] {
+    return PEDAL_FX_TYPE_OPTIONS;
+  }
+
+  editorPedalFxWahTypeOptions(): readonly ValueOption[] {
+    return PEDAL_FX_WAH_TYPE_OPTIONS;
+  }
+
+  editorPedalFxPosition(): number | null {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const block = this.readObject(stages, 'pedalfx');
+    const direct = this.readNumber(block, 'position');
+    if (direct !== null) {
+      return this.clampInteger(Math.trunc(direct), 0, 1);
+    }
+    const rawCom = this.readNumericArray(block, 'raw_com');
+    if (rawCom && rawCom.length >= 1) {
+      return this.clampInteger(rawCom[0], 0, 1);
+    }
+    return null;
+  }
+
+  setEditorPedalFxPosition(value: string): void {
+    const parsed = this.clampInteger(this.parseInteger(value), 0, 1);
     this.updateEditorPatch((draft) => {
       const stages = this.ensureObject(draft, 'stages');
       const block = this.ensureObject(stages, 'pedalfx');
-      block[field] = parsed;
-      this.syncNumericRawField(block, 'raw_com', rawIndexByField[field], parsed);
+      block['position'] = parsed;
+      this.syncNumericRawField(block, 'raw_com', 0, parsed);
     });
+  }
+
+  editorPedalFxType(): number | null {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const block = this.readObject(stages, 'pedalfx');
+    const direct = this.readNumber(block, 'type');
+    if (direct !== null) {
+      return this.clampInteger(Math.trunc(direct), 0, 2);
+    }
+    const rawCom = this.readNumericArray(block, 'raw_com');
+    if (rawCom && rawCom.length >= 3) {
+      return this.clampInteger(rawCom[2], 0, 2);
+    }
+    return null;
+  }
+
+  setEditorPedalFxType(value: string): void {
+    const parsed = this.clampInteger(this.parseInteger(value), 0, 2);
+    this.updateEditorPatch((draft) => {
+      const stages = this.ensureObject(draft, 'stages');
+      const block = this.ensureObject(stages, 'pedalfx');
+      block['type'] = parsed;
+      this.syncNumericRawField(block, 'raw_com', 2, parsed);
+    });
+  }
+
+  editorPedalFxRawValue(index: number, offset = 0): number | null {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const block = this.readObject(stages, 'pedalfx');
+    const raw = this.readNumericArray(block, 'raw');
+    if (!raw || index < 0 || index >= raw.length) {
+      return null;
+    }
+    return raw[index] - offset;
+  }
+
+  setEditorPedalFxRawValue(index: number, value: string, min: number, max: number, offset = 0): void {
+    const parsed = this.clampInteger(this.parseInteger(value), min, max);
+    this.updateEditorPatch((draft) => {
+      const stages = this.ensureObject(draft, 'stages');
+      const block = this.ensureObject(stages, 'pedalfx');
+      this.syncNumericRawField(block, 'raw', index, parsed + offset);
+    });
+  }
+
+  editorPedalFxWahType(): number | null {
+    return this.editorPedalFxRawValue(0);
+  }
+
+  setEditorPedalFxWahType(value: string): void {
+    this.setEditorPedalFxRawValue(0, value, 0, 5);
+  }
+
+  editorPedalFxPedalPosition(): number | null {
+    return this.editorPedalFxRawValue(1);
+  }
+
+  setEditorPedalFxPedalPosition(value: string): void {
+    this.setEditorPedalFxRawValue(1, value, 0, 100);
+  }
+
+  editorPedalFxPedalMin(): number | null {
+    return this.editorPedalFxRawValue(2);
+  }
+
+  setEditorPedalFxPedalMin(value: string): void {
+    this.setEditorPedalFxRawValue(2, value, 0, 100);
+  }
+
+  editorPedalFxPedalMax(): number | null {
+    return this.editorPedalFxRawValue(3);
+  }
+
+  setEditorPedalFxPedalMax(value: string): void {
+    this.setEditorPedalFxRawValue(3, value, 0, 100);
+  }
+
+  editorPedalFxEffectLevel(): number | null {
+    return this.editorPedalFxRawValue(4);
+  }
+
+  setEditorPedalFxEffectLevel(value: string): void {
+    this.setEditorPedalFxRawValue(4, value, 0, 100);
+  }
+
+  editorPedalFxDirectMix(): number | null {
+    return this.editorPedalFxRawValue(5);
+  }
+
+  setEditorPedalFxDirectMix(value: string): void {
+    this.setEditorPedalFxRawValue(5, value, 0, 100);
+  }
+
+  editorPedalFxPitch(): number | null {
+    return this.editorPedalFxRawValue(6, 24);
+  }
+
+  setEditorPedalFxPitch(value: string): void {
+    this.setEditorPedalFxRawValue(6, value, -24, 24, 24);
+  }
+
+  editorPedalFxBendPedalPosition(): number | null {
+    return this.editorPedalFxRawValue(7);
+  }
+
+  setEditorPedalFxBendPedalPosition(value: string): void {
+    this.setEditorPedalFxRawValue(7, value, 0, 100);
+  }
+
+  editorPedalFxBendEffectLevel(): number | null {
+    return this.editorPedalFxRawValue(8);
+  }
+
+  setEditorPedalFxBendEffectLevel(value: string): void {
+    this.setEditorPedalFxRawValue(8, value, 0, 100);
+  }
+
+  editorPedalFxBendDirectMix(): number | null {
+    return this.editorPedalFxRawValue(9);
+  }
+
+  setEditorPedalFxBendDirectMix(value: string): void {
+    this.setEditorPedalFxRawValue(9, value, 0, 100);
+  }
+
+  editorPedalFxEwahPedalPosition(): number | null {
+    return this.editorPedalFxRawValue(10);
+  }
+
+  setEditorPedalFxEwahPedalPosition(value: string): void {
+    this.setEditorPedalFxRawValue(10, value, 0, 100);
+  }
+
+  editorPedalFxEwahPedalMin(): number | null {
+    return this.editorPedalFxRawValue(11);
+  }
+
+  setEditorPedalFxEwahPedalMin(value: string): void {
+    this.setEditorPedalFxRawValue(11, value, 0, 100);
+  }
+
+  editorPedalFxEwahPedalMax(): number | null {
+    return this.editorPedalFxRawValue(12);
+  }
+
+  setEditorPedalFxEwahPedalMax(value: string): void {
+    this.setEditorPedalFxRawValue(12, value, 0, 100);
+  }
+
+  editorPedalFxEwahEffectLevel(): number | null {
+    return this.editorPedalFxRawValue(13);
+  }
+
+  setEditorPedalFxEwahEffectLevel(value: string): void {
+    this.setEditorPedalFxRawValue(13, value, 0, 100);
+  }
+
+  editorPedalFxEwahDirectMix(): number | null {
+    return this.editorPedalFxRawValue(14);
+  }
+
+  setEditorPedalFxEwahDirectMix(value: string): void {
+    this.setEditorPedalFxRawValue(14, value, 0, 100);
   }
 
   editorGafcExp1Function(): number | null {

@@ -541,9 +541,66 @@
                       </div>
                     </div>
                     <div class="row g-2">
-                      <div class="col-6 col-md-4"><label class="form-label small mb-1">Position</label><input type="number" min="0" max="127" class="form-control form-control-sm" [value]="editorPedalFxNumber('position') ?? 0" (input)="setEditorPedalFxNumber('position', $any($event.target).value)" /></div>
-                      <div class="col-6 col-md-4"><label class="form-label small mb-1">Type</label><input type="number" min="0" max="127" class="form-control form-control-sm" [value]="editorPedalFxNumber('type') ?? 0" (input)="setEditorPedalFxNumber('type', $any($event.target).value)" /></div>
+                      <div class="col-12 col-md-4">
+                        <label class="form-label small mb-1">Placement</label>
+                        <select class="form-select form-select-sm" [value]="editorPedalFxPosition() ?? 0" (change)="setEditorPedalFxPosition($any($event.target).value)">
+                          @for (option of editorPedalFxPositionOptions(); track option.value) {
+                            <option [value]="option.value">{{ option.label }}</option>
+                          }
+                        </select>
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <label class="form-label small mb-1">Type</label>
+                        <select class="form-select form-select-sm" [value]="editorPedalFxType() ?? 0" (change)="setEditorPedalFxType($any($event.target).value)">
+                          @for (option of editorPedalFxTypeOptions(); track option.value) {
+                            <option [value]="option.value">{{ option.label }}</option>
+                          }
+                        </select>
+                      </div>
+                      <div class="col-12 col-md-4 d-flex align-items-end">
+                        <div class="small text-secondary">Use Pedal Bend for whammy-style pitch movement.</div>
+                      </div>
                     </div>
+                    @if (editorPedalFxType() === 0) {
+                    <div class="mt-2">
+                      <div class="row g-2">
+                        <div class="col-12 col-md-4">
+                          <label class="form-label small mb-1">Wah Type</label>
+                          <select class="form-select form-select-sm" [value]="editorPedalFxWahType() ?? 0" (change)="setEditorPedalFxWahType($any($event.target).value)">
+                            @for (option of editorPedalFxWahTypeOptions(); track option.value) {
+                              <option [value]="option.value">{{ option.label }}</option>
+                            }
+                          </select>
+                        </div>
+                        <div class="col-12 col-md-4"><label class="form-label small mb-1">Pedal Position</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorPedalFxPedalPosition() ?? 0" (input)="setEditorPedalFxPedalPosition($any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorPedalFxPedalPosition() ?? 0" (input)="setEditorPedalFxPedalPosition($any($event.target).value)" /></div></div>
+                        <div class="col-12 col-md-4"><label class="form-label small mb-1">Pedal Min</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorPedalFxPedalMin() ?? 0" (input)="setEditorPedalFxPedalMin($any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorPedalFxPedalMin() ?? 0" (input)="setEditorPedalFxPedalMin($any($event.target).value)" /></div></div>
+                        <div class="col-12 col-md-4"><label class="form-label small mb-1">Pedal Max</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorPedalFxPedalMax() ?? 0" (input)="setEditorPedalFxPedalMax($any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorPedalFxPedalMax() ?? 0" (input)="setEditorPedalFxPedalMax($any($event.target).value)" /></div></div>
+                        <div class="col-12 col-md-4"><label class="form-label small mb-1">Effect Level</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorPedalFxEffectLevel() ?? 0" (input)="setEditorPedalFxEffectLevel($any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorPedalFxEffectLevel() ?? 0" (input)="setEditorPedalFxEffectLevel($any($event.target).value)" /></div></div>
+                        <div class="col-12 col-md-4"><label class="form-label small mb-1">Direct Mix</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorPedalFxDirectMix() ?? 0" (input)="setEditorPedalFxDirectMix($any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorPedalFxDirectMix() ?? 0" (input)="setEditorPedalFxDirectMix($any($event.target).value)" /></div></div>
+                      </div>
+                    </div>
+                    }
+                    @if (editorPedalFxType() === 1) {
+                    <div class="mt-2">
+                      <div class="row g-2">
+                        <div class="col-12 col-md-4"><label class="form-label small mb-1">Pitch</label><div class="editor-range-field"><input type="range" min="-24" max="24" class="form-range editor-range-slider" [value]="editorPedalFxPitch() ?? 0" (input)="setEditorPedalFxPitch($any($event.target).value)" /><input type="number" min="-24" max="24" class="form-control form-control-sm editor-range-value" [value]="editorPedalFxPitch() ?? 0" (input)="setEditorPedalFxPitch($any($event.target).value)" /></div></div>
+                        <div class="col-12 col-md-4"><label class="form-label small mb-1">Pedal Position</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorPedalFxBendPedalPosition() ?? 0" (input)="setEditorPedalFxBendPedalPosition($any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorPedalFxBendPedalPosition() ?? 0" (input)="setEditorPedalFxBendPedalPosition($any($event.target).value)" /></div></div>
+                        <div class="col-12 col-md-4"><label class="form-label small mb-1">Effect Level</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorPedalFxBendEffectLevel() ?? 0" (input)="setEditorPedalFxBendEffectLevel($any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorPedalFxBendEffectLevel() ?? 0" (input)="setEditorPedalFxBendEffectLevel($any($event.target).value)" /></div></div>
+                        <div class="col-12 col-md-4"><label class="form-label small mb-1">Direct Mix</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorPedalFxBendDirectMix() ?? 0" (input)="setEditorPedalFxBendDirectMix($any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorPedalFxBendDirectMix() ?? 0" (input)="setEditorPedalFxBendDirectMix($any($event.target).value)" /></div></div>
+                      </div>
+                    </div>
+                    }
+                    @if (editorPedalFxType() === 2) {
+                    <div class="mt-2">
+                      <div class="row g-2">
+                        <div class="col-12 col-md-4"><label class="form-label small mb-1">Pedal Position</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorPedalFxEwahPedalPosition() ?? 0" (input)="setEditorPedalFxEwahPedalPosition($any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorPedalFxEwahPedalPosition() ?? 0" (input)="setEditorPedalFxEwahPedalPosition($any($event.target).value)" /></div></div>
+                        <div class="col-12 col-md-4"><label class="form-label small mb-1">Pedal Min</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorPedalFxEwahPedalMin() ?? 0" (input)="setEditorPedalFxEwahPedalMin($any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorPedalFxEwahPedalMin() ?? 0" (input)="setEditorPedalFxEwahPedalMin($any($event.target).value)" /></div></div>
+                        <div class="col-12 col-md-4"><label class="form-label small mb-1">Pedal Max</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorPedalFxEwahPedalMax() ?? 0" (input)="setEditorPedalFxEwahPedalMax($any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorPedalFxEwahPedalMax() ?? 0" (input)="setEditorPedalFxEwahPedalMax($any($event.target).value)" /></div></div>
+                        <div class="col-12 col-md-4"><label class="form-label small mb-1">Effect Level</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorPedalFxEwahEffectLevel() ?? 0" (input)="setEditorPedalFxEwahEffectLevel($any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorPedalFxEwahEffectLevel() ?? 0" (input)="setEditorPedalFxEwahEffectLevel($any($event.target).value)" /></div></div>
+                        <div class="col-12 col-md-4"><label class="form-label small mb-1">Direct Mix</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorPedalFxEwahDirectMix() ?? 0" (input)="setEditorPedalFxEwahDirectMix($any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorPedalFxEwahDirectMix() ?? 0" (input)="setEditorPedalFxEwahDirectMix($any($event.target).value)" /></div></div>
+                      </div>
+                    </div>
+                    }
                   </article>
                   }
 
