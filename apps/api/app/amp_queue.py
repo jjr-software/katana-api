@@ -12,7 +12,6 @@ from app.katana import (
     AmpClientError,
     AmpConnectionResult,
     FullAmpDumpSnapshot,
-    QuickSlotsSnapshot,
     SlotPatchSummary,
     SlotsStateSnapshot,
 )
@@ -28,7 +27,6 @@ JobOperation = Literal[
     "write_slot",
     "full_dump",
     "full_sync_slots",
-    "quick_sync_names",
 ]
 
 
@@ -49,7 +47,6 @@ class AmpQueueJob:
     result_slot: SlotPatchSummary | None = None
     result_dump: FullAmpDumpSnapshot | None = None
     result_slots: SlotsStateSnapshot | None = None
-    result_quick: QuickSlotsSnapshot | None = None
 
 
 class AmpJobQueue:
@@ -78,9 +75,6 @@ class AmpJobQueue:
 
     async def enqueue_slots_sync(self) -> AmpQueueJob:
         return await self._enqueue("full_sync_slots")
-
-    async def enqueue_quick_sync(self) -> AmpQueueJob:
-        return await self._enqueue("quick_sync_names")
 
     async def enqueue_slot_sync(self, slot: int) -> AmpQueueJob:
         return await self._enqueue("sync_slot", slot=slot)
@@ -167,7 +161,6 @@ class AmpJobQueue:
                 slot_result = None
                 dump_result = None
                 slots_result = None
-                quick_result = None
             elif job.operation == "current_patch":
                 current_patch_result = await asyncio.wait_for(
                     client.read_current_patch(),
@@ -177,7 +170,6 @@ class AmpJobQueue:
                 slot_result = None
                 dump_result = None
                 slots_result = None
-                quick_result = None
             elif job.operation == "apply_current_patch":
                 if job.request_patch is None:
                     raise RuntimeError("apply_current_patch operation missing request patch")
@@ -190,7 +182,6 @@ class AmpJobQueue:
                 slot_result = None
                 dump_result = None
                 slots_result = None
-                quick_result = None
             elif job.operation == "sync_slot":
                 slot_target = job.slot
                 if slot_target is None:
@@ -203,7 +194,6 @@ class AmpJobQueue:
                 current_patch_result = None
                 dump_result = None
                 slots_result = None
-                quick_result = None
                 applied_patch_result = None
             elif job.operation == "write_slot":
                 slot_target = job.slot
@@ -219,7 +209,6 @@ class AmpJobQueue:
                 current_patch_result = None
                 dump_result = None
                 slots_result = None
-                quick_result = None
                 applied_patch_result = None
             elif job.operation == "full_dump":
                 dump_result = await asyncio.wait_for(
@@ -230,7 +219,6 @@ class AmpJobQueue:
                 current_patch_result = None
                 slot_result = None
                 slots_result = None
-                quick_result = None
                 applied_patch_result = None
             elif job.operation == "full_sync_slots":
                 slots_result = await asyncio.wait_for(
@@ -241,18 +229,6 @@ class AmpJobQueue:
                 current_patch_result = None
                 slot_result = None
                 dump_result = None
-                quick_result = None
-                applied_patch_result = None
-            elif job.operation == "quick_sync_names":
-                quick_result = await asyncio.wait_for(
-                    client.read_slots_names_quick(synced_at=synced_at),
-                    timeout=max(5.0, settings.quick_sync_timeout_seconds),
-                )
-                connection_result = None
-                current_patch_result = None
-                slot_result = None
-                dump_result = None
-                slots_result = None
                 applied_patch_result = None
             else:
                 raise RuntimeError(f"unknown operation: {job.operation}")
@@ -264,8 +240,7 @@ class AmpJobQueue:
                 failed.status = "failed"
                 failed.error = (
                     f"Queue job timed out: operation={job.operation} "
-                    f"(full_sync_timeout_seconds={settings.full_sync_timeout_seconds}, "
-                    f"quick_sync_timeout_seconds={settings.quick_sync_timeout_seconds})"
+                    f"(full_sync_timeout_seconds={settings.full_sync_timeout_seconds})"
                 )
                 failed.finished_at = datetime.now().isoformat(timespec="seconds")
             await self._persist_sync_history_with_guard(failed)
@@ -302,7 +277,6 @@ class AmpJobQueue:
             done.result_slot = slot_result
             done.result_dump = dump_result
             done.result_slots = slots_result
-            done.result_quick = quick_result
             done.finished_at = datetime.now().isoformat(timespec="seconds")
             self._prune_jobs_locked()
         try:
@@ -334,7 +308,7 @@ class AmpJobQueue:
 
     @staticmethod
     def _is_sync_operation(operation: JobOperation) -> bool:
-        return operation in {"sync_slot", "write_slot", "full_dump", "full_sync_slots", "quick_sync_names"}
+        return operation in {"sync_slot", "write_slot", "full_dump", "full_sync_slots"}
 
     def _prune_jobs_locked(self) -> None:
         if len(self._jobs) <= self._max_job_history:

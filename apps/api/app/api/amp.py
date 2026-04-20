@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.amp_queue import amp_job_queue
 from app.deps import get_amp_client, get_db
-from app.katana import AmpClient, LineOutSnapshot, QuickSlotName, SlotDump, SlotPatchSummary, slot_label
+from app.katana import AmpClient, LineOutSnapshot, SlotDump, SlotPatchSummary, slot_label
 from app.live_patch_state import upsert_live_patch_state
 from app.models import AmpSyncHistory, PatchConfig, PatchSet, PatchSetMember
 
@@ -124,28 +124,6 @@ class SlotWriteResponse(BaseModel):
     slot: SlotPatchSummaryResponse
 
 
-class QuickSlotSummaryResponse(BaseModel):
-    slot: int
-    slot_label: str
-    patch_name: str
-    inferred_hash_sha256: str | None = None
-    candidate_hashes_sha256: list[str]
-    match_count: int
-    in_sync: bool
-    is_saved: bool
-    measured_rms_dbfs: float | None = None
-    measured_peak_dbfs: float | None = None
-    measured_at: str | None = None
-    synced_at: str
-    slot_sync_ms: int
-
-
-class QuickSlotsStateResponse(BaseModel):
-    synced_at: str
-    total_sync_ms: int
-    slots: list[QuickSlotSummaryResponse]
-
-
 class FullDumpSlotResponse(BaseModel):
     slot: int
     slot_label: str
@@ -193,25 +171,6 @@ class SlotsSyncJobResponse(BaseModel):
     elapsed_ms: int
     error: str | None = None
     result: SlotsStateResponse | None = None
-
-
-class QuickSyncEnqueueResponse(BaseModel):
-    job_id: str
-    operation: str
-    status: str
-    created_at: str
-
-
-class QuickSyncJobResponse(BaseModel):
-    job_id: str
-    operation: str
-    status: str
-    created_at: str
-    started_at: str | None = None
-    finished_at: str | None = None
-    elapsed_ms: int
-    error: str | None = None
-    result: QuickSlotsStateResponse | None = None
 
 
 class BackupEnqueueResponse(BaseModel):
@@ -554,51 +513,6 @@ async def write_single_slot(
     )
 
 
-@router.post("/slots/quick/sync", response_model=QuickSyncEnqueueResponse)
-async def enqueue_quick_sync() -> QuickSyncEnqueueResponse:
-    job = await amp_job_queue.enqueue_quick_sync()
-    return QuickSyncEnqueueResponse(
-        job_id=job.job_id,
-        operation=job.operation,
-        status=job.status,
-        created_at=job.created_at,
-    )
-
-
-@router.get("/slots/quick", response_model=QuickSlotsStateResponse)
-async def quick_slots_state(
-    db: Session = Depends(get_db),
-) -> QuickSlotsStateResponse:
-    job = await amp_job_queue.enqueue_quick_sync()
-    settled = await _await_terminal_job(job.job_id, timeout_seconds=120.0)
-    if settled.status != "succeeded" or settled.result_quick is None:
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "message": "Failed to read quick amp slot names",
-                "error": settled.error or "queued quick sync failed",
-                "job_id": settled.job_id,
-            },
-        )
-    quick = settled.result_quick
-    candidates_by_name = _load_hash_candidates_by_patch_name(db, [slot.patch_name for slot in quick.slots])
-    inferred_hashes = [
-        hashes[0]
-        for hashes in candidates_by_name.values()
-        if len(hashes) == 1
-    ]
-    measurements_by_hash = _load_measurements_by_hash(db, inferred_hashes)
-    slots = [
-        QuickSlotSummaryResponse(**_quick_slot_to_dict(slot, candidates_by_name, measurements_by_hash))
-        for slot in quick.slots
-    ]
-    return QuickSlotsStateResponse(
-        synced_at=quick.synced_at,
-        total_sync_ms=quick.total_sync_ms,
-        slots=slots,
-    )
-
-
 @router.get("/queue", response_model=QueueStateResponse)
 async def queue_state() -> QueueStateResponse:
     jobs = await amp_job_queue.list_jobs(limit=25)
@@ -674,49 +588,6 @@ async def get_slots_sync_job(job_id: str, db: Session = Depends(get_db)) -> Slot
         )
 
     return SlotsSyncJobResponse(
-        job_id=job.job_id,
-        operation=job.operation,
-        status=job.status,
-        created_at=job.created_at,
-        started_at=job.started_at,
-        finished_at=job.finished_at,
-        elapsed_ms=_job_elapsed_ms(job),
-        error=job.error,
-        result=result,
-    )
-
-
-@router.get("/slots/quick/sync/{job_id}", response_model=QuickSyncJobResponse)
-async def get_quick_sync_job(job_id: str, db: Session = Depends(get_db)) -> QuickSyncJobResponse:
-    job = await amp_job_queue.get_job(job_id)
-    if job is None:
-        raise HTTPException(
-            status_code=404,
-            detail={"message": "Quick sync job not found", "job_id": job_id},
-        )
-
-    result: QuickSlotsStateResponse | None = None
-    if job.result_quick is not None:
-        candidates_by_name = _load_hash_candidates_by_patch_name(
-            db,
-            [slot.patch_name for slot in job.result_quick.slots],
-        )
-        inferred_hashes = [
-            hashes[0]
-            for hashes in candidates_by_name.values()
-            if len(hashes) == 1
-        ]
-        measurements_by_hash = _load_measurements_by_hash(db, inferred_hashes)
-        result = QuickSlotsStateResponse(
-            synced_at=job.result_quick.synced_at,
-            total_sync_ms=job.result_quick.total_sync_ms,
-            slots=[
-                QuickSlotSummaryResponse(**_quick_slot_to_dict(slot, candidates_by_name, measurements_by_hash))
-                for slot in job.result_quick.slots
-            ],
-        )
-
-    return QuickSyncJobResponse(
         job_id=job.job_id,
         operation=job.operation,
         status=job.status,
@@ -869,32 +740,6 @@ def load_backup_snapshot(
         total_sync_ms=total_sync_ms,
         slots=slots,
     )
-
-
-def _quick_slot_to_dict(
-    slot: QuickSlotName,
-    candidates_by_name: dict[str, list[str]],
-    measurements_by_hash: dict[str, dict[str, object | None]],
-) -> dict:
-    normalized = _normalize_patch_name(slot.patch_name)
-    candidates = candidates_by_name.get(normalized, [])
-    inferred_hash = candidates[0] if len(candidates) == 1 else None
-    measurement = measurements_by_hash.get(inferred_hash or "", {})
-    return {
-        "slot": slot.slot,
-        "slot_label": slot.slot_label,
-        "patch_name": slot.patch_name,
-        "inferred_hash_sha256": inferred_hash,
-        "candidate_hashes_sha256": candidates,
-        "match_count": len(candidates),
-        "in_sync": inferred_hash is not None,
-        "is_saved": len(candidates) > 0,
-        "measured_rms_dbfs": measurement.get("measured_rms_dbfs"),
-        "measured_peak_dbfs": measurement.get("measured_peak_dbfs"),
-        "measured_at": measurement.get("measured_at"),
-        "synced_at": slot.synced_at,
-        "slot_sync_ms": slot.slot_sync_ms,
-    }
 
 
 def _slot_to_dict(
