@@ -1,4 +1,34 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, input, output, signal } from '@angular/core';
+
+const DEFAULT_TARGET_RMS_DBFS = -35.0;
+const GLOBAL_NORMALIZE_TARGET_STORAGE_KEY = 'katana.globalNormalizeTargetRms';
+const LIVE_FFT_MIN_FREQ_HZ = 31;
+const LIVE_FFT_MAX_FREQ_HZ = 20_000;
+const LIVE_METER_DEFAULT_RATE = 48_000;
+const LIVE_GE10_BAND_CENTERS_HZ = [31, 62, 125, 250, 500, 1_000, 2_000, 4_000, 8_000, 16_000] as const;
+const LIVE_TOTAL_LEVEL_ZOOM_DB = 3.0;
+const LIVE_RMS_HISTORY_LIMIT = 240;
+const LIVE_TOTAL_LEVEL_GRAPH_WIDTH = 1000;
+const LIVE_TOTAL_LEVEL_GRAPH_HEIGHT = 72;
+const LIVE_TOTAL_LEVEL_BAR_STEP = 14;
+const LIVE_TOTAL_LEVEL_BAR_WIDTH = 10;
+const LIVE_METER_WINDOW_SEC = 2.0;
+
+type ToneBlockKey =
+  | 'routing'
+  | 'amp'
+  | 'booster'
+  | 'mod'
+  | 'fx'
+  | 'delay'
+  | 'reverb'
+  | 'eq1'
+  | 'eq2'
+  | 'ns'
+  | 'send_return'
+  | 'solo'
+  | 'pedalfx'
+  | 'gafc_exp1';
 
 export interface DashboardStickyPanelBar {
   x: number;
@@ -30,7 +60,6 @@ export interface DashboardStickyPanelViewModel {
   loadPatchLabel: string;
   saveCurrentSettingsLabel: string;
   aiDesignerLabel: string;
-  clearLabel: string;
   currentSlotLabel: string;
   currentSettingsName: string;
   currentSettingsSourceQualifier: string | null;
@@ -40,20 +69,129 @@ export interface DashboardStickyPanelViewModel {
   livePatchConfirmedAt: string;
   lastSyncedAt: string;
   totalSyncMsText: string;
-  liveMeterConnected: boolean;
-  liveMeterAt: string;
-  liveRmsDbfsText: string;
-  liveRmsMaxDbfsText: string;
-  totalLevelTargetText: string;
-  totalLevelCurrentDeltaText: string;
-  totalLevelMaxHoldDeltaText: string;
-  totalLevelWindowMinText: string;
-  totalLevelWindowMaxText: string;
-  totalLevelTargetLineY: number;
-  totalLevelBars: DashboardStickyPanelBar[];
-  globalNormalizeTargetRms: string;
-  liveMeterBands: DashboardStickyPanelBand[];
 }
+
+const BOOSTER_TYPE_NAMES = [
+  'Mid Boost',
+  'Clean Boost',
+  'Treble Boost',
+  'Crunch Overdrive',
+  'Natural Overdrive',
+  'Warm Overdrive',
+  'Fat Distortion',
+  'Metal Distortion',
+  'Octave Fuzz',
+  'Blues Drive',
+  'Overdrive',
+  'Tube Screamer',
+  'Turbo Overdrive',
+  'Distortion',
+  'ProCo RAT',
+  "Marshall Guv'nor Distortion",
+  'MXR Distortion+',
+  'Boss Metal Zone',
+  '1960s Fuzz',
+  'Electro-Harmonix Big Muff Fuzz',
+  'Boss HM-2 Heavy Metal',
+  'Boss Metal Core',
+  'Centaur Overdrive',
+];
+
+const FX_TYPE_NAMES = [
+  'Touch Wah',
+  'Auto Wah',
+  'Pedal Wah',
+  'Compressor',
+  'Limiter',
+  'Graphic EQ',
+  'Parametric EQ',
+  'Guitar Simulator',
+  'Slow Gear',
+  'Wave Synth',
+  'Octave',
+  'Pitch Shifter',
+  'Harmonist',
+  'Acoustic Processor',
+  'Phaser',
+  'Flanger',
+  'Tremolo',
+  'Rotary Speaker',
+  'Uni-Vibe',
+  'Slicer',
+  'Vibrato',
+  'Ring Modulator',
+  'Humanizer',
+  'Chorus',
+  'Acoustic Guitar Simulator',
+  'MXR Phase 90',
+  'MXR Flanger 117',
+  'Cry Baby Wah 95',
+  'Boss DC-30',
+  'Heavy Octave',
+  'Pedal Bend',
+];
+
+const DELAY_TYPE_NAMES = [
+  'Digital Delay',
+  'Pan Delay',
+  'Stereo Delay',
+  'Analog Delay',
+  'Tape Echo',
+  'Reverse Delay',
+  'Modulate Delay',
+  'Roland SDE-3000 Delay',
+];
+const AMP_TYPE_NAMES = ['Acoustic', 'Clean', 'Pushed', 'Crunch', 'Lead', 'Brown'];
+const REVERB_TYPE_NAMES = ['Plate Reverb', 'Room Reverb', 'Hall Reverb', 'Spring Reverb', 'Modulate Reverb'];
+
+interface ValueOption {
+  value: number;
+  label: string;
+}
+
+interface LiveMeterBandRow {
+  id: string;
+  label: string;
+  rangeLabel: string;
+  currentDbfs: number | null;
+  maxDbfs: number | null;
+  currentPercent: number;
+  maxPercent: number;
+}
+
+interface LiveRmsHistoryBar {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  tone: 'above' | 'below';
+}
+
+interface TypeOption {
+  value: number;
+  label: string;
+}
+
+function buildValueOptions(labels: readonly string[]): ValueOption[] {
+  return labels.map((label, value) => ({ value, label }));
+}
+
+function buildLiveMeterBands(centersHz: readonly number[], labels: readonly string[]): Array<{ id: string; label: string; minHz: number; maxHz: number }> {
+  return centersHz.map((centerHz, index) => {
+    const previousCenterHz = index > 0 ? centersHz[index - 1] : centerHz;
+    const nextCenterHz = index < centersHz.length - 1 ? centersHz[index + 1] : centerHz;
+    const minHz = index === 0 ? centerHz : Math.sqrt(previousCenterHz * centerHz);
+    const maxHz = index === centersHz.length - 1 ? LIVE_FFT_MAX_FREQ_HZ : Math.sqrt(centerHz * nextCenterHz);
+    return {
+      id: `ge10-${index}`,
+      label: labels[index] ?? `${centerHz}`,
+      minHz,
+      maxHz,
+    };
+  });
+}
+
+const LIVE_FFT_BANDS = buildLiveMeterBands(LIVE_GE10_BAND_CENTERS_HZ, ['31', '62', '125', '250', '500', '1k', '2k', '4k', '8k', '16k']);
 
 @Component({
   selector: 'app-dashboard-sticky-panel',
@@ -66,23 +204,15 @@ export interface DashboardStickyPanelViewModel {
           <div class="card-body py-2 px-3">
             <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
               <div class="d-flex flex-wrap gap-2">
-                <button type="button" class="btn btn-primary btn-sm" [disabled]="vm.testAmpDisabled" (click)="testAmpConnection.emit()">
-                  {{ vm.testAmpLabel }}
-                </button>
-                <button type="button" class="btn btn-outline-primary btn-sm" [disabled]="vm.syncLivePatchDisabled" (click)="syncLivePatch.emit()">
-                  {{ vm.syncLivePatchLabel }}
-                </button>
-                <button type="button" class="btn btn-outline-warning btn-sm" [disabled]="vm.reapplyDisabled" (click)="reapplyCurrentSettingsToAmp.emit()">
-                  {{ vm.reapplyLabel }}
-                </button>
-                <button type="button" class="btn btn-success btn-sm" [disabled]="vm.storeToAmpDisabled" (click)="persistLivePatchToAmp.emit()">
-                  {{ vm.storeToAmpLabel }}
-                </button>
+                <button type="button" class="btn btn-primary btn-sm" [disabled]="vm.testAmpDisabled" (click)="testAmpConnection.emit()">{{ vm.testAmpLabel }}</button>
+                <button type="button" class="btn btn-outline-primary btn-sm" [disabled]="vm.syncLivePatchDisabled" (click)="syncLivePatch.emit()">{{ vm.syncLivePatchLabel }}</button>
+                <button type="button" class="btn btn-outline-warning btn-sm" [disabled]="vm.reapplyDisabled" (click)="reapplyCurrentSettingsToAmp.emit()">{{ vm.reapplyLabel }}</button>
+                <button type="button" class="btn btn-success btn-sm" [disabled]="vm.storeToAmpDisabled" (click)="persistLivePatchToAmp.emit()">{{ vm.storeToAmpLabel }}</button>
                 <button type="button" class="btn btn-outline-secondary btn-sm" (click)="openToneLibraryModal.emit()">{{ vm.loadPatchLabel }}</button>
                 <button type="button" class="btn btn-outline-success btn-sm" (click)="openToneSaveModal.emit()">{{ vm.saveCurrentSettingsLabel }}</button>
                 <button type="button" class="btn btn-outline-primary btn-sm" (click)="openToneDesignerModal.emit()">{{ vm.aiDesignerLabel }}</button>
               </div>
-              <button type="button" class="btn btn-outline-secondary btn-sm" (click)="clearLiveMeterChart.emit()">{{ vm.clearLabel }}</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" (click)="clearLiveMeterChart()">Clear</button>
             </div>
 
             <div class="d-flex flex-wrap gap-3 small text-secondary mb-2">
@@ -102,45 +232,39 @@ export interface DashboardStickyPanelViewModel {
               <span>Total Sync Time: <code>{{ vm.totalSyncMsText }}</code></span>
               <span>
                 Live Meter:
-                <code [class.text-success]="vm.liveMeterConnected" [class.text-secondary]="!vm.liveMeterConnected">
-                  {{ vm.liveMeterConnected ? 'Connected' : 'Stopped' }}
+                <code [class.text-success]="liveMeterConnected()" [class.text-secondary]="!liveMeterConnected()">
+                  {{ liveMeterConnected() ? 'Connected' : 'Stopped' }}
                 </code>
               </span>
             </div>
 
             <div class="small text-secondary mt-2">Total Level</div>
             <div class="d-flex align-items-baseline justify-content-between gap-2">
-              <span class="fs-5 fw-semibold">{{ vm.liveRmsDbfsText }}</span>
-              <span class="small text-danger fw-semibold">Max <span class="border-bottom border-danger pb-1">{{ vm.liveRmsMaxDbfsText }}</span></span>
+              <span class="fs-5 fw-semibold">{{ formatDb(liveRmsDbfs()) }}</span>
+              <span class="small text-danger fw-semibold">Max <span class="border-bottom border-danger pb-1">{{ formatDb(liveRmsMaxDbfs()) }}</span></span>
             </div>
             <div class="d-flex justify-content-between align-items-center gap-2 small text-secondary">
-              <span>Target {{ vm.totalLevelTargetText }}</span>
+              <span>Target {{ formatDb(liveTotalLevelTargetRms()) }}</span>
               <span>2s RMS chunks</span>
             </div>
             <div class="d-flex justify-content-between align-items-center gap-2 small text-secondary mt-1">
-              <span>Current {{ vm.totalLevelCurrentDeltaText }}</span>
-              <span>Max Hold {{ vm.totalLevelMaxHoldDeltaText }}</span>
+              <span>Current {{ liveTotalLevelDelta(liveRmsDbfs()) }}</span>
+              <span>Max Hold {{ liveTotalLevelDelta(liveRmsMaxDbfs()) }}</span>
             </div>
             <div class="mt-2 rounded overflow-hidden border" style="background: linear-gradient(180deg, rgba(13, 110, 253, 0.04) 0%, rgba(220, 53, 69, 0.04) 50%, rgba(25, 135, 84, 0.04) 100%), #f8f9fa;">
               <svg class="d-block w-100" viewBox="0 0 1000 72" preserveAspectRatio="none" aria-label="Running total level history">
-                <line x1="0" [attr.y1]="vm.totalLevelTargetLineY" x2="1000" [attr.y2]="vm.totalLevelTargetLineY" style="stroke:#dc3545;stroke-width:2;" />
-                @for (bar of vm.totalLevelBars; track $index) {
-                  <rect
-                    [attr.x]="bar.x"
-                    [attr.y]="bar.y"
-                    [attr.width]="bar.width"
-                    [attr.height]="bar.height"
-                    [attr.fill]="bar.tone === 'above' ? '#dc3545' : '#0d6efd'"
-                  />
+                <line x1="0" [attr.y1]="liveTotalLevelTargetLineY()" x2="1000" [attr.y2]="liveTotalLevelTargetLineY()" style="stroke:#dc3545;stroke-width:2;" />
+                @for (bar of liveTotalLevelBars(); track $index) {
+                  <rect [attr.x]="bar.x" [attr.y]="bar.y" [attr.width]="bar.width" [attr.height]="bar.height" [attr.fill]="bar.tone === 'above' ? '#dc3545' : '#0d6efd'" />
                 }
               </svg>
             </div>
             <div class="d-flex justify-content-between align-items-center gap-2 small text-secondary mt-2">
-              <span>{{ vm.totalLevelWindowMinText }}</span>
+              <span>{{ formatDb(liveTotalLevelWindowMin()) }}</span>
               <span class="text-danger fw-semibold text-uppercase">Target</span>
-              <span>{{ vm.totalLevelWindowMaxText }}</span>
+              <span>{{ formatDb(liveTotalLevelWindowMax()) }}</span>
             </div>
-            <div class="small text-secondary mt-2">Zoom {{ vm.totalLevelWindowMinText }} to {{ vm.totalLevelWindowMaxText }}</div>
+            <div class="small text-secondary mt-2">Zoom {{ formatDb(liveTotalLevelWindowMin()) }} to {{ formatDb(liveTotalLevelWindowMax()) }}</div>
           </div>
         </div>
 
@@ -150,21 +274,13 @@ export interface DashboardStickyPanelViewModel {
               <div class="card shadow-sm" style="flex: 1 1 18rem; min-width: 18rem;">
                 <div class="card-body py-2 px-3 d-grid gap-2">
                   <div class="small text-secondary">Global Target RMS</div>
-                  <input
-                    type="number"
-                    step="0.1"
-                    class="form-control form-control-sm"
-                    style="width: 7.5rem;"
-                    [value]="vm.globalNormalizeTargetRms"
-                    (input)="globalNormalizeTargetRmsChange.emit($any($event.target).value)"
-                    (blur)="globalNormalizeTargetRmsCommit.emit()"
-                  />
+                  <input type="number" step="0.1" class="form-control form-control-sm" style="width: 7.5rem;" [value]="globalNormalizeTargetRms()" (input)="globalNormalizeTargetRms.set($any($event.target).value); globalNormalizeTargetRmsChange.emit($any($event.target).value)" (blur)="commitGlobalNormalizeTargetRms(); globalNormalizeTargetRmsCommit.emit()" />
                 </div>
               </div>
               <div class="card shadow-sm" style="flex: 1 1 11rem; min-width: 11rem;">
                 <div class="card-body py-2 px-3">
                   <div class="small text-secondary mb-1">Live At</div>
-                  <code class="d-block text-nowrap">{{ vm.liveMeterAt || 'n/a' }}</code>
+                  <code class="d-block text-nowrap">{{ liveMeterAt() || 'n/a' }}</code>
                 </div>
               </div>
             </div>
@@ -174,7 +290,7 @@ export interface DashboardStickyPanelViewModel {
                 <div class="card-body py-2 px-3">
                   <div class="small text-secondary mb-2">Frequency Buckets</div>
                   <div class="d-flex flex-wrap gap-2">
-                    @for (band of vm.liveMeterBands; track band.id) {
+                    @for (band of liveMeterBandRows(); track band.id) {
                       <div class="card shadow-sm" style="flex: 1 1 14rem; min-width: 14rem;">
                         <div class="card-body py-2 px-3">
                           <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
@@ -184,12 +300,12 @@ export interface DashboardStickyPanelViewModel {
                             </div>
                             <div class="text-end">
                               <div class="small text-secondary">Current</div>
-                              <div class="fw-semibold">{{ band.currentText }}</div>
+                              <div class="fw-semibold">{{ formatRelativeDb(band.currentDbfs) }}</div>
                             </div>
                           </div>
                           <div class="d-flex justify-content-between align-items-center gap-2">
                             <div class="small text-danger">Max</div>
-                            <div class="fw-semibold text-danger border-bottom border-danger pb-1">{{ band.maxText }}</div>
+                            <div class="fw-semibold text-danger border-bottom border-danger pb-1">{{ formatRelativeDb(band.maxDbfs) }}</div>
                           </div>
                           <div class="d-grid mt-2" style="grid-template-columns: 2.75rem minmax(0, 1fr); gap: .5rem; align-items: stretch;">
                             <div class="d-flex flex-column justify-content-between align-items-end small text-secondary" style="min-height: 7.25rem; padding: .15rem 0; line-height: 1;">
@@ -197,29 +313,10 @@ export interface DashboardStickyPanelViewModel {
                               <span>-30 dB</span>
                               <span>-60 dB</span>
                             </div>
-                            <div
-                              class="position-relative"
-                              style="min-height: 7.25rem; border: 1px solid rgba(33, 37, 41, 0.12); border-radius: .6rem; overflow: hidden; background: linear-gradient(180deg, rgba(13, 110, 253, 0.05) 0%, rgba(13, 110, 253, 0.015) 100%), #f8f9fa;"
-                            >
-                              <div
-                                class="position-absolute top-0 start-0 end-0 bottom-0"
-                                style="background: linear-gradient(to top, rgba(33, 37, 41, 0.08) 1px, transparent 1px) 0 0 / 100% 50%, linear-gradient(to top, rgba(33, 37, 41, 0.08) 1px, transparent 1px) 0 0 / 100% 100%; opacity: .9;"
-                              ></div>
-                              <div
-                                class="position-absolute"
-                                [style.left.rem]="0.45"
-                                [style.right.rem]="0.45"
-                                [style.bottom.%]="0"
-                                [style.height.%]="band.currentPercent"
-                                style="border-radius: .35rem .35rem 0 0; background: linear-gradient(180deg, #63b3ff 0%, #0d6efd 100%); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);"
-                              ></div>
-                              <div
-                                class="position-absolute"
-                                [style.left.rem]="0.2"
-                                [style.right.rem]="0.2"
-                                [style.bottom.%]="band.maxPercent"
-                                style="height: 0; border-top: 2px solid #dc3545; box-shadow: 0 0 0 1px rgba(220, 53, 69, 0.12);"
-                              ></div>
+                            <div class="position-relative" style="min-height: 7.25rem; border: 1px solid rgba(33, 37, 41, 0.12); border-radius: .6rem; overflow: hidden; background: linear-gradient(180deg, rgba(13, 110, 253, 0.05) 0%, rgba(13, 110, 253, 0.015) 100%), #f8f9fa;">
+                              <div class="position-absolute top-0 start-0 end-0 bottom-0" style="background: linear-gradient(to top, rgba(33, 37, 41, 0.08) 1px, transparent 1px) 0 0 / 100% 50%, linear-gradient(to top, rgba(33, 37, 41, 0.08) 1px, transparent 1px) 0 0 / 100% 100%; opacity: .9;"></div>
+                              <div class="position-absolute" [style.left.rem]="0.45" [style.right.rem]="0.45" [style.bottom.%]="0" [style.height.%]="band.currentPercent" style="border-radius: .35rem .35rem 0 0; background: linear-gradient(180deg, #63b3ff 0%, #0d6efd 100%); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);"></div>
+                              <div class="position-absolute" [style.left.rem]="0.2" [style.right.rem]="0.2" [style.bottom.%]="band.maxPercent" style="height: 0; border-top: 2px solid #dc3545; box-shadow: 0 0 0 1px rgba(220, 53, 69, 0.12);"></div>
                             </div>
                           </div>
                         </div>
@@ -235,7 +332,7 @@ export interface DashboardStickyPanelViewModel {
     }
   `,
 })
-export class DashboardStickyPanelComponent {
+export class DashboardStickyPanelComponent implements OnInit, OnDestroy {
   readonly model = input.required<DashboardStickyPanelViewModel>();
   readonly testAmpConnection = output<void>();
   readonly syncLivePatch = output<void>();
@@ -244,7 +341,331 @@ export class DashboardStickyPanelComponent {
   readonly openToneLibraryModal = output<void>();
   readonly openToneSaveModal = output<void>();
   readonly openToneDesignerModal = output<void>();
-  readonly clearLiveMeterChart = output<void>();
   readonly globalNormalizeTargetRmsChange = output<string>();
   readonly globalNormalizeTargetRmsCommit = output<void>();
+
+  readonly globalNormalizeTargetRms = signal(DEFAULT_TARGET_RMS_DBFS.toFixed(2));
+  readonly liveRmsDbfs = signal<number | null>(null);
+  readonly liveRmsMaxDbfs = signal<number | null>(null);
+  readonly liveRmsHistory = signal<number[]>([]);
+  readonly liveFftBinsDb = signal<number[]>([]);
+  readonly liveMeterRate = signal(LIVE_METER_DEFAULT_RATE);
+  readonly liveFrequencyBandMaxDbfs = signal<Array<number | null>>([]);
+  readonly liveMeterAt = signal('');
+  readonly liveMeterConnected = signal(false);
+
+  private liveMeterSource: EventSource | null = null;
+  private liveMeterReconnectHandle: ReturnType<typeof setTimeout> | null = null;
+  private liveMeterShouldRun = false;
+
+  ngOnInit(): void {
+    this.loadGlobalNormalizeTargetRms();
+    this.globalNormalizeTargetRmsChange.emit(this.globalNormalizeTargetRms());
+    this.startLiveMeter();
+  }
+
+  ngOnDestroy(): void {
+    this.shutdownLiveMeter();
+  }
+
+  clearLiveMeterChart(): void {
+    this.liveRmsHistory.set([]);
+    this.liveRmsMaxDbfs.set(null);
+    this.liveFrequencyBandMaxDbfs.set([]);
+  }
+
+  formatDb(value: number | null): string {
+    if (value === null || !Number.isFinite(value)) {
+      return 'n/a';
+    }
+    return `${value.toFixed(2)} dBFS`;
+  }
+
+  formatRelativeDb(value: number | null): string {
+    if (value === null || !Number.isFinite(value)) {
+      return 'n/a';
+    }
+    return `${value.toFixed(2)} dB`;
+  }
+
+  liveTotalLevelTargetRms(): number {
+    const parsed = Number.parseFloat(this.globalNormalizeTargetRms());
+    return Number.isFinite(parsed) ? parsed : DEFAULT_TARGET_RMS_DBFS;
+  }
+
+  liveTotalLevelWindowMin(): number {
+    return this.liveTotalLevelTargetRms() - LIVE_TOTAL_LEVEL_ZOOM_DB;
+  }
+
+  liveTotalLevelWindowMax(): number {
+    return this.liveTotalLevelTargetRms() + LIVE_TOTAL_LEVEL_ZOOM_DB;
+  }
+
+  liveTotalLevelDelta(value: number | null): string {
+    if (value === null || !Number.isFinite(value)) {
+      return 'n/a';
+    }
+    const delta = value - this.liveTotalLevelTargetRms();
+    const sign = delta > 0 ? '+' : '';
+    return `${sign}${delta.toFixed(2)} dB`;
+  }
+
+  liveTotalLevelTargetLineY(): number {
+    return this.liveTotalLevelValueToGraphY(this.liveTotalLevelTargetRms());
+  }
+
+  liveTotalLevelBars(): LiveRmsHistoryBar[] {
+    const values = this.liveRmsHistory();
+    if (values.length === 0) {
+      return [];
+    }
+    const graphWidth = LIVE_TOTAL_LEVEL_GRAPH_WIDTH;
+    const baselineY = this.liveTotalLevelTargetLineY();
+    const latestIndex = values.length - 1;
+    return values
+      .map((value, index) => {
+        const distanceFromLatest = latestIndex - index;
+        const x = graphWidth - LIVE_TOTAL_LEVEL_BAR_WIDTH - (distanceFromLatest * LIVE_TOTAL_LEVEL_BAR_STEP);
+        if (x + LIVE_TOTAL_LEVEL_BAR_WIDTH <= 0) {
+          return null;
+        }
+        const y = this.liveTotalLevelValueToGraphY(value);
+        const top = Math.min(y, baselineY);
+        const height = Math.max(1, Math.abs(y - baselineY));
+        return {
+          x,
+          y: top,
+          width: LIVE_TOTAL_LEVEL_BAR_WIDTH,
+          height,
+          tone: value >= this.liveTotalLevelTargetRms() ? 'above' : 'below',
+        };
+      })
+      .filter((bar): bar is LiveRmsHistoryBar => bar !== null);
+  }
+
+  liveMeterBandRows(): LiveMeterBandRow[] {
+    const currentBands = this.buildLiveMeterBandRows(this.liveFftBinsDb());
+    const maxBands = this.liveFrequencyBandMaxDbfs();
+    return currentBands.map((band, index) => ({
+      ...band,
+      maxDbfs: index < maxBands.length ? maxBands[index] ?? null : null,
+      maxPercent: index < maxBands.length ? this.liveMeterDbfsToPercent(maxBands[index] ?? null) : 0,
+    }));
+  }
+
+  commitGlobalNormalizeTargetRms(): void {
+    const parsed = Number.parseFloat(this.globalNormalizeTargetRms());
+    const normalized = Number.isFinite(parsed) ? parsed : DEFAULT_TARGET_RMS_DBFS;
+    const text = normalized.toFixed(2);
+    this.globalNormalizeTargetRms.set(text);
+    try {
+      window.localStorage.setItem(GLOBAL_NORMALIZE_TARGET_STORAGE_KEY, text);
+    } catch {
+      // local storage is best-effort only
+    }
+  }
+
+  private loadGlobalNormalizeTargetRms(): void {
+    try {
+      const saved = window.localStorage.getItem(GLOBAL_NORMALIZE_TARGET_STORAGE_KEY);
+      if (!saved) {
+        return;
+      }
+      const parsed = Number.parseFloat(saved);
+      if (!Number.isFinite(parsed)) {
+        return;
+      }
+      this.globalNormalizeTargetRms.set(parsed.toFixed(2));
+    } catch {
+      // local storage is best-effort only
+    }
+  }
+
+  private startLiveMeter(): void {
+    this.liveMeterShouldRun = true;
+    this.disconnectLiveMeter();
+    const source = new EventSource(`/api/v1/audio/live/sse?window_sec=${LIVE_METER_WINDOW_SEC}`);
+    source.onmessage = (event: MessageEvent<string>) => {
+      try {
+        const payload = JSON.parse(event.data) as Record<string, unknown>;
+        const eventType = String(payload['type'] ?? '');
+        if (eventType === 'connected') {
+          const rate = Number(payload['rate']);
+          if (Number.isFinite(rate) && rate > 0) {
+            this.liveMeterRate.set(rate);
+          }
+          this.liveMeterConnected.set(true);
+          return;
+        }
+        if (eventType !== 'audio_metrics') {
+          return;
+        }
+        const rms = Number(payload['rms_dbfs']);
+        const ts = String(payload['ts'] ?? '');
+        if (Number.isFinite(rms)) {
+          this.liveRmsDbfs.set(rms);
+          this.liveRmsMaxDbfs.update((current) => (current === null || rms > current ? rms : current));
+          this.pushLiveRmsPoint(rms);
+        }
+        const fftBinsUnknown = payload['fft_bins_db'];
+        if (Array.isArray(fftBinsUnknown)) {
+          const fftBins = fftBinsUnknown
+            .map((item) => (typeof item === 'number' && Number.isFinite(item) ? item : null))
+            .filter((item): item is number => item !== null);
+          this.liveFftBinsDb.set(fftBins);
+          const currentBands = this.buildLiveMeterBandRows(fftBins);
+          this.liveFrequencyBandMaxDbfs.update((current) => this.mergeLiveMeterBandMax(current, currentBands));
+        }
+        this.liveMeterAt.set(ts);
+      } catch {
+        // Keep the panel stable if one event is malformed.
+      }
+    };
+    source.onerror = () => {
+      this.liveMeterConnected.set(false);
+      this.disconnectLiveMeter();
+      this.scheduleLiveMeterReconnect();
+    };
+    this.liveMeterSource = source;
+  }
+
+  private disconnectLiveMeter(): void {
+    if (this.liveMeterSource !== null) {
+      this.liveMeterSource.close();
+      this.liveMeterSource = null;
+    }
+    this.liveMeterConnected.set(false);
+  }
+
+  private shutdownLiveMeter(): void {
+    this.liveMeterShouldRun = false;
+    this.clearLiveMeterReconnect();
+    this.disconnectLiveMeter();
+    this.resetLiveMeterDisplay();
+  }
+
+  private resetLiveMeterDisplay(): void {
+    this.liveRmsDbfs.set(null);
+    this.liveRmsMaxDbfs.set(null);
+    this.liveRmsHistory.set([]);
+    this.liveFftBinsDb.set([]);
+    this.liveFrequencyBandMaxDbfs.set([]);
+    this.liveMeterRate.set(LIVE_METER_DEFAULT_RATE);
+    this.liveMeterAt.set('');
+  }
+
+  private scheduleLiveMeterReconnect(): void {
+    if (!this.liveMeterShouldRun || this.liveMeterReconnectHandle !== null) {
+      return;
+    }
+    this.liveMeterReconnectHandle = setTimeout(() => {
+      this.liveMeterReconnectHandle = null;
+      if (!this.liveMeterShouldRun || this.liveMeterSource !== null) {
+        return;
+      }
+      this.startLiveMeter();
+    }, 1000);
+  }
+
+  private clearLiveMeterReconnect(): void {
+    if (this.liveMeterReconnectHandle !== null) {
+      clearTimeout(this.liveMeterReconnectHandle);
+      this.liveMeterReconnectHandle = null;
+    }
+  }
+
+  private pushLiveRmsPoint(value: number): void {
+    this.liveRmsHistory.update((current) => {
+      const next = [...current, value];
+      if (next.length > LIVE_RMS_HISTORY_LIMIT) {
+        return next.slice(next.length - LIVE_RMS_HISTORY_LIMIT);
+      }
+      return next;
+    });
+  }
+
+  private liveTotalLevelValueToGraphY(value: number): number {
+    const min = this.liveTotalLevelWindowMin();
+    const max = this.liveTotalLevelWindowMax();
+    if (max <= min) {
+      return LIVE_TOTAL_LEVEL_GRAPH_HEIGHT / 2;
+    }
+    const clamped = Math.max(min, Math.min(max, value));
+    const normalized = (clamped - min) / (max - min);
+    return (1 - normalized) * LIVE_TOTAL_LEVEL_GRAPH_HEIGHT;
+  }
+
+  private buildLiveMeterBandRows(bins: number[]): LiveMeterBandRow[] {
+    const currentRate = Math.max(1, this.liveMeterRate());
+    const maxFreq = Math.max(LIVE_FFT_MIN_FREQ_HZ + 1, Math.min(LIVE_FFT_MAX_FREQ_HZ, currentRate / 2));
+    return LIVE_FFT_BANDS.map((band) => {
+      const currentValues: number[] = [];
+      const binCount = bins.length;
+      for (let index = 0; index < binCount; index += 1) {
+        const centerFreq = this.liveFftBinCenterHz(index, binCount, LIVE_FFT_MIN_FREQ_HZ, maxFreq);
+        const withinBand = band.id === LIVE_FFT_BANDS[LIVE_FFT_BANDS.length - 1].id
+          ? centerFreq >= band.minHz && centerFreq <= band.maxHz
+          : centerFreq >= band.minHz && centerFreq < band.maxHz;
+        if (!withinBand) {
+          continue;
+        }
+        const value = bins[index];
+        if (!Number.isFinite(value)) {
+          continue;
+        }
+        currentValues.push(value);
+      }
+      if (currentValues.length === 0) {
+        return {
+          id: band.id,
+          label: band.label,
+          rangeLabel: `${Math.round(band.minHz)} Hz - ${Math.round(band.maxHz)} Hz`,
+          currentDbfs: null,
+          maxDbfs: null,
+          currentPercent: 0,
+          maxPercent: 0,
+        };
+      }
+      const meanPower = currentValues.reduce((acc, value) => acc + 10 ** (value / 10), 0) / currentValues.length;
+      const currentDbfs = Math.max(-60, Math.min(0, Number((10 * Math.log10(meanPower)).toFixed(2))));
+      return {
+        id: band.id,
+        label: band.label,
+        rangeLabel: `${Math.round(band.minHz)} Hz - ${Math.round(band.maxHz)} Hz`,
+        currentDbfs,
+        maxDbfs: null,
+        currentPercent: this.liveMeterDbfsToPercent(currentDbfs),
+        maxPercent: 0,
+      };
+    });
+  }
+
+  private liveMeterDbfsToPercent(value: number | null): number {
+    if (value === null || !Number.isFinite(value)) {
+      return 0;
+    }
+    const clamped = Math.max(-60, Math.min(0, value));
+    return Math.max(0, Math.min(100, ((clamped + 60) / 60) * 100));
+  }
+
+  private liveFftBinCenterHz(index: number, binCount: number, minFreq: number, maxFreq: number): number {
+    const logMin = Math.log10(minFreq);
+    const logMax = Math.log10(maxFreq);
+    const startFreq = 10 ** (logMin + (index / binCount) * (logMax - logMin));
+    const endFreq = 10 ** (logMin + ((index + 1) / binCount) * (logMax - logMin));
+    return Math.sqrt(startFreq * endFreq);
+  }
+
+  private mergeLiveMeterBandMax(previous: Array<number | null>, current: LiveMeterBandRow[]): Array<number | null> {
+    return current.map((band, index) => {
+      if (band.currentDbfs === null || !Number.isFinite(band.currentDbfs)) {
+        return index < previous.length ? previous[index] ?? null : null;
+      }
+      const prior = index < previous.length ? previous[index] : null;
+      if (prior === null || !Number.isFinite(prior)) {
+        return band.currentDbfs;
+      }
+      return Math.max(prior, band.currentDbfs);
+    });
+  }
 }
