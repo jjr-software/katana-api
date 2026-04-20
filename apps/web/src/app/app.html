@@ -956,7 +956,7 @@
       <button type="button" class="btn-close" aria-label="Close" (click)="closeToneSaveModal()"></button>
     </div>
     <div class="modal-body d-grid gap-3">
-      <p class="small text-secondary mb-0">Green blocks will be saved. Gray blocks will not.</p>
+      <p class="small text-secondary mb-0">Green blocks will be saved. Gray blocks will not. Defaults to visible blocks or blocks that are On.</p>
       <div>
         <label class="form-label small mb-1" for="toneSaveName">Name</label>
         <input id="toneSaveName" type="text" class="form-control" [value]="toneSaveName()" (input)="setToneSaveName($any($event.target).value)" />

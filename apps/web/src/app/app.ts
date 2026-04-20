@@ -1226,7 +1226,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   openToneSaveModal(): void {
-    this.setToneSaveBlocksFromNames(this.selectedToneBlocks(), true);
+    this.setToneSaveBlocksFromNames(this.defaultToneSaveBlocks(), true);
     const currentName = this.readString(this.editorPatchDraft(), 'patch_name') ?? this.toneLoadedPatchName();
     if (!this.toneSaveName().trim() && currentName) {
       this.toneSaveName.set(currentName);
@@ -1338,6 +1338,34 @@ export class App implements OnInit, OnDestroy {
 
   saveToneBlocks(): string[] {
     return this.toneBlockOptions().filter((block) => this.isToneSaveBlockIncluded(block));
+  }
+
+  private defaultToneSaveBlocks(): string[] {
+    return this.toneBlockOptions().filter((block) => this.isToneBlockSelected(block) || this.editorBlockIsOn(block));
+  }
+
+  private editorBlockIsOn(block: string): boolean {
+    switch (block as ToneBlockKey) {
+      case 'booster':
+      case 'mod':
+      case 'fx':
+      case 'delay':
+      case 'reverb':
+        return this.editorStageOn(block as StageName);
+      case 'eq1':
+      case 'eq2':
+        return this.editorEqOn(block as EqStageName);
+      case 'ns':
+        return this.editorNsOn();
+      case 'send_return':
+        return this.editorSendReturnOn();
+      case 'solo':
+        return this.editorSoloOn();
+      case 'pedalfx':
+        return this.editorPedalFxOn();
+      default:
+        return false;
+    }
   }
 
   editorBlockEnabledLabel(block: string): 'On' | 'Off' | null {
