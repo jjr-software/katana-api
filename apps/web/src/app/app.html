@@ -979,10 +979,7 @@
       <button type="button" class="btn-close" aria-label="Close" (click)="closeToneSaveModal()"></button>
     </div>
     <div class="modal-body d-grid gap-3">
-      <p class="small text-secondary mb-0">Green blocks will be saved. Gray blocks will not. Modified blocks are shown separately so save scope stays obvious.</p>
-      <div class="d-flex flex-wrap gap-2 small">
-        <span class="badge rounded-pill text-bg-warning">Modified {{ toneSaveChangedCount() }}</span>
-      </div>
+      <p class="small text-secondary mb-0">Green blocks will be saved. Gray blocks will not.</p>
       <div>
         <label class="form-label small mb-1" for="toneSaveName">Name</label>
         <input id="toneSaveName" type="text" class="form-control" [value]="toneSaveName()" (input)="setToneSaveName($any($event.target).value)" />
@@ -1027,9 +1024,6 @@
                 <div class="flex-grow-1">
                   <div class="d-flex justify-content-between gap-2 align-items-start">
                     <div class="fw-semibold">{{ toneBlockDisplay(block).label }}</div>
-                    @if (editorBlockIsChanged(block)) {
-                      <span class="badge rounded-pill text-bg-warning">MODIFIED</span>
-                    }
                   </div>
                   <div class="small text-secondary">{{ toneBlockDisplay(block).subtitle }}</div>
                 </div>

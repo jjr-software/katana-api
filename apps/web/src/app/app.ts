@@ -1325,10 +1325,6 @@ export class App implements OnInit, OnDestroy {
     return this.toneBlockOptions().filter((block) => this.isToneSaveBlockIncluded(block));
   }
 
-  toneSaveChangedCount(): number {
-    return this.toneBlockOptions().filter((block) => this.editorBlockIsChanged(block)).length;
-  }
-
   editorBlockIsChanged(block: string): boolean {
     return this.canResetEditorBlockToLoadedPatch(block);
   }
