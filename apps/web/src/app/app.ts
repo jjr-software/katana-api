@@ -1,6 +1,5 @@
 import { Component, NgZone, OnDestroy, OnInit, TemplateRef, ViewChild, computed, effect, inject, signal } from '@angular/core';
 import { NgbModal, NgbModalModule, NgbModalOptions, NgbModalRef } from '@ng-bootstrap/ng-bootstrap';
-import { DashboardFrequencyBucketsComponent } from './dashboard-frequency-buckets.component';
 import { PatchSummaryComponent } from './patch-summary.component';
 import { DashboardStickyPanelComponent, type DashboardStickyPanelViewModel } from './dashboard-sticky-panel.component';
 import {
@@ -611,7 +610,7 @@ function defaultSlotCards(): SlotCard[] {
 
 @Component({
   selector: 'app-root',
-  imports: [DashboardStickyPanelComponent, DashboardFrequencyBucketsComponent, PatchSummaryComponent, NgbModalModule],
+  imports: [DashboardStickyPanelComponent, PatchSummaryComponent, NgbModalModule],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
