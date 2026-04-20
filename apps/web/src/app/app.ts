@@ -192,17 +192,11 @@ const LINE_OUT_AIR_FEEL_OPTIONS: ReadonlyArray<ValueOption> = [
 const LINE_OUT_MIC_TYPE_OPTIONS: ReadonlyArray<ValueOption> = buildValueOptions(['DYN57', 'DYN421', 'CND451', 'CND87', 'RBN121']);
 const LINE_OUT_DISTANCE_OPTIONS: ReadonlyArray<ValueOption> = Array.from({ length: 21 }, (_, value) => ({ value, label: `${value} cm` }));
 const LINE_OUT_POSITION_OPTIONS: ReadonlyArray<ValueOption> = Array.from({ length: 11 }, (_, value) => ({ value, label: `${value} cm` }));
-const LIVE_FFT_MIN_FREQ_HZ = 60;
-const LIVE_FFT_MAX_FREQ_HZ = 12_000;
+const LIVE_FFT_MIN_FREQ_HZ = 31;
+const LIVE_FFT_MAX_FREQ_HZ = 20_000;
 const LIVE_METER_DEFAULT_RATE = 48_000;
-const LIVE_FFT_BANDS = [
-  { id: 'sub', label: 'Sub', minHz: 60, maxHz: 120 },
-  { id: 'bass', label: 'Bass', minHz: 120, maxHz: 250 },
-  { id: 'low-mid', label: 'Low Mid', minHz: 250, maxHz: 500 },
-  { id: 'mid', label: 'Mid', minHz: 500, maxHz: 2_000 },
-  { id: 'presence', label: 'Presence', minHz: 2_000, maxHz: 6_000 },
-  { id: 'air', label: 'Air', minHz: 6_000, maxHz: 12_000 },
-] as const;
+const LIVE_GE10_BAND_CENTERS_HZ = [31, 62, 125, 250, 500, 1_000, 2_000, 4_000, 8_000, 16_000] as const;
+const LIVE_FFT_BANDS = buildLiveMeterBands(LIVE_GE10_BAND_CENTERS_HZ, EQ_GE10_BAND_LABELS.slice(0, LIVE_GE10_BAND_CENTERS_HZ.length));
 const DEFAULT_TARGET_RMS_DBFS = -35.0;
 const LIVE_TOTAL_LEVEL_ZOOM_DB = 3.0;
 const LIVE_METER_WINDOW_SEC = 2.0;
@@ -224,6 +218,21 @@ interface ToneBlockDisplay {
   label: string;
   glyph: string;
   subtitle: string;
+}
+
+function buildLiveMeterBands(centersHz: readonly number[], labels: readonly string[]): Array<{ id: string; label: string; minHz: number; maxHz: number }> {
+  return centersHz.map((centerHz, index) => {
+    const previousCenterHz = index > 0 ? centersHz[index - 1] : centerHz;
+    const nextCenterHz = index < centersHz.length - 1 ? centersHz[index + 1] : centerHz;
+    const minHz = index === 0 ? centerHz : Math.sqrt(previousCenterHz * centerHz);
+    const maxHz = index === centersHz.length - 1 ? LIVE_FFT_MAX_FREQ_HZ : Math.sqrt(centerHz * nextCenterHz);
+    return {
+      id: `ge10-${index}`,
+      label: labels[index] ?? `${centerHz}`,
+      minHz,
+      maxHz,
+    };
+  });
 }
 
 const TONE_BLOCK_DISPLAY: Record<ToneBlockKey, ToneBlockDisplay> = {
@@ -3348,7 +3357,7 @@ export class App implements OnInit, OnDestroy {
         return {
           id: band.id,
           label: band.label,
-          rangeLabel: `${band.minHz} Hz - ${band.maxHz} Hz`,
+          rangeLabel: `${Math.round(band.minHz)} Hz - ${Math.round(band.maxHz)} Hz`,
           currentDbfs: null,
           maxDbfs: null,
           currentPercent: 0,
@@ -3360,7 +3369,7 @@ export class App implements OnInit, OnDestroy {
       return {
         id: band.id,
         label: band.label,
-        rangeLabel: `${band.minHz} Hz - ${band.maxHz} Hz`,
+        rangeLabel: `${Math.round(band.minHz)} Hz - ${Math.round(band.maxHz)} Hz`,
         currentDbfs,
         maxDbfs: null,
         currentPercent: this.liveMeterDbfsToPercent(currentDbfs),
