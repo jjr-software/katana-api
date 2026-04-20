@@ -34,20 +34,24 @@
   }
 
   @if (isDashboardPage()) {
-    <app-dashboard-sticky-panel
-      [model]="stickyPanelVm()"
-      (testAmpConnection)="testAmpConnection()"
-      (syncLivePatch)="syncLivePatch()"
-      (reapplyCurrentSettingsToAmp)="reapplyCurrentSettingsToAmp()"
-      (persistLivePatchToAmp)="persistLivePatchToAmp()"
-      (openToneLibraryModal)="openToneLibraryModal()"
-      (openToneSaveModal)="openToneSaveModal()"
-      (openToneDesignerModal)="openToneDesignerModal()"
-      (globalNormalizeTargetRmsChange)="setGlobalNormalizeTargetRms($event)"
-      (globalNormalizeTargetRmsCommit)="commitGlobalNormalizeTargetRms()"
-    ></app-dashboard-sticky-panel>
+    <div class="row g-3 align-items-start">
+      <div class="col-12 col-xl-3">
+        <app-dashboard-sticky-panel
+          [model]="stickyPanelVm()"
+          (testAmpConnection)="testAmpConnection()"
+          (syncLivePatch)="syncLivePatch()"
+          (reapplyCurrentSettingsToAmp)="reapplyCurrentSettingsToAmp()"
+          (persistLivePatchToAmp)="persistLivePatchToAmp()"
+          (openToneLibraryModal)="openToneLibraryModal()"
+          (openToneSaveModal)="openToneSaveModal()"
+          (openToneDesignerModal)="openToneDesignerModal()"
+          (globalNormalizeTargetRmsChange)="setGlobalNormalizeTargetRms($event)"
+          (globalNormalizeTargetRmsCommit)="commitGlobalNormalizeTargetRms()"
+        ></app-dashboard-sticky-panel>
+      </div>
 
-      <section class="mb-4 d-grid gap-3">
+      <div class="col-12 col-xl-9">
+        <section class="mb-4 d-grid gap-3">
             <div class="border rounded p-2 bg-body-tertiary small d-grid gap-2">
               <div class="d-flex gap-2 flex-wrap">
                 <button type="button" class="btn btn-sm btn-outline-primary" (click)="openLiveEditor()">Reload Live Patch From Amp</button>
@@ -695,6 +699,8 @@
           </article>
         </div>
       </section>
+      </div>
+    </div>
 
   } @else if (isLineOutPage()) {
   <section class="card">
