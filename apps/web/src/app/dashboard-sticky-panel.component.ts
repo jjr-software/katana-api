@@ -50,7 +50,6 @@ export interface DashboardStickyPanelViewModel {
   patchName: string;
   liveAmpName: string;
   ampSlotSavedName: string;
-  ampStateHashShort: string;
   livePatchConfirmedAt: string;
   lastSyncedAt: string;
   totalSyncMsText: string;
@@ -189,7 +188,6 @@ function buildValueOptions(labels: readonly string[]): ValueOption[] {
             </div>
 
             <div class="d-flex flex-wrap gap-3 small text-secondary">
-              <span>AMP State Hash: <code>{{ vm.ampStateHashShort }}</code></span>
               <span>Live Confirmed: <code>{{ vm.livePatchConfirmedAt || 'n/a' }}</code></span>
               <span>Last Sync: <code>{{ vm.lastSyncedAt || 'n/a' }}</code></span>
               <span>Total Sync Time: <code>{{ vm.totalSyncMsText }}</code></span>

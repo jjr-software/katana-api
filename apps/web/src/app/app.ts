@@ -672,7 +672,6 @@ export class App implements OnInit, OnDestroy {
   status = signal('Idle');
   responseJson = signal('');
   slots = signal<SlotCard[]>(defaultSlotCards());
-  ampStateHash = signal('');
   lastSyncedAt = signal('');
   totalSyncMs = signal(0);
   selectedAmpSlot = signal<number | null>(null);
@@ -805,7 +804,6 @@ export class App implements OnInit, OnDestroy {
     patchName: this.currentSettingsPatchName(),
     liveAmpName: this.livePatchExactDbName().trim() || 'n/a',
     ampSlotSavedName: this.selectedAmpSlotSavedName(),
-    ampStateHashShort: this.shortHash(this.ampStateHash()),
     livePatchConfirmedAt: this.livePatchConfirmedAt(),
     lastSyncedAt: this.lastSyncedAt(),
     totalSyncMsText: this.formatMs(this.totalSyncMs()),
@@ -2015,7 +2013,6 @@ export class App implements OnInit, OnDestroy {
       this.applySyncedSlot(synced.slot);
       this.lastSyncedAt.set(synced.synced_at);
       this.totalSyncMs.set(synced.slot.slot_sync_ms);
-      this.ampStateHash.set('');
       this.status.set(`Slot ${slot} read succeeded (${this.formatMs(synced.slot.slot_sync_ms)})`);
     } catch (error: unknown) {
       this.status.set(`Slot ${slot} read failed`);
