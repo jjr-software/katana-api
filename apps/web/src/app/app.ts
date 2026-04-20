@@ -150,6 +150,30 @@ const GAFC_EXP1_ASSIGNMENT_SCHEMA: ReadonlyArray<GafcExp1AssignmentSpec> = [
   { key: 'heavy_oct', label: 'Heavy Oct', detailMax: 3, valueMax: 127, minOffset: 47, minSize: 1, maxOffset: 47, maxSize: 1 },
   { key: 'pedal_bend', label: 'Pedal Bend', detailMax: 4, valueMax: 127, minOffset: 48, minSize: 1, maxOffset: 48, maxSize: 1 },
 ] as const;
+const GAFC_EXP1_FUNCTION_ROW_KEY: ReadonlyArray<string | null> = [
+  null,
+  null,
+  null,
+  null,
+  'booster',
+  null,
+  null,
+  'delay',
+  'delay',
+  'reverb',
+];
+const GAFC_EXP1_FUNCTION_ROW_NOTE: ReadonlyArray<string | null> = [
+  'Volume is handled by the live amp block, not here.',
+  'Foot volume is handled by the live amp block, not here.',
+  'Pedal FX settings live in the Pedal FX block below.',
+  'Pedal FX + FV is a split control mode; the actual Pedal FX controls live in the Pedal FX block.',
+  null,
+  'Mod has no separate assignment row here; use the Mod block below.',
+  'FX has no separate assignment row here; use the FX block below.',
+  null,
+  'Delay 2 shares the Delay assignment row here.',
+  null,
+];
 const EQ_TYPE_NAMES = ['Parametric EQ', 'GE-10'];
 const EQ_POSITION_NAMES = ['Input', 'Post Amp'];
 const EQ_GE10_BAND_LABELS = ['31', '62', '125', '250', '500', '1k', '2k', '4k', '8k', '16k', 'Level'];
@@ -4219,6 +4243,26 @@ export class App implements OnInit, OnDestroy {
       min: this.decodeRolandValue(minRaw.slice(spec.minOffset, spec.minOffset + spec.minSize)),
       max: this.decodeRolandValue(maxRaw.slice(spec.maxOffset, spec.maxOffset + spec.maxSize)),
     }));
+  }
+
+  editorGafcExp1SelectedAssignmentRow(): GafcExp1AssignmentRow | null {
+    const functionValue = this.editorGafcExp1Function();
+    if (functionValue === null || functionValue < 0 || functionValue >= GAFC_EXP1_FUNCTION_ROW_KEY.length) {
+      return null;
+    }
+    const rowKey = GAFC_EXP1_FUNCTION_ROW_KEY[functionValue];
+    if (!rowKey) {
+      return null;
+    }
+    return this.editorGafcExp1AssignmentRows().find((row) => row.key === rowKey) ?? null;
+  }
+
+  editorGafcExp1SelectedFunctionNote(): string | null {
+    const functionValue = this.editorGafcExp1Function();
+    if (functionValue === null || functionValue < 0 || functionValue >= GAFC_EXP1_FUNCTION_ROW_NOTE.length) {
+      return null;
+    }
+    return GAFC_EXP1_FUNCTION_ROW_NOTE[functionValue] ?? null;
   }
 
   setEditorGafcExp1AssignmentValue(key: string, field: 'detail' | 'min' | 'max', value: string): void {

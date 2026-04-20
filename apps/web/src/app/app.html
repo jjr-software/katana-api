@@ -627,56 +627,53 @@
                         </select>
                       </div>
                       <div class="col-12">
-                        <div class="small text-secondary mb-2">Named assignment rows for the GA-FC expression pedal. Each row is a real field, not a byte dump.</div>
-                        <div class="table-responsive">
-                          <table class="table table-sm align-middle mb-0 gafc-exp1-table">
-                            <thead>
-                              <tr>
-                                <th scope="col">Target</th>
-                                <th scope="col">Detail</th>
-                                <th scope="col">Min</th>
-                                <th scope="col">Max</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              @for (row of editorGafcExp1AssignmentRows(); track row.key) {
-                                <tr>
-                                  <th scope="row" class="text-nowrap">{{ row.label }}</th>
-                                  <td>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      [max]="row.detailMax"
-                                      class="form-control form-control-sm"
-                                      [value]="row.detail"
-                                      (input)="setEditorGafcExp1AssignmentValue(row.key, 'detail', $any($event.target).value)"
-                                    />
-                                  </td>
-                                  <td>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      [max]="row.valueMax"
-                                      class="form-control form-control-sm"
-                                      [value]="row.min"
-                                      (input)="setEditorGafcExp1AssignmentValue(row.key, 'min', $any($event.target).value)"
-                                    />
-                                  </td>
-                                  <td>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      [max]="row.valueMax"
-                                      class="form-control form-control-sm"
-                                      [value]="row.max"
-                                      (input)="setEditorGafcExp1AssignmentValue(row.key, 'max', $any($event.target).value)"
-                                    />
-                                  </td>
-                                </tr>
-                              }
-                            </tbody>
-                          </table>
-                        </div>
+                        <div class="small text-secondary mb-2">Only the row for the selected function is shown here. Everything else stays out of the way.</div>
+                        @if (editorGafcExp1SelectedFunctionNote(); as note) {
+                          <div class="alert alert-secondary py-2 px-3 mb-2 small">{{ note }}</div>
+                        }
+                        @if (editorGafcExp1SelectedAssignmentRow(); as row) {
+                          <div class="border rounded p-2 bg-body-tertiary">
+                            <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                              <div class="fw-semibold">{{ row.label }}</div>
+                              <div class="small text-secondary">Target row for the selected function</div>
+                            </div>
+                            <div class="row g-2">
+                              <div class="col-12 col-md-4">
+                                <label class="form-label small mb-1">Detail</label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  [max]="row.detailMax"
+                                  class="form-control form-control-sm"
+                                  [value]="row.detail"
+                                  (input)="setEditorGafcExp1AssignmentValue(row.key, 'detail', $any($event.target).value)"
+                                />
+                              </div>
+                              <div class="col-12 col-md-4">
+                                <label class="form-label small mb-1">Min</label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  [max]="row.valueMax"
+                                  class="form-control form-control-sm"
+                                  [value]="row.min"
+                                  (input)="setEditorGafcExp1AssignmentValue(row.key, 'min', $any($event.target).value)"
+                                />
+                              </div>
+                              <div class="col-12 col-md-4">
+                                <label class="form-label small mb-1">Max</label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  [max]="row.valueMax"
+                                  class="form-control form-control-sm"
+                                  [value]="row.max"
+                                  (input)="setEditorGafcExp1AssignmentValue(row.key, 'max', $any($event.target).value)"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        }
                       </div>
                     </div>
                   </article>
