@@ -72,6 +72,7 @@ class PatchObjectCreateRequest(BaseModel):
     source_type: str = Field(min_length=1, max_length=32)
     source_prompt: str | None = None
     parent_patch_object_id: int | None = None
+    overwrite: bool = False
 
 
 class PatchObjectGroupRefResponse(BaseModel):
@@ -103,6 +104,7 @@ class SaveFromLiveRequest(BaseModel):
     blocks: list[str] = Field(min_length=1)
     source_type: str = Field(default="manual", min_length=1, max_length=32)
     source_prompt: str | None = None
+    overwrite: bool = False
 
 
 class SaveFromPatchRequest(BaseModel):
@@ -112,6 +114,7 @@ class SaveFromPatchRequest(BaseModel):
     blocks: list[str] = Field(min_length=1)
     source_type: str = Field(default="manual", min_length=1, max_length=32)
     source_prompt: str | None = None
+    overwrite: bool = False
 
 
 class SaveFromAmpRequest(BaseModel):
@@ -119,6 +122,7 @@ class SaveFromAmpRequest(BaseModel):
     description: str = ""
     source_type: str = Field(default="manual", min_length=1, max_length=32)
     source_prompt: str | None = None
+    overwrite: bool = False
 
 
 class GroupCreateRequest(BaseModel):
@@ -277,16 +281,16 @@ def list_patch_objects(
 
 @router.post("/patch-objects", response_model=PatchObjectReadResponse)
 def create_patch_object(payload: PatchObjectCreateRequest, db: Session = Depends(get_db)) -> PatchObjectReadResponse:
-    _assert_patch_object_name_available(db, payload.name)
-    row = PatchObject(
+    row = _save_or_overwrite_patch_object(
+        db,
         name=payload.name,
         description=payload.description,
         patch_json=normalize_patch_object(payload.patch_json),
         source_type=payload.source_type,
         source_prompt=payload.source_prompt,
         parent_patch_object_id=payload.parent_patch_object_id,
+        overwrite=payload.overwrite,
     )
-    db.add(row)
     db.commit()
     db.refresh(row)
     return _patch_object_response(db, row)
@@ -330,18 +334,18 @@ async def save_patch_object_from_live(
     db: Session = Depends(get_db),
     client: AmpClient = Depends(get_amp_client),
 ) -> PatchObjectReadResponse:
-    _assert_patch_object_name_available(db, payload.name)
     blocks = _validated_blocks(payload.blocks)
     live_row = await _resolve_live_patch_row(db, client)
     sparse = extract_patch_object(live_row.patch_json, blocks)
-    row = PatchObject(
+    row = _save_or_overwrite_patch_object(
+        db,
         name=payload.name,
         description=payload.description,
         patch_json=sparse,
         source_type=payload.source_type,
         source_prompt=payload.source_prompt,
+        overwrite=payload.overwrite,
     )
-    db.add(row)
     db.commit()
     db.refresh(row)
     return _patch_object_response(db, row)
@@ -352,17 +356,17 @@ def save_patch_object_from_patch(
     payload: SaveFromPatchRequest,
     db: Session = Depends(get_db),
 ) -> PatchObjectReadResponse:
-    _assert_patch_object_name_available(db, payload.name)
     blocks = _validated_blocks(payload.blocks)
     sparse = extract_patch_object(payload.patch_json, blocks)
-    row = PatchObject(
+    row = _save_or_overwrite_patch_object(
+        db,
         name=payload.name,
         description=payload.description,
         patch_json=sparse,
         source_type=payload.source_type,
         source_prompt=payload.source_prompt,
+        overwrite=payload.overwrite,
     )
-    db.add(row)
     db.commit()
     db.refresh(row)
     return _patch_object_response(db, row)
@@ -374,19 +378,19 @@ async def save_patch_object_from_amp(
     db: Session = Depends(get_db),
     client: AmpClient = Depends(get_amp_client),
 ) -> PatchObjectReadResponse:
-    _assert_patch_object_name_available(db, payload.name)
     current = await client.read_current_patch()
     sparse = extract_patch_object(current.payload, ALLOWED_BLOCKS)
     if not sparse:
       raise HTTPException(status_code=502, detail={"message": "Amp current patch did not contain any supported blocks"})
-    row = PatchObject(
+    row = _save_or_overwrite_patch_object(
+        db,
         name=payload.name,
         description=payload.description,
         patch_json=sparse,
         source_type=payload.source_type,
         source_prompt=payload.source_prompt,
+        overwrite=payload.overwrite,
     )
-    db.add(row)
     db.commit()
     db.refresh(row)
     return _patch_object_response(db, row)
@@ -943,6 +947,40 @@ def _assert_patch_object_name_available(db: Session, name: str) -> None:
     existing = db.scalar(select(PatchObject).where(PatchObject.name == name))
     if existing is not None:
         raise HTTPException(status_code=409, detail={"message": "Patch object already exists", "name": name})
+
+
+def _save_or_overwrite_patch_object(
+    db: Session,
+    *,
+    name: str,
+    description: str,
+    patch_json: dict[str, Any],
+    source_type: str,
+    source_prompt: str | None,
+    overwrite: bool,
+    parent_patch_object_id: int | None = None,
+) -> PatchObject:
+    existing = db.scalar(select(PatchObject).where(PatchObject.name == name))
+    if existing is not None:
+        if not overwrite:
+            raise HTTPException(status_code=409, detail={"message": "Patch object already exists", "name": name})
+        existing.description = description
+        existing.patch_json = patch_json
+        existing.source_type = source_type
+        existing.source_prompt = source_prompt
+        if parent_patch_object_id is not None:
+            existing.parent_patch_object_id = parent_patch_object_id
+        return existing
+    row = PatchObject(
+        name=name,
+        description=description,
+        patch_json=patch_json,
+        source_type=source_type,
+        source_prompt=source_prompt,
+        parent_patch_object_id=parent_patch_object_id,
+    )
+    db.add(row)
+    return row
 
 
 def _make_unique_patch_object_name(db: Session, base_name: str) -> str:

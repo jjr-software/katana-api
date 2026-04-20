@@ -1340,6 +1340,14 @@ export class App implements OnInit, OnDestroy {
     return this.toneBlockOptions().filter((block) => this.isToneSaveBlockIncluded(block));
   }
 
+  toneSaveExistingPatch(): TonePatchObjectResponse | null {
+    const name = this.toneSaveName().trim();
+    if (!name) {
+      return null;
+    }
+    return this.tonePatchObjects().find((item) => item.name === name) ?? null;
+  }
+
   private defaultToneSaveBlocks(): string[] {
     return this.toneBlockOptions().filter((block) => this.isToneBlockSelected(block) || this.editorBlockIsOn(block));
   }
@@ -1521,6 +1529,7 @@ export class App implements OnInit, OnDestroy {
     const name = this.toneSaveName().trim();
     const blocks = this.saveToneBlocks();
     const editorPatch = this.editorPatchDraft();
+    const existingPatch = this.toneSaveExistingPatch();
     if (!name) {
       this.status.set('Tone save requires a name.');
       return;
@@ -1534,7 +1543,7 @@ export class App implements OnInit, OnDestroy {
       return;
     }
     this.setActionBusy('tone-save-gui', true);
-    this.status.set(`Saving GUI state as ${name}...`);
+    this.status.set(existingPatch ? `Overwriting ${name}...` : `Saving GUI state as ${name}...`);
     this.responseJson.set('');
     try {
       const response = await fetch('/api/v1/patch-objects/save-from-patch', {
@@ -1547,10 +1556,46 @@ export class App implements OnInit, OnDestroy {
           patch_json: editorPatch,
           blocks,
           source_type: 'manual',
+          overwrite: Boolean(existingPatch),
         }),
       });
       const payload = (await response.json()) as TonePatchObjectResponse | { detail?: unknown };
       if (!response.ok) {
+        if (response.status === 409) {
+          const detail = payload as { detail?: { message?: string; name?: string } };
+          const conflictName = detail.detail?.name || name;
+          if (!window.confirm(`Patch "${conflictName}" already exists. Overwrite it?`)) {
+            this.status.set('GUI state save cancelled');
+            return;
+          }
+          const overwriteResponse = await fetch('/api/v1/patch-objects/save-from-patch', {
+            method: 'POST',
+            cache: 'no-store',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name,
+              description: this.toneSaveDescription(),
+              patch_json: editorPatch,
+              blocks,
+              source_type: 'manual',
+              overwrite: true,
+            }),
+          });
+          const overwritePayload = (await overwriteResponse.json()) as TonePatchObjectResponse | { detail?: unknown };
+          if (!overwriteResponse.ok || !('patch_json' in overwritePayload)) {
+            this.status.set('GUI state save failed');
+            this.responseJson.set(JSON.stringify(overwritePayload, null, 2));
+            return;
+          }
+          const saved = overwritePayload as TonePatchObjectResponse;
+          this.toneSaveName.set('');
+          this.toneSaveDescription.set('');
+          this.closeToneSaveModal();
+          await this.loadTonePatchObjects();
+          this.status.set(`Overwrote ${name}`);
+          this.responseJson.set(JSON.stringify(saved, null, 2));
+          return;
+        }
         this.status.set('GUI state save failed');
         this.responseJson.set(JSON.stringify(payload, null, 2));
         return;
@@ -1560,7 +1605,7 @@ export class App implements OnInit, OnDestroy {
       this.toneSaveDescription.set('');
       this.closeToneSaveModal();
       await this.loadTonePatchObjects();
-      this.status.set(`Saved GUI state as ${name}`);
+      this.status.set(existingPatch ? `Overwrote ${name}` : `Saved GUI state as ${name}`);
       this.responseJson.set(JSON.stringify(saved, null, 2));
     } catch (error: unknown) {
       this.status.set('GUI state save failed');
@@ -1572,12 +1617,16 @@ export class App implements OnInit, OnDestroy {
 
   async saveFullLiveAsTonePatchObject(): Promise<void> {
     const name = this.toneSaveName().trim();
+    const existingPatch = this.toneSaveExistingPatch();
     if (!name) {
       this.status.set('Tone save requires a name.');
       return;
     }
+    if (existingPatch && !window.confirm(`Patch "${name}" already exists. Overwrite it?`)) {
+      return;
+    }
     this.setActionBusy('tone-save-full', true);
-    this.status.set(`Storing full amp patch as ${name}...`);
+    this.status.set(existingPatch ? `Overwriting ${name} from amp...` : `Storing full amp patch as ${name}...`);
     this.responseJson.set('');
     try {
       const response = await fetch('/api/v1/patch-objects/save-from-amp', {
@@ -1588,10 +1637,45 @@ export class App implements OnInit, OnDestroy {
           name,
           description: this.toneSaveDescription(),
           source_type: 'manual',
+          overwrite: Boolean(existingPatch),
         }),
       });
       const payload = (await response.json()) as TonePatchObjectResponse | { detail?: unknown };
       if (!response.ok) {
+        if (response.status === 409) {
+          const detail = payload as { detail?: { message?: string; name?: string } };
+          const conflictName = detail.detail?.name || name;
+          if (!window.confirm(`Patch "${conflictName}" already exists. Overwrite it?`)) {
+            this.status.set('Full patch store cancelled');
+            return;
+          }
+          const overwriteResponse = await fetch('/api/v1/patch-objects/save-from-amp', {
+            method: 'POST',
+            cache: 'no-store',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name,
+              description: this.toneSaveDescription(),
+              source_type: 'manual',
+              overwrite: true,
+            }),
+          });
+          const overwritePayload = (await overwriteResponse.json()) as TonePatchObjectResponse | { detail?: unknown };
+          if (!overwriteResponse.ok || !('patch_json' in overwritePayload)) {
+            this.status.set('Full patch store failed');
+            this.responseJson.set(JSON.stringify(overwritePayload, null, 2));
+            return;
+          }
+          const saved = overwritePayload as TonePatchObjectResponse;
+          this.toneSaveName.set('');
+          this.toneSaveDescription.set('');
+          this.closeToneSaveModal();
+          await this.loadTonePatchObjects();
+          await this.refreshLivePatchStatus();
+          this.status.set(`Overwrote ${name} from amp`);
+          this.responseJson.set(JSON.stringify(saved, null, 2));
+          return;
+        }
         this.status.set('Full patch store failed');
         this.responseJson.set(JSON.stringify(payload, null, 2));
         return;
@@ -1602,7 +1686,7 @@ export class App implements OnInit, OnDestroy {
       this.closeToneSaveModal();
       await this.loadTonePatchObjects();
       await this.refreshLivePatchStatus();
-      this.status.set(`Stored full amp patch as ${name}`);
+      this.status.set(existingPatch ? `Overwrote ${name} from amp` : `Stored full amp patch as ${name}`);
       this.responseJson.set(JSON.stringify(saved, null, 2));
     } catch (error: unknown) {
       this.status.set('Full patch store failed');
