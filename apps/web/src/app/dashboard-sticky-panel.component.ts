@@ -1,12 +1,7 @@
 import { ChangeDetectionStrategy, Component, NgZone, OnDestroy, OnInit, inject, input, output, signal } from '@angular/core';
-import { DashboardFrequencyBucketsComponent, type DashboardFrequencyBucketBand } from './dashboard-frequency-buckets.component';
 
 const DEFAULT_TARGET_RMS_DBFS = -35.0;
 const GLOBAL_NORMALIZE_TARGET_STORAGE_KEY = 'katana.globalNormalizeTargetRms';
-const LIVE_FFT_MIN_FREQ_HZ = 31;
-const LIVE_FFT_MAX_FREQ_HZ = 20_000;
-const LIVE_METER_DEFAULT_RATE = 48_000;
-const LIVE_GE10_BAND_CENTERS_HZ = [31, 62, 125, 250, 500, 1_000, 2_000, 4_000, 8_000, 16_000] as const;
 const LIVE_TOTAL_LEVEL_ZOOM_DB = 3.0;
 const LIVE_RMS_HISTORY_LIMIT = 240;
 const LIVE_TOTAL_LEVEL_GRAPH_WIDTH = 1000;
@@ -147,16 +142,6 @@ interface LiveRmsHistoryBar {
   tone: 'above' | 'below';
 }
 
-interface LiveMeterBandRow {
-  id: string;
-  label: string;
-  rangeLabel: string;
-  currentDbfs: number | null;
-  maxDbfs: number | null;
-  currentPercent: number;
-  maxPercent: number;
-}
-
 interface TypeOption {
   value: number;
   label: string;
@@ -166,27 +151,9 @@ function buildValueOptions(labels: readonly string[]): ValueOption[] {
   return labels.map((label, value) => ({ value, label }));
 }
 
-function buildLiveMeterBands(centersHz: readonly number[], labels: readonly string[]): Array<{ id: string; label: string; minHz: number; maxHz: number }> {
-  return centersHz.map((centerHz, index) => {
-    const previousCenterHz = index > 0 ? centersHz[index - 1] : centerHz;
-    const nextCenterHz = index < centersHz.length - 1 ? centersHz[index + 1] : centerHz;
-    const minHz = index === 0 ? centerHz : Math.sqrt(previousCenterHz * centerHz);
-    const maxHz = index === centersHz.length - 1 ? LIVE_FFT_MAX_FREQ_HZ : Math.sqrt(centerHz * nextCenterHz);
-    return {
-      id: `ge10-${index}`,
-      label: labels[index] ?? `${centerHz}`,
-      minHz,
-      maxHz,
-    };
-  });
-}
-
-const LIVE_FFT_BANDS = buildLiveMeterBands(LIVE_GE10_BAND_CENTERS_HZ, ['31', '62', '125', '250', '500', '1k', '2k', '4k', '8k', '16k']);
-
 @Component({
   selector: 'app-dashboard-sticky-panel',
   standalone: true,
-  imports: [DashboardFrequencyBucketsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     :host {
@@ -281,9 +248,6 @@ const LIVE_FFT_BANDS = buildLiveMeterBands(LIVE_GE10_BAND_CENTERS_HZ, ['31', '62
               </div>
             </div>
 
-            <div class="mt-2">
-              <app-dashboard-frequency-buckets [bands]="liveMeterBandRows()"></app-dashboard-frequency-buckets>
-            </div>
           </div>
         </div>
       </section>
@@ -306,9 +270,6 @@ export class DashboardStickyPanelComponent implements OnInit, OnDestroy {
   readonly liveRmsDbfs = signal<number | null>(null);
   readonly liveRmsMaxDbfs = signal<number | null>(null);
   readonly liveRmsHistory = signal<number[]>([]);
-  readonly liveFftBinsDb = signal<number[]>([]);
-  readonly liveMeterRate = signal(LIVE_METER_DEFAULT_RATE);
-  readonly liveFrequencyBandMaxDbfs = signal<Array<number | null>>([]);
   readonly liveMeterAt = signal('');
   readonly liveMeterConnected = signal(false);
 
@@ -330,7 +291,6 @@ export class DashboardStickyPanelComponent implements OnInit, OnDestroy {
   clearLiveMeterChart(): void {
     this.liveRmsHistory.set([]);
     this.liveRmsMaxDbfs.set(null);
-    this.liveFrequencyBandMaxDbfs.set([]);
   }
 
   formatDb(value: number | null): string {
@@ -395,16 +355,6 @@ export class DashboardStickyPanelComponent implements OnInit, OnDestroy {
       .filter((bar): bar is LiveRmsHistoryBar => bar !== null);
   }
 
-  liveMeterBandRows(): DashboardFrequencyBucketBand[] {
-    const currentBands = this.buildLiveMeterBandRows(this.liveFftBinsDb());
-    const maxBands = this.liveFrequencyBandMaxDbfs();
-    return currentBands.map((band, index) => ({
-      ...band,
-      maxDbfs: index < maxBands.length ? maxBands[index] ?? null : null,
-      maxPercent: index < maxBands.length ? this.liveMeterDbfsToPercent(maxBands[index] ?? null) : 0,
-    }));
-  }
-
   commitGlobalNormalizeTargetRms(): void {
     const parsed = Number.parseFloat(this.globalNormalizeTargetRms());
     const normalized = Number.isFinite(parsed) ? parsed : DEFAULT_TARGET_RMS_DBFS;
@@ -443,10 +393,6 @@ export class DashboardStickyPanelComponent implements OnInit, OnDestroy {
           const payload = JSON.parse(event.data) as Record<string, unknown>;
           const eventType = String(payload['type'] ?? '');
           if (eventType === 'connected') {
-            const rate = Number(payload['rate']);
-            if (Number.isFinite(rate) && rate > 0) {
-              this.liveMeterRate.set(rate);
-            }
             this.liveMeterConnected.set(true);
             return;
           }
@@ -459,15 +405,6 @@ export class DashboardStickyPanelComponent implements OnInit, OnDestroy {
             this.liveRmsDbfs.set(rms);
             this.liveRmsMaxDbfs.update((current) => (current === null || rms > current ? rms : current));
             this.pushLiveRmsPoint(rms);
-          }
-          const fftBinsUnknown = payload['fft_bins_db'];
-          if (Array.isArray(fftBinsUnknown)) {
-            const fftBins = fftBinsUnknown
-              .map((item) => (typeof item === 'number' && Number.isFinite(item) ? item : null))
-              .filter((item): item is number => item !== null);
-            this.liveFftBinsDb.set(fftBins);
-            const currentBands = this.buildLiveMeterBandRows(fftBins);
-            this.liveFrequencyBandMaxDbfs.update((current) => this.mergeLiveMeterBandMax(current, currentBands));
           }
           this.liveMeterAt.set(ts);
         } catch {
@@ -502,9 +439,6 @@ export class DashboardStickyPanelComponent implements OnInit, OnDestroy {
     this.liveRmsDbfs.set(null);
     this.liveRmsMaxDbfs.set(null);
     this.liveRmsHistory.set([]);
-    this.liveFftBinsDb.set([]);
-    this.liveFrequencyBandMaxDbfs.set([]);
-    this.liveMeterRate.set(LIVE_METER_DEFAULT_RATE);
     this.liveMeterAt.set('');
   }
 
@@ -549,77 +483,4 @@ export class DashboardStickyPanelComponent implements OnInit, OnDestroy {
     return (1 - normalized) * LIVE_TOTAL_LEVEL_GRAPH_HEIGHT;
   }
 
-  private buildLiveMeterBandRows(bins: number[]): LiveMeterBandRow[] {
-    const currentRate = Math.max(1, this.liveMeterRate());
-    const maxFreq = Math.max(LIVE_FFT_MIN_FREQ_HZ + 1, Math.min(LIVE_FFT_MAX_FREQ_HZ, currentRate / 2));
-    return LIVE_FFT_BANDS.map((band) => {
-      const currentValues: number[] = [];
-      const binCount = bins.length;
-      for (let index = 0; index < binCount; index += 1) {
-        const centerFreq = this.liveFftBinCenterHz(index, binCount, LIVE_FFT_MIN_FREQ_HZ, maxFreq);
-        const withinBand = band.id === LIVE_FFT_BANDS[LIVE_FFT_BANDS.length - 1].id
-          ? centerFreq >= band.minHz && centerFreq <= band.maxHz
-          : centerFreq >= band.minHz && centerFreq < band.maxHz;
-        if (!withinBand) {
-          continue;
-        }
-        const value = bins[index];
-        if (!Number.isFinite(value)) {
-          continue;
-        }
-        currentValues.push(value);
-      }
-      if (currentValues.length === 0) {
-        return {
-          id: band.id,
-          label: band.label,
-          rangeLabel: `${Math.round(band.minHz)} Hz - ${Math.round(band.maxHz)} Hz`,
-          currentDbfs: null,
-          maxDbfs: null,
-          currentPercent: 0,
-          maxPercent: 0,
-        };
-      }
-      const meanPower = currentValues.reduce((acc, value) => acc + 10 ** (value / 10), 0) / currentValues.length;
-      const currentDbfs = Math.max(-60, Math.min(0, Number((10 * Math.log10(meanPower)).toFixed(2))));
-      return {
-        id: band.id,
-        label: band.label,
-        rangeLabel: `${Math.round(band.minHz)} Hz - ${Math.round(band.maxHz)} Hz`,
-        currentDbfs,
-        maxDbfs: null,
-        currentPercent: this.liveMeterDbfsToPercent(currentDbfs),
-        maxPercent: 0,
-      };
-    });
-  }
-
-  private liveMeterDbfsToPercent(value: number | null): number {
-    if (value === null || !Number.isFinite(value)) {
-      return 0;
-    }
-    const clamped = Math.max(-60, Math.min(0, value));
-    return Math.max(0, Math.min(100, ((clamped + 60) / 60) * 100));
-  }
-
-  private liveFftBinCenterHz(index: number, binCount: number, minFreq: number, maxFreq: number): number {
-    const logMin = Math.log10(minFreq);
-    const logMax = Math.log10(maxFreq);
-    const startFreq = 10 ** (logMin + (index / binCount) * (logMax - logMin));
-    const endFreq = 10 ** (logMin + ((index + 1) / binCount) * (logMax - logMin));
-    return Math.sqrt(startFreq * endFreq);
-  }
-
-  private mergeLiveMeterBandMax(previous: Array<number | null>, current: LiveMeterBandRow[]): Array<number | null> {
-    return current.map((band, index) => {
-      if (band.currentDbfs === null || !Number.isFinite(band.currentDbfs)) {
-        return index < previous.length ? previous[index] ?? null : null;
-      }
-      const prior = index < previous.length ? previous[index] : null;
-      if (prior === null || !Number.isFinite(prior)) {
-        return band.currentDbfs;
-      }
-      return Math.max(prior, band.currentDbfs);
-    });
-  }
 }
