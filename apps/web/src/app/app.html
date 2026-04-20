@@ -720,10 +720,55 @@
                         </select>
                       </div>
                       <div class="col-12">
-                        <div class="small text-secondary font-monospace text-break">
-                          <div>detail_raw: {{ editorGafcExp1Raw('detail_raw')?.join(', ') || 'n/a' }}</div>
-                          <div>min_raw: {{ editorGafcExp1Raw('min_raw')?.join(', ') || 'n/a' }}</div>
-                          <div>max_raw: {{ editorGafcExp1Raw('max_raw')?.join(', ') || 'n/a' }}</div>
+                        <div class="small text-secondary mb-2">Named assignment rows for the GA-FC expression pedal. Each row is a real field, not a byte dump.</div>
+                        <div class="table-responsive">
+                          <table class="table table-sm align-middle mb-0 gafc-exp1-table">
+                            <thead>
+                              <tr>
+                                <th scope="col">Target</th>
+                                <th scope="col">Detail</th>
+                                <th scope="col">Min</th>
+                                <th scope="col">Max</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              @for (row of editorGafcExp1AssignmentRows(); track row.key) {
+                                <tr>
+                                  <th scope="row" class="text-nowrap">{{ row.label }}</th>
+                                  <td>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      [max]="row.detailMax"
+                                      class="form-control form-control-sm"
+                                      [value]="row.detail"
+                                      (input)="setEditorGafcExp1AssignmentValue(row.key, 'detail', $any($event.target).value)"
+                                    />
+                                  </td>
+                                  <td>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      [max]="row.valueMax"
+                                      class="form-control form-control-sm"
+                                      [value]="row.min"
+                                      (input)="setEditorGafcExp1AssignmentValue(row.key, 'min', $any($event.target).value)"
+                                    />
+                                  </td>
+                                  <td>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      [max]="row.valueMax"
+                                      class="form-control form-control-sm"
+                                      [value]="row.max"
+                                      (input)="setEditorGafcExp1AssignmentValue(row.key, 'max', $any($event.target).value)"
+                                    />
+                                  </td>
+                                </tr>
+                              }
+                            </tbody>
+                          </table>
                         </div>
                       </div>
                     </div>

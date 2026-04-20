@@ -95,6 +95,60 @@ const GAFC_EXP1_FUNCTION_OPTIONS: ReadonlyArray<ValueOption> = [
   { value: 8, label: 'Delay 2' },
   { value: 9, label: 'Reverb' },
 ];
+interface GafcExp1AssignmentSpec {
+  key: string;
+  label: string;
+  detailMax: number;
+  valueMax: number;
+  minOffset: number;
+  minSize: number;
+  maxOffset: number;
+  maxSize: number;
+}
+
+interface GafcExp1AssignmentRow extends GafcExp1AssignmentSpec {
+  detail: number;
+  min: number;
+  max: number;
+}
+
+const GAFC_EXP1_ASSIGNMENT_RAW_LENGTH = 49;
+const GAFC_EXP1_ASSIGNMENT_SCHEMA: ReadonlyArray<GafcExp1AssignmentSpec> = [
+  { key: 'booster', label: 'Booster', detailMax: 7, valueMax: 127, minOffset: 0, minSize: 1, maxOffset: 0, maxSize: 1 },
+  { key: 'delay', label: 'Delay', detailMax: 7, valueMax: 2000, minOffset: 1, minSize: 4, maxOffset: 1, maxSize: 4 },
+  { key: 'reverb', label: 'Reverb', detailMax: 7, valueMax: 500, minOffset: 5, minSize: 4, maxOffset: 5, maxSize: 4 },
+  { key: 'chorus', label: 'Chorus', detailMax: 10, valueMax: 127, minOffset: 9, minSize: 1, maxOffset: 9, maxSize: 1 },
+  { key: 'flanger', label: 'Flanger', detailMax: 7, valueMax: 127, minOffset: 10, minSize: 1, maxOffset: 10, maxSize: 1 },
+  { key: 'phaser', label: 'Phaser', detailMax: 7, valueMax: 127, minOffset: 11, minSize: 1, maxOffset: 11, maxSize: 1 },
+  { key: 'univ', label: 'Uni-V', detailMax: 3, valueMax: 127, minOffset: 12, minSize: 1, maxOffset: 12, maxSize: 1 },
+  { key: 'tremolo', label: 'Tremolo', detailMax: 4, valueMax: 127, minOffset: 13, minSize: 1, maxOffset: 13, maxSize: 1 },
+  { key: 'vibrato', label: 'Vibrato', detailMax: 3, valueMax: 127, minOffset: 14, minSize: 1, maxOffset: 14, maxSize: 1 },
+  { key: 'rotary', label: 'Rotary', detailMax: 3, valueMax: 127, minOffset: 15, minSize: 1, maxOffset: 15, maxSize: 1 },
+  { key: 'ring_mod', label: 'Ring Mod', detailMax: 3, valueMax: 127, minOffset: 16, minSize: 1, maxOffset: 16, maxSize: 1 },
+  { key: 'slow_gear', label: 'Slow Gear', detailMax: 3, valueMax: 127, minOffset: 17, minSize: 1, maxOffset: 17, maxSize: 1 },
+  { key: 'slicer', label: 'Slicer', detailMax: 4, valueMax: 127, minOffset: 18, minSize: 1, maxOffset: 18, maxSize: 1 },
+  { key: 'comp', label: 'Comp', detailMax: 4, valueMax: 127, minOffset: 19, minSize: 1, maxOffset: 19, maxSize: 1 },
+  { key: 'limiter', label: 'Limiter', detailMax: 5, valueMax: 127, minOffset: 20, minSize: 1, maxOffset: 20, maxSize: 1 },
+  { key: 't_wah', label: 'T.Wah', detailMax: 5, valueMax: 127, minOffset: 21, minSize: 1, maxOffset: 21, maxSize: 1 },
+  { key: 'auto_wah', label: 'Auto Wah', detailMax: 6, valueMax: 127, minOffset: 22, minSize: 1, maxOffset: 22, maxSize: 1 },
+  { key: 'pedal_wah', label: 'Pedal Wah', detailMax: 5, valueMax: 127, minOffset: 23, minSize: 1, maxOffset: 23, maxSize: 1 },
+  { key: 'geq', label: 'GEQ', detailMax: 11, valueMax: 127, minOffset: 24, minSize: 1, maxOffset: 24, maxSize: 1 },
+  { key: 'peq', label: 'PEQ', detailMax: 11, valueMax: 127, minOffset: 25, minSize: 1, maxOffset: 25, maxSize: 1 },
+  { key: 'guitar_sim', label: 'Guitar Sim', detailMax: 4, valueMax: 127, minOffset: 26, minSize: 1, maxOffset: 26, maxSize: 1 },
+  { key: 'ac_guitar_sim', label: 'AC.Guitar Sim', detailMax: 4, valueMax: 127, minOffset: 27, minSize: 1, maxOffset: 27, maxSize: 1 },
+  { key: 'ac_processor', label: 'AC.Processor', detailMax: 6, valueMax: 127, minOffset: 28, minSize: 1, maxOffset: 28, maxSize: 1 },
+  { key: 'wave_synth', label: 'Wave Synth', detailMax: 7, valueMax: 127, minOffset: 29, minSize: 1, maxOffset: 29, maxSize: 1 },
+  { key: 'octave', label: 'Octave', detailMax: 2, valueMax: 127, minOffset: 30, minSize: 1, maxOffset: 30, maxSize: 1 },
+  { key: 'pitch_shifter', label: 'Pitch Shifter', detailMax: 10, valueMax: 300, minOffset: 31, minSize: 4, maxOffset: 31, maxSize: 4 },
+  { key: 'harmonist', label: 'Harmonist', detailMax: 9, valueMax: 300, minOffset: 35, minSize: 4, maxOffset: 35, maxSize: 4 },
+  { key: 'humanizer', label: 'Humanizer', detailMax: 5, valueMax: 127, minOffset: 39, minSize: 1, maxOffset: 39, maxSize: 1 },
+  { key: 'phase_90e', label: 'Phase 90E', detailMax: 1, valueMax: 127, minOffset: 40, minSize: 1, maxOffset: 40, maxSize: 1 },
+  { key: 'flanger_117e', label: 'Flanger 117E', detailMax: 4, valueMax: 127, minOffset: 41, minSize: 1, maxOffset: 41, maxSize: 1 },
+  { key: 'wah_95e', label: 'Wah 95E', detailMax: 5, valueMax: 127, minOffset: 42, minSize: 1, maxOffset: 42, maxSize: 1 },
+  { key: 'dc_30', label: 'DC-30', detailMax: 6, valueMax: 600, minOffset: 43, minSize: 4, maxOffset: 43, maxSize: 4 },
+  { key: 'heavy_oct', label: 'Heavy Oct', detailMax: 3, valueMax: 127, minOffset: 47, minSize: 1, maxOffset: 47, maxSize: 1 },
+  { key: 'pedal_bend', label: 'Pedal Bend', detailMax: 4, valueMax: 127, minOffset: 48, minSize: 1, maxOffset: 48, maxSize: 1 },
+] as const;
 const EQ_TYPE_NAMES = ['Parametric EQ', 'GE-10'];
 const EQ_POSITION_NAMES = ['Input', 'Post Amp'];
 const EQ_GE10_BAND_LABELS = ['31', '62', '125', '250', '500', '1k', '2k', '4k', '8k', '16k', 'Level'];
@@ -3922,10 +3976,49 @@ export class App implements OnInit, OnDestroy {
     return GAFC_EXP1_FUNCTION_OPTIONS;
   }
 
-  editorGafcExp1Raw(field: 'detail_raw' | 'min_raw' | 'max_raw'): number[] | null {
+  editorGafcExp1AssignmentRows(): readonly GafcExp1AssignmentRow[] {
     const stages = this.readObject(this.editorPatchDraft(), 'stages');
     const block = this.readObject(stages, 'gafc_exp1');
-    return this.readNumericArray(block, field);
+    if (!block) {
+      return [];
+    }
+    const detailRaw = this.readNumericArray(block, 'detail_raw') ?? [];
+    const minRaw = this.readNumericArray(block, 'min_raw') ?? [];
+    const maxRaw = this.readNumericArray(block, 'max_raw') ?? [];
+    return GAFC_EXP1_ASSIGNMENT_SCHEMA.map((spec, index) => ({
+      ...spec,
+      detail: this.decodeRolandValue(detailRaw.slice(index, index + 1)),
+      min: this.decodeRolandValue(minRaw.slice(spec.minOffset, spec.minOffset + spec.minSize)),
+      max: this.decodeRolandValue(maxRaw.slice(spec.maxOffset, spec.maxOffset + spec.maxSize)),
+    }));
+  }
+
+  setEditorGafcExp1AssignmentValue(key: string, field: 'detail' | 'min' | 'max', value: string): void {
+    const specIndex = GAFC_EXP1_ASSIGNMENT_SCHEMA.findIndex((entry) => entry.key === key);
+    if (specIndex < 0) {
+      return;
+    }
+    const spec = GAFC_EXP1_ASSIGNMENT_SCHEMA[specIndex];
+    const parsed = this.parseInteger(value);
+    this.updateEditorPatch((draft) => {
+      const stages = this.ensureObject(draft, 'stages');
+      const block = this.ensureObject(stages, 'gafc_exp1');
+      if (field === 'detail') {
+        const raw = this.ensureRawArray(block, 'detail_raw', GAFC_EXP1_ASSIGNMENT_SCHEMA.length);
+        raw[specIndex] = this.clampInteger(parsed, 0, spec.detailMax);
+        block['detail_raw'] = raw;
+        return;
+      }
+      const rawKey = field === 'min' ? 'min_raw' : 'max_raw';
+      const offset = field === 'min' ? spec.minOffset : spec.maxOffset;
+      const size = field === 'min' ? spec.minSize : spec.maxSize;
+      const raw = this.ensureRawArray(block, rawKey, GAFC_EXP1_ASSIGNMENT_RAW_LENGTH);
+      const encoded = this.encodeRolandValue(this.clampInteger(parsed, 0, spec.valueMax), size);
+      for (let idx = 0; idx < encoded.length; idx += 1) {
+        raw[offset + idx] = encoded[idx];
+      }
+      block[rawKey] = raw;
+    });
   }
 
   editorStageOn(stageName: StageName): boolean {
@@ -4797,6 +4890,24 @@ export class App implements OnInit, OnDestroy {
       return created;
     }
     return rawUnknown.map((item) => this.parseUnknownNumber(item));
+  }
+
+  private decodeRolandValue(bytes: readonly number[]): number {
+    let value = 0;
+    for (const byte of bytes) {
+      value = value * 128 + this.clampInteger(byte, 0, 127);
+    }
+    return value;
+  }
+
+  private encodeRolandValue(value: number, size: number): number[] {
+    const encoded = Array.from({ length: size }, () => 0);
+    let remaining = Math.max(0, Math.floor(value));
+    for (let index = size - 1; index >= 0; index -= 1) {
+      encoded[index] = remaining % 128;
+      remaining = Math.floor(remaining / 128);
+    }
+    return encoded;
   }
 
   private ensureAmpRaw(amp: Record<string, unknown>): number[] {
