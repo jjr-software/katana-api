@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, NgZone, OnDestroy, OnInit, inject, input, output, signal } from '@angular/core';
 
 const DEFAULT_TARGET_RMS_DBFS = -35.0;
 const GLOBAL_NORMALIZE_TARGET_STORAGE_KEY = 'katana.globalNormalizeTargetRms';
@@ -196,10 +196,18 @@ const LIVE_FFT_BANDS = buildLiveMeterBands(LIVE_GE10_BAND_CENTERS_HZ, ['31', '62
   selector: 'app-dashboard-sticky-panel',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  styles: [`
+    :host {
+      display: block;
+      position: sticky;
+      top: .75rem;
+      z-index: 4;
+    }
+  `],
   template: `
     @if (model(); as vm) {
       <section class="d-grid gap-3">
-        <div class="card shadow-sm" style="position: sticky; top: .75rem; z-index: 4;">
+        <div class="card shadow-sm">
           <div class="card-body py-2 px-3">
             <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
               <div class="d-flex flex-wrap gap-2">
@@ -350,6 +358,7 @@ export class DashboardStickyPanelComponent implements OnInit, OnDestroy {
   readonly liveMeterAt = signal('');
   readonly liveMeterConnected = signal(false);
 
+  private readonly ngZone = inject(NgZone);
   private liveMeterSource: EventSource | null = null;
   private liveMeterReconnectHandle: ReturnType<typeof setTimeout> | null = null;
   private liveMeterShouldRun = false;
@@ -480,49 +489,51 @@ export class DashboardStickyPanelComponent implements OnInit, OnDestroy {
   private startLiveMeter(): void {
     this.liveMeterShouldRun = true;
     this.disconnectLiveMeter();
-    const source = new EventSource(`/api/v1/audio/live/sse?window_sec=${LIVE_METER_WINDOW_SEC}`);
-    source.onmessage = (event: MessageEvent<string>) => {
-      try {
-        const payload = JSON.parse(event.data) as Record<string, unknown>;
-        const eventType = String(payload['type'] ?? '');
-        if (eventType === 'connected') {
-          const rate = Number(payload['rate']);
-          if (Number.isFinite(rate) && rate > 0) {
-            this.liveMeterRate.set(rate);
+    this.ngZone.runOutsideAngular(() => {
+      const source = new EventSource(`/api/v1/audio/live/sse?window_sec=${LIVE_METER_WINDOW_SEC}`);
+      source.onmessage = (event: MessageEvent<string>) => {
+        try {
+          const payload = JSON.parse(event.data) as Record<string, unknown>;
+          const eventType = String(payload['type'] ?? '');
+          if (eventType === 'connected') {
+            const rate = Number(payload['rate']);
+            if (Number.isFinite(rate) && rate > 0) {
+              this.liveMeterRate.set(rate);
+            }
+            this.liveMeterConnected.set(true);
+            return;
           }
-          this.liveMeterConnected.set(true);
-          return;
+          if (eventType !== 'audio_metrics') {
+            return;
+          }
+          const rms = Number(payload['rms_dbfs']);
+          const ts = String(payload['ts'] ?? '');
+          if (Number.isFinite(rms)) {
+            this.liveRmsDbfs.set(rms);
+            this.liveRmsMaxDbfs.update((current) => (current === null || rms > current ? rms : current));
+            this.pushLiveRmsPoint(rms);
+          }
+          const fftBinsUnknown = payload['fft_bins_db'];
+          if (Array.isArray(fftBinsUnknown)) {
+            const fftBins = fftBinsUnknown
+              .map((item) => (typeof item === 'number' && Number.isFinite(item) ? item : null))
+              .filter((item): item is number => item !== null);
+            this.liveFftBinsDb.set(fftBins);
+            const currentBands = this.buildLiveMeterBandRows(fftBins);
+            this.liveFrequencyBandMaxDbfs.update((current) => this.mergeLiveMeterBandMax(current, currentBands));
+          }
+          this.liveMeterAt.set(ts);
+        } catch {
+          // Keep the panel stable if one event is malformed.
         }
-        if (eventType !== 'audio_metrics') {
-          return;
-        }
-        const rms = Number(payload['rms_dbfs']);
-        const ts = String(payload['ts'] ?? '');
-        if (Number.isFinite(rms)) {
-          this.liveRmsDbfs.set(rms);
-          this.liveRmsMaxDbfs.update((current) => (current === null || rms > current ? rms : current));
-          this.pushLiveRmsPoint(rms);
-        }
-        const fftBinsUnknown = payload['fft_bins_db'];
-        if (Array.isArray(fftBinsUnknown)) {
-          const fftBins = fftBinsUnknown
-            .map((item) => (typeof item === 'number' && Number.isFinite(item) ? item : null))
-            .filter((item): item is number => item !== null);
-          this.liveFftBinsDb.set(fftBins);
-          const currentBands = this.buildLiveMeterBandRows(fftBins);
-          this.liveFrequencyBandMaxDbfs.update((current) => this.mergeLiveMeterBandMax(current, currentBands));
-        }
-        this.liveMeterAt.set(ts);
-      } catch {
-        // Keep the panel stable if one event is malformed.
-      }
-    };
-    source.onerror = () => {
-      this.liveMeterConnected.set(false);
-      this.disconnectLiveMeter();
-      this.scheduleLiveMeterReconnect();
-    };
-    this.liveMeterSource = source;
+      };
+      source.onerror = () => {
+        this.liveMeterConnected.set(false);
+        this.disconnectLiveMeter();
+        this.scheduleLiveMeterReconnect();
+      };
+      this.liveMeterSource = source;
+    });
   }
 
   private disconnectLiveMeter(): void {

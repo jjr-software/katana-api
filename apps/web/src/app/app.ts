@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, TemplateRef, ViewChild, computed, effect, inject, signal } from '@angular/core';
+import { Component, NgZone, OnDestroy, OnInit, TemplateRef, ViewChild, computed, effect, inject, signal } from '@angular/core';
 import { NgbModal, NgbModalModule, NgbModalOptions, NgbModalRef } from '@ng-bootstrap/ng-bootstrap';
 import { PatchSummaryComponent } from './patch-summary.component';
 import { DashboardStickyPanelComponent, type DashboardStickyPanelViewModel } from './dashboard-sticky-panel.component';
@@ -624,6 +624,7 @@ export class App implements OnInit, OnDestroy {
   @ViewChild('autoLevelModalTpl') private autoLevelModalTpl?: TemplateRef<unknown>;
   @ViewChild('ampStateConflictModalTpl') private ampStateConflictModalTpl?: TemplateRef<unknown>;
   private readonly modalService = inject(NgbModal);
+  private readonly ngZone = inject(NgZone);
   private readonly modalRefs: Partial<Record<ModalKey, NgbModalRef>> = {};
 
   currentPage = signal<'dashboard' | 'lineout' | 'samples'>(this.resolvePageFromPath());
@@ -825,18 +826,19 @@ export class App implements OnInit, OnDestroy {
     void this.loadRecentAudioSamples();
     void this.loadToneLabData();
     if (this.isLineOutPage()) {
-      void this.loadLineOutState();
+    void this.loadLineOutState();
     }
     void this.refreshActiveSlot();
     void this.refreshLivePatchStatus();
     void this.bootstrapLivePatchEditor();
-    this.startLiveMeter();
-    this.queuePollHandle = setInterval(() => {
-      void this.refreshQueueState();
-    }, 1000);
-    this.activeSlotPollHandle = setInterval(() => {
-      void this.refreshActiveSlot();
-    }, 1500);
+    this.ngZone.runOutsideAngular(() => {
+      this.queuePollHandle = setInterval(() => {
+        void this.refreshQueueState();
+      }, 1000);
+      this.activeSlotPollHandle = setInterval(() => {
+        void this.refreshActiveSlot();
+      }, 1500);
+    });
   }
 
   ngOnDestroy(): void {
@@ -2720,6 +2722,9 @@ export class App implements OnInit, OnDestroy {
     ]);
     this.responseJson.set('');
     try {
+    this.ngZone.runOutsideAngular(() => {
+      this.startLiveMeter();
+    });
       let workingPatch = this.clonePatch(slot.patch);
       const boosterInitiallyOn = this.patchBoosterOn(workingPatch);
       await this.waitForPlayingStart(slot.slot_label);
@@ -2757,6 +2762,7 @@ export class App implements OnInit, OnDestroy {
       this.status.set(`Volume normalization failed for ${this.autoLevelSlotLabel()}`);
     } finally {
       this.autoLevelRunning.set(false);
+      this.shutdownLiveMeter();
     }
   }
 
