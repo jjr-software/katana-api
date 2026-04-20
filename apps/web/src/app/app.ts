@@ -676,7 +676,6 @@ export class App implements OnInit, OnDestroy {
   toneAiPreviewCandidate = signal<AiPreviewPatchObjectCandidate | null>(null);
   toneSelectedBlocks = signal<Record<string, boolean>>({ amp: true, booster: true, eq1: true });
   toneSaveBlocks = signal<Record<string, boolean>>({});
-  liveEditorShowAllBlocks = signal(false);
   toneLoadedPatchObjectId = signal('');
   toneLoadedPatchName = signal('');
   toneLoadedPatchSnapshot = signal<Record<string, unknown> | null>(null);
@@ -1187,8 +1186,12 @@ export class App implements OnInit, OnDestroy {
     this.toneSaveBlocks.update((current) => ({ ...current, [block]: checked }));
   }
 
-  setLiveEditorShowAllBlocks(checked: boolean): void {
-    this.liveEditorShowAllBlocks.set(checked);
+  selectAllLiveEditorBlocks(): void {
+    this.setToneBlocksFromNames(this.toneBlockOptions(), true);
+  }
+
+  selectNoneLiveEditorBlocks(): void {
+    this.setToneBlocksFromNames([], true);
   }
 
   selectedToneBlocks(): string[] {
@@ -1234,11 +1237,11 @@ export class App implements OnInit, OnDestroy {
   }
 
   liveEditorShowsBlock(block: string): boolean {
-    return this.liveEditorShowAllBlocks() || this.isToneBlockSelected(block);
+    return this.isToneBlockSelected(block);
   }
 
   liveEditorShowsAnyBlocks(blocks: readonly string[]): boolean {
-    return this.liveEditorShowAllBlocks() || blocks.some((block) => this.isToneBlockSelected(block));
+    return blocks.some((block) => this.isToneBlockSelected(block));
   }
 
   setToneSaveName(value: string): void {
@@ -5748,11 +5751,11 @@ export class App implements OnInit, OnDestroy {
 
   livePatchSelectedBlocksSummary(): string {
     const blocks = this.selectedToneBlocks();
-    if (this.liveEditorShowAllBlocks()) {
-      return blocks.length > 0 ? `${blocks.join(', ')} · editor showing all blocks` : 'Editor showing all blocks';
-    }
     if (blocks.length === 0) {
       return 'No blocks visible yet';
+    }
+    if (blocks.length === this.toneBlockOptions().length) {
+      return 'All blocks visible';
     }
     return blocks.join(', ');
   }
@@ -5846,7 +5849,6 @@ export class App implements OnInit, OnDestroy {
     this.toneLoadedPatchSnapshot.set(null);
     this.toneLoadedPatchObjectId.set('');
     this.toneLoadedPatchName.set('');
-    this.liveEditorShowAllBlocks.set(false);
     this.setToneBlocksFromNames(this.toneBlockOptions(), true);
   }
 
