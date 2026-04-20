@@ -592,6 +592,7 @@ export class App implements OnInit, OnDestroy {
   totalSyncMs = signal(0);
   selectedAmpSlot = signal<number | null>(null);
   selectedAmpSlotText = signal('n/a');
+  selectedAmpSlotSavedName = signal('n/a');
   currentAmpPatchHash = signal('');
   currentAmpCommitState = signal<'unknown' | 'committed' | 'uncommitted'>('unknown');
   livePatchConfirmedAt = signal('');
@@ -604,7 +605,6 @@ export class App implements OnInit, OnDestroy {
   livePatchPartialDbMatches = signal<Array<{ id: number; name: string }>>([]);
   livePatchExactSlotMatch = signal<{ slot: number; patch_name: string } | null>(null);
   livePatchPartialSlotMatches = signal<Array<{ slot: number; patch_name: string }>>([]);
-  ampSlotSavedNames = signal<Record<number, string>>({});
   toasts = signal<ToastMessage[]>([]);
   globalNormalizeTargetRms = signal(DEFAULT_TARGET_RMS_DBFS.toFixed(2));
   liveRmsDbfs = signal<number | null>(null);
@@ -942,7 +942,6 @@ export class App implements OnInit, OnDestroy {
 
       const persisted = payload as LivePatchResponse;
       this.applyLivePatchStatus(persisted);
-      void this.refreshAmpSlotSavedNames();
 
       let synced: SlotSyncResponse | null = null;
       let refreshError: string | null = null;
@@ -951,6 +950,7 @@ export class App implements OnInit, OnDestroy {
         this.applySyncedSlot(synced.slot);
         this.selectedAmpSlot.set(synced.slot.slot);
         this.selectedAmpSlotText.set(synced.slot.slot_label);
+        this.selectedAmpSlotSavedName.set(synced.slot.patch_name?.trim() || 'n/a');
         this.lastSyncedAt.set(synced.synced_at);
         this.totalSyncMs.set(synced.slot.slot_sync_ms);
         this.currentAmpPatchHash.set(synced.slot.config_hash_sha256 || '');
@@ -1009,7 +1009,6 @@ export class App implements OnInit, OnDestroy {
       const live = payload as LivePatchResponse;
       this.applyLivePatchStatus(live);
       this.loadLivePatchIntoEditorState(live, false, true);
-      void this.refreshAmpSlotSavedNames();
       this.status.set('Loaded current Live Patch from amp');
     } catch (error: unknown) {
       this.status.set('Failed to load current Live Patch from amp.');
@@ -1077,7 +1076,6 @@ export class App implements OnInit, OnDestroy {
       const live = payload as LivePatchResponse;
       this.applyLivePatchStatus(live);
       this.loadLivePatchIntoEditorState(live, false);
-      void this.refreshAmpSlotSavedNames();
     } catch {
       // Silent bootstrap path.
     }
@@ -1950,6 +1948,7 @@ export class App implements OnInit, OnDestroy {
       }
       const synced = syncPayload as SlotSyncResponse;
       this.applySyncedSlot(synced.slot);
+      this.selectedAmpSlotSavedName.set(synced.slot.patch_name?.trim() || 'n/a');
       this.lastSyncedAt.set(synced.synced_at);
       this.totalSyncMs.set(synced.slot.slot_sync_ms);
       this.currentAmpPatchHash.set(synced.slot.config_hash_sha256 || '');
@@ -1992,6 +1991,7 @@ export class App implements OnInit, OnDestroy {
       this.applySyncedSlot(synced.slot);
       this.selectedAmpSlot.set(slot.slot);
       this.selectedAmpSlotText.set(slot.slot_label);
+      this.selectedAmpSlotSavedName.set(synced.slot.patch_name?.trim() || 'n/a');
       this.lastSyncedAt.set(synced.synced_at);
       this.totalSyncMs.set(synced.slot.slot_sync_ms);
       this.currentAmpPatchHash.set(synced.slot.config_hash_sha256 || '');
@@ -4241,15 +4241,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   selectedAmpSlotSavedPatchName(): string {
-    const slotNumber = this.selectedAmpSlot();
-    if (slotNumber === null) {
-      return 'n/a';
-    }
-    const savedName = this.ampSlotSavedNames()[slotNumber] ?? '';
-    if (savedName.trim()) {
-      return savedName.trim();
-    }
-    return 'Loading...';
+    return this.selectedAmpSlotSavedName();
   }
 
   currentSettingsPatchName(): string {
@@ -5992,6 +5984,9 @@ export class App implements OnInit, OnDestroy {
       this.selectedAmpSlot.set(payload.active_slot);
       this.selectedAmpSlotText.set(payload.active_slot <= 4 ? `A:${payload.active_slot}` : `B:${payload.active_slot - 4}`);
     }
+    if (payload.exact_amp_slot?.patch_name) {
+      this.selectedAmpSlotSavedName.set(payload.exact_amp_slot.patch_name.trim() || 'Unnamed');
+    }
   }
 
   private refreshCurrentCommitStateFromKnownState(): void {
@@ -6008,26 +6003,6 @@ export class App implements OnInit, OnDestroy {
       return;
     }
     this.currentAmpCommitState.set(currentHash === selectedHash ? 'committed' : 'uncommitted');
-  }
-
-  private async refreshAmpSlotSavedNames(): Promise<void> {
-    try {
-      const response = await fetch('/api/v1/amp/slots/quick', {
-        method: 'GET',
-        cache: 'no-store',
-      });
-      const payload = (await response.json()) as QuickAmpSlotNamesResponse | { detail?: unknown };
-      if (!response.ok || !('slots' in payload)) {
-        return;
-      }
-      const next: Record<number, string> = {};
-      for (const slot of payload.slots) {
-        next[slot.slot] = slot.patch_name || '';
-      }
-      this.ampSlotSavedNames.set(next);
-    } catch {
-      // Best-effort only.
-    }
   }
 
   private async refreshActiveSlot(): Promise<void> {
@@ -6060,8 +6035,8 @@ export class App implements OnInit, OnDestroy {
       }
       this.selectedAmpSlot.set(active.slot);
       this.selectedAmpSlotText.set(active.slot_label || 'n/a');
-      if (previousSlot === null || active.slot !== previousSlot) {
-        void this.refreshAmpSlotSavedNames();
+      if (active.patch_name && active.patch_name.trim()) {
+        this.selectedAmpSlotSavedName.set(active.patch_name.trim());
       }
       this.refreshCurrentCommitStateFromKnownState();
     } catch {
