@@ -744,8 +744,6 @@ export class App implements OnInit, OnDestroy {
   editorSlotLabel = signal('');
   editorPatchDraft = signal<Record<string, unknown> | null>(null);
   editorTargetIsActive = signal(false);
-  editorOriginalFingerprint = signal('');
-  editorOriginalConfigHash = signal('');
   editorLiveApplyPending = signal(false);
   editorLiveApplyError = signal('');
   editorLiveApplyReadbackAt = signal('');
@@ -1196,8 +1194,6 @@ export class App implements OnInit, OnDestroy {
     this.editorSlotLabel.set('Live Patch');
     this.editorTargetIsActive.set(true);
     this.editorPatchDraft.set(draft);
-    this.editorOriginalFingerprint.set(this.patchFingerprint(draft));
-    this.editorOriginalConfigHash.set('');
     this.editorLiveApplyLastAppliedFingerprint = this.patchFingerprint(draft);
     this.editorLiveApplyQueuedFingerprint = null;
     this.editorLiveApplyInFlight = false;
@@ -3574,59 +3570,14 @@ export class App implements OnInit, OnDestroy {
     return this.editorTargetIsActive();
   }
 
-  editorIsModified(): boolean {
-    const draftFingerprint = this.editorDraftFingerprint();
-    const originalFingerprint = this.editorOriginalFingerprint();
-    if (!draftFingerprint || !originalFingerprint) {
-      return false;
-    }
-    return draftFingerprint !== originalFingerprint;
-  }
-
-  editorSavedPatchStatusLabel(): string {
-    const selectedName = this.toneLoadedPatchName().trim();
-    if (!selectedName) {
-      const exactMatchName = this.livePatchExactDbName().trim();
-      if (exactMatchName && !this.editorIsModified()) {
-        return `Saved patch: ${exactMatchName}`;
-      }
-      return '';
-    }
-    if (this.editorIsModified()) {
-      return `Unsaved changes from ${selectedName}`;
-    }
-    return `Saved patch: ${selectedName}`;
-  }
-
-  editorHashLabel(): string {
-    const draftHash = this.readString(this.editorPatchDraft(), 'config_hash_sha256') ?? '';
-    const originalHash = this.editorOriginalConfigHash();
-    if (this.editorIsModified()) {
-      if (originalHash) {
-        return `${this.shortHash(originalHash)} -> pending`;
-      }
-      return 'pending';
-    }
-    if (draftHash) {
-      return this.shortHash(draftHash);
-    }
-    return 'n/a';
-  }
-
   editorDbStateLabel(): string {
     const slotNumber = this.editorSlotNumber();
     if (slotNumber === null) {
       return 'DB ?';
     }
     const slot = this.slots().find((card) => card.slot === slotNumber);
-    if (!slot?.saved_hash_sha256) {
-      return this.editorPatchDraft() ? 'DB ✗' : 'DB ?';
-    }
-    if (this.editorIsModified()) {
-      return 'DB ✗';
-    }
     const draftHash = this.readString(this.editorPatchDraft(), 'config_hash_sha256') ?? '';
-    if (!draftHash) {
+    if (!slot?.saved_hash_sha256 || !draftHash) {
       return 'DB ✗';
     }
     return draftHash === slot.saved_hash_sha256 ? 'DB ✓' : 'DB ✗';
@@ -5690,7 +5641,7 @@ export class App implements OnInit, OnDestroy {
       return false;
     }
     const draftSnapshot = this.clonePatch(draft);
-    const changedBlocks = forceFullPatch ? [] : this.editorChangedBlocks(this.livePatchSnapshot(), draftSnapshot);
+    const changedBlocks = forceFullPatch ? [] : this.editorBlocksToApply(this.livePatchSnapshot(), draftSnapshot);
     this.editorLiveApplyInFlight = true;
     this.editorLiveApplyPending.set(true);
     this.editorLiveApplyReadbackAt.set('');
@@ -5793,7 +5744,7 @@ export class App implements OnInit, OnDestroy {
     return this.patchFingerprint(draft);
   }
 
-  private editorChangedBlocks(referencePatch: Record<string, unknown> | null, currentPatch: Record<string, unknown>): string[] {
+  private editorBlocksToApply(referencePatch: Record<string, unknown> | null, currentPatch: Record<string, unknown>): string[] {
     if (!referencePatch) {
       return [];
     }
@@ -5826,10 +5777,6 @@ export class App implements OnInit, OnDestroy {
     this.ampStateConflictPreviousSlotLabel.set('');
     this.ampStateConflictCurrentSlotLabel.set('');
     this.ampStateConflictDetectedAt.set('');
-  }
-
-  editorLiveApplyHasApplied(): boolean {
-    return this.editorLiveApplyReadbackAt() !== '' && !this.editorIsModified();
   }
 
   private patchFingerprint(patch: Record<string, unknown>): string {
@@ -6133,27 +6080,6 @@ export class App implements OnInit, OnDestroy {
   private clearToneAiPreview(): void {
     this.toneAiPreviewSummary.set('');
     this.toneAiPreviewCandidate.set(null);
-  }
-
-  canResetEditorBlockToLoadedPatch(block: string): boolean {
-    const loadedPatch = this.toneLoadedPatchSnapshot();
-    const currentPatch = this.editorPatchDraft();
-    if (!loadedPatch || !currentPatch) {
-      return false;
-    }
-    const loadedBlock = this.comparablePatchBlock(loadedPatch, block);
-    const currentBlock = this.comparablePatchBlock(currentPatch, block);
-    return this.stableStringify(loadedBlock) !== this.stableStringify(currentBlock);
-  }
-
-  resetEditorBlockToLoadedPatch(block: string): void {
-    const loadedPatch = this.toneLoadedPatchSnapshot();
-    if (!loadedPatch) {
-      return;
-    }
-    this.updateEditorPatch((draft) => {
-      this.applyLoadedPatchBlockToDraft(draft, loadedPatch, block);
-    });
   }
 
   private selectSavedPatch(patchObject: TonePatchObjectResponse): void {

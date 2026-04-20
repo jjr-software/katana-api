@@ -121,18 +121,9 @@
             @if (editorModalOpen()) {
               @if (editorPatchDraft(); as draft) {
                 <div class="d-grid gap-3">
-                  @if (editorSavedPatchStatusLabel() || editorLiveApplyError()) {
+                  @if (editorLiveApplyError()) {
                   <article class="border rounded p-2">
-                    @if (editorSavedPatchStatusLabel(); as savedPatchStatus) {
-                      <p class="small mb-0 text-secondary">
-                        <code [class.text-warning]="editorIsModified()" [class.text-success]="!editorIsModified()">
-                          {{ savedPatchStatus }}
-                        </code>
-                      </p>
-                    }
-                    @if (editorLiveApplyError()) {
-                      <p class="small mb-0 text-danger mt-1">{{ editorLiveApplyError() }}</p>
-                    }
+                    <p class="small mb-0 text-danger">{{ editorLiveApplyError() }}</p>
                   </article>
                   }
 
@@ -142,7 +133,6 @@
                       <div class="d-flex align-items-center gap-2">
                         <h4 class="h6 mb-0">Routing</h4>
                       </div>
-                      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch('routing')" [disabled]="!canResetEditorBlockToLoadedPatch('routing')">Reset</button>
                     </div>
                     <div class="row g-2">
                       <div class="col-12 col-md-4">
@@ -176,7 +166,6 @@
                       <div class="d-flex align-items-center gap-2">
                         <h4 class="h6 mb-0">Amp</h4>
                       </div>
-                      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch('amp')" [disabled]="!canResetEditorBlockToLoadedPatch('amp')">Reset</button>
                     </div>
                     <div class="row g-2">
                       <div class="col-6 col-md-4">
@@ -232,7 +221,6 @@
                           </span>
                         </div>
                         <div class="d-flex gap-2 align-items-center">
-                          <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch($any(stageName))" [disabled]="!canResetEditorBlockToLoadedPatch($any(stageName))">Reset</button>
                           <label class="form-check-label small d-flex align-items-center gap-1">
                             <input class="form-check-input m-0" type="checkbox" [checked]="editorStageOn($any(stageName))" (change)="setEditorStageOn($any(stageName), $any($event.target).checked)" />
                             <span>Enabled</span>
@@ -305,7 +293,6 @@
                           </span>
                         </div>
                         <div class="d-flex gap-2 align-items-center">
-                          <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch($any(eqName))" [disabled]="!canResetEditorBlockToLoadedPatch($any(eqName))">Reset</button>
                           <label class="form-check-label small d-flex align-items-center gap-1">
                             <input class="form-check-input m-0" type="checkbox" [checked]="editorEqOn($any(eqName))" (change)="setEditorEqOn($any(eqName), $any($event.target).checked)" />
                             <span>Enabled</span>
@@ -438,7 +425,6 @@
                         <h4 class="h6 mb-0">NS</h4>
                       </div>
                       <div class="d-flex gap-2 align-items-center">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch('ns')" [disabled]="!canResetEditorBlockToLoadedPatch('ns')">Reset</button>
                         <label class="form-check-label small d-flex align-items-center gap-1">
                           <input class="form-check-input m-0" type="checkbox" [checked]="editorNsOn()" (change)="setEditorNsOn($any($event.target).checked)" />
                           <span>Enabled</span>
@@ -459,7 +445,6 @@
                         <h4 class="h6 mb-0">Send / Return</h4>
                       </div>
                       <div class="d-flex gap-2 align-items-center">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch('send_return')" [disabled]="!canResetEditorBlockToLoadedPatch('send_return')">Reset</button>
                         <label class="form-check-label small d-flex align-items-center gap-1">
                           <input class="form-check-input m-0" type="checkbox" [checked]="editorSendReturnOn()" (change)="setEditorSendReturnOn($any($event.target).checked)" />
                           <span>Enabled</span>
@@ -482,7 +467,6 @@
                         <h4 class="h6 mb-0">Solo</h4>
                       </div>
                       <div class="d-flex gap-2 align-items-center">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch('solo')" [disabled]="!canResetEditorBlockToLoadedPatch('solo')">Reset</button>
                         <label class="form-check-label small d-flex align-items-center gap-1">
                           <input class="form-check-input m-0" type="checkbox" [checked]="editorSoloOn()" (change)="setEditorSoloOn($any($event.target).checked)" />
                           <span>Enabled</span>
@@ -502,7 +486,6 @@
                         <h4 class="h6 mb-0">Pedal FX</h4>
                       </div>
                       <div class="d-flex gap-2 align-items-center">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch('pedalfx')" [disabled]="!canResetEditorBlockToLoadedPatch('pedalfx')">Reset</button>
                         <label class="form-check-label small d-flex align-items-center gap-1">
                           <input class="form-check-input m-0" type="checkbox" [checked]="editorPedalFxOn()" (change)="setEditorPedalFxOn($any($event.target).checked)" />
                           <span>Enabled</span>
@@ -579,9 +562,7 @@
                       <div class="d-flex align-items-center gap-2">
                         <h4 class="h6 mb-0">GA-FC EXP1</h4>
                       </div>
-                      <div class="d-flex gap-2 align-items-center">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch('gafc_exp1')" [disabled]="!canResetEditorBlockToLoadedPatch('gafc_exp1')">Reset</button>
-                      </div>
+                      <div class="d-flex gap-2 align-items-center"></div>
                     </div>
                     <div class="row g-2">
                       <div class="col-12 col-md-6">
