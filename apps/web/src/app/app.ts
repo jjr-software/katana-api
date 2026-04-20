@@ -114,6 +114,8 @@ interface LiveMeterBandRow {
   rangeLabel: string;
   currentDbfs: number | null;
   maxDbfs: number | null;
+  currentPercent: number;
+  maxPercent: number;
 }
 
 interface LiveRmsHistoryBar {
@@ -3229,6 +3231,7 @@ export class App implements OnInit, OnDestroy {
     return currentBands.map((band, index) => ({
       ...band,
       maxDbfs: index < maxBands.length ? maxBands[index] ?? null : null,
+      maxPercent: index < maxBands.length ? this.liveMeterDbfsToPercent(maxBands[index] ?? null) : 0,
     }));
   }
 
@@ -3348,17 +3351,30 @@ export class App implements OnInit, OnDestroy {
           rangeLabel: `${band.minHz} Hz - ${band.maxHz} Hz`,
           currentDbfs: null,
           maxDbfs: null,
+          currentPercent: 0,
+          maxPercent: 0,
         };
       }
       const meanPower = currentValues.reduce((acc, value) => acc + 10 ** (value / 10), 0) / currentValues.length;
+      const currentDbfs = Math.max(-60, Math.min(0, Number((10 * Math.log10(meanPower)).toFixed(2))));
       return {
         id: band.id,
         label: band.label,
         rangeLabel: `${band.minHz} Hz - ${band.maxHz} Hz`,
-        currentDbfs: Math.max(-60, Math.min(0, Number((10 * Math.log10(meanPower)).toFixed(2)))),
+        currentDbfs,
         maxDbfs: null,
+        currentPercent: this.liveMeterDbfsToPercent(currentDbfs),
+        maxPercent: 0,
       };
     });
+  }
+
+  private liveMeterDbfsToPercent(value: number | null): number {
+    if (value === null || !Number.isFinite(value)) {
+      return 0;
+    }
+    const clamped = Math.max(-60, Math.min(0, value));
+    return Math.max(0, Math.min(100, ((clamped + 60) / 60) * 100));
   }
 
   private liveFftBinCenterHz(index: number, binCount: number, minFreq: number, maxFreq: number): number {
