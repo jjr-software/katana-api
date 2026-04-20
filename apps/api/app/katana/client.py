@@ -275,11 +275,13 @@ class AmpClient:
             started = time.perf_counter()
             await self._send_only(EDITOR_MODE_ON)
             await self._select_patch(slot)
+            await asyncio.sleep(0.15)
             authoritative_payload = self._clone_patch_payload(patch_payload)
             authoritative_hash = self._config_hash(authoritative_payload)
             authoritative_payload["config_hash_sha256"] = authoritative_hash
             authoritative_name = str(authoritative_payload.get("patch_name", ""))
             await self._apply_selected_patch_payload(patch_payload)
+            await asyncio.sleep(0.15)
             live_applied = await self._read_selected_patch_payload()
             await self._send_only(build_dt1(PATCH_WRITE_ADDR, [0x00, int(slot)]))
             await asyncio.sleep(0.2)

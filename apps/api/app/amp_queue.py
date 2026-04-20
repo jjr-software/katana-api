@@ -349,22 +349,6 @@ class AmpJobQueue:
                     "slot_sync_ms": job.result_slot.slot_sync_ms,
                 }
             }
-        elif job.result_quick is not None:
-            synced_at = job.result_quick.synced_at
-            total_sync_ms = job.result_quick.total_sync_ms
-            slot_count = len(job.result_quick.slots)
-            result_json = {
-                "slots": [
-                    {
-                        "slot": item.slot,
-                        "slot_label": item.slot_label,
-                        "patch_name": item.patch_name,
-                        "synced_at": item.synced_at,
-                        "slot_sync_ms": item.slot_sync_ms,
-                    }
-                    for item in job.result_quick.slots
-                ]
-            }
         elif job.result_slots is not None:
             synced_at = job.result_slots.synced_at
             amp_state_hash = job.result_slots.amp_state_hash_sha256
