@@ -5,7 +5,7 @@ const GLOBAL_NORMALIZE_TARGET_STORAGE_KEY = 'katana.globalNormalizeTargetRms';
 const LIVE_TOTAL_LEVEL_ZOOM_DB = 3.0;
 const LIVE_RMS_HISTORY_LIMIT = 240;
 const LIVE_TOTAL_LEVEL_GRAPH_WIDTH = 1000;
-const LIVE_TOTAL_LEVEL_GRAPH_HEIGHT = 72;
+const LIVE_TOTAL_LEVEL_GRAPH_HEIGHT = 288;
 const LIVE_TOTAL_LEVEL_BAR_STEP = 14;
 const LIVE_TOTAL_LEVEL_BAR_WIDTH = 10;
 const LIVE_METER_WINDOW_SEC = 2.0;
@@ -215,7 +215,7 @@ function buildValueOptions(labels: readonly string[]): ValueOption[] {
               <span>Max Hold {{ liveTotalLevelDelta(liveRmsMaxDbfs()) }}</span>
             </div>
             <div class="mt-2 rounded overflow-hidden border" style="background: linear-gradient(180deg, rgba(13, 110, 253, 0.04) 0%, rgba(220, 53, 69, 0.04) 50%, rgba(25, 135, 84, 0.04) 100%), #f8f9fa;">
-              <svg class="d-block w-100" viewBox="0 0 1000 72" preserveAspectRatio="none" aria-label="Running total level history">
+              <svg class="d-block w-100" viewBox="0 0 1000 288" preserveAspectRatio="none" aria-label="Running total level history">
                 <line x1="0" [attr.y1]="liveTotalLevelTargetLineY()" x2="1000" [attr.y2]="liveTotalLevelTargetLineY()" style="stroke:#dc3545;stroke-width:2;" />
                 @for (bar of liveTotalLevelBars(); track $index) {
                   <rect [attr.x]="bar.x" [attr.y]="bar.y" [attr.width]="bar.width" [attr.height]="bar.height" [attr.fill]="bar.tone === 'above' ? '#dc3545' : '#0d6efd'" />
