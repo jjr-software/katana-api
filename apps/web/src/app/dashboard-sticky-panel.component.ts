@@ -50,9 +50,6 @@ export interface DashboardStickyPanelViewModel {
   patchName: string;
   liveAmpName: string;
   ampSlotSavedName: string;
-  livePatchConfirmedAt: string;
-  lastSyncedAt: string;
-  totalSyncMsText: string;
 }
 
 const BOOSTER_TYPE_NAMES = [
@@ -188,9 +185,6 @@ function buildValueOptions(labels: readonly string[]): ValueOption[] {
             </div>
 
             <div class="d-flex flex-wrap gap-3 small text-secondary">
-              <span>Live Confirmed: <code>{{ vm.livePatchConfirmedAt || 'n/a' }}</code></span>
-              <span>Last Sync: <code>{{ vm.lastSyncedAt || 'n/a' }}</code></span>
-              <span>Total Sync Time: <code>{{ vm.totalSyncMsText }}</code></span>
               <span>
                 Live Meter:
                 <code [class.text-success]="liveMeterConnected()" [class.text-secondary]="!liveMeterConnected()">

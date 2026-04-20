@@ -672,14 +672,11 @@ export class App implements OnInit, OnDestroy {
   status = signal('Idle');
   responseJson = signal('');
   slots = signal<SlotCard[]>(defaultSlotCards());
-  lastSyncedAt = signal('');
-  totalSyncMs = signal(0);
   selectedAmpSlot = signal<number | null>(null);
   selectedAmpSlotText = signal('n/a');
   selectedAmpSlotSavedName = signal('n/a');
   currentAmpPatchHash = signal('');
   currentAmpCommitState = signal<'unknown' | 'committed' | 'uncommitted'>('unknown');
-  livePatchConfirmedAt = signal('');
   livePatchSourceType = signal('');
   livePatchExactDbName = signal('');
   livePatchExactSlotText = signal('');
@@ -804,9 +801,6 @@ export class App implements OnInit, OnDestroy {
     patchName: this.currentSettingsPatchName(),
     liveAmpName: this.livePatchExactDbName().trim() || 'n/a',
     ampSlotSavedName: this.selectedAmpSlotSavedName(),
-    livePatchConfirmedAt: this.livePatchConfirmedAt(),
-    lastSyncedAt: this.lastSyncedAt(),
-    totalSyncMsText: this.formatMs(this.totalSyncMs()),
   }));
   private readonly onPopState = (): void => {
     const page = this.resolvePageFromPath();
@@ -1057,8 +1051,6 @@ export class App implements OnInit, OnDestroy {
         this.selectedAmpSlot.set(synced.slot.slot);
         this.selectedAmpSlotText.set(synced.slot.slot_label);
         this.selectedAmpSlotSavedName.set(synced.slot.patch_name?.trim() || 'n/a');
-        this.lastSyncedAt.set(synced.synced_at);
-        this.totalSyncMs.set(synced.slot.slot_sync_ms);
         this.currentAmpPatchHash.set(synced.slot.config_hash_sha256 || '');
         this.refreshCurrentCommitStateFromKnownState();
       } catch (syncError: unknown) {
@@ -2011,8 +2003,6 @@ export class App implements OnInit, OnDestroy {
 
       const synced = payload as SlotSyncResponse;
       this.applySyncedSlot(synced.slot);
-      this.lastSyncedAt.set(synced.synced_at);
-      this.totalSyncMs.set(synced.slot.slot_sync_ms);
       this.status.set(`Slot ${slot} read succeeded (${this.formatMs(synced.slot.slot_sync_ms)})`);
     } catch (error: unknown) {
       this.status.set(`Slot ${slot} read failed`);
@@ -2072,8 +2062,6 @@ export class App implements OnInit, OnDestroy {
       const synced = syncPayload as SlotSyncResponse;
       this.applySyncedSlot(synced.slot);
       this.selectedAmpSlotSavedName.set(synced.slot.patch_name?.trim() || 'n/a');
-      this.lastSyncedAt.set(synced.synced_at);
-      this.totalSyncMs.set(synced.slot.slot_sync_ms);
       this.currentAmpPatchHash.set(synced.slot.config_hash_sha256 || '');
       this.refreshCurrentCommitStateFromKnownState();
       this.status.set(`Activated ${slot.slot_label}; patch state read back (${this.formatMs(synced.slot.slot_sync_ms)})`);
@@ -2115,8 +2103,6 @@ export class App implements OnInit, OnDestroy {
       this.selectedAmpSlot.set(slot.slot);
       this.selectedAmpSlotText.set(slot.slot_label);
       this.selectedAmpSlotSavedName.set(synced.slot.patch_name?.trim() || 'n/a');
-      this.lastSyncedAt.set(synced.synced_at);
-      this.totalSyncMs.set(synced.slot.slot_sync_ms);
       this.currentAmpPatchHash.set(synced.slot.config_hash_sha256 || '');
       this.refreshCurrentCommitStateFromKnownState();
       this.status.set(`Read active patch state for ${slot.slot_label} (${this.formatMs(synced.slot.slot_sync_ms)})`);
@@ -2263,8 +2249,6 @@ export class App implements OnInit, OnDestroy {
         }),
       );
       this.selectedAmpSlot.set(slot.slot);
-      this.lastSyncedAt.set(committed.synced_at);
-      this.totalSyncMs.set(committed.slot.slot_sync_ms);
       this.currentAmpPatchHash.set(committed.slot.config_hash_sha256 || '');
       this.refreshCurrentCommitStateFromKnownState();
       this.status.set(`Committed ${slot.slot_label} to amp memory`);
@@ -6337,7 +6321,6 @@ export class App implements OnInit, OnDestroy {
 
   private applyLivePatchStatus(payload: LivePatchResponse): void {
     this.livePatchSnapshot.set(this.clonePatch(payload.patch_json));
-    this.livePatchConfirmedAt.set(payload.amp_confirmed_at || '');
     this.livePatchSourceType.set(payload.source_type || '');
     this.livePatchExactDbMatch.set(payload.exact_patch_object ?? null);
     this.livePatchExactDbName.set(payload.exact_patch_object?.name || '');
