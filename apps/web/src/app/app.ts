@@ -5586,7 +5586,6 @@ export class App implements OnInit, OnDestroy {
       const slotNumber = this.editorSlotNumber();
       slotNumberForHash = slotNumber;
       nextDraftSnapshot = this.clonePatch(next);
-      this.autoSelectToneBlocksFromLoadedPatch(nextDraftSnapshot, false);
       if (slotNumber !== null) {
         this.slots.update((cards) =>
           cards.map((card) => {
@@ -6154,30 +6153,6 @@ export class App implements OnInit, OnDestroy {
     }
     this.updateEditorPatch((draft) => {
       this.applyLoadedPatchBlockToDraft(draft, loadedPatch, block);
-    });
-  }
-
-  private autoSelectToneBlocksFromLoadedPatch(currentPatch: Record<string, unknown>, replaceSelection: boolean): void {
-    const loadedPatch = this.toneLoadedPatchSnapshot();
-    if (!loadedPatch) {
-      return;
-    }
-    const next: Record<string, boolean> = {};
-    for (const block of this.toneBlockOptions()) {
-      const loadedBlock = this.comparablePatchBlock(loadedPatch, block);
-      const currentBlock = this.comparablePatchBlock(currentPatch, block);
-      next[block] = this.stableStringify(loadedBlock) !== this.stableStringify(currentBlock);
-    }
-    if (replaceSelection) {
-      this.toneSelectedBlocks.set(next);
-      return;
-    }
-    this.toneSelectedBlocks.update((current) => {
-      const merged = { ...current };
-      for (const block of this.toneBlockOptions()) {
-        merged[block] = Boolean(current[block]) || next[block];
-      }
-      return merged;
     });
   }
 
