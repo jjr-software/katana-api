@@ -107,25 +107,25 @@ def extract_patch_object(full_patch: dict[str, Any], blocks: list[str] | tuple[s
         if block:
             out["amp"] = block
 
-    stages = full_patch.get("stages")
     colors = full_patch.get("colors")
-    if isinstance(stages, dict):
-        for block_name in selected:
-            if block_name not in STAGE_BLOCKS:
-                continue
-            stage = full_patch.get(block_name)
-            if not isinstance(stage, dict):
-                stage = stages.get(block_name)
-            if not isinstance(stage, dict):
-                continue
-            stage_copy = deepcopy(stage)
-            if block_name in COLOR_BLOCKS and isinstance(colors, dict):
-                stage_color = colors.get(block_name)
-                if isinstance(stage_color, dict) and isinstance(stage_color.get("index"), (int, float)):
-                    stage_copy["color_index"] = int(stage_color["index"])
-            block = _normalize_block(block_name, stage_copy)
-            if block:
-                out[block_name] = block
+    stages = full_patch.get("stages")
+    stages_dict = stages if isinstance(stages, dict) else None
+    for block_name in selected:
+        if block_name not in STAGE_BLOCKS:
+            continue
+        stage = full_patch.get(block_name)
+        if not isinstance(stage, dict) and stages_dict is not None:
+            stage = stages_dict.get(block_name)
+        if not isinstance(stage, dict):
+            continue
+        stage_copy = deepcopy(stage)
+        if block_name in COLOR_BLOCKS and isinstance(colors, dict):
+            stage_color = colors.get(block_name)
+            if isinstance(stage_color, dict) and isinstance(stage_color.get("index"), (int, float)):
+                stage_copy["color_index"] = int(stage_color["index"])
+        block = _normalize_block(block_name, stage_copy)
+        if block:
+            out[block_name] = block
 
     return out
 
