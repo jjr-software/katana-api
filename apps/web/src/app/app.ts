@@ -1242,7 +1242,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   openToneSaveModal(): void {
-    this.toneSaveBlocks.set({ ...this.toneSelectedBlocks() });
+    this.setToneSaveBlocksFromPatch(this.editorPatchDraft(), true);
     const currentName = this.readString(this.editorPatchDraft(), 'patch_name') ?? this.toneLoadedPatchName();
     if (!this.toneSaveName().trim() && currentName) {
       this.toneSaveName.set(currentName);
@@ -1301,6 +1301,24 @@ export class App implements OnInit, OnDestroy {
 
   setToneSaveBlockIncluded(block: string, checked: boolean): void {
     this.toneSaveBlocks.update((current) => ({ ...current, [block]: checked }));
+  }
+
+  private setToneSaveBlocksFromPatch(source: Record<string, unknown> | null, replaceSelection: boolean): void {
+    const next: Record<string, boolean> = {};
+    for (const block of this.toneBlockOptions()) {
+      next[block] = this.patchDefinesBlock(source, block);
+    }
+    if (replaceSelection) {
+      this.toneSaveBlocks.set(next);
+      return;
+    }
+    this.toneSaveBlocks.update((current) => {
+      const merged = { ...current };
+      for (const block of this.toneBlockOptions()) {
+        merged[block] = Boolean(current[block]) || next[block];
+      }
+      return merged;
+    });
   }
 
   selectAllLiveEditorBlocks(): void {

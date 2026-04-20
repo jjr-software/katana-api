@@ -1009,9 +1009,9 @@
       <button type="button" class="btn-close" aria-label="Close" (click)="closeToneSaveModal()"></button>
     </div>
     <div class="modal-body d-grid gap-3">
-      <p class="small text-secondary mb-0">Choose which blocks belong in the saved patch. Changed blocks are highlighted so you can see what the save will capture before you commit it.</p>
+      <p class="small text-secondary mb-0">Green blocks will be saved. Gray blocks will not. Modified blocks are shown separately so save scope stays obvious.</p>
       <div class="d-flex flex-wrap gap-2 small">
-        <span class="badge rounded-pill text-bg-warning">Changed {{ toneSaveChangedCount() }}</span>
+        <span class="badge rounded-pill text-bg-warning">Modified {{ toneSaveChangedCount() }}</span>
       </div>
       <div>
         <label class="form-label small mb-1" for="toneSaveName">Name</label>
@@ -1037,28 +1037,29 @@
             <label
               class="card shadow-sm"
               style="flex: 1 1 12rem; min-width: 12rem; cursor: pointer;"
-              [class.bg-warning-subtle]="editorBlockIsChanged(block)"
-              [class.border-warning]="editorBlockIsChanged(block)"
-              [class.bg-success-subtle]="!editorBlockIsChanged(block) && isToneSaveBlockIncluded(block)"
-              [class.border-success]="!editorBlockIsChanged(block) && isToneSaveBlockIncluded(block)"
+              [class.bg-success-subtle]="isToneSaveBlockIncluded(block)"
+              [class.border-success]="isToneSaveBlockIncluded(block)"
+              [class.bg-body-tertiary]="!isToneSaveBlockIncluded(block)"
+              [class.border-secondary-subtle]="!isToneSaveBlockIncluded(block)"
               [for]="toneBlockControlId('save', block)"
             >
               <div class="card-body py-2 px-3 d-flex align-items-start gap-2">
                 <span
                   class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0"
                   style="width: 2.5rem; height: 2.5rem; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em;"
-                  [class.bg-warning]="editorBlockIsChanged(block)"
-                  [class.text-dark]="editorBlockIsChanged(block)"
-                  [class.bg-success]="!editorBlockIsChanged(block) && isToneSaveBlockIncluded(block)"
-                  [class.text-white]="!editorBlockIsChanged(block) && isToneSaveBlockIncluded(block)"
-                  [class.bg-body-tertiary]="!editorBlockIsChanged(block) && !isToneSaveBlockIncluded(block)"
-                  [class.text-secondary]="!editorBlockIsChanged(block) && !isToneSaveBlockIncluded(block)"
+                  [class.bg-success]="isToneSaveBlockIncluded(block)"
+                  [class.text-white]="isToneSaveBlockIncluded(block)"
+                  [class.bg-body-tertiary]="!isToneSaveBlockIncluded(block)"
+                  [class.text-secondary]="!isToneSaveBlockIncluded(block)"
                 >
                   {{ toneBlockDisplay(block).glyph }}
                 </span>
                 <div class="flex-grow-1">
                   <div class="d-flex justify-content-between gap-2 align-items-start">
                     <div class="fw-semibold">{{ toneBlockDisplay(block).label }}</div>
+                    @if (editorBlockIsChanged(block)) {
+                      <span class="badge rounded-pill text-bg-warning">MODIFIED</span>
+                    }
                   </div>
                   <div class="small text-secondary">{{ toneBlockDisplay(block).subtitle }}</div>
                 </div>
