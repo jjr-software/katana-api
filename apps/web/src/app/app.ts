@@ -5642,6 +5642,7 @@ export class App implements OnInit, OnDestroy {
     }
     const draftSnapshot = this.clonePatch(draft);
     const changedBlocks = forceFullPatch ? [] : this.editorBlocksToApply(this.livePatchSnapshot(), draftSnapshot);
+    this.pushToast(this.editorPatchApplyToast(changedBlocks, forceFullPatch), 'info');
     this.editorLiveApplyInFlight = true;
     this.editorLiveApplyPending.set(true);
     this.editorLiveApplyReadbackAt.set('');
@@ -5742,6 +5743,13 @@ export class App implements OnInit, OnDestroy {
       return '';
     }
     return this.patchFingerprint(draft);
+  }
+
+  private editorPatchApplyToast(changedBlocks: readonly string[], forceFullPatch: boolean): string {
+    if (forceFullPatch || changedBlocks.length !== 1) {
+      return 'Patching current settings to amp live';
+    }
+    return `Patching ${this.toneBlockDisplay(changedBlocks[0]).label} to amp live`;
   }
 
   private editorBlocksToApply(referencePatch: Record<string, unknown> | null, currentPatch: Record<string, unknown>): string[] {
