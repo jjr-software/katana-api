@@ -1230,7 +1230,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   openToneSaveModal(): void {
-    this.setToneSaveBlocksFromPatch(this.editorPatchDraft(), true);
+    this.setToneSaveBlocksFromNames(this.selectedToneBlocks(), true);
     const currentName = this.readString(this.editorPatchDraft(), 'patch_name') ?? this.toneLoadedPatchName();
     if (!this.toneSaveName().trim() && currentName) {
       this.toneSaveName.set(currentName);
@@ -1289,6 +1289,25 @@ export class App implements OnInit, OnDestroy {
 
   setToneSaveBlockIncluded(block: string, checked: boolean): void {
     this.toneSaveBlocks.update((current) => ({ ...current, [block]: checked }));
+  }
+
+  private setToneSaveBlocksFromNames(blocks: readonly string[], replaceSelection: boolean): void {
+    const selected = new Set(blocks.filter((block) => this.toneBlockOptions().includes(block)));
+    const next: Record<string, boolean> = {};
+    for (const block of this.toneBlockOptions()) {
+      next[block] = selected.has(block);
+    }
+    if (replaceSelection) {
+      this.toneSaveBlocks.set(next);
+      return;
+    }
+    this.toneSaveBlocks.update((current) => {
+      const merged = { ...current };
+      for (const block of this.toneBlockOptions()) {
+        merged[block] = Boolean(current[block]) || next[block];
+      }
+      return merged;
+    });
   }
 
   private setToneSaveBlocksFromPatch(source: Record<string, unknown> | null, replaceSelection: boolean): void {
