@@ -82,15 +82,7 @@ def patch_object_block_names(patch_object: dict[str, Any]) -> list[str]:
 
 
 def normalize_patch_object(patch_object: dict[str, Any]) -> dict[str, Any]:
-    normalized: dict[str, Any] = {}
-    for block_name in ALLOWED_BLOCKS:
-        block = patch_object.get(block_name)
-        if not isinstance(block, dict):
-            continue
-        compact = _normalize_block(block_name, block)
-        if compact:
-            normalized[block_name] = compact
-    return normalized
+    return extract_patch_object(patch_object, ALLOWED_BLOCKS)
 
 
 def patch_object_exact_hash(patch_object: dict[str, Any]) -> str:
@@ -121,7 +113,9 @@ def extract_patch_object(full_patch: dict[str, Any], blocks: list[str] | tuple[s
         for block_name in selected:
             if block_name not in STAGE_BLOCKS:
                 continue
-            stage = stages.get(block_name)
+            stage = full_patch.get(block_name)
+            if not isinstance(stage, dict):
+                stage = stages.get(block_name)
             if not isinstance(stage, dict):
                 continue
             stage_copy = deepcopy(stage)

@@ -354,7 +354,7 @@ def save_patch_object_from_patch(
 ) -> PatchObjectReadResponse:
     _assert_patch_object_name_available(db, payload.name)
     blocks = _validated_blocks(payload.blocks)
-    sparse = extract_patch_object(normalize_patch_object(payload.patch_json), blocks)
+    sparse = extract_patch_object(payload.patch_json, blocks)
     row = PatchObject(
         name=payload.name,
         description=payload.description,
