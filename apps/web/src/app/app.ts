@@ -1776,6 +1776,7 @@ export class App implements OnInit, OnDestroy {
       }
       this.applyLivePatchStatus(payload as LivePatchResponse);
       this.loadLivePatchIntoEditorState(payload as LivePatchResponse, false);
+      this.selectSavedPatch(patchObject);
       this.status.set(`Applied ${patchObject.name} to Live Patch`);
       this.responseJson.set(JSON.stringify(payload, null, 2));
     } catch (error: unknown) {
