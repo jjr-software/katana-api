@@ -760,10 +760,9 @@ export class App implements OnInit, OnDestroy {
     aiDesignerLabel: 'AI Designer',
     clearLabel: 'Clear',
     currentSlotLabel: this.selectedAmpSlotLabel(),
-    currentSettingsName: this.currentSettingsPatchName(),
-    currentSettingsSourceQualifier: this.currentSettingsSourceQualifier() || null,
+    patchName: this.currentSettingsPatchName(),
+    liveAmpName: this.livePatchExactDbName().trim() || 'n/a',
     ampSlotSavedName: this.selectedAmpSlotSavedName(),
-    shownBlocks: this.livePatchSelectedBlocksSummary(),
     ampStateHashShort: this.shortHash(this.ampStateHash()),
     livePatchConfirmedAt: this.livePatchConfirmedAt(),
     lastSyncedAt: this.lastSyncedAt(),
@@ -4356,10 +4355,6 @@ export class App implements OnInit, OnDestroy {
     return this.readString(this.editorPatchDraft(), 'patch_name')?.trim() || this.toneLoadedPatchName().trim() || 'Unnamed Current Settings';
   }
 
-  currentSettingsSourceQualifier(): string {
-    return this.livePatchSourceType() === 'amp_sync' ? 'AMP only' : '';
-  }
-
   private applySyncedSlot(slot: SlotPatchSummary): void {
     this.slots.update((current) =>
       current.map((card) => {
@@ -5887,17 +5882,6 @@ export class App implements OnInit, OnDestroy {
 
   hasLoadedSavedPatch(): boolean {
     return this.toneLoadedPatchObjectId().trim().length > 0;
-  }
-
-  livePatchSelectedBlocksSummary(): string {
-    const blocks = this.selectedToneBlocks();
-    if (blocks.length === 0) {
-      return 'No blocks visible yet';
-    }
-    if (blocks.length === this.toneBlockOptions().length) {
-      return 'All blocks visible';
-    }
-    return blocks.join(', ');
   }
 
   private clearToneAiPreview(): void {

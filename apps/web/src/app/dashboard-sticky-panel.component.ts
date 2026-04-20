@@ -61,10 +61,9 @@ export interface DashboardStickyPanelViewModel {
   saveCurrentSettingsLabel: string;
   aiDesignerLabel: string;
   currentSlotLabel: string;
-  currentSettingsName: string;
-  currentSettingsSourceQualifier: string | null;
+  patchName: string;
+  liveAmpName: string;
   ampSlotSavedName: string;
-  shownBlocks: string;
   ampStateHashShort: string;
   livePatchConfirmedAt: string;
   lastSyncedAt: string;
@@ -217,12 +216,9 @@ const LIVE_FFT_BANDS = buildLiveMeterBands(LIVE_GE10_BAND_CENTERS_HZ, ['31', '62
 
             <div class="d-flex flex-wrap gap-3 small text-secondary mb-2">
               <span>Current Slot: <strong>{{ vm.currentSlotLabel }}</strong></span>
-              <span>Current Settings Name: <strong>{{ vm.currentSettingsName }}</strong></span>
-              @if (vm.currentSettingsSourceQualifier) {
-                <span>({{ vm.currentSettingsSourceQualifier }})</span>
-              }
-              <span>Amp Slot Saved Name: <strong>{{ vm.ampSlotSavedName }}</strong></span>
-              <span>Shown Blocks: <span>{{ vm.shownBlocks }}</span></span>
+              <span>Patch Name: <strong>{{ vm.patchName }}</strong></span>
+              <span>Live Amp Name: <strong>{{ vm.liveAmpName }}</strong></span>
+              <span>Stored Amp Name: <strong>{{ vm.ampSlotSavedName }}</strong></span>
             </div>
 
             <div class="d-flex flex-wrap gap-3 small text-secondary">
