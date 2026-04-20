@@ -87,22 +87,18 @@
                   <label
                     class="card shadow-sm"
                     style="flex: 1 1 12rem; min-width: 12rem; cursor: pointer;"
-                    [class.bg-warning-subtle]="editorBlockIsChanged(block)"
-                    [class.border-warning]="editorBlockIsChanged(block)"
-                    [class.bg-success-subtle]="!editorBlockIsChanged(block) && isToneBlockSelected(block)"
-                    [class.border-success]="!editorBlockIsChanged(block) && isToneBlockSelected(block)"
+                    [class.bg-success-subtle]="isToneBlockSelected(block)"
+                    [class.border-success]="isToneBlockSelected(block)"
                   [for]="toneBlockControlId('live', block)"
                   >
                     <div class="card-body py-2 px-3 d-flex align-items-start gap-2">
                       <span
                         class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0"
                         style="width: 2.5rem; height: 2.5rem; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em;"
-                        [class.bg-warning]="editorBlockIsChanged(block)"
-                        [class.text-dark]="editorBlockIsChanged(block)"
-                        [class.bg-success]="!editorBlockIsChanged(block) && isToneBlockSelected(block)"
-                        [class.text-white]="!editorBlockIsChanged(block) && isToneBlockSelected(block)"
-                        [class.bg-body-tertiary]="!editorBlockIsChanged(block) && !isToneBlockSelected(block)"
-                        [class.text-secondary]="!editorBlockIsChanged(block) && !isToneBlockSelected(block)"
+                        [class.bg-success]="isToneBlockSelected(block)"
+                        [class.text-white]="isToneBlockSelected(block)"
+                        [class.bg-body-tertiary]="!isToneBlockSelected(block)"
+                        [class.text-secondary]="!isToneBlockSelected(block)"
                       >
                         {{ toneBlockDisplay(block).glyph }}
                       </span>
@@ -141,7 +137,7 @@
                   }
 
                   @if (liveEditorShowsBlock('routing')) {
-                  <article class="border rounded p-2" [class.bg-warning-subtle]="editorBlockIsChanged('routing')" [class.border-warning]="editorBlockIsChanged('routing')">
+                  <article class="border rounded p-2">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <div class="d-flex align-items-center gap-2">
                         <h4 class="h6 mb-0">Routing</h4>
@@ -175,7 +171,7 @@
                   }
 
                   @if (liveEditorShowsBlock('amp')) {
-                  <article class="border rounded p-2" [class.bg-warning-subtle]="editorBlockIsChanged('amp')" [class.border-warning]="editorBlockIsChanged('amp')">
+                  <article class="border rounded p-2">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <div class="d-flex align-items-center gap-2">
                         <h4 class="h6 mb-0">Amp</h4>
@@ -227,7 +223,7 @@
 
                   @for (stageName of ['booster', 'mod', 'fx', 'delay', 'reverb']; track stageName) {
                     @if (liveEditorShowsBlock($any(stageName))) {
-                    <article class="border rounded p-2 effect-card" [class.bg-warning-subtle]="editorBlockIsChanged($any(stageName))" [class.border-warning]="editorBlockIsChanged($any(stageName))">
+                    <article class="border rounded p-2 effect-card">
                       <div class="d-flex justify-content-between align-items-center mb-2">
                         <div class="d-flex align-items-center gap-2">
                           <h4 class="h6 mb-0 text-capitalize" [class.text-success]="editorStageOn($any(stageName))" [class.text-danger]="!editorStageOn($any(stageName))">{{ stageName }}</h4>
@@ -300,7 +296,7 @@
 
                   @for (eqName of ['eq1', 'eq2']; track eqName) {
                     @if (liveEditorShowsBlock($any(eqName))) {
-                    <article class="border rounded p-2 effect-card" [class.bg-warning-subtle]="editorBlockIsChanged($any(eqName))" [class.border-warning]="editorBlockIsChanged($any(eqName))">
+                    <article class="border rounded p-2 effect-card">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <div class="d-flex align-items-center gap-2">
                         <h4 class="h6 mb-0 text-uppercase" [class.text-success]="editorEqOn($any(eqName))" [class.text-danger]="!editorEqOn($any(eqName))">{{ eqName }}</h4>
@@ -436,7 +432,7 @@
                   }
 
                   @if (liveEditorShowsBlock('ns')) {
-                  <article class="border rounded p-2 effect-card" [class.bg-warning-subtle]="editorBlockIsChanged('ns')" [class.border-warning]="editorBlockIsChanged('ns')">
+                  <article class="border rounded p-2 effect-card">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <div class="d-flex align-items-center gap-2">
                         <h4 class="h6 mb-0">NS</h4>
@@ -457,7 +453,7 @@
                   }
 
                   @if (liveEditorShowsBlock('send_return')) {
-                  <article class="border rounded p-2 effect-card" [class.bg-warning-subtle]="editorBlockIsChanged('send_return')" [class.border-warning]="editorBlockIsChanged('send_return')">
+                  <article class="border rounded p-2 effect-card">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <div class="d-flex align-items-center gap-2">
                         <h4 class="h6 mb-0">Send / Return</h4>
@@ -480,7 +476,7 @@
                   }
 
                   @if (liveEditorShowsBlock('solo')) {
-                  <article class="border rounded p-2 effect-card" [class.bg-warning-subtle]="editorBlockIsChanged('solo')" [class.border-warning]="editorBlockIsChanged('solo')">
+                  <article class="border rounded p-2 effect-card">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <div class="d-flex align-items-center gap-2">
                         <h4 class="h6 mb-0">Solo</h4>
@@ -500,7 +496,7 @@
                   }
 
                   @if (liveEditorShowsBlock('pedalfx')) {
-                  <article class="border rounded p-2 effect-card" [class.bg-warning-subtle]="editorBlockIsChanged('pedalfx')" [class.border-warning]="editorBlockIsChanged('pedalfx')">
+                  <article class="border rounded p-2 effect-card">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <div class="d-flex align-items-center gap-2">
                         <h4 class="h6 mb-0">Pedal FX</h4>
@@ -578,7 +574,7 @@
                   }
 
                   @if (liveEditorShowsBlock('gafc_exp1')) {
-                  <article class="border rounded p-2 effect-card" [class.bg-warning-subtle]="editorBlockIsChanged('gafc_exp1')" [class.border-warning]="editorBlockIsChanged('gafc_exp1')">
+                  <article class="border rounded p-2 effect-card">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <div class="d-flex align-items-center gap-2">
                         <h4 class="h6 mb-0">GA-FC EXP1</h4>

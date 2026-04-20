@@ -1344,10 +1344,6 @@ export class App implements OnInit, OnDestroy {
     return this.toneBlockOptions().filter((block) => this.isToneSaveBlockIncluded(block));
   }
 
-  editorBlockIsChanged(block: string): boolean {
-    return this.canResetEditorBlockToLoadedPatch(block);
-  }
-
   editorBlockEnabledLabel(block: string): 'On' | 'Off' | null {
     switch (block as ToneBlockKey) {
       case 'booster':
@@ -5118,19 +5114,6 @@ export class App implements OnInit, OnDestroy {
       return EQ_POSITION_NAMES[index];
     }
     return `Unknown (${index})`;
-  }
-
-  private colorName(index: number): string {
-    if (index === 0) {
-      return 'green';
-    }
-    if (index === 1) {
-      return 'red';
-    }
-    if (index === 2) {
-      return 'yellow';
-    }
-    return `unknown(${index})`;
   }
 
   private readObject(value: unknown, key?: string): Record<string, unknown> | null {
