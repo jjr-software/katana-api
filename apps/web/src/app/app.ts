@@ -6387,8 +6387,12 @@ export class App implements OnInit, OnDestroy {
         method: 'GET',
         cache: 'no-store',
       });
-      const payload = (await response.json()) as ActiveSlotResponse | { detail?: unknown };
+      const payload = await this.readJsonOrTextResponse<ActiveSlotResponse>(response);
       if (!response.ok) {
+        const detail = this.responseDetailMessage(payload);
+        if (detail) {
+          this.status.set(detail);
+        }
         return;
       }
       const active = payload as ActiveSlotResponse;
@@ -6417,6 +6421,35 @@ export class App implements OnInit, OnDestroy {
 
   private nv(value: number | null): string {
     return value === null ? 'n/a' : `${value}`;
+  }
+
+  private async readJsonOrTextResponse<T>(response: Response): Promise<T | { detail?: unknown }> {
+    const text = await response.text();
+    if (!text.trim()) {
+      return {};
+    }
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      return { detail: text };
+    }
+  }
+
+  private responseDetailMessage(payload: unknown): string {
+    if (!payload || typeof payload !== 'object') {
+      return '';
+    }
+    const detail = (payload as { detail?: unknown }).detail;
+    if (typeof detail === 'string') {
+      return detail;
+    }
+    if (detail && typeof detail === 'object') {
+      const message = (detail as { message?: unknown }).message;
+      if (typeof message === 'string' && message.trim()) {
+        return message;
+      }
+    }
+    return '';
   }
 
   operationLabel(value: string): string {
