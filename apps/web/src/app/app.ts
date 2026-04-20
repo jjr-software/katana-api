@@ -525,7 +525,7 @@ interface StageParam {
 }
 
 type TriState = 'true' | 'false' | 'unknown';
-type ModalKey = 'toneSave' | 'toneDesigner' | 'toneSet' | 'patchSamples' | 'ai' | 'autoLevel' | 'ampStateConflict';
+type ModalKey = 'toneSave' | 'toneDesigner' | 'toneSet' | 'patchSamples' | 'toneLibrary' | 'ai' | 'autoLevel' | 'ampStateConflict';
 
 function defaultSlotCards(): SlotCard[] {
   return Array.from({ length: 8 }, (_, idx) => {
@@ -565,6 +565,7 @@ export class App implements OnInit, OnDestroy {
   @ViewChild('toneDesignerModalTpl') private toneDesignerModalTpl?: TemplateRef<unknown>;
   @ViewChild('toneSetModalTpl') private toneSetModalTpl?: TemplateRef<unknown>;
   @ViewChild('patchSamplesModalTpl') private patchSamplesModalTpl?: TemplateRef<unknown>;
+  @ViewChild('toneLibraryModalTpl') private toneLibraryModalTpl?: TemplateRef<unknown>;
   @ViewChild('aiModalTpl') private aiModalTpl?: TemplateRef<unknown>;
   @ViewChild('autoLevelModalTpl') private autoLevelModalTpl?: TemplateRef<unknown>;
   @ViewChild('ampStateConflictModalTpl') private ampStateConflictModalTpl?: TemplateRef<unknown>;
@@ -1148,6 +1149,15 @@ export class App implements OnInit, OnDestroy {
     this.closeModal('toneDesigner');
   }
 
+  async openToneLibraryModal(): Promise<void> {
+    await this.loadTonePatchObjects();
+    this.openModal('toneLibrary', this.toneLibraryModalTpl, { size: 'xl', scrollable: true });
+  }
+
+  closeToneLibraryModal(): void {
+    this.closeModal('toneLibrary');
+  }
+
   setToneAiMode(value: 'refine' | 'ideas' | 'set'): void {
     this.clearToneAiPreview();
     this.toneAiMode.set(value);
@@ -1535,8 +1545,7 @@ export class App implements OnInit, OnDestroy {
   async focusTonePatchObject(match: { id: number; name: string }): Promise<void> {
     this.tonePatchQuery.set(match.name);
     this.toneHighlightedPatchObjectId.set(match.id);
-    await this.loadTonePatchObjects();
-    globalThis.document?.getElementById('tone-patch-objects')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    await this.openToneLibraryModal();
   }
 
   async activateMatchedSlot(slot: number): Promise<void> {
@@ -2194,7 +2203,6 @@ export class App implements OnInit, OnDestroy {
       await this.loadTonePatchObjects();
       this.status.set(`Kept ${slot.slot_label} as ${trimmed}`);
       this.responseJson.set(JSON.stringify(created, null, 2));
-      globalThis.document?.getElementById('tone-patch-objects')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (error: unknown) {
       this.status.set(`Failed keeping ${slot.slot_label} in Tone Lab`);
       this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
