@@ -321,18 +321,6 @@ interface LivePatchResponse {
   compat_hash_sha256: string;
 }
 
-interface QuickAmpSlotName {
-  slot: number;
-  slot_label: string;
-  patch_name: string;
-}
-
-interface QuickAmpSlotNamesResponse {
-  synced_at: string;
-  total_sync_ms: number;
-  slots: QuickAmpSlotName[];
-}
-
 interface TonePatchObjectResponse {
   id: number;
   name: string;
@@ -5983,9 +5971,6 @@ export class App implements OnInit, OnDestroy {
     if (payload.active_slot !== null) {
       this.selectedAmpSlot.set(payload.active_slot);
       this.selectedAmpSlotText.set(payload.active_slot <= 4 ? `A:${payload.active_slot}` : `B:${payload.active_slot - 4}`);
-    }
-    if (payload.exact_amp_slot?.patch_name) {
-      this.selectedAmpSlotSavedName.set(payload.exact_amp_slot.patch_name.trim() || 'Unnamed');
     }
   }
 
