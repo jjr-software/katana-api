@@ -674,7 +674,6 @@ export class App implements OnInit, OnDestroy {
   slots = signal<SlotCard[]>(defaultSlotCards());
   selectedAmpSlot = signal<number | null>(null);
   selectedAmpSlotText = signal('n/a');
-  selectedAmpSlotSavedName = signal('n/a');
   currentAmpPatchHash = signal('');
   currentAmpCommitState = signal<'unknown' | 'committed' | 'uncommitted'>('unknown');
   livePatchSourceType = signal('');
@@ -800,7 +799,7 @@ export class App implements OnInit, OnDestroy {
     currentSlotLabel: this.selectedAmpSlotLabel(),
     patchName: this.currentSettingsPatchName(),
     liveAmpName: this.livePatchExactDbName().trim() || 'n/a',
-    ampSlotSavedName: this.selectedAmpSlotSavedName(),
+    ampSlotSavedName: this.selectedAmpSlotSavedPatchName(),
   }));
   private readonly onPopState = (): void => {
     const page = this.resolvePageFromPath();
@@ -1050,7 +1049,6 @@ export class App implements OnInit, OnDestroy {
         this.applySyncedSlot(synced.slot);
         this.selectedAmpSlot.set(synced.slot.slot);
         this.selectedAmpSlotText.set(synced.slot.slot_label);
-        this.selectedAmpSlotSavedName.set(synced.slot.patch_name?.trim() || 'n/a');
         this.currentAmpPatchHash.set(synced.slot.config_hash_sha256 || '');
         this.refreshCurrentCommitStateFromKnownState();
       } catch (syncError: unknown) {
@@ -2061,7 +2059,6 @@ export class App implements OnInit, OnDestroy {
       }
       const synced = syncPayload as SlotSyncResponse;
       this.applySyncedSlot(synced.slot);
-      this.selectedAmpSlotSavedName.set(synced.slot.patch_name?.trim() || 'n/a');
       this.currentAmpPatchHash.set(synced.slot.config_hash_sha256 || '');
       this.refreshCurrentCommitStateFromKnownState();
       this.status.set(`Activated ${slot.slot_label}; patch state read back (${this.formatMs(synced.slot.slot_sync_ms)})`);
@@ -2102,7 +2099,6 @@ export class App implements OnInit, OnDestroy {
       this.applySyncedSlot(synced.slot);
       this.selectedAmpSlot.set(slot.slot);
       this.selectedAmpSlotText.set(slot.slot_label);
-      this.selectedAmpSlotSavedName.set(synced.slot.patch_name?.trim() || 'n/a');
       this.currentAmpPatchHash.set(synced.slot.config_hash_sha256 || '');
       this.refreshCurrentCommitStateFromKnownState();
       this.status.set(`Read active patch state for ${slot.slot_label} (${this.formatMs(synced.slot.slot_sync_ms)})`);
@@ -4593,7 +4589,15 @@ export class App implements OnInit, OnDestroy {
   }
 
   selectedAmpSlotSavedPatchName(): string {
-    return this.selectedAmpSlotSavedName();
+    const selectedSlot = this.selectedAmpSlot();
+    if (selectedSlot === null) {
+      return 'n/a';
+    }
+    const card = this.slots().find((item) => item.slot === selectedSlot) ?? null;
+    if (!card || !card.in_sync || !card.patch_name.trim()) {
+      return 'n/a';
+    }
+    return card.patch_name.trim();
   }
 
   currentSettingsPatchName(): string {
@@ -6386,9 +6390,6 @@ export class App implements OnInit, OnDestroy {
       }
       this.selectedAmpSlot.set(active.slot);
       this.selectedAmpSlotText.set(active.slot_label || 'n/a');
-      if (active.patch_name && active.patch_name.trim()) {
-        this.selectedAmpSlotSavedName.set(active.patch_name.trim());
-      }
       this.refreshCurrentCommitStateFromKnownState();
     } catch {
       // Active-slot probe is informational; leave current UI state unchanged on failure.
