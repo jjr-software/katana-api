@@ -109,9 +109,6 @@
                       <div class="flex-grow-1">
                         <div class="d-flex justify-content-between gap-2 align-items-start">
                           <div class="fw-semibold">{{ toneBlockDisplay(block).label }}</div>
-                          @if (editorBlockIsChanged(block)) {
-                            <span class="badge rounded-pill text-bg-warning">MODIFIED</span>
-                          }
                           @if (editorBlockEnabledLabel(block); as enabledLabel) {
                             <span class="badge rounded-pill" [class.text-bg-success]="enabledLabel === 'On'" [class.text-bg-secondary]="enabledLabel === 'Off'">
                               {{ enabledLabel }}
@@ -148,9 +145,6 @@
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <div class="d-flex align-items-center gap-2">
                         <h4 class="h6 mb-0">Routing</h4>
-                        @if (editorBlockIsChanged('routing')) {
-                          <span class="badge rounded-pill text-bg-warning">MODIFIED</span>
-                        }
                       </div>
                       <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch('routing')" [disabled]="!canResetEditorBlockToLoadedPatch('routing')">Reset</button>
                     </div>
@@ -185,9 +179,6 @@
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <div class="d-flex align-items-center gap-2">
                         <h4 class="h6 mb-0">Amp</h4>
-                        @if (editorBlockIsChanged('amp')) {
-                          <span class="badge rounded-pill text-bg-warning">MODIFIED</span>
-                        }
                       </div>
                       <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch('amp')" [disabled]="!canResetEditorBlockToLoadedPatch('amp')">Reset</button>
                     </div>
@@ -225,9 +216,6 @@
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <div class="d-flex align-items-center gap-2">
                         <h4 class="h6 mb-0">Delay Extras</h4>
-                        @if (editorBlockIsChanged('delay')) {
-                          <span class="badge rounded-pill text-bg-warning">MODIFIED</span>
-                        }
                       </div>
                       <label class="form-check-label small d-flex align-items-center gap-1">
                         <input class="form-check-input m-0" type="checkbox" [checked]="editorDelay2On()" (change)="setEditorDelay2On($any($event.target).checked)" />
@@ -313,12 +301,9 @@
                   @for (eqName of ['eq1', 'eq2']; track eqName) {
                     @if (liveEditorShowsBlock($any(eqName))) {
                     <article class="border rounded p-2 effect-card" [class.bg-warning-subtle]="editorBlockIsChanged($any(eqName))" [class.border-warning]="editorBlockIsChanged($any(eqName))">
-                      <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="d-flex align-items-center gap-2">
-                          <h4 class="h6 mb-0 text-uppercase" [class.text-success]="editorEqOn($any(eqName))" [class.text-danger]="!editorEqOn($any(eqName))">{{ eqName }}</h4>
-                          @if (editorBlockIsChanged($any(eqName))) {
-                            <span class="badge rounded-pill text-bg-warning">MODIFIED</span>
-                          }
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <div class="d-flex align-items-center gap-2">
+                        <h4 class="h6 mb-0 text-uppercase" [class.text-success]="editorEqOn($any(eqName))" [class.text-danger]="!editorEqOn($any(eqName))">{{ eqName }}</h4>
                           <span class="badge rounded-pill" [class.text-bg-success]="editorEqOn($any(eqName))" [class.text-bg-secondary]="!editorEqOn($any(eqName))">
                             {{ editorEqOn($any(eqName)) ? 'On' : 'Off' }}
                           </span>
@@ -455,9 +440,6 @@
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <div class="d-flex align-items-center gap-2">
                         <h4 class="h6 mb-0">NS</h4>
-                        @if (editorBlockIsChanged('ns')) {
-                          <span class="badge rounded-pill text-bg-warning">MODIFIED</span>
-                        }
                       </div>
                       <div class="d-flex gap-2 align-items-center">
                         <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch('ns')" [disabled]="!canResetEditorBlockToLoadedPatch('ns')">Reset</button>
@@ -479,9 +461,6 @@
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <div class="d-flex align-items-center gap-2">
                         <h4 class="h6 mb-0">Send / Return</h4>
-                        @if (editorBlockIsChanged('send_return')) {
-                          <span class="badge rounded-pill text-bg-warning">MODIFIED</span>
-                        }
                       </div>
                       <div class="d-flex gap-2 align-items-center">
                         <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch('send_return')" [disabled]="!canResetEditorBlockToLoadedPatch('send_return')">Reset</button>
@@ -505,9 +484,6 @@
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <div class="d-flex align-items-center gap-2">
                         <h4 class="h6 mb-0">Solo</h4>
-                        @if (editorBlockIsChanged('solo')) {
-                          <span class="badge rounded-pill text-bg-warning">MODIFIED</span>
-                        }
                       </div>
                       <div class="d-flex gap-2 align-items-center">
                         <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch('solo')" [disabled]="!canResetEditorBlockToLoadedPatch('solo')">Reset</button>
@@ -528,9 +504,6 @@
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <div class="d-flex align-items-center gap-2">
                         <h4 class="h6 mb-0">Pedal FX</h4>
-                        @if (editorBlockIsChanged('pedalfx')) {
-                          <span class="badge rounded-pill text-bg-warning">MODIFIED</span>
-                        }
                       </div>
                       <div class="d-flex gap-2 align-items-center">
                         <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch('pedalfx')" [disabled]="!canResetEditorBlockToLoadedPatch('pedalfx')">Reset</button>
@@ -609,9 +582,6 @@
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <div class="d-flex align-items-center gap-2">
                         <h4 class="h6 mb-0">GA-FC EXP1</h4>
-                        @if (editorBlockIsChanged('gafc_exp1')) {
-                          <span class="badge rounded-pill text-bg-warning">MODIFIED</span>
-                        }
                       </div>
                       <div class="d-flex gap-2 align-items-center">
                         <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetEditorBlockToLoadedPatch('gafc_exp1')" [disabled]="!canResetEditorBlockToLoadedPatch('gafc_exp1')">Reset</button>

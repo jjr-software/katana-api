@@ -4601,10 +4601,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   currentSettingsPatchName(): string {
-    if (this.editorIsModified()) {
-      return 'MODIFIED';
-    }
-    return this.readString(this.editorPatchDraft(), 'patch_name')?.trim() || this.toneLoadedPatchName().trim() || 'Unnamed Current Settings';
+    return this.readString(this.editorPatchDraft(), 'patch_name')?.trim() || this.toneLoadedPatchName().trim() || this.livePatchExactDbName().trim() || 'Unnamed Current Settings';
   }
 
   private applySyncedSlot(slot: SlotPatchSummary): void {
