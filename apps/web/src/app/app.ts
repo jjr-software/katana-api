@@ -5777,7 +5777,11 @@ export class App implements OnInit, OnDestroy {
           }
           const applied = payload as LivePatchResponse;
           const appliedFingerprint = this.patchFingerprint(applied.patch_json);
-          this.editorPatchDraft.set(this.clonePatch(applied.patch_json));
+          const currentFingerprint = this.editorDraftFingerprint();
+          const shouldAdoptResponse = currentFingerprint === expectedFingerprint;
+          if (shouldAdoptResponse) {
+            this.editorPatchDraft.set(this.clonePatch(applied.patch_json));
+          }
           this.editorLiveApplyLastAppliedFingerprint = appliedFingerprint;
           if (this.editorLiveApplyQueuedFingerprint === expectedFingerprint) {
             this.editorLiveApplyQueuedFingerprint = null;
