@@ -534,6 +534,13 @@ interface ToastMessage {
   tone: 'info' | 'success' | 'danger';
 }
 
+interface RecentLoadedPatch {
+  id: number;
+  label: string;
+  source: string;
+  loadedAt: string;
+}
+
 interface SlotCard {
   slot: number;
   slot_label: string;
@@ -685,6 +692,7 @@ export class App implements OnInit, OnDestroy {
   livePatchExactSlotMatch = signal<{ slot: number; patch_name: string } | null>(null);
   livePatchPartialSlotMatches = signal<Array<{ slot: number; patch_name: string }>>([]);
   toasts = signal<ToastMessage[]>([]);
+  recentLoadedPatches = signal<RecentLoadedPatch[]>([]);
   globalNormalizeTargetRms = signal(DEFAULT_TARGET_RMS_DBFS.toFixed(2));
   liveRmsDbfs = signal<number | null>(null);
   liveRmsMaxDbfs = signal<number | null>(null);
@@ -781,6 +789,7 @@ export class App implements OnInit, OnDestroy {
   private lastStatusToast = '';
   private queueJobStatusById = new Map<string, QueueJobSummary['status']>();
   private queueNotificationsInitialized = false;
+  private recentLoadedPatchSeq = 0;
   readonly stickyPanelVm = computed<DashboardStickyPanelViewModel>(() => ({
     testAmpLabel: this.headerActionLabel('test-amp-connection', 'Test Amp Connection', 'Testing...'),
     testAmpDisabled: this.isActionBusy('test-amp-connection'),
@@ -970,6 +979,7 @@ export class App implements OnInit, OnDestroy {
       }
       this.applyLivePatchStatus(payload as LivePatchResponse);
       this.loadLivePatchIntoEditorState(payload as LivePatchResponse, false, true);
+      this.recordRecentLoadedPatch(this.readString(payload.patch_json, 'patch_name')?.trim() || 'Live Patch', 'AMP');
       this.status.set('Live Patch synced');
       return true;
     } catch (error: unknown) {
@@ -1104,6 +1114,7 @@ export class App implements OnInit, OnDestroy {
       const live = payload as LivePatchResponse;
       this.applyLivePatchStatus(live);
       this.loadLivePatchIntoEditorState(live, false, true);
+      this.recordRecentLoadedPatch(this.readString(live.patch_json, 'patch_name')?.trim() || 'Live Patch', 'AMP');
       this.status.set('Loaded current Live Patch from amp');
     } catch (error: unknown) {
       this.status.set('Failed to load current Live Patch from amp.');
@@ -1208,6 +1219,22 @@ export class App implements OnInit, OnDestroy {
     if (replaceLoadedPatch && this.toneLoadedPatchSnapshot() === null) {
       this.setToneBlocksFromPatch(draft, true);
     }
+  }
+
+  private recordRecentLoadedPatch(label: string, source: string): void {
+    const normalizedLabel = label.trim() || 'Unnamed Patch';
+    const normalizedSource = source.trim() || 'Load';
+    const key = `${normalizedLabel}\u0000${normalizedSource}`;
+    this.recentLoadedPatches.update((current) => {
+      const next = current.filter((item) => `${item.label}\u0000${item.source}` !== key);
+      next.unshift({
+        id: ++this.recentLoadedPatchSeq,
+        label: normalizedLabel,
+        source: normalizedSource,
+        loadedAt: new Date().toISOString(),
+      });
+      return next.slice(0, 5);
+    });
   }
 
   toneBlockOptions(): readonly string[] {
@@ -1901,6 +1928,7 @@ export class App implements OnInit, OnDestroy {
       }
       this.applyLivePatchStatus(payload as LivePatchResponse);
       this.loadLivePatchIntoEditorState(payload as LivePatchResponse, false);
+      this.recordRecentLoadedPatch(patchObject.name, patchObject.source_type.toUpperCase());
       this.selectSavedPatch(patchObject);
       this.status.set(`Applied ${patchObject.name} to Live Patch`);
       this.responseJson.set(JSON.stringify(payload, null, 2));
