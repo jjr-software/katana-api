@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.amp_queue import amp_job_queue
 from app.deps import get_amp_client, get_db
 from app.katana import AmpClient, LineOutSnapshot, SlotDump, SlotPatchSummary, slot_label
+from app.katana import AmpClientError
 from app.live_patch_state import upsert_live_patch_state
 from app.models import AmpSyncHistory, PatchConfig, PatchSet, PatchSetMember
 
@@ -238,6 +239,33 @@ class SyncHistoryItemResponse(BaseModel):
     created_at: str
 
 
+def _is_amp_unavailable_error(exc: AmpClientError) -> bool:
+    text = str(exc).lower()
+    return any(
+        needle in text
+        for needle in (
+            "cannot open port",
+            "no such file or directory",
+            "no dt1 response",
+            "no sysex response bytes detected",
+            "amidi send failed",
+            "amidi query failed",
+        )
+    )
+
+
+def _raise_amp_read_error(message: str, exc: AmpClientError) -> None:
+    status_code = 503 if _is_amp_unavailable_error(exc) else 502
+    detail_message = "Amp is unavailable or powered off" if status_code == 503 else message
+    raise HTTPException(
+        status_code=status_code,
+        detail={
+            "message": detail_message,
+            "error": str(exc),
+        },
+    ) from exc
+
+
 @router.get("/test-connection", response_model=AmpConnectionTestResponse)
 async def test_connection() -> AmpConnectionTestResponse:
     job = await amp_job_queue.enqueue_test_connection()
@@ -290,7 +318,10 @@ async def current_patch(
             },
         )
 
-    active = await client.read_active_slot()
+    try:
+        active = await client.read_active_slot()
+    except AmpClientError as exc:
+        _raise_amp_read_error("Failed to read active slot after current patch read", exc)
     upsert_live_patch_state(
         db,
         full_patch=settled.result_current_patch,
@@ -307,7 +338,10 @@ async def current_patch(
 @router.get("/current-slot", response_model=ActiveSlotResponse)
 async def current_slot(client: AmpClient = Depends(get_amp_client)) -> ActiveSlotResponse:
     read_at = datetime.now().isoformat(timespec="seconds")
-    active = await client.read_active_slot()
+    try:
+        active = await client.read_active_slot()
+    except AmpClientError as exc:
+        _raise_amp_read_error("Failed to read active amp slot", exc)
     return ActiveSlotResponse(
         patch_number=active.patch_number,
         slot=active.slot,
@@ -320,7 +354,10 @@ async def current_slot(client: AmpClient = Depends(get_amp_client)) -> ActiveSlo
 @router.get("/line-out", response_model=LineOutStateResponse)
 async def read_line_out(client: AmpClient = Depends(get_amp_client)) -> LineOutStateResponse:
     read_at = datetime.now().isoformat(timespec="seconds")
-    state = await client.read_line_out_state()
+    try:
+        state = await client.read_line_out_state()
+    except AmpClientError as exc:
+        _raise_amp_read_error("Failed to read line-out state", exc)
     return _line_out_response(state=state, read_at=read_at)
 
 
@@ -330,7 +367,10 @@ async def write_line_out(
     client: AmpClient = Depends(get_amp_client),
 ) -> LineOutStateResponse:
     read_at = datetime.now().isoformat(timespec="seconds")
-    state = await client.write_line_out_state(payload.model_dump())
+    try:
+        state = await client.write_line_out_state(payload.model_dump())
+    except AmpClientError as exc:
+        _raise_amp_read_error("Failed to write line-out state", exc)
     return _line_out_response(state=state, read_at=read_at)
 
 
@@ -352,7 +392,10 @@ async def apply_current_patch_live(
             },
         )
     applied_at = datetime.now().isoformat(timespec="seconds")
-    active = await client.read_active_slot()
+    try:
+        active = await client.read_active_slot()
+    except AmpClientError as exc:
+        _raise_amp_read_error("Failed to read active slot after live apply", exc)
     upsert_live_patch_state(
         db,
         full_patch=settled.result_applied_patch,
