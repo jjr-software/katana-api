@@ -27,9 +27,9 @@ from app.models import (
 )
 from app.patch_objects import (
     ALLOWED_BLOCKS,
+    canonicalize_patch_object,
     extract_patch_object,
     merge_patch_object_into_full_patch,
-    normalize_patch_object,
     patch_object_block_names,
 )
 from app.settings import Settings, get_settings
@@ -318,7 +318,7 @@ def duplicate_patch_object(
     duplicate = PatchObject(
         name=payload.name,
         description=row.description,
-        patch_json=normalize_patch_object(row.patch_json),
+        patch_json=row.patch_json,
         source_type="manual",
         source_prompt=row.source_prompt,
         parent_patch_object_id=row.id,
@@ -550,7 +550,7 @@ async def program_patch_object_set_to_amp(
         patch_object = db.get(PatchObject, slot_item.patch_object_id)
         if patch_object is None:
             raise HTTPException(status_code=404, detail={"message": "Patch object not found", "patch_object_id": slot_item.patch_object_id})
-        rendered = normalize_patch_object(patch_object.patch_json)
+        rendered = dict(patch_object.patch_json)
         rendered["patch_name"] = patch_object.name[:16]
         job = await amp_job_queue.enqueue_slot_write(slot=target_slot, patch=rendered)
         settled = await _await_terminal_job(job.job_id, timeout_seconds=120.0)
@@ -774,7 +774,7 @@ async def apply_patch_object_to_live_patch(
     if patch_object is None:
         raise HTTPException(status_code=404, detail={"message": "Patch object not found", "patch_object_id": payload.patch_object_id})
     live_row = await _resolve_live_patch_row(db, client)
-    rendered = normalize_patch_object(patch_object.patch_json)
+    rendered = dict(patch_object.patch_json)
     rendered["patch_name"] = patch_object.name[:16]
     applied = await _queued_apply_current_patch(rendered)
     applied_at = datetime.now().isoformat(timespec="seconds")
@@ -798,9 +798,7 @@ async def patch_live_patch_block(
     if block_name not in ALLOWED_BLOCKS:
         raise HTTPException(status_code=400, detail={"message": "Unknown block", "block": block_name})
     live_row = await _resolve_live_patch_row(db, client)
-    sparse_patch_object = normalize_patch_object({block_name: payload.patch_block})
-    if block_name not in sparse_patch_object:
-        raise HTTPException(status_code=400, detail={"message": "Block payload did not normalize to a valid patch block", "block": block_name})
+    sparse_patch_object = {block_name: payload.patch_block}
     rendered = dict(sparse_patch_object)
     rendered["patch_name"] = str(live_row.patch_json.get("patch_name", ""))[:16]
     applied = await _queued_apply_current_patch(rendered)
@@ -854,7 +852,7 @@ def _patch_object_response(
     *,
     groups: list[PatchObjectGroupRefResponse] | None = None,
 ) -> PatchObjectReadResponse:
-    patch_json = normalize_patch_object(row.patch_json)
+    patch_json = row.patch_json
     return PatchObjectReadResponse(
         id=row.id,
         name=row.name,
@@ -951,9 +949,9 @@ def _assert_patch_object_name_available(db: Session, name: str) -> None:
         raise HTTPException(status_code=409, detail={"message": "Patch object already exists", "name": name})
 
 
-def _normalize_patch_object_json_or_http(patch_json: dict[str, Any], *, status_code: int, message: str) -> dict[str, Any]:
+def _canonicalize_patch_object_json_or_http(patch_json: dict[str, Any], *, status_code: int, message: str) -> dict[str, Any]:
     try:
-        return normalize_patch_object(patch_json)
+        return canonicalize_patch_object(patch_json)
     except ValueError as exc:
         raise HTTPException(status_code=status_code, detail={"message": message, "error": str(exc)}) from exc
 
@@ -969,7 +967,7 @@ def _save_or_overwrite_patch_object(
     overwrite: bool,
     parent_patch_object_id: int | None = None,
 ) -> PatchObject:
-    canonical_patch_json = _normalize_patch_object_json_or_http(
+    canonical_patch_json = _canonicalize_patch_object_json_or_http(
         patch_json,
         status_code=400,
         message="Invalid patch object",
@@ -1057,7 +1055,7 @@ def _validated_ai_candidate_patch_json(patch_json: dict[str, Any], selected_bloc
     for key in cleaned.keys():
         if key not in selected_blocks:
             raise HTTPException(status_code=502, detail={"message": "AI returned block outside requested scope", "block": key})
-    normalized = _normalize_patch_object_json_or_http(
+    normalized = _canonicalize_patch_object_json_or_http(
         cleaned,
         status_code=502,
         message="AI returned invalid patch_json",

@@ -97,12 +97,12 @@ def patch_object_block_names(patch_object: dict[str, Any]) -> list[str]:
     return [name for name in ALLOWED_BLOCKS if isinstance(patch_object.get(name), dict)]
 
 
-def normalize_patch_object(patch_object: dict[str, Any]) -> dict[str, Any]:
+def canonicalize_patch_object(patch_object: dict[str, Any]) -> dict[str, Any]:
     return extract_patch_object(patch_object, ALLOWED_BLOCKS)
 
 
 def patch_object_exact_hash(patch_object: dict[str, Any]) -> str:
-    normalized = normalize_patch_object(patch_object)
+    normalized = canonicalize_patch_object(patch_object)
     blob = json.dumps(normalized, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
@@ -113,13 +113,13 @@ def extract_patch_object(full_patch: dict[str, Any], blocks: list[str] | tuple[s
 
     routing = full_patch.get("routing")
     if "routing" in selected and isinstance(routing, dict):
-        block = _normalize_block("routing", routing)
+        block = _canonicalize_block("routing", routing)
         if block:
             out["routing"] = block
 
     amp = full_patch.get("amp")
     if "amp" in selected and isinstance(amp, dict):
-        block = _normalize_block("amp", amp)
+        block = _canonicalize_block("amp", amp)
         if block:
             out["amp"] = block
 
@@ -139,7 +139,7 @@ def extract_patch_object(full_patch: dict[str, Any], blocks: list[str] | tuple[s
             stage_color = colors.get(block_name)
             if isinstance(stage_color, dict) and isinstance(stage_color.get("index"), (int, float)):
                 stage_copy["color_index"] = int(stage_color["index"])
-        block = _normalize_block(block_name, stage_copy)
+        block = _canonicalize_block(block_name, stage_copy)
         if block:
             out[block_name] = block
 
@@ -148,7 +148,7 @@ def extract_patch_object(full_patch: dict[str, Any], blocks: list[str] | tuple[s
 
 def merge_patch_object_into_full_patch(full_patch: dict[str, Any], patch_object: dict[str, Any]) -> dict[str, Any]:
     merged = deepcopy(full_patch)
-    normalized = normalize_patch_object(patch_object)
+    normalized = canonicalize_patch_object(patch_object)
 
     if "routing" in normalized:
         routing_target = _ensure_object(merged, "routing")
@@ -177,14 +177,14 @@ def merge_patch_object_into_full_patch(full_patch: dict[str, Any], patch_object:
 
 
 def patch_object_partially_matches_full_patch(patch_object: dict[str, Any], full_patch: dict[str, Any]) -> bool:
-    normalized = normalize_patch_object(patch_object)
+    normalized = canonicalize_patch_object(patch_object)
     extracted = extract_patch_object(full_patch, patch_object_block_names(normalized))
-    return normalize_patch_object(extracted) == normalized
+    return canonicalize_patch_object(extracted) == normalized
 
 
 def patch_object_partially_matches_patch_object(lhs: dict[str, Any], rhs: dict[str, Any]) -> bool:
-    normalized_lhs = normalize_patch_object(lhs)
-    normalized_rhs = normalize_patch_object(rhs)
+    normalized_lhs = canonicalize_patch_object(lhs)
+    normalized_rhs = canonicalize_patch_object(rhs)
     rhs_subset = {block_name: normalized_rhs[block_name] for block_name in patch_object_block_names(normalized_lhs) if block_name in normalized_rhs}
     return rhs_subset == normalized_lhs
 
@@ -195,7 +195,7 @@ def patch_object_exactly_matches_full_patch(patch_object: dict[str, Any], full_p
 
 def patch_object_to_full_snapshot_for_hash(patch_object: dict[str, Any]) -> dict[str, Any]:
     snapshot: dict[str, Any] = {}
-    normalized = normalize_patch_object(patch_object)
+    normalized = canonicalize_patch_object(patch_object)
     if "routing" in normalized:
         snapshot["routing"] = deepcopy(normalized["routing"])
     if "amp" in normalized:
@@ -221,7 +221,7 @@ def patch_object_hash_for_full_snapshot_compat(patch_object: dict[str, Any]) -> 
     return hashlib.sha256(canonical_blob(patch_object_to_full_snapshot_for_hash(patch_object)).encode("utf-8")).hexdigest()
 
 
-def _normalize_block(block_name: str, block: dict[str, Any]) -> dict[str, Any]:
+def _canonicalize_block(block_name: str, block: dict[str, Any]) -> dict[str, Any]:
     out: dict[str, Any] = {}
 
     if block_name == "routing":
