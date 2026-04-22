@@ -5837,6 +5837,22 @@ export class App implements OnInit, OnDestroy {
           const targetSlotNumber = this.selectedAmpSlot() ?? slotNumber;
           if (targetSlotNumber !== null) {
             this.editorSlotNumber.set(targetSlotNumber);
+            this.slots.update((current) =>
+              current.map((card) => {
+                if (card.slot !== targetSlotNumber) {
+                  return card;
+                }
+                return {
+                  ...card,
+                  patch_name: this.readString(applied.patch_json, 'patch_name') || card.patch_name,
+                  patch: this.clonePatch(applied.patch_json),
+                  config_hash_sha256: appliedFingerprint,
+                  in_sync: true,
+                  out_synced: true,
+                  is_saved: false,
+                };
+              }),
+            );
           }
           this.refreshCurrentCommitStateFromKnownState();
           return true;
@@ -5859,11 +5875,15 @@ export class App implements OnInit, OnDestroy {
       if (this.editorLiveApplyQueuedFingerprint === expectedFingerprint) {
         this.editorLiveApplyQueuedFingerprint = null;
       }
-      const patchName = this.readString(draftSnapshot, 'patch_name') ?? '';
-      const hash = this.readString(applied.patch, 'config_hash_sha256') ?? '';
+      const appliedPatch = this.clonePatch(applied.patch);
+      const patchName = this.readString(appliedPatch, 'patch_name') ?? this.readString(draftSnapshot, 'patch_name') ?? '';
+      const hash = this.readString(appliedPatch, 'config_hash_sha256') ?? '';
       const targetSlotNumber = this.selectedAmpSlot() ?? slotNumber;
       if (targetSlotNumber !== null) {
         this.editorSlotNumber.set(targetSlotNumber);
+        if (this.editorDraftFingerprint() === expectedFingerprint) {
+          this.editorPatchDraft.set(this.clonePatch(appliedPatch));
+        }
         this.slots.update((current) =>
           current.map((card) => {
             if (card.slot !== targetSlotNumber) {
@@ -5872,7 +5892,7 @@ export class App implements OnInit, OnDestroy {
             return {
               ...card,
               patch_name: patchName || card.patch_name,
-              patch: this.clonePatch(draftSnapshot),
+              patch: this.clonePatch(appliedPatch),
               config_hash_sha256: hash,
               in_sync: true,
               out_synced: true,
