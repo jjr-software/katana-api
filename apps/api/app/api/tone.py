@@ -286,7 +286,7 @@ def create_patch_object(payload: PatchObjectCreateRequest, db: Session = Depends
         db,
         name=payload.name,
         description=payload.description,
-        patch_json=normalize_patch_object(payload.patch_json),
+        patch_json=payload.patch_json,
         source_type=payload.source_type,
         source_prompt=payload.source_prompt,
         parent_patch_object_id=payload.parent_patch_object_id,
@@ -318,7 +318,7 @@ def duplicate_patch_object(
     duplicate = PatchObject(
         name=payload.name,
         description=row.description,
-        patch_json=row.patch_json,
+        patch_json=normalize_patch_object(row.patch_json),
         source_type="manual",
         source_prompt=row.source_prompt,
         parent_patch_object_id=row.id,
@@ -550,7 +550,7 @@ async def program_patch_object_set_to_amp(
         patch_object = db.get(PatchObject, slot_item.patch_object_id)
         if patch_object is None:
             raise HTTPException(status_code=404, detail={"message": "Patch object not found", "patch_object_id": slot_item.patch_object_id})
-        rendered = dict(patch_object.patch_json)
+        rendered = normalize_patch_object(patch_object.patch_json)
         rendered["patch_name"] = patch_object.name[:16]
         job = await amp_job_queue.enqueue_slot_write(slot=target_slot, patch=rendered)
         settled = await _await_terminal_job(job.job_id, timeout_seconds=120.0)
@@ -774,7 +774,7 @@ async def apply_patch_object_to_live_patch(
     if patch_object is None:
         raise HTTPException(status_code=404, detail={"message": "Patch object not found", "patch_object_id": payload.patch_object_id})
     live_row = await _resolve_live_patch_row(db, client)
-    rendered = dict(patch_object.patch_json)
+    rendered = normalize_patch_object(patch_object.patch_json)
     rendered["patch_name"] = patch_object.name[:16]
     applied = await _queued_apply_current_patch(rendered)
     applied_at = datetime.now().isoformat(timespec="seconds")
@@ -854,15 +854,16 @@ def _patch_object_response(
     *,
     groups: list[PatchObjectGroupRefResponse] | None = None,
 ) -> PatchObjectReadResponse:
+    patch_json = normalize_patch_object(row.patch_json)
     return PatchObjectReadResponse(
         id=row.id,
         name=row.name,
         description=row.description,
-        patch_json=row.patch_json,
+        patch_json=patch_json,
         source_type=row.source_type,
         source_prompt=row.source_prompt,
         parent_patch_object_id=row.parent_patch_object_id,
-        blocks=patch_object_block_names(row.patch_json),
+        blocks=patch_object_block_names(patch_json),
         groups=groups if groups is not None else _group_refs_by_patch_object_ids(db, [row.id]).get(row.id, []),
         created_at=row.created_at.isoformat(timespec="seconds"),
         updated_at=row.updated_at.isoformat(timespec="seconds"),
@@ -950,6 +951,13 @@ def _assert_patch_object_name_available(db: Session, name: str) -> None:
         raise HTTPException(status_code=409, detail={"message": "Patch object already exists", "name": name})
 
 
+def _normalize_patch_object_json_or_http(patch_json: dict[str, Any], *, status_code: int, message: str) -> dict[str, Any]:
+    try:
+        return normalize_patch_object(patch_json)
+    except ValueError as exc:
+        raise HTTPException(status_code=status_code, detail={"message": message, "error": str(exc)}) from exc
+
+
 def _save_or_overwrite_patch_object(
     db: Session,
     *,
@@ -961,6 +969,11 @@ def _save_or_overwrite_patch_object(
     overwrite: bool,
     parent_patch_object_id: int | None = None,
 ) -> PatchObject:
+    canonical_patch_json = _normalize_patch_object_json_or_http(
+        patch_json,
+        status_code=400,
+        message="Invalid patch object",
+    )
     existing = db.scalar(select(PatchObject).where(PatchObject.name == name))
     if existing is not None:
         if existing.source_type == "rom" and source_type != "rom":
@@ -968,7 +981,7 @@ def _save_or_overwrite_patch_object(
         if not overwrite:
             raise HTTPException(status_code=409, detail={"message": "Patch object already exists", "name": name})
         existing.description = description
-        existing.patch_json = patch_json
+        existing.patch_json = canonical_patch_json
         existing.source_type = source_type
         existing.source_prompt = source_prompt
         if parent_patch_object_id is not None:
@@ -977,7 +990,7 @@ def _save_or_overwrite_patch_object(
     row = PatchObject(
         name=name,
         description=description,
-        patch_json=patch_json,
+        patch_json=canonical_patch_json,
         source_type=source_type,
         source_prompt=source_prompt,
         parent_patch_object_id=parent_patch_object_id,
@@ -1044,7 +1057,11 @@ def _validated_ai_candidate_patch_json(patch_json: dict[str, Any], selected_bloc
     for key in cleaned.keys():
         if key not in selected_blocks:
             raise HTTPException(status_code=502, detail={"message": "AI returned block outside requested scope", "block": key})
-    normalized = normalize_patch_object(cleaned)
+    normalized = _normalize_patch_object_json_or_http(
+        cleaned,
+        status_code=502,
+        message="AI returned invalid patch_json",
+    )
     if not normalized:
         raise HTTPException(status_code=502, detail={"message": "AI returned empty sparse patch object", "patch_json": cleaned})
     return normalized

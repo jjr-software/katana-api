@@ -1005,13 +1005,6 @@ class AmpClient:
             raise AmpClientError(f"Invalid payload: {field_name} must be numeric")
         if isinstance(value, (int, float)):
             return int(value)
-        if isinstance(value, str):
-            text = value.strip()
-            if text:
-                try:
-                    return int(text)
-                except ValueError as exc:
-                    raise AmpClientError(f"Invalid payload: {field_name} must be numeric") from exc
         raise AmpClientError(f"Invalid payload: {field_name} must be numeric")
 
     @classmethod

@@ -73,6 +73,22 @@ STAGE_RAW_FIELD_MAP: dict[str, dict[str, int]] = {
     "pedalfx": {"position": 0, "type": 2},
     "gafc_exp1": {"function": 0},
 }
+NUMERIC_BLOCK_FIELDS: dict[str, tuple[str, ...]] = {
+    "routing": ("chain_pattern", "cabinet_resonance", "master_key"),
+    "amp": ("gain", "volume", "bass", "middle", "treble", "presence", "poweramp_variation", "amp_type", "resonance", "preamp_variation"),
+    "booster": ("type", "drive", "bottom", "tone", "solo_level", "effect_level", "direct_mix"),
+    "mod": ("type",),
+    "fx": ("type",),
+    "delay": ("type", "feedback", "high_cut", "effect_level", "direct_level", "layer_mode", "time", "pre_delay"),
+    "reverb": ("type", "layer_mode", "time", "pre_delay", "low_cut", "high_cut", "effect_level", "direct_level"),
+    "eq1": ("position", "type"),
+    "eq2": ("position", "type"),
+    "ns": ("threshold", "release"),
+    "send_return": ("position", "mode", "send_level", "return_level"),
+    "solo": ("effect_level",),
+    "pedalfx": ("position", "type"),
+    "gafc_exp1": ("function",),
+}
 DELAY_TIME_RAW_START = 1
 DELAY_TIME_RAW_END = 5
 
@@ -209,33 +225,24 @@ def _normalize_block(block_name: str, block: dict[str, Any]) -> dict[str, Any]:
     out: dict[str, Any] = {}
 
     if block_name == "routing":
-        for key in ("chain_pattern", "cabinet_resonance", "master_key"):
-            if key in block:
-                out[key] = block[key]
+        for key in NUMERIC_BLOCK_FIELDS[block_name]:
+            value = block.get(key)
+            if value is not None:
+                out[key] = _coerce_int_value(value, f"routing.{key}")
         return out
 
     if block_name == "amp":
         if isinstance(block.get("raw"), list):
-            out["raw"] = list(block["raw"])
+            out["raw"] = _coerce_int_list(block["raw"], "amp.raw")
             return out
-        for key in (
-            "gain",
-            "volume",
-            "bass",
-            "middle",
-            "treble",
-            "presence",
-            "poweramp_variation",
-            "amp_type",
-            "resonance",
-            "preamp_variation",
-        ):
-            if key in block:
-                out[key] = block[key]
+        for key in NUMERIC_BLOCK_FIELDS[block_name]:
+            value = block.get(key)
+            if value is not None:
+                out[key] = _coerce_int_value(value, f"amp.{key}")
         return out
 
-    if block_name in COLOR_BLOCKS and isinstance(block.get("color_index"), (int, float)):
-        out["color_index"] = int(block["color_index"])
+    if block_name in COLOR_BLOCKS and "color_index" in block:
+        out["color_index"] = _coerce_int_value(block["color_index"], f"{block_name}.color_index")
 
     if "on" in block:
         out["on"] = bool(block["on"])
@@ -245,73 +252,88 @@ def _normalize_block(block_name: str, block: dict[str, Any]) -> dict[str, Any]:
 
     if block_name in {"booster", "mod", "fx", "delay", "reverb"}:
         if isinstance(block.get("raw"), list):
-            out["raw"] = list(block["raw"])
+            out["raw"] = _coerce_int_list(block["raw"], f"{block_name}.raw")
         if block_name == "delay" and isinstance(block.get("delay2_raw"), list):
-            out["delay2_raw"] = list(block["delay2_raw"])
-        for key in (
-            "type",
-            "drive",
-            "bottom",
-            "tone",
-            "solo_level",
-            "feedback",
-            "effect_level",
-            "direct_mix",
-            "direct_level",
-            "layer_mode",
-            "time",
-            "pre_delay",
-            "high_cut",
-            "low_cut",
-        ):
-            if key in block:
-                out[key] = block[key]
+            out["delay2_raw"] = _coerce_int_list(block["delay2_raw"], "delay.delay2_raw")
         if block_name == "delay" and isinstance(block.get("time_raw"), list):
-            out["time_raw"] = list(block["time_raw"])
+            out["time_raw"] = _coerce_int_list(block["time_raw"], "delay.time_raw")
+        for key in NUMERIC_BLOCK_FIELDS[block_name]:
+            value = block.get(key)
+            if value is not None:
+                out[key] = _coerce_int_value(value, f"{block_name}.{key}")
         return out
 
     if block_name in {"eq1", "eq2"}:
-        for key in ("position", "on", "type"):
-            if key in block:
-                out[key] = block[key]
+        for key in ("position", "type"):
+            value = block.get(key)
+            if value is not None:
+                out[key] = _coerce_int_value(value, f"{block_name}.{key}")
+        if "on" in block:
+            out["on"] = bool(block["on"])
         if isinstance(block.get("peq_raw"), list):
-            out["peq_raw"] = list(block["peq_raw"])
+            out["peq_raw"] = _coerce_int_list(block["peq_raw"], f"{block_name}.peq_raw")
         if isinstance(block.get("ge10_raw"), list):
-            out["ge10_raw"] = list(block["ge10_raw"])
+            out["ge10_raw"] = _coerce_int_list(block["ge10_raw"], f"{block_name}.ge10_raw")
         return out
 
     if block_name in {"ns", "send_return", "solo"}:
         if isinstance(block.get("raw"), list):
-            out["raw"] = list(block["raw"])
-        for key in ("threshold", "release", "position", "mode", "send_level", "return_level", "effect_level"):
-            if key in block:
-                out[key] = block[key]
+            out["raw"] = _coerce_int_list(block["raw"], f"{block_name}.raw")
+        for key in NUMERIC_BLOCK_FIELDS[block_name]:
+            value = block.get(key)
+            if value is not None:
+                out[key] = _coerce_int_value(value, f"{block_name}.{key}")
         return out
 
     if block_name == "pedalfx":
         if isinstance(block.get("raw_com"), list):
-            out["raw_com"] = list(block["raw_com"])
+            out["raw_com"] = _coerce_int_list(block["raw_com"], "pedalfx.raw_com")
         if isinstance(block.get("raw"), list):
-            out["raw"] = list(block["raw"])
-        for key in ("position", "on", "type"):
-            if key in block:
-                out[key] = block[key]
+            out["raw"] = _coerce_int_list(block["raw"], "pedalfx.raw")
+        for key in ("position", "type"):
+            value = block.get(key)
+            if value is not None:
+                out[key] = _coerce_int_value(value, f"pedalfx.{key}")
+        if "on" in block:
+            out["on"] = bool(block["on"])
         return out
 
     if block_name == "gafc_exp1":
         if isinstance(block.get("raw"), list):
-            out["raw"] = list(block["raw"])
+            out["raw"] = _coerce_int_list(block["raw"], "gafc_exp1.raw")
         if isinstance(block.get("detail_raw"), list):
-            out["detail_raw"] = list(block["detail_raw"])
+            out["detail_raw"] = _coerce_int_list(block["detail_raw"], "gafc_exp1.detail_raw")
         if isinstance(block.get("min_raw"), list):
-            out["min_raw"] = list(block["min_raw"])
+            out["min_raw"] = _coerce_int_list(block["min_raw"], "gafc_exp1.min_raw")
         if isinstance(block.get("max_raw"), list):
-            out["max_raw"] = list(block["max_raw"])
+            out["max_raw"] = _coerce_int_list(block["max_raw"], "gafc_exp1.max_raw")
         if "function" in block:
-            out["function"] = block["function"]
+            out["function"] = _coerce_int_value(block["function"], "gafc_exp1.function")
         return out
 
     return out
+
+
+def _coerce_int_list(values: list[Any], field_name: str) -> list[int]:
+    out: list[int] = []
+    for index, value in enumerate(values):
+        out.append(_coerce_int_value(value, f"{field_name}[{index}]"))
+    return out
+
+
+def _coerce_int_value(value: Any, field_name: str) -> int:
+    if isinstance(value, bool):
+        raise ValueError(f"{field_name} must be numeric")
+    if isinstance(value, (int, float)):
+        return int(value)
+    if isinstance(value, str):
+        text = value.strip()
+        if text:
+            try:
+                return int(text)
+            except ValueError as exc:
+                raise ValueError(f"{field_name} must be numeric") from exc
+    raise ValueError(f"{field_name} must be numeric")
 
 
 def _ensure_object(target: dict[str, Any], key: str) -> dict[str, Any]:
