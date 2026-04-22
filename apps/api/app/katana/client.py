@@ -193,7 +193,7 @@ class AmpClient:
         async with self._port_lock():
             await self._send_only(EDITOR_MODE_ON)
             await self._apply_selected_patch_payload(patch_payload)
-            payload = await self._read_selected_patch_payload()
+            payload = self._clone_patch_payload(patch_payload)
             payload["config_hash_sha256"] = self._config_hash(payload)
             return CurrentPatchSnapshot(payload=payload)
 
