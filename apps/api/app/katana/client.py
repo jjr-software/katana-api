@@ -585,8 +585,8 @@ class AmpClient:
         async def ensure_stage_state() -> tuple[list[int], list[int]]:
             nonlocal sw_data, color_data
             if sw_data is None or color_data is None:
-                sw_data = _ensure_len(await self._read_rq1(ADDR_PATCH_SW, 6), 6)
-                color_data = _ensure_len(await self._read_rq1(ADDR_PATCH_COLOR, 5), 5)
+                sw_data = await self._read_rq1(ADDR_PATCH_SW, 6)
+                color_data = await self._read_rq1(ADDR_PATCH_COLOR, 5)
             return sw_data, color_data
 
         async def apply_color_stage(

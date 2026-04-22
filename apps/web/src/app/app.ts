@@ -6229,6 +6229,9 @@ export class App implements OnInit, OnDestroy {
   }
 
   setLabelForSlot(slot: number): string {
+    if (!Number.isFinite(slot) || !Number.isInteger(slot) || slot < 1) {
+      return 'n/a';
+    }
     return slot <= 4 ? `A:${slot}` : `B:${slot - 4}`;
   }
 
