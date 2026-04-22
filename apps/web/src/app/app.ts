@@ -802,7 +802,7 @@ export class App implements OnInit, OnDestroy {
   }));
   readonly romDistortionPatchOptions = computed(() =>
     this.tonePatchObjects()
-      .filter((item) => item.source_type === 'rom' && item.blocks.includes('amp') && item.blocks.includes('booster'))
+      .filter((item) => item.source_type === 'rom')
       .sort((lhs, rhs) => lhs.name.localeCompare(rhs.name)),
   );
   private readonly onPopState = (): void => {
@@ -1284,7 +1284,7 @@ export class App implements OnInit, OnDestroy {
       return;
     }
     this.toneAiPrompt.set(
-      `Use the ROM patch "${patch.name}" as the starting point. Preserve its character, then refine the amp, booster, and EQ blocks toward the requested distortion sound.`,
+      `Use the ROM patch "${patch.name}" as the starting point. Preserve its character, then refine the available blocks toward the requested distortion sound.`,
     );
     this.setToneBlocksFromNames(patch.blocks, true);
     this.status.set(`Loaded ROM patch: ${patch.name}`);

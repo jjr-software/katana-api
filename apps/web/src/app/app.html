@@ -1107,11 +1107,11 @@
           </div>
           <div class="col-12 col-lg-4">
             <div class="small text-secondary mb-1">Focus</div>
-            <div class="fw-semibold">{{ selectedToneAiRomPatch()?.name || 'ROM amp + booster + EQ starter' }}</div>
+            <div class="fw-semibold">{{ selectedToneAiRomPatch()?.name || 'ROM patch starter' }}</div>
           </div>
         </div>
         <div class="small text-secondary">
-          Picking one preloads the prompt and shifts the AI block focus toward that ROM patch’s amp, booster, and EQ shape.
+          Picking one preloads the prompt and shifts the AI block focus toward that ROM patch’s available blocks.
         </div>
       </div>
       @if (toneAiMode() === 'refine') {
