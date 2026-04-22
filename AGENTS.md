@@ -1917,3 +1917,9 @@
 - Current status:
   - built-in ROM list now includes amp+booster entries alongside the existing EQ-only ROM patches,
   - next step is to rebuild/restart the stack so startup seeding can materialize the new ROM records.
+
+## Session Note - 2026-04-22 (ROM Patch Model)
+- ROM patches are hard-coded seed data, not user-authored database records.
+- The source of truth is `apps/api/app/rom_patches.py`.
+- Startup seeds those specs into `patch_objects` with `source_type='rom'`, which keeps them visible in the library but read-only.
+- If we add more built-in ROM tones, the correct path is to extend the seed list in `rom_patches.py`, not to route through the normal save flow.
