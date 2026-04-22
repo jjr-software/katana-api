@@ -48,7 +48,6 @@ export interface DashboardStickyPanelViewModel {
   aiDesignerLabel: string;
   currentSlotLabel: string;
   patchName: string;
-  liveAmpName: string;
   ampSlotSavedName: string;
 }
 
@@ -176,8 +175,7 @@ function buildValueOptions(labels: readonly string[]): ValueOption[] {
 
             <div class="d-flex flex-wrap gap-3 small text-secondary mb-2">
               <span>Current Slot: <strong>{{ vm.currentSlotLabel }}</strong></span>
-              <span>Patch Name: <strong>{{ vm.patchName }}</strong></span>
-              <span>Live Amp Name: <strong>{{ vm.liveAmpName }}</strong></span>
+              <span>Current Settings: <strong>{{ vm.patchName }}</strong></span>
               <span>Stored Amp Name: <strong>{{ vm.ampSlotSavedName }}</strong></span>
             </div>
 

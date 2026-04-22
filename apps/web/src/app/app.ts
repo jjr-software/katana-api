@@ -677,7 +677,6 @@ export class App implements OnInit, OnDestroy {
   currentAmpPatchHash = signal('');
   currentAmpCommitState = signal<'unknown' | 'committed' | 'uncommitted'>('unknown');
   livePatchSourceType = signal('');
-  livePatchExactDbName = signal('');
   livePatchExactSlotText = signal('');
   livePatchPartialDbCount = signal(0);
   livePatchPartialSlotCount = signal(0);
@@ -797,7 +796,6 @@ export class App implements OnInit, OnDestroy {
     clearLabel: 'Clear',
     currentSlotLabel: this.selectedAmpSlotLabel(),
     patchName: this.currentSettingsPatchName(),
-    liveAmpName: this.livePatchExactDbName().trim() || 'n/a',
     ampSlotSavedName: this.selectedAmpSlotSavedPatchName(),
   }));
   readonly romDistortionPatchOptions = computed(() =>
@@ -1545,7 +1543,6 @@ export class App implements OnInit, OnDestroy {
         return rhs.id - lhs.id;
       });
       this.tonePatchObjects.set(sorted);
-      this.syncSelectedPatchFromExactMatch();
     } catch {
       // Informational panel only.
     }
@@ -2037,7 +2034,7 @@ export class App implements OnInit, OnDestroy {
       this.status.set('Select at least one block before AI refinement.');
       return;
     }
-    const currentName = this.livePatchExactDbName().trim() || this.toneLoadedPatchName().trim() || 'Live Patch';
+    const currentName = this.toneLoadedPatchName().trim() || 'Live State';
     this.setActionBusy('tone-ai-refine', true);
     this.status.set(`Previewing AI refinement for ${currentName}...`);
     this.responseJson.set('');
@@ -2516,7 +2513,7 @@ export class App implements OnInit, OnDestroy {
       }
       const currentPatch = currentPatchPayload as CurrentPatchResponse;
       const activeHash = this.readString(currentPatch.patch, 'config_hash_sha256');
-      const activeName = this.readString(currentPatch.patch, 'patch_name') ?? 'Active Patch';
+      const activeName = this.toneLoadedPatchName().trim() || 'Live State';
       const exactPatchObjectId = this.livePatchExactDbMatch()?.id ?? null;
       const selectedSlot = this.selectedAmpSlot();
 
@@ -4723,7 +4720,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   currentSettingsPatchName(): string {
-    return this.readString(this.editorPatchDraft(), 'patch_name')?.trim() || this.toneLoadedPatchName().trim() || this.livePatchExactDbName().trim() || 'Unnamed Current Settings';
+    return this.readString(this.editorPatchDraft(), 'patch_name')?.trim() || this.toneLoadedPatchName().trim() || 'Unnamed Current Settings';
   }
 
   private applySyncedSlot(slot: SlotPatchSummary): void {
@@ -6268,25 +6265,6 @@ export class App implements OnInit, OnDestroy {
     this.setToneBlocksFromPatch(patchObject.patch_json, true);
   }
 
-  private syncSelectedPatchFromExactMatch(): void {
-    const exactMatch = this.livePatchExactDbMatch();
-    if (!exactMatch) {
-      return;
-    }
-    const patchObject = this.tonePatchObjects().find((item) => item.id === exactMatch.id) ?? null;
-    if (!patchObject) {
-      return;
-    }
-    const currentSelectedId = this.toneLoadedPatchObjectId().trim();
-    if (currentSelectedId && currentSelectedId !== String(exactMatch.id)) {
-      return;
-    }
-    if (!currentSelectedId && this.toneLoadedPatchSnapshot() !== null) {
-      return;
-    }
-    this.selectSavedPatch(patchObject);
-  }
-
   private setToneBlocksFromPatch(source: Record<string, unknown>, replaceSelection: boolean): void {
     const blockNames = this.toneBlockOptions().filter((block) => this.patchDefinesBlock(source, block));
     this.setToneBlocksFromNames(blockNames, replaceSelection);
@@ -6398,7 +6376,6 @@ export class App implements OnInit, OnDestroy {
     this.livePatchSnapshot.set(this.clonePatch(payload.patch_json));
     this.livePatchSourceType.set(payload.source_type || '');
     this.livePatchExactDbMatch.set(payload.exact_patch_object ?? null);
-    this.livePatchExactDbName.set(payload.exact_patch_object?.name || '');
     this.livePatchExactSlotMatch.set(payload.exact_amp_slot ?? null);
     this.livePatchExactSlotText.set(
       payload.exact_amp_slot ? `${payload.exact_amp_slot.slot} · ${payload.exact_amp_slot.patch_name || 'Unnamed'}` : '',
@@ -6408,7 +6385,6 @@ export class App implements OnInit, OnDestroy {
     this.livePatchPartialDbCount.set(Array.isArray(payload.partial_patch_objects) ? payload.partial_patch_objects.length : 0);
     this.livePatchPartialSlotCount.set(Array.isArray(payload.partial_amp_slots) ? payload.partial_amp_slots.length : 0);
     this.currentAmpPatchHash.set(payload.compat_hash_sha256 || this.currentAmpPatchHash());
-    this.syncSelectedPatchFromExactMatch();
     if (payload.active_slot !== null) {
       this.selectedAmpSlot.set(payload.active_slot);
       this.selectedAmpSlotText.set(payload.active_slot <= 4 ? `A:${payload.active_slot}` : `B:${payload.active_slot - 4}`);
