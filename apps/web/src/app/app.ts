@@ -757,6 +757,7 @@ export class App implements OnInit, OnDestroy {
   editorLiveApplyInFlight = false;
   editorLiveApplyLastAppliedFingerprint = '';
   editorLiveApplyQueuedFingerprint: string | null = null;
+  editorLiveApplyAbortController: AbortController | null = null;
   livePatchSnapshot = signal<Record<string, unknown> | null>(null);
   tonePatchObjects = signal<TonePatchObjectResponse[]>([]);
   toneSets = signal<TonePatchObjectSetResponse[]>([]);
@@ -1235,6 +1236,10 @@ export class App implements OnInit, OnDestroy {
       });
       return next.slice(0, 5);
     });
+  }
+
+  private isAbortError(error: unknown): boolean {
+    return typeof error === 'object' && error !== null && 'name' in error && (error as { name: string }).name === 'AbortError';
   }
 
   toneBlockOptions(): readonly string[] {
@@ -5773,6 +5778,7 @@ export class App implements OnInit, OnDestroy {
     }
     this.editorLiveApplyQueuedFingerprint = draftFingerprint;
     if (this.editorLiveApplyInFlight) {
+      this.editorLiveApplyAbortController?.abort();
       return;
     }
     void this.flushEditorLiveApplyQueue();
@@ -5812,6 +5818,8 @@ export class App implements OnInit, OnDestroy {
     this.editorLiveApplyInFlight = true;
     this.editorLiveApplyPending.set(true);
     this.editorLiveApplyReadbackAt.set('');
+    const abortController = new AbortController();
+    this.editorLiveApplyAbortController = abortController;
     try {
       if (!forceFullPatch && changedBlocks.length === 1) {
         const blockName = changedBlocks[0];
@@ -5821,6 +5829,7 @@ export class App implements OnInit, OnDestroy {
             method: 'PATCH',
             cache: 'no-store',
             headers: { 'Content-Type': 'application/json' },
+            signal: abortController.signal,
             body: JSON.stringify({ patch_block: blockPayload }),
           });
           const payload = (await response.json()) as LivePatchResponse | { detail?: unknown };
@@ -5871,6 +5880,7 @@ export class App implements OnInit, OnDestroy {
         method: 'POST',
         cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
+        signal: abortController.signal,
         body: JSON.stringify({ patch: draftSnapshot }),
       });
       const payload = (await response.json()) as ApplyCurrentPatchResponse | { detail?: unknown };
@@ -5916,11 +5926,17 @@ export class App implements OnInit, OnDestroy {
       void this.refreshLivePatchStatus();
       return true;
     } catch (error: unknown) {
+      if (this.isAbortError(error)) {
+        return false;
+      }
       this.editorLiveApplyError.set(String(error));
       return false;
     } finally {
       this.editorLiveApplyInFlight = false;
       this.editorLiveApplyPending.set(false);
+      if (this.editorLiveApplyAbortController === abortController) {
+        this.editorLiveApplyAbortController = null;
+      }
       if (this.editorLiveApplyQueuedFingerprint && this.editorLiveApplyQueuedFingerprint !== this.editorLiveApplyLastAppliedFingerprint) {
         void this.flushEditorLiveApplyQueue();
       }
