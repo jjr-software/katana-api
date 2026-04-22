@@ -1089,6 +1089,31 @@
         <button type="button" class="btn btn-sm" [class.btn-primary]="toneAiMode() === 'ideas'" [class.btn-outline-primary]="toneAiMode() !== 'ideas'" (click)="setToneAiMode('ideas')">Ideas</button>
         <button type="button" class="btn btn-sm" [class.btn-primary]="toneAiMode() === 'set'" [class.btn-outline-primary]="toneAiMode() !== 'set'" (click)="setToneAiMode('set')">Audition Set</button>
       </div>
+      <div class="border rounded p-3 bg-body-tertiary d-grid gap-2">
+        <div class="row g-2 align-items-end">
+          <div class="col-12 col-lg-8">
+            <label class="form-label small mb-1" for="toneAiDistortionRecipe">Distortion Recipe</label>
+            <select
+              id="toneAiDistortionRecipe"
+              class="form-select form-select-sm"
+              [value]="toneAiDistortionRecipe()"
+              (change)="selectToneAiDistortionRecipe($any($event.target).value)"
+            >
+              <option value="">Choose a starting point</option>
+              @for (recipe of distortionRecipeOptions; track recipe.value) {
+                <option [value]="recipe.value">{{ recipe.label }}</option>
+              }
+            </select>
+          </div>
+          <div class="col-12 col-lg-4">
+            <div class="small text-secondary mb-1">Focus</div>
+            <div class="fw-semibold">{{ selectedToneAiDistortionRecipe()?.summary || 'Amp + booster + EQ starter' }}</div>
+          </div>
+        </div>
+        <div class="small text-secondary">
+          Picking one preloads the prompt and shifts the AI block focus toward the recipe’s amp, booster, and EQ shape.
+        </div>
+      </div>
       @if (toneAiMode() === 'refine') {
         <p class="small text-secondary mb-0">Preview one AI refinement for the current Live Patch, inspect the proposal in plain English and JSON, then explicitly approve or reject it before anything is applied.</p>
       } @else if (toneAiMode() === 'ideas') {

@@ -84,6 +84,41 @@ const DELAY_TYPE_NAMES = [
 ];
 const AMP_TYPE_NAMES = ['Acoustic', 'Clean', 'Pushed', 'Crunch', 'Lead', 'Brown'];
 const REVERB_TYPE_NAMES = ['Plate Reverb', 'Room Reverb', 'Hall Reverb', 'Spring Reverb', 'Modulate Reverb'];
+
+interface DistortionRecipePreset {
+  value: string;
+  label: string;
+  summary: string;
+  prompt: string;
+  blocks: readonly string[];
+}
+
+const DISTORTION_RECIPE_OPTIONS: ReadonlyArray<DistortionRecipePreset> = [
+  {
+    value: 'modern-tight',
+    label: 'Modern Tight',
+    summary: 'Brown or Lead with a Tube Screamer-style boost and firmer EQ cuts.',
+    prompt:
+      'Build a tight modern distortion patch. Start from Brown or Lead, keep gain moderate instead of maxed, use a T-Scream style booster with drive low and level high, then use EQ1 and EQ2 to cut low-end mud and fizz. Aim for a focused, mix-ready high-gain sound with clear palm mutes and restrained bass.',
+    blocks: ['amp', 'booster', 'eq1', 'eq2', 'ns'],
+  },
+  {
+    value: 'classic-rock-stack',
+    label: 'Classic Rock Stack',
+    summary: 'Brown or Lead with moderate gain, boosted mids, and a leaner front end.',
+    prompt:
+      'Build a classic 80s rock distortion patch. Use Brown or Lead, keep gain around the midrange rather than maxing it, and add a Tube Screamer-style or Distortion+ style booster with low drive and strong level. Keep the mids and high mids present, avoid a deep scoop, and use gentle EQ shaping so the sound stays open and punchy.',
+    blocks: ['amp', 'booster', 'eq1', 'eq2'],
+  },
+  {
+    value: 'pedal-platform-dirt',
+    label: 'Pedal Platform Dirt',
+    summary: 'Clean or Acoustic as a platform, then let the booster supply the dirt.',
+    prompt:
+      'Build a pedal-platform distortion patch. Start from Clean or Acoustic with low amp gain and healthy channel volume, then use a distortion or overdrive booster for the dirt. Keep the amp EQ close to neutral, add a low cut to remove mud, and only trim the top end if the distortion gets fizzy.',
+    blocks: ['amp', 'booster', 'eq1'],
+  },
+];
 const GAFC_EXP1_FUNCTION_OPTIONS: ReadonlyArray<ValueOption> = [
   { value: 0, label: 'Volume' },
   { value: 1, label: 'Foot Volume' },
@@ -757,6 +792,7 @@ export class App implements OnInit, OnDestroy {
   toneSaveDescription = signal('');
   toneAiPrompt = signal('Refine the current editor patch or generate distinct sparse candidates around the target sound. Keep the results audibly useful for quick auditioning.');
   toneAiMode = signal<'refine' | 'ideas' | 'set'>('refine');
+  toneAiDistortionRecipe = signal('');
   toneAiSetName = signal('');
   toneAiDescription = signal('');
   toneAiCount = signal('8');
@@ -1261,6 +1297,23 @@ export class App implements OnInit, OnDestroy {
   setToneAiMode(value: 'refine' | 'ideas' | 'set'): void {
     this.clearToneAiPreview();
     this.toneAiMode.set(value);
+  }
+
+  readonly distortionRecipeOptions = DISTORTION_RECIPE_OPTIONS;
+
+  selectedToneAiDistortionRecipe(): DistortionRecipePreset | null {
+    return this.distortionRecipeOptions.find((recipe) => recipe.value === this.toneAiDistortionRecipe()) ?? null;
+  }
+
+  selectToneAiDistortionRecipe(value: string): void {
+    this.toneAiDistortionRecipe.set(value);
+    const recipe = this.selectedToneAiDistortionRecipe();
+    if (!recipe) {
+      return;
+    }
+    this.toneAiPrompt.set(recipe.prompt);
+    this.setToneBlocksFromNames(recipe.blocks, true);
+    this.status.set(`Loaded distortion recipe: ${recipe.label}`);
   }
 
   openToneSetModal(): void {
