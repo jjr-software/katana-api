@@ -1348,6 +1348,10 @@ export class App implements OnInit, OnDestroy {
     return this.tonePatchObjects().find((item) => item.name === name) ?? null;
   }
 
+  tonePatchKindLabel(patchObject: TonePatchObjectResponse): 'ROM' | 'User' {
+    return patchObject.source_type === 'rom' ? 'ROM' : 'User';
+  }
+
   private defaultToneSaveBlocks(): string[] {
     return this.toneBlockOptions().filter((block) => this.isToneBlockSelected(block) || this.editorBlockIsOn(block));
   }
@@ -1505,7 +1509,15 @@ export class App implements OnInit, OnDestroy {
       if (!response.ok || !Array.isArray(payload)) {
         return;
       }
-      this.tonePatchObjects.set(payload as TonePatchObjectResponse[]);
+      const sorted = [...payload].sort((lhs, rhs) => {
+        const lhsRom = lhs.source_type === 'rom';
+        const rhsRom = rhs.source_type === 'rom';
+        if (lhsRom !== rhsRom) {
+          return lhsRom ? -1 : 1;
+        }
+        return rhs.id - lhs.id;
+      });
+      this.tonePatchObjects.set(sorted);
       this.syncSelectedPatchFromExactMatch();
     } catch {
       // Informational panel only.
@@ -1540,6 +1552,10 @@ export class App implements OnInit, OnDestroy {
     }
     if (!editorPatch) {
       this.status.set('Load GUI state first before saving it.');
+      return;
+    }
+    if (existingPatch?.source_type === 'rom') {
+      this.status.set('ROM patch names are read-only. Duplicate it to create a user patch.');
       return;
     }
     this.setActionBusy('tone-save-gui', true);
@@ -1620,6 +1636,10 @@ export class App implements OnInit, OnDestroy {
     const existingPatch = this.toneSaveExistingPatch();
     if (!name) {
       this.status.set('Tone save requires a name.');
+      return;
+    }
+    if (existingPatch?.source_type === 'rom') {
+      this.status.set('ROM patch names are read-only. Duplicate it to create a user patch.');
       return;
     }
     if (existingPatch && !window.confirm(`Patch "${name}" already exists. Overwrite it?`)) {

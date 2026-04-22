@@ -257,7 +257,7 @@ def list_patch_objects(
     q: str | None = None,
     db: Session = Depends(get_db),
 ) -> list[PatchObjectReadResponse]:
-    rows = list(db.scalars(select(PatchObject).order_by(PatchObject.id.desc())))
+    rows = list(db.scalars(select(PatchObject)))
     filtered: list[PatchObject] = []
     selected_blocks = _validated_blocks(blocks) if blocks else []
     allowed_group_members = _group_member_patch_object_ids(db, group_id) if group_id is not None else None
@@ -274,6 +274,7 @@ def list_patch_objects(
             if query_text not in haystack:
                 continue
         filtered.append(row)
+    filtered.sort(key=lambda row: (row.source_type != "rom", -row.id))
     rows = filtered
     groups_by_patch_object_id = _group_refs_by_patch_object_ids(db, [row.id for row in rows])
     return [_patch_object_response(db, row, groups=groups_by_patch_object_id.get(row.id, [])) for row in rows]
@@ -318,7 +319,7 @@ def duplicate_patch_object(
         name=payload.name,
         description=row.description,
         patch_json=row.patch_json,
-        source_type=row.source_type,
+        source_type="manual",
         source_prompt=row.source_prompt,
         parent_patch_object_id=row.id,
     )
@@ -962,6 +963,8 @@ def _save_or_overwrite_patch_object(
 ) -> PatchObject:
     existing = db.scalar(select(PatchObject).where(PatchObject.name == name))
     if existing is not None:
+        if existing.source_type == "rom" and source_type != "rom":
+            raise HTTPException(status_code=409, detail={"message": "ROM patch objects are read-only", "name": name})
         if not overwrite:
             raise HTTPException(status_code=409, detail={"message": "Patch object already exists", "name": name})
         existing.description = description

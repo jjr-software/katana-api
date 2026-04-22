@@ -960,9 +960,15 @@
         Green blocks will be saved. Gray blocks will not. Default save scope is <strong>visible</strong> blocks or blocks that are <strong>On</strong>.
       </div>
       @if (toneSaveExistingPatch(); as existingPatch) {
-        <div class="alert alert-warning py-2 px-3 mb-0 small">
-          A patch named <strong>{{ existingPatch.name }}</strong> already exists. Saving will overwrite it.
-        </div>
+        @if (existingPatch.source_type === 'rom') {
+          <div class="alert alert-danger py-2 px-3 mb-0 small">
+            <strong>{{ existingPatch.name }}</strong> is a built-in ROM patch. Duplicate it first if you want a user-editable copy.
+          </div>
+        } @else {
+          <div class="alert alert-warning py-2 px-3 mb-0 small">
+            A patch named <strong>{{ existingPatch.name }}</strong> already exists. Saving will overwrite it.
+          </div>
+        }
       }
       <div>
         <label class="form-label small mb-1" for="toneSaveName">Name</label>
@@ -1017,9 +1023,9 @@
         </div>
       </div>
       <div class="d-flex justify-content-end flex-wrap gap-2">
-        <button type="button" class="btn btn-sm btn-outline-success" (click)="saveFullLiveAsTonePatchObject()" [disabled]="isActionBusy('tone-save-full')">Store Full Patch</button>
-        <button type="button" class="btn btn-sm btn-success" (click)="saveGuiStateAsTonePatchObject()" [disabled]="isActionBusy('tone-save-gui')">
-          {{ isActionBusy('tone-save-gui') ? 'Saving...' : (toneSaveExistingPatch() ? 'Overwrite Current Settings' : 'Save Current Settings') }}
+        <button type="button" class="btn btn-sm btn-outline-success" (click)="saveFullLiveAsTonePatchObject()" [disabled]="isActionBusy('tone-save-full') || toneSaveExistingPatch()?.source_type === 'rom'">Store Full Patch</button>
+        <button type="button" class="btn btn-sm btn-success" (click)="saveGuiStateAsTonePatchObject()" [disabled]="isActionBusy('tone-save-gui') || toneSaveExistingPatch()?.source_type === 'rom'">
+          {{ isActionBusy('tone-save-gui') ? 'Saving...' : (toneSaveExistingPatch()?.source_type === 'rom' ? 'ROM Name Reserved' : (toneSaveExistingPatch() ? 'Overwrite Current Settings' : 'Save Current Settings')) }}
         </button>
       </div>
     </div>
@@ -1031,7 +1037,7 @@
       <button type="button" class="btn-close" aria-label="Close" (click)="closeToneLibraryModal()"></button>
     </div>
     <div class="modal-body d-grid gap-3">
-      <p class="small text-secondary mb-0">Load a saved patch to the live amp from here. Refresh to pull the latest library state, then apply the patch you want.</p>
+      <p class="small text-secondary mb-0">Load a saved patch to the live amp from here. ROM patches are built in and read-only; user patches are stored in the database.</p>
       <div class="row g-2">
         <div class="col-12 col-lg-7">
           <input type="text" class="form-control form-control-sm" placeholder="Search name or description" [value]="tonePatchQuery()" (input)="setTonePatchQuery($any($event.target).value)" />
@@ -1046,7 +1052,7 @@
           <article class="border rounded p-2 small bg-body-tertiary d-grid gap-2" [class.border-primary]="toneHighlightedPatchObjectId() === patchObject.id">
             <div class="d-flex justify-content-between gap-2 flex-wrap">
               <div>
-                <app-patch-summary [name]="patchObject.name" [blocks]="patchObject.blocks"></app-patch-summary>
+                <app-patch-summary [name]="patchObject.name" [blocks]="patchObject.blocks" [kind]="tonePatchKindLabel(patchObject)"></app-patch-summary>
               </div>
               <div class="d-flex gap-2 flex-wrap">
                 <button type="button" class="btn btn-sm btn-outline-secondary" (click)="duplicateTonePatchObject(patchObject)" [disabled]="isActionBusy('tone-duplicate:' + patchObject.id)">

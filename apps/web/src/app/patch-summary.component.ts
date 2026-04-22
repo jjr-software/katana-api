@@ -23,6 +23,11 @@ const PATCH_BLOCK_LABELS: Record<string, string> = {
   template: `
     <div class="d-flex flex-wrap align-items-center gap-1">
       <strong>{{ name() }}</strong>
+      @if (kind()) {
+        <span class="badge rounded-pill" [class.text-bg-warning]="kind() === 'ROM'" [class.text-bg-secondary]="kind() !== 'ROM'">
+          {{ kind() }}
+        </span>
+      }
       @for (block of blocks(); track block) {
         <span class="badge rounded-pill text-bg-secondary fw-normal">{{ blockLabel(block) }}</span>
       }
@@ -32,6 +37,7 @@ const PATCH_BLOCK_LABELS: Record<string, string> = {
 export class PatchSummaryComponent {
   readonly name = input.required<string>();
   readonly blocks = input<readonly string[]>([]);
+  readonly kind = input<string | null>(null);
 
   blockLabel(block: string): string {
     return PATCH_BLOCK_LABELS[block] ?? block;
