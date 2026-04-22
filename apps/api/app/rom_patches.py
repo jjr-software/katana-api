@@ -30,6 +30,10 @@ def _eq_block(position: int, bands: dict[int, int], level: int = 20) -> dict[str
     }
 
 
+def _raw_block(raw: list[int]) -> dict[str, Any]:
+    return {"raw": list(raw)}
+
+
 ROM_PATCH_OBJECT_SPECS: list[dict[str, Any]] = [
     {
         "name": "Hendrix-Style Dynamic Crunch",
@@ -231,6 +235,38 @@ ROM_PATCH_OBJECT_SPECS: list[dict[str, Any]] = [
                     9: 4,
                 },
             ),
+        },
+    },
+    {
+        "name": "Graham Coxon Brit Scratch",
+        "description": "Lean lows and sharp upper-mids with a distortion booster for dry 90s Brit scratch.",
+        "patch_json": {
+            "amp": _raw_block([28, 78, 32, 76, 52, 30, 0, 1, 1, 0]),
+            "booster": _raw_block([13, 74, 36, 62, 0, 50, 70, 0]),
+        },
+    },
+    {
+        "name": "90s Alt RAT Lane",
+        "description": "Tight lows and biting mids with a RAT booster for angular alt-rock drive.",
+        "patch_json": {
+            "amp": _raw_block([30, 78, 34, 75, 49, 27, 0, 1, 1, 0]),
+            "booster": _raw_block([14, 76, 38, 60, 0, 50, 69, 0]),
+        },
+    },
+    {
+        "name": "90s Brit GUV Wall",
+        "description": "Clean base with GUV DS thickness for a mid-forward rhythm wall.",
+        "patch_json": {
+            "amp": _raw_block([34, 80, 40, 70, 50, 26, 0, 1, 1, 0]),
+            "booster": _raw_block([15, 78, 46, 52, 0, 50, 72, 0]),
+        },
+    },
+    {
+        "name": "Mild Comp Clean v02",
+        "description": "Gain-floor clean patch with clean boost feel and usable loudness.",
+        "patch_json": {
+            "amp": _raw_block([50, 68, 42, 62, 58, 54, 1, 1, 0, 0]),
+            "booster": _raw_block([1, 18, 50, 45, 0, 50, 58, 0]),
         },
     },
 ]

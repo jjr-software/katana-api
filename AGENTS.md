@@ -1904,3 +1904,16 @@
   - `apps/web/src/app/app.css`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-04-22 (Built-In Amp+Booster ROM Seeds)
+- Added new ROM seed entries to the built-in patch library for existing amp+booster tone snapshots.
+- File changed:
+  - `apps/api/app/rom_patches.py`
+- Added ROM entries:
+  - `Graham Coxon Brit Scratch`
+  - `90s Alt RAT Lane`
+  - `90s Brit GUV Wall`
+  - `Mild Comp Clean v02`
+- Current status:
+  - built-in ROM list now includes amp+booster entries alongside the existing EQ-only ROM patches,
+  - next step is to rebuild/restart the stack so startup seeding can materialize the new ROM records.
