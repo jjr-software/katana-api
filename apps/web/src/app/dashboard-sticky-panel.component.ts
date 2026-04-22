@@ -46,8 +46,6 @@ export interface DashboardStickyPanelViewModel {
   loadPatchLabel: string;
   saveCurrentSettingsLabel: string;
   aiDesignerLabel: string;
-  currentSlotLabel: string;
-  patchName: string;
 }
 
 const BOOSTER_TYPE_NAMES = [
@@ -170,11 +168,6 @@ function buildValueOptions(labels: readonly string[]): ValueOption[] {
                 <button type="button" class="btn btn-outline-primary btn-sm" (click)="openToneDesignerModal.emit()">{{ vm.aiDesignerLabel }}</button>
               </div>
               <button type="button" class="btn btn-outline-secondary btn-sm" (click)="clearLiveMeterChart()">Clear</button>
-            </div>
-
-            <div class="d-flex flex-wrap gap-3 small text-secondary mb-2">
-              <span>Current Slot: <strong>{{ vm.currentSlotLabel }}</strong></span>
-              <span>Current Settings: <strong>{{ vm.patchName }}</strong></span>
             </div>
 
             <div class="d-grid gap-2 small text-secondary">

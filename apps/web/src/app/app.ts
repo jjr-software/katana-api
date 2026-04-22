@@ -794,8 +794,6 @@ export class App implements OnInit, OnDestroy {
     saveCurrentSettingsLabel: 'Save Current Settings',
     aiDesignerLabel: 'AI Designer',
     clearLabel: 'Clear',
-    currentSlotLabel: this.selectedAmpSlotLabel(),
-    patchName: this.currentSettingsPatchName(),
   }));
   readonly romDistortionPatchOptions = computed(() =>
     this.tonePatchObjects()
@@ -4704,10 +4702,6 @@ export class App implements OnInit, OnDestroy {
 
   selectedAmpSlotLabel(): string {
     return this.selectedAmpSlotText();
-  }
-
-  currentSettingsPatchName(): string {
-    return this.readString(this.editorPatchDraft(), 'patch_name')?.trim() || this.toneLoadedPatchName().trim() || 'Unnamed Current Settings';
   }
 
   private applySyncedSlot(slot: SlotPatchSummary): void {
