@@ -35,7 +35,7 @@
 
   @if (isDashboardPage()) {
     <div class="row g-3 align-items-start">
-      <div class="col-12 col-xl-3">
+      <div class="col-12 col-xl-3 dashboard-sticky-panel-column">
         <app-dashboard-sticky-panel
           [model]="stickyPanelVm()"
           (testAmpConnection)="testAmpConnection()"

@@ -154,9 +154,6 @@ function buildValueOptions(labels: readonly string[]): ValueOption[] {
   styles: [`
     :host {
       display: block;
-      position: sticky;
-      top: .75rem;
-      z-index: 4;
     }
   `],
   template: `
@@ -184,62 +181,39 @@ function buildValueOptions(labels: readonly string[]): ValueOption[] {
               <span>Stored Amp Name: <strong>{{ vm.ampSlotSavedName }}</strong></span>
             </div>
 
-            <div class="d-flex flex-wrap gap-3 small text-secondary">
-              <span>
-                Live Meter:
-                <code [class.text-success]="liveMeterConnected()" [class.text-secondary]="!liveMeterConnected()">
-                  {{ liveMeterConnected() ? 'Connected' : 'Stopped' }}
-                </code>
-              </span>
-            </div>
-
-            <div class="small text-secondary mt-2">Total Level</div>
-            <div class="d-flex align-items-baseline justify-content-between gap-2">
-              <span class="fs-5 fw-semibold">{{ formatDb(liveRmsDbfs()) }}</span>
-              <span class="small text-danger fw-semibold">Max <span class="border-bottom border-danger pb-1">{{ formatDb(liveRmsMaxDbfs()) }}</span></span>
-            </div>
-            <div class="d-flex justify-content-between align-items-center gap-2 small text-secondary">
-              <span>Target {{ formatDb(liveTotalLevelTargetRms()) }}</span>
-              <span>2s RMS chunks</span>
-            </div>
-            <div class="d-flex justify-content-between align-items-center gap-2 small text-secondary mt-1">
-              <span>Current {{ liveTotalLevelDelta(liveRmsDbfs()) }}</span>
-              <span>Max Hold {{ liveTotalLevelDelta(liveRmsMaxDbfs()) }}</span>
-            </div>
-            <div class="mt-2 rounded overflow-hidden border" style="background: linear-gradient(180deg, rgba(13, 110, 253, 0.04) 0%, rgba(220, 53, 69, 0.04) 50%, rgba(25, 135, 84, 0.04) 100%), #f8f9fa;">
-              <svg class="d-block w-100" viewBox="0 0 1000 288" preserveAspectRatio="none" aria-label="Running total level history">
-                <line x1="0" [attr.y1]="liveTotalLevelTargetLineY()" x2="1000" [attr.y2]="liveTotalLevelTargetLineY()" style="stroke:#dc3545;stroke-width:2;" />
-                @for (bar of liveTotalLevelBars(); track $index) {
-                  <rect [attr.x]="bar.x" [attr.y]="bar.y" [attr.width]="bar.width" [attr.height]="bar.height" [attr.fill]="bar.tone === 'above' ? '#dc3545' : '#0d6efd'" />
-                }
-              </svg>
-            </div>
-            <div class="d-flex justify-content-between align-items-center gap-2 small text-secondary mt-2">
-              <span>{{ formatDb(liveTotalLevelWindowMin()) }}</span>
-              <span class="text-danger fw-semibold text-uppercase">Target</span>
-              <span>{{ formatDb(liveTotalLevelWindowMax()) }}</span>
-            </div>
-            <div class="small text-secondary mt-2">Zoom {{ formatDb(liveTotalLevelWindowMin()) }} to {{ formatDb(liveTotalLevelWindowMax()) }}</div>
-          </div>
-        </div>
-
-        <div class="card mb-3">
-          <div class="card-body py-2">
-            <div class="d-flex flex-wrap gap-2 mt-2">
-              <div class="card shadow-sm" style="flex: 1 1 18rem; min-width: 18rem;">
-                <div class="card-body py-2 px-3 d-grid gap-2">
-                  <div class="small text-secondary">Global Target RMS</div>
-                  <input type="number" step="0.1" class="form-control form-control-sm" style="width: 7.5rem;" [value]="globalNormalizeTargetRms()" (input)="globalNormalizeTargetRms.set($any($event.target).value); globalNormalizeTargetRmsChange.emit($any($event.target).value)" (blur)="commitGlobalNormalizeTargetRms(); globalNormalizeTargetRmsCommit.emit()" />
-                </div>
+            <div class="d-grid gap-2 small text-secondary">
+              <div class="w-100 small text-secondary mt-2">Total Level</div>
+              <div class="d-flex align-items-baseline justify-content-between gap-2 w-100">
+                <span class="fs-5 fw-semibold">{{ formatDb(liveRmsDbfs()) }}</span>
+                <span class="small text-danger fw-semibold">Max <span class="border-bottom border-danger pb-1">{{ formatDb(liveRmsMaxDbfs()) }}</span></span>
               </div>
-              <div class="card shadow-sm" style="flex: 1 1 11rem; min-width: 11rem;">
-                <div class="card-body py-2 px-3">
-                  <div class="small text-secondary mb-1">Live At</div>
-                  <code class="d-block text-nowrap">{{ liveMeterAt() || 'n/a' }}</code>
-                </div>
+              <div class="d-flex justify-content-between align-items-center gap-2 small text-secondary w-100">
+                <span>Target {{ formatDb(liveTotalLevelTargetRms()) }}</span>
+                <span>2s RMS chunks</span>
+              </div>
+              <div class="d-flex justify-content-between align-items-center gap-2 small text-secondary w-100 mt-1">
+                <span>Current {{ liveTotalLevelDelta(liveRmsDbfs()) }}</span>
+                <span>Max Hold {{ liveTotalLevelDelta(liveRmsMaxDbfs()) }}</span>
+              </div>
+              <div class="mt-2 rounded overflow-hidden border w-100" style="background: linear-gradient(180deg, rgba(13, 110, 253, 0.04) 0%, rgba(220, 53, 69, 0.04) 50%, rgba(25, 135, 84, 0.04) 100%), #f8f9fa;">
+                <svg class="d-block w-100" viewBox="0 0 1000 288" preserveAspectRatio="none" aria-label="Running total level history">
+                  <line x1="0" [attr.y1]="liveTotalLevelTargetLineY()" x2="1000" [attr.y2]="liveTotalLevelTargetLineY()" style="stroke:#dc3545;stroke-width:2;" />
+                  @for (bar of liveTotalLevelBars(); track $index) {
+                    <rect [attr.x]="bar.x" [attr.y]="bar.y" [attr.width]="bar.width" [attr.height]="bar.height" [attr.fill]="bar.tone === 'above' ? '#dc3545' : '#0d6efd'" />
+                  }
+                </svg>
+              </div>
+              <div class="d-flex justify-content-between align-items-center gap-2 small text-secondary mt-2 w-100">
+                <span>{{ formatDb(liveTotalLevelWindowMin()) }}</span>
+                <span class="text-danger fw-semibold text-uppercase">Target</span>
+                <span>{{ formatDb(liveTotalLevelWindowMax()) }}</span>
+              </div>
+              <div class="small text-secondary mt-2 w-100">Zoom {{ formatDb(liveTotalLevelWindowMin()) }} to {{ formatDb(liveTotalLevelWindowMax()) }}</div>
+              <div class="d-flex flex-wrap align-items-center gap-2 mt-3 w-100">
+                <span class="small text-secondary">Global Target RMS</span>
+                <input type="number" step="0.1" class="form-control form-control-sm" style="width: 7.5rem;" [value]="globalNormalizeTargetRms()" (input)="globalNormalizeTargetRms.set($any($event.target).value); globalNormalizeTargetRmsChange.emit($any($event.target).value)" (blur)="commitGlobalNormalizeTargetRms(); globalNormalizeTargetRmsCommit.emit()" />
               </div>
             </div>
-
           </div>
         </div>
       </section>
@@ -262,8 +236,6 @@ export class DashboardStickyPanelComponent implements OnInit, OnDestroy {
   readonly liveRmsDbfs = signal<number | null>(null);
   readonly liveRmsMaxDbfs = signal<number | null>(null);
   readonly liveRmsHistory = signal<number[]>([]);
-  readonly liveMeterAt = signal('');
-  readonly liveMeterConnected = signal(false);
 
   private readonly ngZone = inject(NgZone);
   private liveMeterSource: EventSource | null = null;
@@ -384,27 +356,20 @@ export class DashboardStickyPanelComponent implements OnInit, OnDestroy {
         try {
           const payload = JSON.parse(event.data) as Record<string, unknown>;
           const eventType = String(payload['type'] ?? '');
-          if (eventType === 'connected') {
-            this.liveMeterConnected.set(true);
-            return;
-          }
           if (eventType !== 'audio_metrics') {
             return;
           }
           const rms = Number(payload['rms_dbfs']);
-          const ts = String(payload['ts'] ?? '');
           if (Number.isFinite(rms)) {
             this.liveRmsDbfs.set(rms);
             this.liveRmsMaxDbfs.update((current) => (current === null || rms > current ? rms : current));
             this.pushLiveRmsPoint(rms);
           }
-          this.liveMeterAt.set(ts);
         } catch {
           // Keep the panel stable if one event is malformed.
         }
       };
       source.onerror = () => {
-        this.liveMeterConnected.set(false);
         this.disconnectLiveMeter();
         this.scheduleLiveMeterReconnect();
       };
@@ -417,7 +382,6 @@ export class DashboardStickyPanelComponent implements OnInit, OnDestroy {
       this.liveMeterSource.close();
       this.liveMeterSource = null;
     }
-    this.liveMeterConnected.set(false);
   }
 
   private shutdownLiveMeter(): void {
@@ -431,7 +395,6 @@ export class DashboardStickyPanelComponent implements OnInit, OnDestroy {
     this.liveRmsDbfs.set(null);
     this.liveRmsMaxDbfs.set(null);
     this.liveRmsHistory.set([]);
-    this.liveMeterAt.set('');
   }
 
   private scheduleLiveMeterReconnect(): void {
