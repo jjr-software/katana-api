@@ -913,10 +913,7 @@ class AmpClient:
         stage_color_obj = colors_obj.get(stage_name)
         if not isinstance(stage_color_obj, dict):
             raise AmpClientError(f"Invalid payload: colors.{stage_name} must be an object")
-        value = stage_color_obj.get("index")
-        if not isinstance(value, (int, float)):
-            raise AmpClientError(f"Invalid payload: colors.{stage_name}.index must be numeric")
-        ivalue = int(value)
+        ivalue = AmpClient._coerce_int_value(stage_color_obj.get("index"), f"colors.{stage_name}.index")
         if ivalue < 0 or ivalue > 2:
             raise AmpClientError(f"Invalid payload: colors.{stage_name}.index out of range 0..2")
         return ivalue
@@ -996,13 +993,26 @@ class AmpClient:
             )
         out: list[int] = []
         for idx, item in enumerate(value):
-            if not isinstance(item, (int, float)):
-                raise AmpClientError(f"Invalid payload: {field_name}[{idx}] must be numeric")
-            ivalue = int(item)
+            ivalue = AmpClient._coerce_int_value(item, f"{field_name}[{idx}]")
             if ivalue < 0 or ivalue > 127:
                 raise AmpClientError(f"Invalid payload: {field_name}[{idx}] out of range 0..127")
             out.append(ivalue)
         return out
+
+    @staticmethod
+    def _coerce_int_value(value: Any, field_name: str) -> int:
+        if isinstance(value, bool):
+            raise AmpClientError(f"Invalid payload: {field_name} must be numeric")
+        if isinstance(value, (int, float)):
+            return int(value)
+        if isinstance(value, str):
+            text = value.strip()
+            if text:
+                try:
+                    return int(text)
+                except ValueError as exc:
+                    raise AmpClientError(f"Invalid payload: {field_name} must be numeric") from exc
+        raise AmpClientError(f"Invalid payload: {field_name} must be numeric")
 
     @classmethod
     def _read_compact_raw_block(
@@ -1025,9 +1035,7 @@ class AmpClient:
             if isinstance(value, bool):
                 values.append(1 if value else 0)
                 continue
-            if not isinstance(value, (int, float)):
-                raise AmpClientError(f"Invalid payload: {field_name_prefix}.{field_name} must be numeric")
-            ivalue = int(value)
+            ivalue = cls._coerce_int_value(value, f"{field_name_prefix}.{field_name}")
             if ivalue < 0 or ivalue > 127:
                 raise AmpClientError(f"Invalid payload: {field_name_prefix}.{field_name} out of range 0..127")
             values.append(ivalue)
