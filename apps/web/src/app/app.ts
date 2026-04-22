@@ -4713,7 +4713,7 @@ export class App implements OnInit, OnDestroy {
       return 'n/a';
     }
     const card = this.slots().find((item) => item.slot === selectedSlot) ?? null;
-    if (!card || !card.in_sync || !card.patch_name.trim()) {
+    if (!card || !card.patch_name.trim()) {
       return 'n/a';
     }
     return card.patch_name.trim();
