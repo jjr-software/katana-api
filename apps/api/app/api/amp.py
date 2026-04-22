@@ -12,7 +12,8 @@ from app.deps import get_amp_client, get_db
 from app.katana import AmpClient, LineOutSnapshot, SlotDump, SlotPatchSummary, slot_label
 from app.katana import AmpClientError
 from app.live_patch_state import upsert_live_patch_state
-from app.models import AmpSyncHistory, PatchConfig, PatchSet, PatchSetMember
+from app.models import AmpSyncHistory, LivePatchState, PatchConfig, PatchSet, PatchSetMember
+from app.patch_objects import merge_patch_object_into_full_patch
 
 router = APIRouter(prefix="/api/v1/amp", tags=["amp"])
 
@@ -380,7 +381,24 @@ async def apply_current_patch_live(
     db: Session = Depends(get_db),
     client: AmpClient = Depends(get_amp_client),
 ) -> ApplyCurrentPatchResponse:
-    job = await amp_job_queue.enqueue_apply_current_patch(payload.patch)
+    live_row = db.get(LivePatchState, 1)
+    if live_row is None:
+        synced_at = datetime.now().isoformat(timespec="seconds")
+        live_patch = await client.read_current_patch()
+        active = await client.read_active_slot()
+        live_row = upsert_live_patch_state(
+            db,
+            full_patch=live_patch.payload,
+            active_slot=active.slot,
+            amp_confirmed_at=synced_at,
+            source_type="amp_sync",
+        )
+    rendered = merge_patch_object_into_full_patch(live_row.patch_json, payload.patch)
+    patch_name = rendered.get("patch_name")
+    if not isinstance(patch_name, str) or not patch_name.strip():
+        patch_name = str(live_row.patch_json.get("patch_name", ""))
+    rendered["patch_name"] = patch_name[:16]
+    job = await amp_job_queue.enqueue_apply_current_patch(rendered)
     settled = await _await_terminal_job(job.job_id, timeout_seconds=120.0)
     if settled.status != "succeeded" or settled.result_applied_patch is None:
         raise HTTPException(

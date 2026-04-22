@@ -774,7 +774,7 @@ async def apply_patch_object_to_live_patch(
     if patch_object is None:
         raise HTTPException(status_code=404, detail={"message": "Patch object not found", "patch_object_id": payload.patch_object_id})
     live_row = await _resolve_live_patch_row(db, client)
-    rendered = dict(patch_object.patch_json)
+    rendered = merge_patch_object_into_full_patch(live_row.patch_json, patch_object.patch_json)
     rendered["patch_name"] = patch_object.name[:16]
     applied = await _queued_apply_current_patch(rendered)
     applied_at = datetime.now().isoformat(timespec="seconds")
@@ -799,7 +799,7 @@ async def patch_live_patch_block(
         raise HTTPException(status_code=400, detail={"message": "Unknown block", "block": block_name})
     live_row = await _resolve_live_patch_row(db, client)
     sparse_patch_object = {block_name: payload.patch_block}
-    rendered = dict(sparse_patch_object)
+    rendered = merge_patch_object_into_full_patch(live_row.patch_json, sparse_patch_object)
     rendered["patch_name"] = str(live_row.patch_json.get("patch_name", ""))[:16]
     applied = await _queued_apply_current_patch(rendered)
     applied_at = datetime.now().isoformat(timespec="seconds")
