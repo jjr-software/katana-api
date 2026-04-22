@@ -796,7 +796,6 @@ export class App implements OnInit, OnDestroy {
     clearLabel: 'Clear',
     currentSlotLabel: this.selectedAmpSlotLabel(),
     patchName: this.currentSettingsPatchName(),
-    ampSlotSavedName: this.selectedAmpSlotSavedPatchName(),
   }));
   readonly romDistortionPatchOptions = computed(() =>
     this.tonePatchObjects()
@@ -4705,18 +4704,6 @@ export class App implements OnInit, OnDestroy {
 
   selectedAmpSlotLabel(): string {
     return this.selectedAmpSlotText();
-  }
-
-  selectedAmpSlotSavedPatchName(): string {
-    const selectedSlot = this.selectedAmpSlot();
-    if (selectedSlot === null) {
-      return 'n/a';
-    }
-    const card = this.slots().find((item) => item.slot === selectedSlot) ?? null;
-    if (!card || !card.patch_name.trim()) {
-      return 'n/a';
-    }
-    return card.patch_name.trim();
   }
 
   currentSettingsPatchName(): string {

@@ -48,7 +48,6 @@ export interface DashboardStickyPanelViewModel {
   aiDesignerLabel: string;
   currentSlotLabel: string;
   patchName: string;
-  ampSlotSavedName: string;
 }
 
 const BOOSTER_TYPE_NAMES = [
@@ -176,7 +175,6 @@ function buildValueOptions(labels: readonly string[]): ValueOption[] {
             <div class="d-flex flex-wrap gap-3 small text-secondary mb-2">
               <span>Current Slot: <strong>{{ vm.currentSlotLabel }}</strong></span>
               <span>Current Settings: <strong>{{ vm.patchName }}</strong></span>
-              <span>Stored Amp Name: <strong>{{ vm.ampSlotSavedName }}</strong></span>
             </div>
 
             <div class="d-grid gap-2 small text-secondary">
