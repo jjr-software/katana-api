@@ -84,81 +84,6 @@ const DELAY_TYPE_NAMES = [
 ];
 const AMP_TYPE_NAMES = ['Acoustic', 'Clean', 'Pushed', 'Crunch', 'Lead', 'Brown'];
 const REVERB_TYPE_NAMES = ['Plate Reverb', 'Room Reverb', 'Hall Reverb', 'Spring Reverb', 'Modulate Reverb'];
-
-interface DistortionRecipePreset {
-  value: string;
-  label: string;
-  summary: string;
-  prompt: string;
-  blocks: readonly string[];
-}
-
-const DISTORTION_RECIPE_OPTIONS: ReadonlyArray<DistortionRecipePreset> = [
-  {
-    value: 'modern-tight',
-    label: 'Modern Tight',
-    summary: 'Brown or Lead with a Tube Screamer-style boost and firmer EQ cuts.',
-    prompt:
-      'Build a tight modern distortion patch. Start from Brown or Lead, keep gain moderate instead of maxed, use a T-Scream style booster with drive low and level high, then use EQ1 and EQ2 to cut low-end mud and fizz. Aim for a focused, mix-ready high-gain sound with clear palm mutes and restrained bass.',
-    blocks: ['amp', 'booster', 'eq1', 'eq2', 'ns'],
-  },
-  {
-    value: 'classic-rock-stack',
-    label: 'Classic Rock Stack',
-    summary: 'Brown or Lead with moderate gain, boosted mids, and a leaner front end.',
-    prompt:
-      'Build a classic 80s rock distortion patch. Use Brown or Lead, keep gain around the midrange rather than maxing it, and add a Tube Screamer-style or Distortion+ style booster with low drive and strong level. Keep the mids and high mids present, avoid a deep scoop, and use gentle EQ shaping so the sound stays open and punchy.',
-    blocks: ['amp', 'booster', 'eq1', 'eq2'],
-  },
-  {
-    value: 'pedal-platform-dirt',
-    label: 'Pedal Platform Dirt',
-    summary: 'Clean or Acoustic as a platform, then let the booster supply the dirt.',
-    prompt:
-      'Build a pedal-platform distortion patch. Start from Clean or Acoustic with low amp gain and healthy channel volume, then use a distortion or overdrive booster for the dirt. Keep the amp EQ close to neutral, add a low cut to remove mud, and only trim the top end if the distortion gets fizzy.',
-    blocks: ['amp', 'booster', 'eq1'],
-  },
-  {
-    value: 'djent-tight',
-    label: 'Djent Tight',
-    summary: 'Very tight low end, hard low cuts, and a pushed front end for precision chugs.',
-    prompt:
-      'Build a tight djent-style distortion patch. Use Brown or Lead with gain kept lower than you think, then push it with a Tube Screamer-style booster or similar tight overdrive. Cut low end aggressively with EQ1, keep low mids under control, and leave enough upper mids so pick attack stays sharp and defined.',
-    blocks: ['amp', 'booster', 'eq1', 'eq2', 'ns'],
-  },
-  {
-    value: 'hard-rock-crunch',
-    label: 'Hard Rock Crunch',
-    summary: 'Classic crunchy drive with enough mids to cut without sounding scooped.',
-    prompt:
-      'Build a hard rock crunch patch. Use Crunch or Lead with moderate gain, then add a mild boost or distortion in front to thicken the attack. Keep mids and high mids present, trim a little low end if the sound gets woolly, and leave the EQ more open than a metal patch so chords breathe.',
-    blocks: ['amp', 'booster', 'eq1'],
-  },
-  {
-    value: 'lead-sustain',
-    label: 'Lead Sustain',
-    summary: 'Singing lead tone with compressed sustain and controlled top end.',
-    prompt:
-      'Build a singing lead distortion patch. Use Lead or Brown with moderate gain and a booster that adds sustain rather than just more clipping. Keep mids forward, slightly soften the treble and presence if the tone gets sharp, and use EQ to keep note bloom and vocal sustain without turning the sound muddy.',
-    blocks: ['amp', 'booster', 'eq1', 'eq2', 'reverb'],
-  },
-  {
-    value: 'vintage-fuzz-wall',
-    label: 'Vintage Fuzz Wall',
-    summary: 'Big Muff-style wall of fuzz with a controlled bottom and less top-end splatter.',
-    prompt:
-      'Build a vintage fuzz wall distortion patch. Start from Brown or Clean and use a Big Muff-style or fuzz booster as the main dirt source. Reduce low-end bloom with EQ, keep the mids from disappearing completely, and tame the highest fizz with a gentle high cut so the fuzz sounds thick instead of brittle.',
-    blocks: ['amp', 'booster', 'eq1', 'eq2'],
-  },
-  {
-    value: 'post-grunge-heavy',
-    label: 'Post-Grunge Heavy',
-    summary: 'Heavier alt-rock drive with fat mids and a less scooped low end.',
-    prompt:
-      'Build a post-grunge heavy distortion patch. Use Lead or Brown with a medium gain setting and a booster that adds grit and weight. Keep the bass solid but not oversized, let the mids stay strong so power chords are audible, and use EQ to trim any boxy low mids or fizzy top end.',
-    blocks: ['amp', 'booster', 'eq1', 'eq2'],
-  },
-];
 const GAFC_EXP1_FUNCTION_OPTIONS: ReadonlyArray<ValueOption> = [
   { value: 0, label: 'Volume' },
   { value: 1, label: 'Foot Volume' },
@@ -832,7 +757,7 @@ export class App implements OnInit, OnDestroy {
   toneSaveDescription = signal('');
   toneAiPrompt = signal('Refine the current editor patch or generate distinct sparse candidates around the target sound. Keep the results audibly useful for quick auditioning.');
   toneAiMode = signal<'refine' | 'ideas' | 'set'>('refine');
-  toneAiDistortionRecipe = signal('');
+  toneAiRomPatchId = signal('');
   toneAiSetName = signal('');
   toneAiDescription = signal('');
   toneAiCount = signal('8');
@@ -875,6 +800,11 @@ export class App implements OnInit, OnDestroy {
     liveAmpName: this.livePatchExactDbName().trim() || 'n/a',
     ampSlotSavedName: this.selectedAmpSlotSavedPatchName(),
   }));
+  readonly romDistortionPatchOptions = computed(() =>
+    this.tonePatchObjects()
+      .filter((item) => item.source_type === 'rom' && item.blocks.includes('amp') && item.blocks.includes('booster'))
+      .sort((lhs, rhs) => lhs.name.localeCompare(rhs.name)),
+  );
   private readonly onPopState = (): void => {
     const page = this.resolvePageFromPath();
     this.currentPage.set(page);
@@ -1339,21 +1269,25 @@ export class App implements OnInit, OnDestroy {
     this.toneAiMode.set(value);
   }
 
-  readonly distortionRecipeOptions = DISTORTION_RECIPE_OPTIONS;
-
-  selectedToneAiDistortionRecipe(): DistortionRecipePreset | null {
-    return this.distortionRecipeOptions.find((recipe) => recipe.value === this.toneAiDistortionRecipe()) ?? null;
+  selectedToneAiRomPatch(): TonePatchObjectResponse | null {
+    const selectedId = Number.parseInt(this.toneAiRomPatchId(), 10);
+    if (!Number.isFinite(selectedId)) {
+      return null;
+    }
+    return this.romDistortionPatchOptions().find((patch) => patch.id === selectedId) ?? null;
   }
 
-  selectToneAiDistortionRecipe(value: string): void {
-    this.toneAiDistortionRecipe.set(value);
-    const recipe = this.selectedToneAiDistortionRecipe();
-    if (!recipe) {
+  selectToneAiRomPatch(value: string): void {
+    this.toneAiRomPatchId.set(value);
+    const patch = this.selectedToneAiRomPatch();
+    if (!patch) {
       return;
     }
-    this.toneAiPrompt.set(recipe.prompt);
-    this.setToneBlocksFromNames(recipe.blocks, true);
-    this.status.set(`Loaded distortion recipe: ${recipe.label}`);
+    this.toneAiPrompt.set(
+      `Use the ROM patch "${patch.name}" as the starting point. Preserve its character, then refine the amp, booster, and EQ blocks toward the requested distortion sound.`,
+    );
+    this.setToneBlocksFromNames(patch.blocks, true);
+    this.status.set(`Loaded ROM patch: ${patch.name}`);
   }
 
   openToneSetModal(): void {

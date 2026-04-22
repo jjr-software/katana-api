@@ -1092,26 +1092,26 @@
       <div class="border rounded p-3 bg-body-tertiary d-grid gap-2">
         <div class="row g-2 align-items-end">
           <div class="col-12 col-lg-8">
-            <label class="form-label small mb-1" for="toneAiDistortionRecipe">Distortion Recipe</label>
+            <label class="form-label small mb-1" for="toneAiRomPatch">ROM Patch</label>
             <select
-              id="toneAiDistortionRecipe"
+              id="toneAiRomPatch"
               class="form-select form-select-sm"
-              [value]="toneAiDistortionRecipe()"
-              (change)="selectToneAiDistortionRecipe($any($event.target).value)"
+              [value]="toneAiRomPatchId()"
+              (change)="selectToneAiRomPatch($any($event.target).value)"
             >
-              <option value="">Choose a starting point</option>
-              @for (recipe of distortionRecipeOptions; track recipe.value) {
-                <option [value]="recipe.value">{{ recipe.label }}</option>
+              <option value="">Choose a ROM patch</option>
+              @for (patch of romDistortionPatchOptions(); track patch.id) {
+                <option [value]="patch.id">{{ patch.name }}</option>
               }
             </select>
           </div>
           <div class="col-12 col-lg-4">
             <div class="small text-secondary mb-1">Focus</div>
-            <div class="fw-semibold">{{ selectedToneAiDistortionRecipe()?.summary || 'Amp + booster + EQ starter' }}</div>
+            <div class="fw-semibold">{{ selectedToneAiRomPatch()?.name || 'ROM amp + booster + EQ starter' }}</div>
           </div>
         </div>
         <div class="small text-secondary">
-          Picking one preloads the prompt and shifts the AI block focus toward the recipe’s amp, booster, and EQ shape.
+          Picking one preloads the prompt and shifts the AI block focus toward that ROM patch’s amp, booster, and EQ shape.
         </div>
       </div>
       @if (toneAiMode() === 'refine') {
