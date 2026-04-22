@@ -544,14 +544,13 @@ async def program_patch_object_set_to_amp(
             status_code=400,
             detail={"message": "Patch object set does not fit starting at this slot", "start_slot": payload.start_slot, "count": len(slots)},
         )
-    live_row = await _resolve_live_patch_row(db, client)
     programmed: list[ProgrammedSlotResponse] = []
     for index, slot_item in enumerate(slots):
         target_slot = payload.start_slot + index
         patch_object = db.get(PatchObject, slot_item.patch_object_id)
         if patch_object is None:
             raise HTTPException(status_code=404, detail={"message": "Patch object not found", "patch_object_id": slot_item.patch_object_id})
-        rendered = merge_patch_object_into_full_patch(live_row.patch_json, patch_object.patch_json)
+        rendered = dict(patch_object.patch_json)
         rendered["patch_name"] = patch_object.name[:16]
         job = await amp_job_queue.enqueue_slot_write(slot=target_slot, patch=rendered)
         settled = await _await_terminal_job(job.job_id, timeout_seconds=120.0)
@@ -775,9 +774,9 @@ async def apply_patch_object_to_live_patch(
     if patch_object is None:
         raise HTTPException(status_code=404, detail={"message": "Patch object not found", "patch_object_id": payload.patch_object_id})
     live_row = await _resolve_live_patch_row(db, client)
-    merged = merge_patch_object_into_full_patch(live_row.patch_json, patch_object.patch_json)
-    merged["patch_name"] = patch_object.name[:16]
-    applied = await _queued_apply_current_patch(merged)
+    rendered = dict(patch_object.patch_json)
+    rendered["patch_name"] = patch_object.name[:16]
+    applied = await _queued_apply_current_patch(rendered)
     applied_at = datetime.now().isoformat(timespec="seconds")
     row = upsert_live_patch_state(
         db,
@@ -802,8 +801,9 @@ async def patch_live_patch_block(
     sparse_patch_object = normalize_patch_object({block_name: payload.patch_block})
     if block_name not in sparse_patch_object:
         raise HTTPException(status_code=400, detail={"message": "Block payload did not normalize to a valid patch block", "block": block_name})
-    merged = merge_patch_object_into_full_patch(live_row.patch_json, sparse_patch_object)
-    applied = await _queued_apply_current_patch(merged)
+    rendered = dict(sparse_patch_object)
+    rendered["patch_name"] = str(live_row.patch_json.get("patch_name", ""))[:16]
+    applied = await _queued_apply_current_patch(rendered)
     applied_at = datetime.now().isoformat(timespec="seconds")
     row = upsert_live_patch_state(
         db,
