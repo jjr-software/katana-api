@@ -132,7 +132,6 @@ Decoded name tables are loaded from BTS `resource.js` and cached locally at:
 ```bash
 # Sample USB level in 1-second windows and write JSONL
 python3 python/katana_patch_tool.py sample \
-  --source alsa_input.usb-Roland_KATANA3-01.analog-surround-40 \
   --window-sec 1.0 \
   --samples 20 \
   --log-file setups/analysis/level_log.jsonl

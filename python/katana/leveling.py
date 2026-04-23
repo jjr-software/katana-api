@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import math
 import struct
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import Any
 
 from .midi import AmidiTransport
 from .model import KatanaPatch
@@ -43,6 +45,93 @@ def _analyze_f32le(raw: bytes) -> tuple[float, float, float, float, int] | None:
     return rms, peak, linear_to_dbfs(rms), linear_to_dbfs(peak), len(vals)
 
 
+def _pipewire_entry_text(entry: dict[str, Any]) -> str:
+    info = entry.get("info")
+    props: dict[str, Any] = {}
+    if isinstance(info, dict):
+        props_obj = info.get("props")
+        if isinstance(props_obj, dict):
+            props = props_obj
+    parts: list[str] = []
+    for key in (
+        "name",
+        "node.name",
+        "node.nick",
+        "node.description",
+        "device.name",
+        "device.description",
+        "media.class",
+    ):
+        value = props.get(key)
+        if isinstance(value, str) and value.strip():
+            parts.append(value.strip())
+    return " ".join(parts).lower()
+
+
+async def resolve_katana_pipewire_source(requested_source: str | None = None) -> str:
+    if requested_source is not None:
+        source = requested_source.strip()
+        if not source:
+            raise RuntimeError("requested PipeWire source must not be blank")
+        if "katana" not in source.lower():
+            raise RuntimeError("requested PipeWire source must resolve to the Katana input")
+        return source
+
+    proc = await asyncio.create_subprocess_exec(
+        "pw-dump",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout_bytes, stderr_bytes = await proc.communicate()
+    if proc.returncode != 0:
+        stderr = stderr_bytes.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(f"pw-dump failed: {stderr or 'unknown error'}")
+    try:
+        parsed = json.loads(stdout_bytes.decode("utf-8"))
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("pw-dump returned invalid JSON") from exc
+    if not isinstance(parsed, list):
+        raise RuntimeError("pw-dump returned unexpected payload")
+
+    best_source: str | None = None
+    best_score = -1
+    available_sources: list[str] = []
+    for entry in parsed:
+        if not isinstance(entry, dict):
+            continue
+        info = entry.get("info")
+        if not isinstance(info, dict):
+            continue
+        props_obj = info.get("props")
+        if not isinstance(props_obj, dict):
+            continue
+        media_class = str(props_obj.get("media.class") or "").lower()
+        if "source" not in media_class:
+            continue
+        node_name = props_obj.get("node.name")
+        if not isinstance(node_name, str) or not node_name.strip():
+            continue
+        available_sources.append(node_name.strip())
+        haystack = _pipewire_entry_text(entry)
+        score = 0
+        if "katana" in haystack:
+            score += 100
+        if "boss" in haystack:
+            score += 20
+        if "usb" in haystack:
+            score += 10
+        if "source" in media_class:
+            score += 1
+        if score > best_score:
+            best_score = score
+            best_source = node_name.strip()
+
+    if best_source is None or best_score <= 0 or "katana" not in best_source.lower():
+        available = ", ".join(available_sources) if available_sources else "none"
+        raise RuntimeError(f"Katana PipeWire source not found; available sources: {available}")
+    return best_source
+
+
 @dataclass
 class LevelSample:
     timestamp_utc: str
@@ -54,7 +143,7 @@ class LevelSample:
 class PipeWireSampler:
     def __init__(
         self,
-        source: str = "alsa_input.usb-Roland_KATANA3-01.analog-surround-40",
+        source: str | None = None,
         rate: int = 48000,
         channels: int = 2,
         window_sec: float = 1.0,
@@ -69,6 +158,7 @@ class PipeWireSampler:
     async def start(self) -> None:
         if self._proc is not None and self._proc.returncode is None:
             return
+        self.source = await resolve_katana_pipewire_source(self.source)
         self._proc = await asyncio.create_subprocess_exec(
             "timeout",
             "365d",

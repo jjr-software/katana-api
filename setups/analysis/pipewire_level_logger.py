@@ -8,14 +8,95 @@ import struct
 import subprocess
 import time
 from datetime import datetime, timezone
+from typing import Any
 
 
-DEFAULT_SOURCE = "alsa_input.usb-Roland_KATANA3-01.analog-surround-40"
+def _pipewire_entry_text(entry: dict[str, Any]) -> str:
+    info = entry.get("info")
+    props: dict[str, Any] = {}
+    if isinstance(info, dict):
+        props_obj = info.get("props")
+        if isinstance(props_obj, dict):
+            props = props_obj
+    parts: list[str] = []
+    for key in (
+        "name",
+        "node.name",
+        "node.nick",
+        "node.description",
+        "device.name",
+        "device.description",
+        "media.class",
+    ):
+        value = props.get(key)
+        if isinstance(value, str) and value.strip():
+            parts.append(value.strip())
+    return " ".join(parts).lower()
+
+
+def resolve_katana_source(requested_source: str | None) -> str:
+    if requested_source is not None:
+        source = requested_source.strip()
+        if not source:
+            raise RuntimeError("requested PipeWire source must not be blank")
+        if "katana" not in source.lower():
+            raise RuntimeError("requested PipeWire source must resolve to the Katana input")
+        return source
+
+    proc = subprocess.run(
+        ["pw-dump"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(f"pw-dump failed: {(proc.stderr or '').strip() or 'unknown error'}")
+    parsed = json.loads(proc.stdout)
+    if not isinstance(parsed, list):
+        raise RuntimeError("pw-dump returned unexpected payload")
+
+    best_source = None
+    best_score = -1
+    available_sources: list[str] = []
+    for entry in parsed:
+        if not isinstance(entry, dict):
+            continue
+        info = entry.get("info")
+        if not isinstance(info, dict):
+            continue
+        props_obj = info.get("props")
+        if not isinstance(props_obj, dict):
+            continue
+        media_class = str(props_obj.get("media.class") or "").lower()
+        if "source" not in media_class:
+            continue
+        node_name = props_obj.get("node.name")
+        if not isinstance(node_name, str) or not node_name.strip():
+            continue
+        available_sources.append(node_name.strip())
+        haystack = _pipewire_entry_text(entry)
+        score = 0
+        if "katana" in haystack:
+            score += 100
+        if "boss" in haystack:
+            score += 20
+        if "usb" in haystack:
+            score += 10
+        if "source" in media_class:
+            score += 1
+        if score > best_score:
+            best_score = score
+            best_source = node_name.strip()
+
+    if best_source is None or best_score <= 0 or "katana" not in best_source.lower():
+        available = ", ".join(available_sources) if available_sources else "none"
+        raise RuntimeError(f"Katana PipeWire source not found; available sources: {available}")
+    return best_source
 
 
 def parse_args():
     p = argparse.ArgumentParser(description="Periodic PipeWire level logger (RMS/Peak dBFS)")
-    p.add_argument("--source", default=DEFAULT_SOURCE, help="PipeWire source node name")
+    p.add_argument("--source", default=None, help="PipeWire source node name (default: auto-detect Katana)")
     p.add_argument("--rate", type=int, default=48000)
     p.add_argument("--channels", type=int, default=2)
     p.add_argument("--window-sec", type=float, default=1.0, help="Measurement window duration")
@@ -105,6 +186,7 @@ def analyze_chunk(raw):
 
 def main():
     args = parse_args()
+    args.source = resolve_katana_source(args.source)
     ensure_log_dir(args.log_file)
     target_rms_dbfs = read_target_rms_dbfs(args.reference_file)
     target_samples = int(args.rate * args.window_sec * args.channels)

@@ -21,5 +21,11 @@ def run_startup_checks() -> None:
     if shutil.which("amidi") is None:
         raise RuntimeError("amidi not found in container PATH")
 
+    if shutil.which("pw-dump") is None:
+        raise RuntimeError("pw-dump not found in container PATH")
+
+    if shutil.which("pw-record") is None:
+        raise RuntimeError("pw-record not found in container PATH")
+
     with engine.connect() as conn:
         conn.execute(text("SELECT 1"))

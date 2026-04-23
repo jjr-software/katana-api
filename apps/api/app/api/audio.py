@@ -12,7 +12,6 @@ from starlette.responses import Response, StreamingResponse
 from app.audio_capture import (
     KATANA_CAPTURE_CHANNELS,
     KATANA_CAPTURE_RATE,
-    KATANA_USB_SOURCE,
     PipeWireLiveMeter,
     capture_audio_sample,
 )
@@ -26,7 +25,7 @@ class AudioSampleCreateRequest(BaseModel):
     patch_hash: str | None = Field(default=None, min_length=64, max_length=64)
     patch_object_id: int | None = Field(default=None, ge=1)
     slot: int | None = Field(default=None, ge=1, le=8)
-    source: str = Field(default=KATANA_USB_SOURCE, min_length=1, max_length=255)
+    source: str | None = Field(default=None, max_length=255)
     duration_sec: float = Field(default=2.0, gt=0.2, le=30.0)
     rate: int = Field(default=KATANA_CAPTURE_RATE, ge=8_000, le=192_000)
     channels: int = Field(default=KATANA_CAPTURE_CHANNELS, ge=1, le=2)
@@ -134,7 +133,7 @@ def list_audio_measurements(
 
 
 class AudioLevelMarkerCaptureRequest(BaseModel):
-    source: str = Field(default=KATANA_USB_SOURCE, min_length=1, max_length=255)
+    source: str | None = Field(default=None, max_length=255)
     duration_sec: float = Field(default=2.0, gt=0.2, le=30.0)
     rate: int = Field(default=KATANA_CAPTURE_RATE, ge=8_000, le=192_000)
     channels: int = Field(default=KATANA_CAPTURE_CHANNELS, ge=1, le=2)
@@ -253,7 +252,7 @@ def get_audio_measurement_wav(
 @router.get("/live/sse")
 async def stream_live_audio_measurement_sse(
     request: Request,
-    source: str = KATANA_USB_SOURCE,
+    source: str | None = None,
     window_sec: float = 0.5,
     rate: int = KATANA_CAPTURE_RATE,
     channels: int = KATANA_CAPTURE_CHANNELS,
@@ -261,8 +260,9 @@ async def stream_live_audio_measurement_sse(
     bounded_window = max(0.2, min(window_sec, 5.0))
     bounded_rate = max(8_000, min(rate, 192_000))
     bounded_channels = max(1, min(channels, 2))
+    resolved_source = source.strip() if isinstance(source, str) and source.strip() else None
     meter = PipeWireLiveMeter(
-        source=source,
+        source=resolved_source,
         rate=bounded_rate,
         channels=bounded_channels,
         window_sec=bounded_window,
@@ -274,7 +274,7 @@ async def stream_live_audio_measurement_sse(
             yield _sse_event(
                 {
                     "type": "connected",
-                    "source": source,
+                    "source": meter.source,
                     "window_sec": bounded_window,
                     "rate": bounded_rate,
                     "channels": bounded_channels,
@@ -293,7 +293,7 @@ async def stream_live_audio_measurement_sse(
                         "fft_bins_db": sample.fft_bins_db,
                         "sample_count": sample.sample_count,
                         "duration_sec": bounded_window,
-                        "source": source,
+                        "source": meter.source,
                         "ts": datetime.now().isoformat(timespec="seconds"),
                     }
                 )

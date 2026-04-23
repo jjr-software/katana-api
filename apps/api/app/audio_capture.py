@@ -1,11 +1,12 @@
 import asyncio
+import json
 import io
 import math
 import struct
 import wave
 from dataclasses import dataclass
+from typing import Any
 
-KATANA_USB_SOURCE = "alsa_input.usb-Roland_KATANA3-01.analog-surround-40"
 KATANA_CAPTURE_RATE = 48_000
 KATANA_CAPTURE_CHANNELS = 1
 
@@ -208,18 +209,108 @@ def _pw_record_args(source: str, rate: int, channels: int) -> list[str]:
     ]
 
 
+def _pipewire_entry_text(entry: dict[str, Any]) -> str:
+    info = entry.get("info")
+    props: dict[str, Any] = {}
+    if isinstance(info, dict):
+        props_obj = info.get("props")
+        if isinstance(props_obj, dict):
+            props = props_obj
+    parts: list[str] = []
+    for key in (
+        "name",
+        "node.name",
+        "node.nick",
+        "node.description",
+        "device.name",
+        "device.description",
+        "media.class",
+    ):
+        value = props.get(key)
+        if isinstance(value, str) and value.strip():
+            parts.append(value.strip())
+    return " ".join(parts).lower()
+
+
+async def _read_pipewire_dump() -> list[dict[str, Any]]:
+    proc = await asyncio.create_subprocess_exec(
+        "pw-dump",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout_bytes, stderr_bytes = await proc.communicate()
+    if proc.returncode != 0:
+        stderr = stderr_bytes.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(f"pw-dump failed: {stderr or 'unknown error'}")
+    try:
+        parsed = json.loads(stdout_bytes.decode("utf-8"))
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("pw-dump returned invalid JSON") from exc
+    if not isinstance(parsed, list):
+        raise RuntimeError("pw-dump returned unexpected payload")
+    return [item for item in parsed if isinstance(item, dict)]
+
+
+async def resolve_katana_pipewire_source(requested_source: str | None = None) -> str:
+    if requested_source is not None:
+        source = requested_source.strip()
+        if not source:
+            raise RuntimeError("requested PipeWire source must not be blank")
+        if "katana" not in source.lower():
+            raise RuntimeError("requested PipeWire source must resolve to the Katana input")
+        return source
+
+    entries = await _read_pipewire_dump()
+    best_source: str | None = None
+    best_score = -1
+    available_sources: list[str] = []
+    for entry in entries:
+        info = entry.get("info")
+        if not isinstance(info, dict):
+            continue
+        props_obj = info.get("props")
+        if not isinstance(props_obj, dict):
+            continue
+        media_class = str(props_obj.get("media.class") or "").lower()
+        if "source" not in media_class:
+            continue
+        node_name = props_obj.get("node.name")
+        if not isinstance(node_name, str) or not node_name.strip():
+            continue
+        available_sources.append(node_name.strip())
+        haystack = _pipewire_entry_text(entry)
+        score = 0
+        if "katana" in haystack:
+            score += 100
+        if "boss" in haystack:
+            score += 20
+        if "usb" in haystack:
+            score += 10
+        if "source" in media_class:
+            score += 1
+        if score > best_score:
+            best_score = score
+            best_source = node_name.strip()
+
+    if best_source is None or best_score <= 0 or "katana" not in best_source.lower():
+        available = ", ".join(available_sources) if available_sources else "none"
+        raise RuntimeError(f"Katana PipeWire source not found; available sources: {available}")
+    return best_source
+
+
 async def capture_audio_sample(
-    source: str,
+    source: str | None,
     duration_sec: float,
     rate: int,
     channels: int,
 ) -> AudioCaptureResult:
     if duration_sec <= 0:
         raise RuntimeError("duration_sec must be > 0")
+    resolved_source = await resolve_katana_pipewire_source(source)
     proc = await asyncio.create_subprocess_exec(
         "timeout",
         f"{duration_sec:.3f}",
-        *_pw_record_args(source=source, rate=rate, channels=channels),
+        *_pw_record_args(source=resolved_source, rate=rate, channels=channels),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
@@ -244,7 +335,7 @@ async def capture_audio_sample(
         rms_dbfs=analyzed.rms_dbfs,
         peak_dbfs=analyzed.peak_dbfs,
         sample_count=analyzed.sample_count,
-        source=source,
+        source=resolved_source,
         duration_sec=float(duration_sec),
         rate=int(rate),
         channels=int(channels),
@@ -256,7 +347,7 @@ async def capture_audio_sample(
 
 
 async def capture_audio_metrics(
-    source: str,
+    source: str | None,
     duration_sec: float,
     rate: int,
     channels: int,
@@ -271,7 +362,7 @@ async def capture_audio_metrics(
 
 
 class PipeWireLiveMeter:
-    def __init__(self, source: str, rate: int, channels: int, window_sec: float) -> None:
+    def __init__(self, source: str | None, rate: int, channels: int, window_sec: float) -> None:
         self.source = source
         self.rate = int(rate)
         self.channels = int(channels)
@@ -284,6 +375,7 @@ class PipeWireLiveMeter:
             raise RuntimeError("window size must produce >0 bytes")
         if self._proc is not None and self._proc.returncode is None:
             return
+        self.source = await resolve_katana_pipewire_source(self.source)
         self._proc = await asyncio.create_subprocess_exec(
             "timeout",
             "365d",

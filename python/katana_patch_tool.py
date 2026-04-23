@@ -150,7 +150,7 @@ def parse_args() -> argparse.Namespace:
     level.add_argument("--tol-db", type=float, default=0.7)
     level.add_argument("--active-floor-dbfs", type=float, default=-45.0)
     level.add_argument("--slot", type=int, default=4)
-    level.add_argument("--source", default="alsa_input.usb-Roland_KATANA3-01.analog-surround-40")
+    level.add_argument("--source", default=None, help="PipeWire source node name (default: auto-detect Katana)")
     level.add_argument("--rate", type=int, default=48000)
     level.add_argument("--channels", type=int, default=2)
     level.add_argument("--window-sec", type=float, default=1.0)
@@ -163,7 +163,7 @@ def parse_args() -> argparse.Namespace:
     )
 
     sample = sub.add_parser("sample", help="Sample USB level in 1-second chunks and optionally log JSONL")
-    sample.add_argument("--source", default="alsa_input.usb-Roland_KATANA3-01.analog-surround-40")
+    sample.add_argument("--source", default=None, help="PipeWire source node name (default: auto-detect Katana)")
     sample.add_argument("--rate", type=int, default=48000)
     sample.add_argument("--channels", type=int, default=2)
     sample.add_argument("--window-sec", type=float, default=1.0)
@@ -785,7 +785,7 @@ async def _run_match_5(args: argparse.Namespace, transport: AmidiTransport) -> i
         match_step_scale=2.0,
         match_max_step=8,
         active_floor_dbfs=-45.0,
-        source="alsa_input.usb-Roland_KATANA3-01.analog-surround-40",
+        source=None,
         rate=48000,
         channels=2,
         window_sec=0.5,

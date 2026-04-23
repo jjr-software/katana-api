@@ -1923,3 +1923,17 @@
 - The source of truth is `apps/api/app/rom_patches.py`.
 - Startup seeds those specs into `patch_objects` with `source_type='rom'`, which keeps them visible in the library but read-only.
 - If we add more built-in ROM tones, the correct path is to extend the seed list in `rom_patches.py`, not to route through the normal save flow.
+
+## Session Update - 2026-04-23 (Katana PipeWire Source Auto-Discovery)
+- Removed the hard-coded PipeWire source default from the live audio capture path and switched both the API and CLI sampling code to auto-discover the Katana input with `pw-dump`.
+- The live audio endpoints now fail hard if the Katana source cannot be resolved, instead of silently using an arbitrary PipeWire source.
+- Files changed:
+  - `apps/api/app/audio_capture.py`
+  - `apps/api/app/api/audio.py`
+  - `apps/api/app/health.py`
+  - `python/katana/leveling.py`
+  - `python/katana_patch_tool.py`
+  - `setups/analysis/ab_swap_rms.py`
+  - `setups/analysis/pipewire_level_logger.py`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`

@@ -28,8 +28,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--slot", type=int, default=4, help="Target slot for patch apply")
     parser.add_argument(
         "--source",
-        default="alsa_input.usb-Roland_KATANA3-01.analog-surround-40",
-        help="PipeWire source node name",
+        default=None,
+        help="PipeWire source node name (default: auto-detect Katana)",
     )
     parser.add_argument("--rate", type=int, default=48000)
     parser.add_argument("--channels", type=int, default=2)
