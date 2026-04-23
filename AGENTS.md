@@ -1937,3 +1937,12 @@
   - `setups/analysis/pipewire_level_logger.py`
 - Rebuilt/restarted stack:
   - `docker compose up -d --build`
+
+## Session Update - 2026-04-23 (Katana Pedal FX Knowledge Base)
+- Added a related live-playing note in willdocs:
+  - `katana/pedal-fx-exp1`
+- That page is the human-readable knowledge base for:
+  - `Pedal FX` vs `GA-FC EXP1`
+  - wah vs whammy helper patches
+  - when to use `Pedal Bend`, `Pedal Wah`, and `WAH 95E`
+- Keep pointing future Katana pedal-mode questions at that willdocs page instead of re-deriving the same distinction here.
