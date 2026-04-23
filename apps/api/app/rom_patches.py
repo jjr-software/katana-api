@@ -34,6 +34,28 @@ def _raw_block(raw: list[int]) -> dict[str, Any]:
     return {"raw": list(raw)}
 
 
+def _booster_block(raw: list[int], *, on: bool = True) -> dict[str, Any]:
+    return {"on": on, "raw": list(raw)}
+
+
+def _drive_patch(
+    amp_raw: list[int],
+    booster_raw: list[int],
+    *,
+    eq1_bands: dict[int, int] | None = None,
+    eq2_bands: dict[int, int] | None = None,
+) -> dict[str, Any]:
+    patch: dict[str, Any] = {
+        "amp": _raw_block(amp_raw),
+        "booster": _booster_block(booster_raw),
+    }
+    if eq1_bands is not None:
+        patch["eq1"] = _eq_block(0, eq1_bands)
+    if eq2_bands is not None:
+        patch["eq2"] = _eq_block(1, eq2_bands)
+    return patch
+
+
 ROM_PATCH_OBJECT_SPECS: list[dict[str, Any]] = [
     {
         "name": "Hendrix-Style Dynamic Crunch",
@@ -239,27 +261,151 @@ ROM_PATCH_OBJECT_SPECS: list[dict[str, Any]] = [
     },
     {
         "name": "Graham Coxon Brit Scratch",
-        "description": "Lean lows and sharp upper-mids with a distortion booster for dry 90s Brit scratch.",
-        "patch_json": {
-            "amp": _raw_block([28, 78, 32, 76, 52, 30, 0, 1, 1, 0]),
-            "booster": _raw_block([13, 74, 36, 62, 0, 50, 70, 0]),
-        },
+        "description": "Lean lows and sharp upper-mids with a distortion booster and focused GE-10 shaping for dry 90s Brit scratch.",
+        "patch_json": _drive_patch(
+            [28, 78, 32, 76, 52, 30, 0, 1, 1, 0],
+            [13, 74, 36, 62, 0, 50, 70, 0],
+            eq1_bands={
+                0: -4,
+                1: -3,
+                2: -1,
+                4: 2,
+            },
+            eq2_bands={
+                5: 2,
+                6: 4,
+                7: 5,
+                8: 4,
+                9: 2,
+            },
+        ),
     },
     {
         "name": "90s Alt RAT Lane",
-        "description": "Tight lows and biting mids with a RAT booster for angular alt-rock drive.",
-        "patch_json": {
-            "amp": _raw_block([30, 78, 34, 75, 49, 27, 0, 1, 1, 0]),
-            "booster": _raw_block([14, 76, 38, 60, 0, 50, 69, 0]),
-        },
+        "description": "Tight lows and biting mids with a RAT booster and a pre/post EQ squeeze for angular alt-rock drive.",
+        "patch_json": _drive_patch(
+            [30, 78, 34, 75, 49, 27, 0, 1, 1, 0],
+            [14, 76, 38, 60, 0, 50, 69, 0],
+            eq1_bands={
+                1: -2,
+                2: -1,
+                4: 3,
+                5: 4,
+                6: 3,
+            },
+            eq2_bands={
+                2: -2,
+                3: 2,
+                6: 3,
+                7: 4,
+                8: 3,
+            },
+        ),
     },
     {
         "name": "90s Brit GUV Wall",
-        "description": "Clean base with GUV DS thickness for a mid-forward rhythm wall.",
-        "patch_json": {
-            "amp": _raw_block([34, 80, 40, 70, 50, 26, 0, 1, 1, 0]),
-            "booster": _raw_block([15, 78, 46, 52, 0, 50, 72, 0]),
-        },
+        "description": "Clean base with GUV DS thickness plus a thick low-mid EQ wall for mid-forward rhythm grit.",
+        "patch_json": _drive_patch(
+            [34, 80, 40, 70, 50, 26, 0, 1, 1, 0],
+            [15, 78, 46, 52, 0, 50, 72, 0],
+            eq1_bands={
+                2: 2,
+                3: 3,
+                4: 4,
+                5: 5,
+            },
+            eq2_bands={
+                1: 2,
+                3: -2,
+                6: 4,
+                7: 4,
+                8: 3,
+            },
+        ),
+    },
+    {
+        "name": "T-Scream Edge Clamp",
+        "description": "Tight T-Scream edge with low-cut pre-EQ and a brighter post-EQ bite for compact drive rhythm.",
+        "patch_json": _drive_patch(
+            [27, 76, 31, 74, 55, 31, 0, 1, 1, 0],
+            [11, 68, 36, 58, 0, 50, 68, 0],
+            eq1_bands={
+                0: -4,
+                1: -2,
+                4: 3,
+                5: 4,
+            },
+            eq2_bands={
+                2: -2,
+                4: 2,
+                6: 4,
+                7: 4,
+                8: 2,
+            },
+        ),
+    },
+    {
+        "name": "Turbo OD Mid Stack",
+        "description": "Turbo OD grind with a stacked mid shape and controlled top-end for punchy rock drive.",
+        "patch_json": _drive_patch(
+            [29, 77, 33, 73, 53, 29, 0, 1, 1, 0],
+            [12, 72, 38, 60, 0, 50, 69, 0],
+            eq1_bands={
+                2: -3,
+                3: -2,
+                4: 4,
+                5: 5,
+            },
+            eq2_bands={
+                1: 2,
+                3: -2,
+                6: 3,
+                7: 4,
+                8: 3,
+            },
+        ),
+    },
+    {
+        "name": "Crunch OD Garage Bite",
+        "description": "Crunch OD hair and a narrow garage-band EQ contour for rough, immediate rhythm bite.",
+        "patch_json": _drive_patch(
+            [31, 78, 35, 72, 48, 27, 0, 1, 1, 0],
+            [3, 70, 40, 55, 0, 50, 68, 0],
+            eq1_bands={
+                0: -3,
+                1: -2,
+                4: 4,
+                5: 4,
+            },
+            eq2_bands={
+                6: 3,
+                7: 5,
+                8: 4,
+                9: 2,
+            },
+        ),
+    },
+    {
+        "name": "Natural OD Smooth Lead",
+        "description": "Natural OD saturation with a rounder EQ curve for smoother lead sustain and less fizz.",
+        "patch_json": _drive_patch(
+            [33, 79, 34, 71, 50, 28, 0, 1, 1, 0],
+            [4, 66, 34, 57, 0, 50, 66, 0],
+            eq1_bands={
+                1: 2,
+                3: 2,
+                4: 3,
+                5: 4,
+                6: 2,
+            },
+            eq2_bands={
+                2: -2,
+                3: 1,
+                6: 3,
+                7: 3,
+                8: 2,
+            },
+        ),
     },
     {
         "name": "Mild Comp Clean v02",
