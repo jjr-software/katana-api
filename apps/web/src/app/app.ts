@@ -98,6 +98,18 @@ const GAFC_EXP1_FUNCTION_OPTIONS: ReadonlyArray<ValueOption> = [
   { value: 8, label: 'Delay 2' },
   { value: 9, label: 'Reverb' },
 ];
+const GAFC_EXP1_FUNCTION_ROW_KEYS: ReadonlyArray<readonly string[] | null> = [
+  null,
+  null,
+  ['pedal_wah', 'wah_95e', 'pedal_bend'],
+  ['pedal_wah', 'wah_95e', 'pedal_bend'],
+  ['booster'],
+  null,
+  null,
+  ['delay'],
+  ['delay'],
+  ['reverb'],
+];
 interface GafcExp1AssignmentSpec {
   key: string;
   label: string;
@@ -152,18 +164,6 @@ const GAFC_EXP1_ASSIGNMENT_SCHEMA: ReadonlyArray<GafcExp1AssignmentSpec> = [
   { key: 'heavy_oct', label: 'Heavy Oct', detailMax: 3, valueMax: 127, minOffset: 47, minSize: 1, maxOffset: 47, maxSize: 1 },
   { key: 'pedal_bend', label: 'Pedal Bend', detailMax: 4, valueMax: 127, minOffset: 48, minSize: 1, maxOffset: 48, maxSize: 1 },
 ] as const;
-const GAFC_EXP1_FUNCTION_ROW_KEY: ReadonlyArray<string | null> = [
-  null,
-  null,
-  null,
-  null,
-  'booster',
-  null,
-  null,
-  'delay',
-  'delay',
-  'reverb',
-];
 const EQ_TYPE_NAMES = ['Parametric EQ', 'GE-10'];
 const EQ_POSITION_NAMES = ['Input', 'Post Amp'];
 const EQ_GE10_BAND_LABELS = ['31', '62', '125', '250', '500', '1k', '2k', '4k', '8k', '16k', 'Level'];
@@ -4180,21 +4180,6 @@ export class App implements OnInit, OnDestroy {
     return PEDAL_FX_TYPE_OPTIONS;
   }
 
-  editorPedalFxTypeLabel(): string {
-    const type = this.editorPedalFxType();
-    if (type === null) {
-      return 'n/a';
-    }
-    return this.editorPedalFxTypeOptions().find((option) => option.value === type)?.label ?? 'n/a';
-  }
-
-  editorPedalFxTypeLabelFor(type: number | null): string {
-    if (type === null) {
-      return 'n/a';
-    }
-    return this.editorPedalFxTypeOptions().find((option) => option.value === type)?.label ?? 'n/a';
-  }
-
   editorPedalFxWahTypeOptions(): readonly ValueOption[] {
     return PEDAL_FX_WAH_TYPE_OPTIONS;
   }
@@ -4424,24 +4409,18 @@ export class App implements OnInit, OnDestroy {
   }
 
   editorGafcExp1VisibleAssignmentRows(): readonly GafcExp1AssignmentRow[] {
-    const selectedRow = this.editorGafcExp1SelectedAssignmentRow();
-    return selectedRow ? [selectedRow] : [];
-  }
-
-  editorGafcExp1VisibleAssignmentRow(): GafcExp1AssignmentRow | null {
-    return this.editorGafcExp1SelectedAssignmentRow();
-  }
-
-  editorGafcExp1SelectedAssignmentRow(): GafcExp1AssignmentRow | null {
     const functionValue = this.editorGafcExp1Function();
-    if (functionValue === null || functionValue < 0 || functionValue >= GAFC_EXP1_FUNCTION_ROW_KEY.length) {
-      return null;
+    if (functionValue === null || functionValue < 0 || functionValue >= GAFC_EXP1_FUNCTION_ROW_KEYS.length) {
+      return [];
     }
-    const rowKey = GAFC_EXP1_FUNCTION_ROW_KEY[functionValue];
-    if (!rowKey) {
-      return null;
+    const rowKeys = GAFC_EXP1_FUNCTION_ROW_KEYS[functionValue];
+    if (!rowKeys || rowKeys.length === 0) {
+      return [];
     }
-    return this.editorGafcExp1AssignmentRows().find((row) => row.key === rowKey) ?? null;
+    const rows = this.editorGafcExp1AssignmentRows();
+    return rowKeys
+      .map((rowKey) => rows.find((row) => row.key === rowKey))
+      .filter((row): row is GafcExp1AssignmentRow => row !== undefined);
   }
 
   setEditorGafcExp1AssignmentValue(key: string, field: 'detail' | 'min' | 'max', value: string): void {

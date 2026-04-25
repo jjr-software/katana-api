@@ -515,10 +515,7 @@
                   <article class="border rounded p-2 effect-card">
                     @let pedalFxType = editorPedalFxType();
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                      <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <h4 class="h6 mb-0">Pedal FX</h4>
-                        <span class="badge rounded-pill text-bg-secondary">{{ editorPedalFxTypeLabelFor(pedalFxType) }}</span>
-                      </div>
+                      <h4 class="h6 mb-0">Pedal FX</h4>
                       <div class="d-flex gap-2 align-items-center">
                         <label class="form-check-label small d-flex align-items-center gap-1">
                           <input class="form-check-input m-0" type="checkbox" [checked]="editorPedalFxOn()" (change)="setEditorPedalFxOn($any($event.target).checked)" />
@@ -539,7 +536,7 @@
                         <label class="form-label small mb-1">Type</label>
                         <select class="form-select form-select-sm" [value]="pedalFxType ?? 0" (change)="setEditorPedalFxType($any($event.target).value)">
                           @for (option of editorPedalFxTypeOptions(); track option.value) {
-                            <option [value]="option.value" [selected]="pedalFxType === option.value">{{ option.label }}</option>
+                            <option [value]="option.value">{{ option.label }}</option>
                           }
                         </select>
                       </div>
