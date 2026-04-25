@@ -213,6 +213,8 @@ class QueueJobSummaryResponse(BaseModel):
     job_id: str
     operation: str
     slot: int | None = None
+    request_patch_name: str | None = None
+    request_patch_hash: str | None = None
     status: str
     created_at: str
     started_at: str | None = None
@@ -890,10 +892,22 @@ async def _await_terminal_job(job_id: str, timeout_seconds: float) -> object:
 
 
 def _queue_job_summary(job: object) -> dict:
+    request_patch = getattr(job, "request_patch", None)
+    request_patch_name = None
+    request_patch_hash = None
+    if isinstance(request_patch, dict):
+        patch_name = request_patch.get("patch_name")
+        if isinstance(patch_name, str) and patch_name.strip():
+            request_patch_name = patch_name.strip()
+        patch_hash = request_patch.get("config_hash_sha256")
+        if isinstance(patch_hash, str) and patch_hash.strip():
+            request_patch_hash = patch_hash.strip()
     return {
         "job_id": getattr(job, "job_id"),
         "operation": getattr(job, "operation"),
         "slot": getattr(job, "slot", None),
+        "request_patch_name": request_patch_name,
+        "request_patch_hash": request_patch_hash,
         "status": getattr(job, "status"),
         "created_at": getattr(job, "created_at"),
         "started_at": getattr(job, "started_at", None),
