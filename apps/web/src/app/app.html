@@ -133,32 +133,58 @@
                   }
 
                   @if (liveEditorShowsBlock('routing')) {
-                  <article class="border rounded p-2">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                      <div class="d-flex align-items-center gap-2">
-                        <h4 class="h6 mb-0">Routing</h4>
+                  <article class="border rounded p-3">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                      <div>
+                        <h4 class="h6 mb-1">Routing</h4>
+                        <p class="small text-body-secondary mb-0">
+                          Internal signal-path settings. This block changes how the patch is wired, not the amp tone stack.
+                        </p>
+                      </div>
+                      <div class="d-flex flex-wrap gap-2">
+                        <span class="badge text-bg-primary">Chain: {{ routingFieldDisplay('chain_pattern') }}</span>
+                        <span class="badge text-bg-secondary">Cab: {{ routingFieldDisplay('cabinet_resonance') }}</span>
+                        <span class="badge text-bg-secondary">Key: {{ routingFieldDisplay('master_key') }}</span>
                       </div>
                     </div>
-                    <div class="row g-2">
-                      <div class="col-12 col-md-4">
-                        <label class="form-label small mb-1">Chain Pattern</label>
-                        <div class="editor-range-field">
-                          <input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorRoutingNumber('chain_pattern') ?? 0" (input)="setEditorRoutingNumber('chain_pattern', $any($event.target).value)" />
-                          <input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorRoutingNumber('chain_pattern') ?? 0" (input)="setEditorRoutingNumber('chain_pattern', $any($event.target).value)" />
+                    <div class="row g-3">
+                      <div class="col-12 col-lg-4">
+                        <div class="border rounded-3 p-3 bg-body-tertiary h-100">
+                          <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                            <label class="form-label small fw-semibold mb-0">Chain Pattern</label>
+                            <span class="badge text-bg-primary">{{ routingFieldDisplay('chain_pattern') }}</span>
+                          </div>
+                          <p class="small text-body-secondary mb-2">{{ routingFieldHelp('chain_pattern') }}</p>
+                          <div class="editor-range-field">
+                            <input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorRoutingNumber('chain_pattern') ?? 0" (input)="setEditorRoutingNumber('chain_pattern', $any($event.target).value)" />
+                            <input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorRoutingNumber('chain_pattern') ?? 0" (input)="setEditorRoutingNumber('chain_pattern', $any($event.target).value)" />
+                          </div>
                         </div>
                       </div>
-                      <div class="col-12 col-md-4">
-                        <label class="form-label small mb-1">Cab Resonance</label>
-                        <div class="editor-range-field">
-                          <input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorRoutingNumber('cabinet_resonance') ?? 0" (input)="setEditorRoutingNumber('cabinet_resonance', $any($event.target).value)" />
-                          <input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorRoutingNumber('cabinet_resonance') ?? 0" (input)="setEditorRoutingNumber('cabinet_resonance', $any($event.target).value)" />
+                      <div class="col-12 col-lg-4">
+                        <div class="border rounded-3 p-3 bg-body-tertiary h-100">
+                          <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                            <label class="form-label small fw-semibold mb-0">Cab Resonance</label>
+                            <span class="badge text-bg-secondary">{{ routingFieldDisplay('cabinet_resonance') }}</span>
+                          </div>
+                          <p class="small text-body-secondary mb-2">{{ routingFieldHelp('cabinet_resonance') }}</p>
+                          <div class="editor-range-field">
+                            <input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorRoutingNumber('cabinet_resonance') ?? 0" (input)="setEditorRoutingNumber('cabinet_resonance', $any($event.target).value)" />
+                            <input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorRoutingNumber('cabinet_resonance') ?? 0" (input)="setEditorRoutingNumber('cabinet_resonance', $any($event.target).value)" />
+                          </div>
                         </div>
                       </div>
-                      <div class="col-12 col-md-4">
-                        <label class="form-label small mb-1">Master Key</label>
-                        <div class="editor-range-field">
-                          <input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorRoutingNumber('master_key') ?? 0" (input)="setEditorRoutingNumber('master_key', $any($event.target).value)" />
-                          <input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorRoutingNumber('master_key') ?? 0" (input)="setEditorRoutingNumber('master_key', $any($event.target).value)" />
+                      <div class="col-12 col-lg-4">
+                        <div class="border rounded-3 p-3 bg-body-tertiary h-100">
+                          <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                            <label class="form-label small fw-semibold mb-0">Master Key</label>
+                            <span class="badge text-bg-secondary">{{ routingFieldDisplay('master_key') }}</span>
+                          </div>
+                          <p class="small text-body-secondary mb-2">{{ routingFieldHelp('master_key') }}</p>
+                          <div class="editor-range-field">
+                            <input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorRoutingNumber('master_key') ?? 0" (input)="setEditorRoutingNumber('master_key', $any($event.target).value)" />
+                            <input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorRoutingNumber('master_key') ?? 0" (input)="setEditorRoutingNumber('master_key', $any($event.target).value)" />
+                          </div>
                         </div>
                       </div>
                     </div>

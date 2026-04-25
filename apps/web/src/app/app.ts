@@ -84,6 +84,8 @@ const DELAY_TYPE_NAMES = [
 ];
 const AMP_TYPE_NAMES = ['Acoustic', 'Clean', 'Pushed', 'Crunch', 'Lead', 'Brown'];
 const REVERB_TYPE_NAMES = ['Plate Reverb', 'Room Reverb', 'Hall Reverb', 'Spring Reverb', 'Modulate Reverb'];
+const ROUTING_CHAIN_PATTERN_NAMES = ['CHAIN1', 'CHAIN2-1', 'CHAIN3-1', 'CHAIN4-1', 'CHAIN2-2', 'CHAIN3-2', 'CHAIN4-2'] as const;
+type RoutingFieldName = 'chain_pattern' | 'cabinet_resonance' | 'master_key';
 const GAFC_EXP1_FUNCTION_OPTIONS: ReadonlyArray<ValueOption> = [
   { value: 0, label: 'Volume' },
   { value: 1, label: 'Foot Volume' },
@@ -332,7 +334,7 @@ function buildLiveMeterBands(centersHz: readonly number[], labels: readonly stri
 }
 
 const TONE_BLOCK_DISPLAY: Record<ToneBlockKey, ToneBlockDisplay> = {
-  routing: { label: 'Routing', glyph: 'RT', subtitle: 'Chain order and cab routing' },
+  routing: { label: 'Routing', glyph: 'RT', subtitle: 'Signal path, cab resonance, and key routing' },
   amp: { label: 'Amp', glyph: 'AMP', subtitle: 'Gain, tone stack, and volume' },
   booster: { label: 'Booster', glyph: 'BST', subtitle: 'Boost and drive stage' },
   mod: { label: 'Mod', glyph: 'MOD', subtitle: 'Modulation block' },
@@ -3815,17 +3817,42 @@ export class App implements OnInit, OnDestroy {
     return AMP_TYPE_NAMES.map((label, index) => ({ value: index, label }));
   }
 
-  editorRoutingNumber(field: 'chain_pattern' | 'cabinet_resonance' | 'master_key'): number | null {
+  editorRoutingNumber(field: RoutingFieldName): number | null {
     const routing = this.readObject(this.editorPatchDraft(), 'routing');
     return this.readNumber(routing, field);
   }
 
-  setEditorRoutingNumber(field: 'chain_pattern' | 'cabinet_resonance' | 'master_key', value: string): void {
+  routingFieldDisplay(field: RoutingFieldName): string {
+    const value = this.editorRoutingNumber(field);
+    if (value === null) {
+      return 'Unset';
+    }
+    if (field === 'chain_pattern') {
+      return `${this.routingChoiceLabel(ROUTING_CHAIN_PATTERN_NAMES, value)} (${value})`;
+    }
+    return `${value}`;
+  }
+
+  routingFieldHelp(field: RoutingFieldName): string {
+    if (field === 'chain_pattern') {
+      return 'Selects the internal chain layout used by the patch.';
+    }
+    if (field === 'cabinet_resonance') {
+      return 'Controls the cab/resonance value associated with the patch.';
+    }
+    return 'Global key parameter exposed in the BTS routing block.';
+  }
+
+  setEditorRoutingNumber(field: RoutingFieldName, value: string): void {
     const parsed = this.parseInteger(value);
     this.updateEditorPatch((draft) => {
       const routing = this.ensureObject(draft, 'routing');
       routing[field] = parsed;
     });
+  }
+
+  private routingChoiceLabel(labels: readonly string[], value: number): string {
+    return labels[value] ?? `Unknown (${value})`;
   }
 
   editorDelay2On(): boolean {
