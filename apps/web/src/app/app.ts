@@ -4432,6 +4432,10 @@ export class App implements OnInit, OnDestroy {
     return this.editorGafcExp1AssignmentRows().find((row) => row.key === rowKey) ?? null;
   }
 
+  editorGafcExp1SelectedAssignmentRowKey(): string | null {
+    return this.editorGafcExp1SelectedAssignmentRow()?.key ?? null;
+  }
+
   editorGafcExp1SelectedFunctionNote(): string | null {
     const functionValue = this.editorGafcExp1Function();
     if (functionValue === null || functionValue < 0 || functionValue >= GAFC_EXP1_FUNCTION_ROW_NOTE.length) {
