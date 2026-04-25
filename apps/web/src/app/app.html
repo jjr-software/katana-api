@@ -513,10 +513,11 @@
 
                   @if (liveEditorShowsBlock('pedalfx')) {
                   <article class="border rounded p-2 effect-card">
+                    @let pedalFxType = editorPedalFxType();
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <div class="d-flex align-items-center gap-2 flex-wrap">
                         <h4 class="h6 mb-0">Pedal FX</h4>
-                        <span class="badge rounded-pill text-bg-secondary">{{ editorPedalFxTypeLabel() }}</span>
+                        <span class="badge rounded-pill text-bg-secondary">{{ editorPedalFxTypeLabelFor(pedalFxType) }}</span>
                       </div>
                       <div class="d-flex gap-2 align-items-center">
                         <label class="form-check-label small d-flex align-items-center gap-1">
@@ -536,14 +537,14 @@
                       </div>
                       <div class="col-12 col-md-4">
                         <label class="form-label small mb-1">Type</label>
-                        <select class="form-select form-select-sm" [value]="editorPedalFxType() ?? 0" (change)="setEditorPedalFxType($any($event.target).value)">
+                        <select class="form-select form-select-sm" [value]="pedalFxType ?? 0" (change)="setEditorPedalFxType($any($event.target).value)">
                           @for (option of editorPedalFxTypeOptions(); track option.value) {
-                            <option [value]="option.value">{{ option.label }}</option>
+                            <option [value]="option.value" [selected]="pedalFxType === option.value">{{ option.label }}</option>
                           }
                         </select>
                       </div>
                     </div>
-                    @if (editorPedalFxType() === 0) {
+                    @if (pedalFxType === 0) {
                     <div class="mt-2">
                       <div class="row g-2">
                         <div class="col-12 col-md-4">
@@ -562,7 +563,7 @@
                       </div>
                     </div>
                     }
-                    @if (editorPedalFxType() === 1) {
+                    @if (pedalFxType === 1) {
                     <div class="mt-2">
                       <div class="row g-2">
                         <div class="col-12 col-md-4"><label class="form-label small mb-1">Pitch</label><div class="editor-range-field"><input type="range" min="-24" max="24" class="form-range editor-range-slider" [value]="editorPedalFxPitch() ?? 0" (input)="setEditorPedalFxPitch($any($event.target).value)" /><input type="number" min="-24" max="24" class="form-control form-control-sm editor-range-value" [value]="editorPedalFxPitch() ?? 0" (input)="setEditorPedalFxPitch($any($event.target).value)" /></div></div>
@@ -572,7 +573,7 @@
                       </div>
                     </div>
                     }
-                    @if (editorPedalFxType() === 2) {
+                    @if (pedalFxType === 2) {
                     <div class="mt-2">
                       <div class="row g-2">
                         <div class="col-12 col-md-4"><label class="form-label small mb-1">Pedal Position</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorPedalFxEwahPedalPosition() ?? 0" (input)="setEditorPedalFxEwahPedalPosition($any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorPedalFxEwahPedalPosition() ?? 0" (input)="setEditorPedalFxEwahPedalPosition($any($event.target).value)" /></div></div>
@@ -588,6 +589,7 @@
 
                   @if (liveEditorShowsBlock('gafc_exp1')) {
                   <article class="border rounded p-2 effect-card">
+                    @let gafcRows = editorGafcExp1VisibleAssignmentRows();
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <div class="d-flex align-items-center gap-2">
                         <h4 class="h6 mb-0">GA-FC EXP1</h4>
@@ -614,7 +616,7 @@
                               </tr>
                             </thead>
                             <tbody>
-                              @for (row of editorGafcExp1VisibleAssignmentRows(); track row.key) {
+                              @for (row of gafcRows; track row.key) {
                                 <tr>
                                   <th scope="row" class="text-nowrap">
                                     <div class="fw-semibold">{{ row.label }}</div>
@@ -641,7 +643,7 @@
                                   </td>
                                 </tr>
                               }
-                              @if (editorGafcExp1VisibleAssignmentRows().length === 0) {
+                              @if (gafcRows.length === 0) {
                                 <tr>
                                   <td colspan="3" class="text-secondary small">This function does not use an EXP1 assignment row.</td>
                                 </tr>

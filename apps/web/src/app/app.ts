@@ -4188,6 +4188,13 @@ export class App implements OnInit, OnDestroy {
     return this.editorPedalFxTypeOptions().find((option) => option.value === type)?.label ?? 'n/a';
   }
 
+  editorPedalFxTypeLabelFor(type: number | null): string {
+    if (type === null) {
+      return 'n/a';
+    }
+    return this.editorPedalFxTypeOptions().find((option) => option.value === type)?.label ?? 'n/a';
+  }
+
   editorPedalFxWahTypeOptions(): readonly ValueOption[] {
     return PEDAL_FX_WAH_TYPE_OPTIONS;
   }
@@ -4419,6 +4426,10 @@ export class App implements OnInit, OnDestroy {
   editorGafcExp1VisibleAssignmentRows(): readonly GafcExp1AssignmentRow[] {
     const selectedRow = this.editorGafcExp1SelectedAssignmentRow();
     return selectedRow ? [selectedRow] : [];
+  }
+
+  editorGafcExp1VisibleAssignmentRow(): GafcExp1AssignmentRow | null {
+    return this.editorGafcExp1SelectedAssignmentRow();
   }
 
   editorGafcExp1SelectedAssignmentRow(): GafcExp1AssignmentRow | null {
