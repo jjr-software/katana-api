@@ -3276,14 +3276,14 @@ export class App implements OnInit, OnDestroy {
     if (value === null || !Number.isFinite(value)) {
       return 'n/a';
     }
-    return this.lineOutAirFeelOptions.find((option) => option.value === value)?.label ?? `Mode ${value}`;
+    return this.lineOutAirFeelOptions.find((option) => option.value === value)?.label ?? 'Unknown';
   }
 
   lineOutMicTypeLabel(value: number | null): string {
     if (value === null || !Number.isFinite(value)) {
       return 'n/a';
     }
-    return this.lineOutMicTypeOptions.find((option) => option.value === value)?.label ?? `Type ${value}`;
+    return this.lineOutMicTypeOptions.find((option) => option.value === value)?.label ?? 'Unknown';
   }
 
   lineOutMemoryLabel(value: number | null): string {
@@ -3827,7 +3827,7 @@ export class App implements OnInit, OnDestroy {
       return 'Unset';
     }
     if (field === 'chain_pattern') {
-      return `${this.routingChoiceLabel(ROUTING_CHAIN_PATTERN_NAMES, value)} (${value})`;
+      return this.routingChoiceLabel(ROUTING_CHAIN_PATTERN_NAMES, value);
     }
     return `${value}`;
   }
@@ -3887,7 +3887,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   private routingChoiceLabel(labels: readonly string[], value: number): string {
-    return labels[value] ?? `Unknown (${value})`;
+    return labels[value] ?? 'Unknown';
   }
 
   editorDelay2On(): boolean {
@@ -4649,7 +4649,7 @@ export class App implements OnInit, OnDestroy {
       return 'No pedal type selected';
     }
     if (type < 0 || type >= FX_PARAM_SCHEMAS_BY_TYPE.length) {
-      return `No schema mapped for ${this.effectTypeLabel(stageName, type)} (${type})`;
+      return `No schema mapped for ${this.effectTypeLabel(stageName, type)}`;
     }
     return null;
   }
@@ -5175,7 +5175,7 @@ export class App implements OnInit, OnDestroy {
     }
     const ampTypeIndex = Math.trunc(ampType);
     const ampTypeName =
-      ampTypeIndex >= 0 && ampTypeIndex < AMP_TYPE_NAMES.length ? AMP_TYPE_NAMES[ampTypeIndex] : `Unknown (${ampTypeIndex})`;
+      ampTypeIndex >= 0 && ampTypeIndex < AMP_TYPE_NAMES.length ? AMP_TYPE_NAMES[ampTypeIndex] : 'Unknown';
     const preampVariation = this.readAmpField(amp, 'preamp_variation');
     const variationLabel = preampVariation === null ? 'n/a' : (Math.trunc(preampVariation) === 1 ? 'On' : 'Off');
     return `${ampTypeName} | Variation ${variationLabel}`;
@@ -5295,7 +5295,7 @@ export class App implements OnInit, OnDestroy {
     if (index >= 0 && index < table.length) {
       return table[index];
     }
-    return `Unknown (${index})`;
+    return 'Unknown';
   }
 
   private eqTypeLabel(type: number): string {
@@ -5303,7 +5303,7 @@ export class App implements OnInit, OnDestroy {
     if (index >= 0 && index < EQ_TYPE_NAMES.length) {
       return EQ_TYPE_NAMES[index];
     }
-    return `Unknown (${index})`;
+    return 'Unknown';
   }
 
   private eqPositionLabel(position: number): string {
@@ -5311,7 +5311,23 @@ export class App implements OnInit, OnDestroy {
     if (index >= 0 && index < EQ_POSITION_NAMES.length) {
       return EQ_POSITION_NAMES[index];
     }
-    return `Unknown (${index})`;
+    return 'Unknown';
+  }
+
+  editorPedalFxTypeLabel(): string {
+    const value = this.editorPedalFxType();
+    if (value === null) {
+      return 'n/a';
+    }
+    return this.editorPedalFxTypeOptions().find((option) => option.value === value)?.label ?? 'Unknown';
+  }
+
+  editorPedalFxWahTypeLabel(): string {
+    const value = this.editorPedalFxWahType();
+    if (value === null) {
+      return 'n/a';
+    }
+    return this.editorPedalFxWahTypeOptions().find((option) => option.value === value)?.label ?? 'Unknown';
   }
 
   private readObject(value: unknown, key?: string): Record<string, unknown> | null {

@@ -280,6 +280,7 @@
                               <option [value]="opt.value" [selected]="editorStageType($any(stageName)) === opt.value">{{ opt.label }}</option>
                             }
                           </select>
+                          <div class="small text-body-secondary mt-1">Selected: {{ editorStageTypeLabel($any(stageName)) }}</div>
                         </div>
                       </div>
                       @if (editorStageSchemaWarning($any(stageName)); as warning) {
@@ -557,6 +558,7 @@
                             <option [value]="option.value" [selected]="pedalFxType === option.value">{{ option.label }}</option>
                           }
                         </select>
+                        <div class="small text-body-secondary mt-1">Selected: {{ editorPedalFxTypeLabel() }}</div>
                       </div>
                     </div>
                     @if (pedalFxType === 0) {
@@ -569,6 +571,7 @@
                               <option [value]="option.value">{{ option.label }}</option>
                             }
                           </select>
+                          <div class="small text-body-secondary mt-1">Selected: {{ editorPedalFxWahTypeLabel() }}</div>
                         </div>
                         <div class="col-12 col-md-4"><label class="form-label small mb-1">Pedal Position</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorPedalFxPedalPosition() ?? 0" (input)="setEditorPedalFxPedalPosition($any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorPedalFxPedalPosition() ?? 0" (input)="setEditorPedalFxPedalPosition($any($event.target).value)" /></div></div>
                         <div class="col-12 col-md-4"><label class="form-label small mb-1">Pedal Min</label><div class="editor-range-field"><input type="range" min="0" max="100" class="form-range editor-range-slider" [value]="editorPedalFxPedalMin() ?? 0" (input)="setEditorPedalFxPedalMin($any($event.target).value)" /><input type="number" min="0" max="100" class="form-control form-control-sm editor-range-value" [value]="editorPedalFxPedalMin() ?? 0" (input)="setEditorPedalFxPedalMin($any($event.target).value)" /></div></div>
