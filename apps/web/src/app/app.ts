@@ -508,6 +508,8 @@ interface QueueJobSummary {
   job_id: string;
   operation: string;
   slot: number | null;
+  request_patch_name?: string | null;
+  request_patch_hash?: string | null;
   status: 'queued' | 'running' | 'succeeded' | 'failed';
   created_at: string;
   started_at: string | null;
@@ -2319,7 +2321,8 @@ export class App implements OnInit, OnDestroy {
     }
     const actionKey = this.slotActionKey('stage', slot.slot);
     this.setActionBusy(actionKey, true);
-    this.status.set(`Staging ${slot.slot_label} to active amp patch...`);
+    const stageLabel = this.stageSlotLabel(slot);
+    this.status.set(`Staging ${stageLabel} to active amp patch...`);
     this.responseJson.set('');
     try {
       const response = await fetch('/api/v1/amp/current-patch/live-apply', {
@@ -2330,13 +2333,14 @@ export class App implements OnInit, OnDestroy {
       });
       const payload = (await response.json()) as ApplyCurrentPatchResponse | { detail?: unknown };
       if (!response.ok) {
-        this.status.set(`Failed staging ${slot.slot_label} to active amp patch`);
+        this.status.set(`Failed staging ${stageLabel} to active amp patch`);
         this.responseJson.set(JSON.stringify(payload, null, 2));
         return;
       }
       const staged = payload as ApplyCurrentPatchResponse;
       const appliedPatch = this.clonePatch(staged.patch);
       const hash = this.readString(appliedPatch, 'config_hash_sha256') ?? '';
+      const patchName = this.readString(appliedPatch, 'patch_name')?.trim() || slot.patch_name.trim() || 'Unnamed Patch';
       this.currentAmpPatchHash.set(hash);
       this.slots.update((rows) =>
         rows.map((card) =>
@@ -2356,12 +2360,13 @@ export class App implements OnInit, OnDestroy {
         ),
       );
       this.currentAmpCommitState.set('uncommitted');
-      this.status.set(`Staged ${slot.slot_label} to active amp patch`);
+      this.status.set(`Staged ${stageLabel} to active amp patch`);
       this.responseJson.set(
         JSON.stringify(
           {
             message: 'Patch staged to active amp patch',
             slot: slot.slot_label,
+            patch_name: patchName,
             applied_at: staged.applied_at,
             hash_id: hash || null,
           },
@@ -2370,7 +2375,7 @@ export class App implements OnInit, OnDestroy {
         ),
       );
     } catch (error: unknown) {
-      this.status.set(`Failed staging ${slot.slot_label} to active amp patch`);
+      this.status.set(`Failed staging ${stageLabel} to active amp patch`);
       this.responseJson.set(
         JSON.stringify(
           {
@@ -4495,6 +4500,9 @@ export class App implements OnInit, OnDestroy {
         raw[0] = parsed;
         stage['raw'] = raw;
       }
+      if ((stageName === 'mod' || stageName === 'fx') && parsed === 2) {
+        this.initializePedalWahDefaults(stage);
+      }
       this.syncStageDerivedFields(stageName, stage);
     });
   }
@@ -4724,8 +4732,7 @@ export class App implements OnInit, OnDestroy {
       if (job.status !== 'succeeded' && job.status !== 'failed') {
         continue;
       }
-      const slotLabel = job.slot !== null ? ` ${this.setLabelForSlot(job.slot)}` : '';
-      const messageLabel = `${this.operationLabel(job.operation)}${slotLabel}`;
+      const messageLabel = this.queueJobLabel(job);
       if (job.status === 'succeeded') {
         this.pushToast(`${messageLabel} completed`, 'success');
       } else {
@@ -4743,6 +4750,23 @@ export class App implements OnInit, OnDestroy {
 
   shortHash(hash: string): string {
     return hash.slice(0, 12);
+  }
+
+  private stageSlotLabel(slot: SlotCard): string {
+    const patchName = slot.patch_name.trim() || 'Unnamed Patch';
+    const hash = slot.config_hash_sha256.trim();
+    return hash ? `${slot.slot_label} · ${patchName} [${this.shortHash(hash)}]` : `${slot.slot_label} · ${patchName}`;
+  }
+
+  private queueJobLabel(job: QueueJobSummary): string {
+    const slotLabel = job.slot !== null ? ` ${this.setLabelForSlot(job.slot)}` : '';
+    if (job.operation === 'apply_current_patch') {
+      const patchName = job.request_patch_name?.trim();
+      const patchHash = job.request_patch_hash?.trim();
+      const patchSuffix = patchName ? ` · ${patchName}${patchHash ? ` [${this.shortHash(patchHash)}]` : ''}` : '';
+      return `${this.operationLabel(job.operation)}${slotLabel}${patchSuffix}`;
+    }
+    return `${this.operationLabel(job.operation)}${slotLabel}`;
   }
 
   displayPatchName(slot: SlotCard): string {
@@ -5448,6 +5472,21 @@ export class App implements OnInit, OnDestroy {
     if (raw.length > 0) {
       stage['type'] = raw[0];
     }
+  }
+
+  private initializePedalWahDefaults(stage: Record<string, unknown>): void {
+    const raw = this.ensureNumericRaw(stage);
+    if (raw.length <= 20) {
+      return;
+    }
+    // Keep the wah's toe-down sweep from starting in the harshest spot.
+    raw[15] = 0;
+    raw[16] = 50;
+    raw[17] = 0;
+    raw[18] = 100;
+    raw[19] = 100;
+    raw[20] = 0;
+    stage['raw'] = raw;
   }
 
   private editorNestedRawFields(path: string[], rawKey: string, idPrefix: string): RawValueField[] {
