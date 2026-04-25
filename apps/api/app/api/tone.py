@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.amp_queue import amp_job_queue
 from app.api.ai import _extract_refusal_text, _extract_response_text
+from app.db import SessionLocal
 from app.deps import get_amp_client, get_db
 from app.katana import AmpClient, slot_label
 from app.live_patch_state import live_patch_status_payload, upsert_amp_slot_snapshot, upsert_live_patch_state
@@ -774,18 +775,25 @@ async def apply_patch_object_to_live_patch(
     if patch_object is None:
         raise HTTPException(status_code=404, detail={"message": "Patch object not found", "patch_object_id": payload.patch_object_id})
     live_row = await _resolve_live_patch_row(db, client)
-    rendered = merge_patch_object_into_full_patch(live_row.patch_json, patch_object.patch_json)
-    rendered["patch_name"] = patch_object.name[:16]
+    live_patch_json = live_row.patch_json
+    live_active_slot = live_row.active_slot
+    patch_object_json = patch_object.patch_json
+    patch_object_name = patch_object.name
+    patch_object_source_type = patch_object.source_type
+    db.close()
+    rendered = merge_patch_object_into_full_patch(live_patch_json, patch_object_json)
+    rendered["patch_name"] = patch_object_name[:16]
     applied = await _queued_apply_current_patch(rendered)
     applied_at = datetime.now().isoformat(timespec="seconds")
-    row = upsert_live_patch_state(
-        db,
-        full_patch=applied,
-        active_slot=live_row.active_slot,
-        amp_confirmed_at=applied_at,
-        source_type="ai_apply" if patch_object.source_type == "ai" else "manual_apply",
-    )
-    return LivePatchReadResponse(**live_patch_status_payload(db, row))
+    with SessionLocal() as write_db:
+        row = upsert_live_patch_state(
+            write_db,
+            full_patch=applied,
+            active_slot=live_active_slot,
+            amp_confirmed_at=applied_at,
+            source_type="ai_apply" if patch_object_source_type == "ai" else "manual_apply",
+        )
+        return LivePatchReadResponse(**live_patch_status_payload(write_db, row))
 
 
 @router.patch("/live-patch/blocks/{block_name}", response_model=LivePatchReadResponse)
@@ -798,19 +806,24 @@ async def patch_live_patch_block(
     if block_name not in ALLOWED_BLOCKS:
         raise HTTPException(status_code=400, detail={"message": "Unknown block", "block": block_name})
     live_row = await _resolve_live_patch_row(db, client)
+    live_patch_json = live_row.patch_json
+    live_active_slot = live_row.active_slot
+    live_patch_name = str(live_row.patch_json.get("patch_name", ""))[:16]
+    db.close()
     sparse_patch_object = {block_name: payload.patch_block}
-    rendered = merge_patch_object_into_full_patch(live_row.patch_json, sparse_patch_object)
-    rendered["patch_name"] = str(live_row.patch_json.get("patch_name", ""))[:16]
+    rendered = merge_patch_object_into_full_patch(live_patch_json, sparse_patch_object)
+    rendered["patch_name"] = live_patch_name
     applied = await _queued_apply_current_patch(rendered)
     applied_at = datetime.now().isoformat(timespec="seconds")
-    row = upsert_live_patch_state(
-        db,
-        full_patch=applied,
-        active_slot=live_row.active_slot,
-        amp_confirmed_at=applied_at,
-        source_type="manual_apply",
-    )
-    return LivePatchReadResponse(**live_patch_status_payload(db, row))
+    with SessionLocal() as write_db:
+        row = upsert_live_patch_state(
+            write_db,
+            full_patch=applied,
+            active_slot=live_active_slot,
+            amp_confirmed_at=applied_at,
+            source_type="manual_apply",
+        )
+        return LivePatchReadResponse(**live_patch_status_payload(write_db, row))
 
 
 @router.post("/live-patch/store-to-slot", response_model=LivePatchReadResponse)
@@ -821,7 +834,10 @@ async def store_live_patch_to_slot(
     live_row = db.get(LivePatchState, 1)
     if live_row is None:
         raise HTTPException(status_code=404, detail={"message": "Live Patch has not been synced yet"})
-    job = await amp_job_queue.enqueue_slot_write(slot=payload.slot, patch=live_row.patch_json)
+    live_patch_json = live_row.patch_json
+    live_source_type = live_row.source_type
+    db.close()
+    job = await amp_job_queue.enqueue_slot_write(slot=payload.slot, patch=live_patch_json)
     settled = await _await_terminal_job(job.job_id, timeout_seconds=120.0)
     if settled.status != "succeeded" or settled.result_slot is None:
         raise HTTPException(
@@ -829,21 +845,22 @@ async def store_live_patch_to_slot(
             detail={"message": "Failed to store Live Patch to slot", "error": settled.error, "slot": payload.slot},
         )
     slot_item = settled.result_slot
-    upsert_amp_slot_snapshot(
-        db,
-        slot=payload.slot,
-        patch_name=slot_item.patch_name,
-        full_patch=slot_item.payload or live_row.patch_json,
-        amp_confirmed_at=slot_item.synced_at,
-    )
-    row = upsert_live_patch_state(
-        db,
-        full_patch=live_row.patch_json,
-        active_slot=payload.slot,
-        amp_confirmed_at=slot_item.synced_at,
-        source_type=live_row.source_type,
-    )
-    return LivePatchReadResponse(**live_patch_status_payload(db, row))
+    with SessionLocal() as write_db:
+        upsert_amp_slot_snapshot(
+            write_db,
+            slot=payload.slot,
+            patch_name=slot_item.patch_name,
+            full_patch=slot_item.payload or live_patch_json,
+            amp_confirmed_at=slot_item.synced_at,
+        )
+        row = upsert_live_patch_state(
+            write_db,
+            full_patch=live_patch_json,
+            active_slot=payload.slot,
+            amp_confirmed_at=slot_item.synced_at,
+            source_type=live_source_type,
+        )
+        return LivePatchReadResponse(**live_patch_status_payload(write_db, row))
 
 
 def _patch_object_response(
