@@ -6,6 +6,7 @@
 - If host tooling is missing, fail hard and switch to Compose; do not use host fallbacks.
 - After each code change, always rebuild and restart the stack with:
   - `docker compose up -d --build`
+- For browser and UI testing, use `https://katana.ryzen.jjrsoftware.co.uk/` rather than `localhost`.
 
 ## Scope
 - Date: 2026-03-22
