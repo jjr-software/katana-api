@@ -44,7 +44,8 @@ STAGE_RAW_FIELD_MAP: dict[str, dict[str, int]] = {
         "drive": 1,
         "bottom": 2,
         "tone": 3,
-        "solo_level": 4,
+        "solo_sw": 4,
+        "solo_level": 5,
         "effect_level": 6,
         "direct_mix": 7,
     },
@@ -76,7 +77,7 @@ STAGE_RAW_FIELD_MAP: dict[str, dict[str, int]] = {
 NUMERIC_BLOCK_FIELDS: dict[str, tuple[str, ...]] = {
     "routing": ("chain_pattern", "cabinet_resonance", "master_key"),
     "amp": ("gain", "volume", "bass", "middle", "treble", "presence", "poweramp_variation", "amp_type", "resonance", "preamp_variation"),
-    "booster": ("type", "drive", "bottom", "tone", "solo_level", "effect_level", "direct_mix"),
+    "booster": ("type", "drive", "bottom", "tone", "solo_sw", "solo_level", "effect_level", "direct_mix"),
     "mod": ("type",),
     "fx": ("type",),
     "delay": ("type", "feedback", "high_cut", "effect_level", "direct_level", "layer_mode", "time", "pre_delay"),
@@ -445,7 +446,9 @@ def _sync_stage_compact_from_raw(block_name: str, target: dict[str, Any]) -> Non
         if len(raw) >= 4:
             target["tone"] = raw[3]
         if len(raw) >= 5:
-            target["solo_level"] = raw[4]
+            target["solo_sw"] = raw[4]
+        if len(raw) >= 6:
+            target["solo_level"] = raw[5]
         if len(raw) >= 7:
             target["effect_level"] = raw[6]
         if len(raw) >= 8:

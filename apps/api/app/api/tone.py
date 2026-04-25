@@ -53,7 +53,7 @@ Rules:
 - Keep candidates audibly distinct and useful for A/B testing.
 - Give each candidate a short unique name and one short description.
 - If a stage should be off, include that stage block and set `on` to false.
-- Use compact fields when possible, for example `amp.gain`, `booster.drive`, `booster.tone`, `booster.effect_level`, `eq1.position`, `eq1.type`, `eq1.ge10_raw`.
+- Use compact fields when possible, for example `amp.gain`, `booster.drive`, `booster.bottom`, `booster.tone`, `booster.effect_level`, `eq1.position`, `eq1.type`, `eq1.ge10_raw`.
 - For EQ blocks, `ge10_raw` or `peq_raw` arrays are allowed and expected when needed.
 - For color stages, `color_index` may be set to 0, 1, or 2 when relevant.
 - Patch-level assign blocks such as `gafc_exp1.function` are valid when requested.
@@ -1159,6 +1159,7 @@ def _build_ai_block_schema(block_name: str) -> dict[str, Any]:
                 drive=JSON_INTEGER_SCHEMA,
                 bottom=JSON_INTEGER_SCHEMA,
                 tone=JSON_INTEGER_SCHEMA,
+                solo_sw=JSON_INTEGER_SCHEMA,
                 solo_level=JSON_INTEGER_SCHEMA,
                 effect_level=JSON_INTEGER_SCHEMA,
                 direct_mix=JSON_INTEGER_SCHEMA,

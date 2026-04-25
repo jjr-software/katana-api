@@ -5495,8 +5495,23 @@ export class App implements OnInit, OnDestroy {
       if (raw.length > 1) {
         stage['drive'] = raw[1];
       }
+      if (raw.length > 2) {
+        stage['bottom'] = raw[2];
+      }
+      if (raw.length > 3) {
+        stage['tone'] = raw[3];
+      }
+      if (raw.length > 4) {
+        stage['solo_sw'] = raw[4];
+      }
+      if (raw.length > 5) {
+        stage['solo_level'] = raw[5];
+      }
       if (raw.length > 6) {
         stage['effect_level'] = raw[6];
+      }
+      if (raw.length > 7) {
+        stage['direct_mix'] = raw[7];
       }
       return;
     }
