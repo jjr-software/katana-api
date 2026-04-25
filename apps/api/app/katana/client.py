@@ -1,5 +1,6 @@
 import asyncio
 import time
+from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any
 
@@ -1058,11 +1059,13 @@ class AmpClient:
                 timeout=max(5.0, timeout_seconds + 2.0),
             )
         except asyncio.TimeoutError as exc:
-            proc.kill()
+            with suppress(ProcessLookupError):
+                proc.kill()
             await proc.wait()
             raise AmpClientError("amidi command timed out") from exc
         except asyncio.CancelledError:
-            proc.kill()
+            with suppress(ProcessLookupError):
+                proc.kill()
             await proc.wait()
             raise
         stdout = stdout_bytes.decode("utf-8", errors="replace")
