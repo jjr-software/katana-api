@@ -34,6 +34,14 @@ def _raw_block(raw: list[int]) -> dict[str, Any]:
     return {"raw": list(raw)}
 
 
+def _delay_block(raw: list[int], *, on: bool = True, delay2_on: bool = False) -> dict[str, Any]:
+    return {
+        "on": on,
+        "delay2_on": delay2_on,
+        "raw": list(raw),
+    }
+
+
 def _booster_block(raw: list[int], *, on: bool = True) -> dict[str, Any]:
     return {"on": on, "raw": list(raw)}
 
@@ -413,6 +421,41 @@ ROM_PATCH_OBJECT_SPECS: list[dict[str, Any]] = [
         "patch_json": {
             "amp": _raw_block([50, 68, 42, 62, 58, 54, 1, 1, 0, 0]),
             "booster": _raw_block([1, 18, 50, 45, 0, 50, 58, 0]),
+        },
+    },
+    {
+        "name": "Delay Slapback Utility",
+        "description": "Short slapback with a clear dry core for rhythm thickening and lead doubling.",
+        "patch_json": {
+            "delay": _delay_block([0, 0, 6, 14, 0, 12, 11, 22, 88, 0, 0, 0, 0, 0, 0, 1, 0]),
+        },
+    },
+    {
+        "name": "Delay Digital Rhythm",
+        "description": "Medium digital delay with clean repeats that stays useful across most clean and edge tones.",
+        "patch_json": {
+            "delay": _delay_block([0, 0, 1, 2, 12, 18, 10, 26, 82, 0, 0, 0, 0, 0, 0, 1, 0]),
+        },
+    },
+    {
+        "name": "Delay Warm Analog",
+        "description": "Rounder analog-style delay with softer repeats for leads and looser rhythm space.",
+        "patch_json": {
+            "delay": _delay_block([3, 0, 1, 4, 0, 24, 8, 24, 84, 0, 0, 0, 1, 0, 0, 1, 0]),
+        },
+    },
+    {
+        "name": "Delay Tape Echo",
+        "description": "Tape echo flavour with slightly darker repeats and a gentle, musical decay.",
+        "patch_json": {
+            "delay": _delay_block([4, 0, 1, 7, 12, 22, 8, 22, 84, 0, 0, 0, 1, 0, 0, 1, 0]),
+        },
+    },
+    {
+        "name": "Delay Modulated Space",
+        "description": "Modulated delay for wider ambient leads without becoming a special effect.",
+        "patch_json": {
+            "delay": _delay_block([6, 0, 1, 12, 2, 20, 9, 24, 80, 0, 16, 18, 1, 1, 0, 1, 1]),
         },
     },
 ]
