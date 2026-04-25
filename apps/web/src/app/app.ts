@@ -11,6 +11,7 @@ import {
   REVERB_PARAM_SCHEMA,
   type StageParamSchema,
 } from './pedal-schemas';
+import { buildRoutingChainOrder, routingChainBlockLabel, type RoutingChainBlockId } from './routing-chain';
 
 const BOOSTER_TYPE_NAMES = [
   'Mid Boost',
@@ -3843,6 +3844,38 @@ export class App implements OnInit, OnDestroy {
 
   routingChainPatternOptions(): TypeOption[] {
     return ROUTING_CHAIN_PATTERN_NAMES.map((label, value) => ({ value, label }));
+  }
+
+  editorRoutingChainOrder(): readonly RoutingChainBlockId[] {
+    const chainPattern = this.editorRoutingNumber('chain_pattern') ?? 0;
+    const pedalFxPosition = this.editorPedalFxPosition() ?? 0;
+    const sendReturnPosition = this.editorSendReturnNumber('position') ?? 0;
+    const eq1Position = this.editorEqNumber('eq1', 'position') ?? 0;
+    const eq2Position = this.editorEqNumber('eq2', 'position') ?? 0;
+    return buildRoutingChainOrder({
+      chainPattern,
+      pedalFxPosition,
+      sendReturnPosition,
+      eq1Position,
+      eq2Position,
+    });
+  }
+
+  routingChainOrderLabel(blockId: RoutingChainBlockId): string {
+    return routingChainBlockLabel(blockId);
+  }
+
+  editorPedalWahPlacement(stageName: 'mod' | 'fx'): string | null {
+    if (this.editorStageType(stageName) !== 2) {
+      return null;
+    }
+    const chain = this.editorRoutingChainOrder();
+    const ampIndex = chain.indexOf('amp');
+    const stageIndex = chain.indexOf(stageName);
+    if (ampIndex < 0 || stageIndex < 0) {
+      return null;
+    }
+    return stageIndex < ampIndex ? 'pre-amp' : 'post-amp';
   }
 
   setEditorRoutingNumber(field: RoutingFieldName, value: string): void {
