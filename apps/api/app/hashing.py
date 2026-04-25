@@ -171,6 +171,22 @@ def canonicalize_snapshot_for_hash(snapshot: dict[str, Any]) -> dict[str, Any]:
             if out:
                 stages_out["pedalfx"] = out
 
+        exp_pedal = stages.get("exp_pedal")
+        if isinstance(exp_pedal, dict):
+            out = {}
+            if isinstance(exp_pedal.get("raw"), list):
+                out["raw"] = exp_pedal["raw"]
+            if isinstance(exp_pedal.get("detail_raw"), list):
+                out["detail_raw"] = exp_pedal["detail_raw"]
+            if isinstance(exp_pedal.get("min_raw"), list):
+                out["min_raw"] = exp_pedal["min_raw"]
+            if isinstance(exp_pedal.get("max_raw"), list):
+                out["max_raw"] = exp_pedal["max_raw"]
+            if "function" in exp_pedal:
+                out["function"] = exp_pedal["function"]
+            if out:
+                stages_out["exp_pedal"] = out
+
         gafc_exp1 = stages.get("gafc_exp1")
         if isinstance(gafc_exp1, dict):
             out = {}

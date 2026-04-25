@@ -295,7 +295,7 @@ const AUTO_LEVEL_MAX_ITERS = 8;
 const AUTO_LEVEL_STEP_SCALE = 2.0;
 const AUTO_LEVEL_MAX_STEP = 8;
 const GLOBAL_NORMALIZE_TARGET_STORAGE_KEY = 'katana.globalNormalizeTargetRms';
-const TONE_BLOCK_OPTIONS = ['routing', 'amp', 'booster', 'mod', 'fx', 'delay', 'reverb', 'eq1', 'eq2', 'ns', 'send_return', 'solo', 'pedalfx', 'gafc_exp1'] as const;
+const TONE_BLOCK_OPTIONS = ['routing', 'amp', 'booster', 'mod', 'fx', 'delay', 'reverb', 'eq1', 'eq2', 'ns', 'send_return', 'solo', 'pedalfx', 'exp_pedal', 'gafc_exp1'] as const;
 type ToneBlockKey = (typeof TONE_BLOCK_OPTIONS)[number];
 
 interface ToneBlockDisplay {
@@ -333,6 +333,7 @@ const TONE_BLOCK_DISPLAY: Record<ToneBlockKey, ToneBlockDisplay> = {
   send_return: { label: 'Send/Return', glyph: 'S/R', subtitle: 'External loop levels' },
   solo: { label: 'Solo', glyph: 'SO', subtitle: 'Solo lift and level' },
   pedalfx: { label: 'Pedal FX', glyph: 'PFX', subtitle: 'Pedal effect stage' },
+  exp_pedal: { label: 'EXP Pedal', glyph: 'EXP', subtitle: 'Which target the expression pedal drives' },
   gafc_exp1: { label: 'GA-FC EXP1', glyph: 'EXP1', subtitle: 'Patch-level expression assignment' },
 } as const;
 
@@ -4501,6 +4502,80 @@ export class App implements OnInit, OnDestroy {
     return options.find((option) => option.value === value)?.label ?? 'Unknown';
   }
 
+  editorExpPedalFunction(): number | null {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const block = this.readObject(stages, 'exp_pedal');
+    return this.readNumber(block, 'function');
+  }
+
+  setEditorExpPedalFunction(value: string): void {
+    const parsed = this.parseInteger(value);
+    this.updateEditorPatch((draft) => {
+      const stages = this.ensureObject(draft, 'stages');
+      const block = this.ensureObject(stages, 'exp_pedal');
+      block['function'] = parsed;
+      this.syncNumericRawField(block, 'raw', 0, parsed);
+    });
+  }
+
+  editorExpPedalFunctionOptions(): readonly ValueOption[] {
+    return GAFC_EXP1_FUNCTION_OPTIONS;
+  }
+
+  editorExpPedalAssignmentRows(): readonly GafcExp1AssignmentRow[] {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const block = this.readObject(stages, 'exp_pedal');
+    if (!block) {
+      return [];
+    }
+    const detailRaw = this.readNumericArray(block, 'detail_raw') ?? [];
+    const minRaw = this.readNumericArray(block, 'min_raw') ?? [];
+    const maxRaw = this.readNumericArray(block, 'max_raw') ?? [];
+    return GAFC_EXP1_ASSIGNMENT_SCHEMA.map((spec, index) => {
+      const detail = this.decodeRolandValue(detailRaw.slice(index, index + 1));
+      return {
+        ...spec,
+        detail,
+        detailLabel: this.editorGafcExp1DetailLabel(spec.key, detail),
+        detailOptions: this.editorGafcExp1DetailOptions(spec.key),
+        min: this.decodeRolandValue(minRaw.slice(spec.minOffset, spec.minOffset + spec.minSize)),
+        max: this.decodeRolandValue(maxRaw.slice(spec.maxOffset, spec.maxOffset + spec.maxSize)),
+      };
+    });
+  }
+
+  editorExpPedalVisibleAssignmentRows(): readonly GafcExp1AssignmentRow[] {
+    return this.editorExpPedalAssignmentRows();
+  }
+
+  setEditorExpPedalAssignmentValue(key: string, field: 'detail' | 'min' | 'max', value: string): void {
+    const specIndex = GAFC_EXP1_ASSIGNMENT_SCHEMA.findIndex((entry) => entry.key === key);
+    if (specIndex < 0) {
+      return;
+    }
+    const spec = GAFC_EXP1_ASSIGNMENT_SCHEMA[specIndex];
+    const parsed = this.parseInteger(value);
+    this.updateEditorPatch((draft) => {
+      const stages = this.ensureObject(draft, 'stages');
+      const block = this.ensureObject(stages, 'exp_pedal');
+      if (field === 'detail') {
+        const raw = this.ensureRawArray(block, 'detail_raw', GAFC_EXP1_ASSIGNMENT_SCHEMA.length);
+        raw[specIndex] = this.clampInteger(parsed, 0, spec.detailMax);
+        block['detail_raw'] = raw;
+        return;
+      }
+      const rawKey = field === 'min' ? 'min_raw' : 'max_raw';
+      const offset = field === 'min' ? spec.minOffset : spec.maxOffset;
+      const size = field === 'min' ? spec.minSize : spec.maxSize;
+      const raw = this.ensureRawArray(block, rawKey, GAFC_EXP1_ASSIGNMENT_RAW_LENGTH);
+      const encoded = this.encodeRolandValue(this.clampInteger(parsed, 0, spec.valueMax), size);
+      for (let idx = 0; idx < encoded.length; idx += 1) {
+        raw[offset + idx] = encoded[idx];
+      }
+      block[rawKey] = raw;
+    });
+  }
+
   editorStageOn(stageName: StageName): boolean {
     const stages = this.readObject(this.editorPatchDraft(), 'stages');
     const stage = this.readObject(stages, stageName);
@@ -6399,6 +6474,29 @@ export class App implements OnInit, OnDestroy {
         }
         if (Object.keys(out).length > 0) {
           stagesOut['gafc_exp1'] = out;
+        }
+      }
+
+      const expPedal = this.readObject(stages, 'exp_pedal');
+      if (expPedal) {
+        const out: Record<string, unknown> = {};
+        if (expPedal['function'] !== undefined) {
+          out['function'] = expPedal['function'];
+        }
+        if (Array.isArray(expPedal['raw'])) {
+          out['raw'] = expPedal['raw'];
+        }
+        if (Array.isArray(expPedal['detail_raw'])) {
+          out['detail_raw'] = expPedal['detail_raw'];
+        }
+        if (Array.isArray(expPedal['min_raw'])) {
+          out['min_raw'] = expPedal['min_raw'];
+        }
+        if (Array.isArray(expPedal['max_raw'])) {
+          out['max_raw'] = expPedal['max_raw'];
+        }
+        if (Object.keys(out).length > 0) {
+          stagesOut['exp_pedal'] = out;
         }
       }
 

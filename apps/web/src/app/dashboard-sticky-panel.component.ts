@@ -24,6 +24,7 @@ type ToneBlockKey =
   | 'send_return'
   | 'solo'
   | 'pedalfx'
+  | 'exp_pedal'
   | 'gafc_exp1';
 
 export interface DashboardStickyPanelBar {

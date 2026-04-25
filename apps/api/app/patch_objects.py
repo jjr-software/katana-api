@@ -21,11 +21,12 @@ ALLOWED_BLOCKS = (
     "send_return",
     "solo",
     "pedalfx",
+    "exp_pedal",
     "gafc_exp1",
 )
 
 COLOR_BLOCKS = {"booster", "mod", "fx", "delay", "reverb"}
-STAGE_BLOCKS = {"booster", "mod", "fx", "delay", "reverb", "eq1", "eq2", "ns", "send_return", "solo", "pedalfx", "gafc_exp1"}
+STAGE_BLOCKS = {"booster", "mod", "fx", "delay", "reverb", "eq1", "eq2", "ns", "send_return", "solo", "pedalfx", "exp_pedal", "gafc_exp1"}
 AMP_FIELD_TO_RAW_INDEX = {
     "gain": 0,
     "volume": 1,
@@ -72,6 +73,7 @@ STAGE_RAW_FIELD_MAP: dict[str, dict[str, int]] = {
     "send_return": {"position": 1, "mode": 2, "send_level": 3, "return_level": 4},
     "solo": {"effect_level": 1},
     "pedalfx": {"position": 0, "type": 2},
+    "exp_pedal": {"function": 0},
     "gafc_exp1": {"function": 0},
 }
 NUMERIC_BLOCK_FIELDS: dict[str, tuple[str, ...]] = {
@@ -88,6 +90,7 @@ NUMERIC_BLOCK_FIELDS: dict[str, tuple[str, ...]] = {
     "send_return": ("position", "mode", "send_level", "return_level"),
     "solo": ("effect_level",),
     "pedalfx": ("position", "type"),
+    "exp_pedal": ("function",),
     "gafc_exp1": ("function",),
 }
 DELAY_TIME_RAW_START = 2
@@ -299,6 +302,19 @@ def _canonicalize_block(block_name: str, block: dict[str, Any]) -> dict[str, Any
             out["on"] = bool(block["on"])
         return out
 
+    if block_name == "exp_pedal":
+        if isinstance(block.get("raw"), list):
+            out["raw"] = _coerce_int_list(block["raw"], "exp_pedal.raw")
+        if isinstance(block.get("detail_raw"), list):
+            out["detail_raw"] = _coerce_int_list(block["detail_raw"], "exp_pedal.detail_raw")
+        if isinstance(block.get("min_raw"), list):
+            out["min_raw"] = _coerce_int_list(block["min_raw"], "exp_pedal.min_raw")
+        if isinstance(block.get("max_raw"), list):
+            out["max_raw"] = _coerce_int_list(block["max_raw"], "exp_pedal.max_raw")
+        if "function" in block:
+            out["function"] = _coerce_int_value(block["function"], "exp_pedal.function")
+        return out
+
     if block_name == "gafc_exp1":
         if isinstance(block.get("raw"), list):
             out["raw"] = _coerce_int_list(block["raw"], "gafc_exp1.raw")
@@ -422,6 +438,27 @@ def _sync_stage_raw_from_compact(block_name: str, target: dict[str, Any], patch_
                 raw_com[2] = int(target["type"])
             target["raw_com"] = raw_com
 
+    if block_name == "exp_pedal":
+        raw = target.get("raw")
+        if isinstance(raw, list):
+            if isinstance(target.get("function"), (int, float)) and len(raw) >= 1:
+                raw[0] = int(target["function"])
+        else:
+            raw = [0]
+            if isinstance(target.get("function"), (int, float)):
+                raw[0] = int(target["function"])
+            target["raw"] = raw
+
+        detail_raw = target.get("detail_raw")
+        if isinstance(detail_raw, list) and len(detail_raw) < 34:
+            target["detail_raw"] = detail_raw + [0] * (34 - len(detail_raw))
+        min_raw = target.get("min_raw")
+        if isinstance(min_raw, list) and len(min_raw) < 49:
+            target["min_raw"] = min_raw + [0] * (49 - len(min_raw))
+        max_raw = target.get("max_raw")
+        if isinstance(max_raw, list) and len(max_raw) < 49:
+            target["max_raw"] = max_raw + [0] * (49 - len(max_raw))
+
     if block_name == "gafc_exp1":
         raw = target.get("raw")
         if isinstance(raw, list):
@@ -511,6 +548,11 @@ def _sync_stage_compact_from_raw(block_name: str, target: dict[str, Any]) -> Non
                 target["on"] = bool(raw_com[1])
             if len(raw_com) >= 3:
                 target["type"] = raw_com[2]
+
+    if block_name == "exp_pedal":
+        raw = target.get("raw")
+        if isinstance(raw, list) and len(raw) >= 1:
+            target["function"] = raw[0]
 
     if block_name == "gafc_exp1":
         raw = target.get("raw")

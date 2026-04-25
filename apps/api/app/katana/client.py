@@ -19,6 +19,10 @@ from app.katana.protocol import (
     ADDR_PATCH_EQ_GE10_2,
     ADDR_PATCH_EQ_PEQ_1,
     ADDR_PATCH_EQ_PEQ_2,
+    ADDR_PATCH_EXPPDL_DETAIL,
+    ADDR_PATCH_EXPPDL_FUNC,
+    ADDR_PATCH_EXPPDL_MAX,
+    ADDR_PATCH_EXPPDL_MIN,
     ADDR_PATCH_FX_1,
     ADDR_PATCH_FX_DETAIL_1,
     ADDR_PATCH_FX_4,
@@ -400,6 +404,10 @@ class AmpClient:
         solo_com = await self._read_rq1(ADDR_PATCH_SOLO_COM, 2)
         pedalfx_com = await self._read_rq1(ADDR_PATCH_PEDALFX_COM, 3)
         pedalfx = await self._read_rq1(ADDR_PATCH_PEDALFX, 15)
+        exp_pedal_func = await self._read_rq1(ADDR_PATCH_EXPPDL_FUNC, 1)
+        exp_pedal_detail = await self._read_rq1(ADDR_PATCH_EXPPDL_DETAIL, 34)
+        exp_pedal_min = await self._read_rq1(ADDR_PATCH_EXPPDL_MIN, 49)
+        exp_pedal_max = await self._read_rq1(ADDR_PATCH_EXPPDL_MAX, 49)
         gafc_exp1_func = await self._read_rq1(ADDR_PATCH_GAFC_EXP1_FUNC, 1)
         gafc_exp1_detail = await self._read_rq1(ADDR_PATCH_GAFC_EXP1_DETAIL, 34)
         gafc_exp1_min = await self._read_rq1(ADDR_PATCH_GAFC_EXP1_MIN, 49)
@@ -546,6 +554,13 @@ class AmpClient:
                     "type": pedalfx_com[2] if len(pedalfx_com) >= 3 else None,
                     "raw_com": pedalfx_com,
                     "raw": pedalfx,
+                },
+                "exp_pedal": {
+                    "function": exp_pedal_func[0] if len(exp_pedal_func) >= 1 else None,
+                    "raw": exp_pedal_func,
+                    "detail_raw": exp_pedal_detail,
+                    "min_raw": exp_pedal_min,
+                    "max_raw": exp_pedal_max,
                 },
                 "gafc_exp1": {
                     "function": gafc_exp1_func[0] if len(gafc_exp1_func) >= 1 else None,
@@ -845,6 +860,59 @@ class AmpClient:
                             field_names=(),
                             field_name_prefix="stages.pedalfx.raw",
                             expected_size=15,
+                        ),
+                    )
+                )
+        exp_pedal_obj = stages_obj.get("exp_pedal")
+        if isinstance(exp_pedal_obj, dict):
+            await self._send_only(
+                build_dt1(
+                    ADDR_PATCH_EXPPDL_FUNC,
+                    self._read_compact_raw_block(
+                        exp_pedal_obj,
+                        raw_key="raw",
+                        field_names=("function",),
+                        field_name_prefix="stages.exp_pedal",
+                        expected_size=1,
+                    ),
+                )
+            )
+            if isinstance(exp_pedal_obj.get("detail_raw"), list):
+                await self._send_only(
+                    build_dt1(
+                        ADDR_PATCH_EXPPDL_DETAIL,
+                        self._read_compact_raw_block(
+                            exp_pedal_obj,
+                            raw_key="detail_raw",
+                            field_names=(),
+                            field_name_prefix="stages.exp_pedal.detail_raw",
+                            expected_size=34,
+                        ),
+                    )
+                )
+            if isinstance(exp_pedal_obj.get("min_raw"), list):
+                await self._send_only(
+                    build_dt1(
+                        ADDR_PATCH_EXPPDL_MIN,
+                        self._read_compact_raw_block(
+                            exp_pedal_obj,
+                            raw_key="min_raw",
+                            field_names=(),
+                            field_name_prefix="stages.exp_pedal.min_raw",
+                            expected_size=49,
+                        ),
+                    )
+                )
+            if isinstance(exp_pedal_obj.get("max_raw"), list):
+                await self._send_only(
+                    build_dt1(
+                        ADDR_PATCH_EXPPDL_MAX,
+                        self._read_compact_raw_block(
+                            exp_pedal_obj,
+                            raw_key="max_raw",
+                            field_names=(),
+                            field_name_prefix="stages.exp_pedal.max_raw",
+                            expected_size=49,
                         ),
                     )
                 )

@@ -605,6 +605,93 @@
                   </article>
                   }
 
+                  @if (liveEditorShowsBlock('exp_pedal')) {
+                  <article class="border rounded p-2 effect-card">
+                    @let expPedalFunction = editorExpPedalFunction();
+                    @let expPedalRows = editorExpPedalVisibleAssignmentRows();
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <div class="d-flex align-items-center gap-2">
+                        <h4 class="h6 mb-0">EXP Pedal</h4>
+                      </div>
+                    </div>
+                    <div class="row g-2">
+                      <div class="col-12 col-md-6">
+                        <label class="form-label small mb-1">Function</label>
+                        <select class="form-select form-select-sm" [value]="expPedalFunction ?? 0" (change)="setEditorExpPedalFunction($any($event.target).value)">
+                          @for (option of editorExpPedalFunctionOptions(); track option.value) {
+                            <option [value]="option.value" [selected]="expPedalFunction === option.value">{{ option.label }}</option>
+                          }
+                        </select>
+                        <div class="small text-body-secondary mt-1">This is the field the pedal drives.</div>
+                      </div>
+                      <div class="col-12">
+                        <div class="table-responsive border rounded bg-body-tertiary">
+                          <table class="table table-sm table-hover align-middle mb-0">
+                            <thead class="table-light">
+                              <tr>
+                                <th scope="col">Control</th>
+                                <th scope="col">Detail</th>
+                                <th scope="col">Min</th>
+                                <th scope="col">Max</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              @for (row of expPedalRows; track row.key) {
+                                <tr>
+                                  <th scope="row" class="text-nowrap">
+                                    <div class="fw-semibold">{{ row.label }}</div>
+                                  </th>
+                                  <td class="text-nowrap">
+                                    @if (row.detailOptions.length > 0) {
+                                      <select
+                                        class="form-select form-select-sm"
+                                        [value]="row.detail"
+                                        (change)="setEditorExpPedalAssignmentValue(row.key, 'detail', $any($event.target).value)"
+                                      >
+                                        @for (option of row.detailOptions; track option.value) {
+                                          <option [value]="option.value" [selected]="row.detail === option.value">{{ option.label }}</option>
+                                        }
+                                      </select>
+                                      <div class="small text-body-secondary mt-1">Selected: {{ row.detailLabel }}</div>
+                                    } @else {
+                                      <span class="small text-body-secondary">{{ row.detailLabel }}</span>
+                                    }
+                                  </td>
+                                  <td>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      [max]="row.valueMax"
+                                      class="form-control form-control-sm"
+                                      [value]="row.min"
+                                      (input)="setEditorExpPedalAssignmentValue(row.key, 'min', $any($event.target).value)"
+                                    />
+                                  </td>
+                                  <td>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      [max]="row.valueMax"
+                                      class="form-control form-control-sm"
+                                      [value]="row.max"
+                                      (input)="setEditorExpPedalAssignmentValue(row.key, 'max', $any($event.target).value)"
+                                    />
+                                  </td>
+                                </tr>
+                              }
+                              @if (expPedalRows.length === 0) {
+                                <tr>
+                                  <td colspan="4" class="text-secondary small">This function has no EXP pedal control mapping.</td>
+                                </tr>
+                              }
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                  }
+
                   @if (liveEditorShowsBlock('gafc_exp1')) {
                   <article class="border rounded p-2 effect-card">
                     @let gafcRows = editorGafcExp1VisibleAssignmentRows();
