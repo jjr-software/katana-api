@@ -99,18 +99,6 @@ const GAFC_EXP1_FUNCTION_OPTIONS: ReadonlyArray<ValueOption> = [
   { value: 8, label: 'Delay 2' },
   { value: 9, label: 'Reverb' },
 ];
-const GAFC_EXP1_FUNCTION_ROW_KEYS: ReadonlyArray<readonly string[] | null> = [
-  null,
-  null,
-  ['pedal_wah', 'wah_95e', 'pedal_bend'],
-  ['pedal_wah', 'wah_95e', 'pedal_bend'],
-  ['booster'],
-  null,
-  null,
-  ['delay'],
-  ['delay'],
-  ['reverb'],
-];
 interface GafcExp1AssignmentSpec {
   key: string;
   label: string;
@@ -4466,18 +4454,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   editorGafcExp1VisibleAssignmentRows(): readonly GafcExp1AssignmentRow[] {
-    const functionValue = this.editorGafcExp1Function();
-    if (functionValue === null || functionValue < 0 || functionValue >= GAFC_EXP1_FUNCTION_ROW_KEYS.length) {
-      return [];
-    }
-    const rowKeys = GAFC_EXP1_FUNCTION_ROW_KEYS[functionValue];
-    if (!rowKeys || rowKeys.length === 0) {
-      return [];
-    }
-    const rows = this.editorGafcExp1AssignmentRows();
-    return rowKeys
-      .map((rowKey) => rows.find((row) => row.key === rowKey))
-      .filter((row): row is GafcExp1AssignmentRow => row !== undefined);
+    return this.editorGafcExp1AssignmentRows();
   }
 
   setEditorGafcExp1AssignmentValue(key: string, field: 'detail' | 'min' | 'max', value: string): void {
