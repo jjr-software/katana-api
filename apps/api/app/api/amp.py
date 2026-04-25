@@ -75,6 +75,7 @@ class LineOutStateWriteRequest(BaseModel):
 
 class ApplyCurrentPatchRequest(BaseModel):
     patch: dict
+    queue_key: str | None = None
 
 
 class ApplyCurrentPatchResponse(BaseModel):
@@ -398,7 +399,10 @@ async def apply_current_patch_live(
     if not isinstance(patch_name, str) or not patch_name.strip():
         patch_name = str(live_row.patch_json.get("patch_name", ""))
     rendered["patch_name"] = patch_name[:16]
-    job = await amp_job_queue.enqueue_apply_current_patch(rendered)
+    job = await amp_job_queue.enqueue_apply_current_patch(
+        rendered,
+        queue_key=payload.queue_key or "live-patch",
+    )
     settled = await _await_terminal_job(job.job_id, timeout_seconds=120.0)
     if settled.status != "succeeded" or settled.result_applied_patch is None:
         raise HTTPException(

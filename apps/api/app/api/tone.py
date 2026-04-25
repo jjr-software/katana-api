@@ -157,6 +157,7 @@ class ApplyPatchObjectRequest(BaseModel):
 
 class PatchLiveBlockRequest(BaseModel):
     patch_block: dict
+    queue_key: str | None = None
 
 
 class StoreLivePatchToSlotRequest(BaseModel):
@@ -783,7 +784,7 @@ async def apply_patch_object_to_live_patch(
     db.close()
     rendered = merge_patch_object_into_full_patch(live_patch_json, patch_object_json)
     rendered["patch_name"] = patch_object_name[:16]
-    applied = await _queued_apply_current_patch(rendered)
+    applied = await _queued_apply_current_patch(rendered, queue_key=f"patch-object:{patch_object.id}")
     applied_at = datetime.now().isoformat(timespec="seconds")
     with SessionLocal() as write_db:
         row = upsert_live_patch_state(
@@ -813,7 +814,10 @@ async def patch_live_patch_block(
     sparse_patch_object = {block_name: payload.patch_block}
     rendered = merge_patch_object_into_full_patch(live_patch_json, sparse_patch_object)
     rendered["patch_name"] = live_patch_name
-    applied = await _queued_apply_current_patch(rendered)
+    applied = await _queued_apply_current_patch(
+        rendered,
+        queue_key=payload.queue_key or f"live-patch:block:{block_name}",
+    )
     applied_at = datetime.now().isoformat(timespec="seconds")
     with SessionLocal() as write_db:
         row = upsert_live_patch_state(
@@ -1368,8 +1372,11 @@ async def _queued_current_patch() -> dict[str, Any]:
     return settled.result_current_patch
 
 
-async def _queued_apply_current_patch(patch: dict[str, Any]) -> dict[str, Any]:
-    job = await amp_job_queue.enqueue_apply_current_patch(patch)
+async def _queued_apply_current_patch(
+    patch: dict[str, Any],
+    queue_key: str | None = None,
+) -> dict[str, Any]:
+    job = await amp_job_queue.enqueue_apply_current_patch(patch, queue_key=queue_key)
     settled = await _await_terminal_job(job.job_id, timeout_seconds=120.0)
     if settled.status != "succeeded" or settled.result_applied_patch is None:
         raise HTTPException(status_code=502, detail={"message": "Failed to apply current patch", "error": settled.error})

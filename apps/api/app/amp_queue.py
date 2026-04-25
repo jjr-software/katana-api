@@ -36,6 +36,7 @@ class AmpQueueJob:
     operation: JobOperation
     status: JobStatus
     created_at: str
+    queue_key: str | None = None
     slot: int | None = None
     started_at: str | None = None
     finished_at: str | None = None
@@ -88,22 +89,44 @@ class AmpJobQueue:
     async def enqueue_current_patch(self) -> AmpQueueJob:
         return await self._enqueue("current_patch")
 
-    async def enqueue_apply_current_patch(self, patch: dict) -> AmpQueueJob:
-        return await self._enqueue("apply_current_patch", request_patch=patch)
+    async def enqueue_apply_current_patch(self, patch: dict, queue_key: str | None = None) -> AmpQueueJob:
+        return await self._enqueue("apply_current_patch", request_patch=patch, queue_key=queue_key)
 
     async def enqueue_full_dump(self) -> AmpQueueJob:
         return await self._enqueue("full_dump")
 
-    async def _enqueue(self, operation: JobOperation, slot: int | None = None, request_patch: dict | None = None) -> AmpQueueJob:
-        job = AmpQueueJob(
-            job_id=str(uuid4()),
-            operation=operation,
-            status="queued",
-            created_at=datetime.now().isoformat(timespec="seconds"),
-            slot=slot,
-            request_patch=request_patch,
-        )
+    async def _enqueue(
+        self,
+        operation: JobOperation,
+        slot: int | None = None,
+        request_patch: dict | None = None,
+        queue_key: str | None = None,
+    ) -> AmpQueueJob:
         async with self._jobs_lock:
+            if queue_key is not None:
+                queued_job = next(
+                    (
+                        job
+                        for job in self._jobs.values()
+                        if job.queue_key == queue_key and job.status == "queued"
+                    ),
+                    None,
+                )
+                if queued_job is not None:
+                    queued_job.operation = operation
+                    queued_job.slot = slot
+                    queued_job.request_patch = request_patch
+                    return queued_job
+
+            job = AmpQueueJob(
+                job_id=str(uuid4()),
+                operation=operation,
+                status="queued",
+                created_at=datetime.now().isoformat(timespec="seconds"),
+                queue_key=queue_key,
+                slot=slot,
+                request_patch=request_patch,
+            )
             self._jobs[job.job_id] = job
             self._prune_jobs_locked()
         await self._queue.put(job.job_id)

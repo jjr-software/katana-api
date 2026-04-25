@@ -395,6 +395,11 @@ interface ApplyCurrentPatchResponse {
   patch: Record<string, unknown>;
 }
 
+interface ApplyCurrentPatchRequest {
+  patch: Record<string, unknown>;
+  queue_key: string | null;
+}
+
 interface LivePatchResponse {
   patch_json: Record<string, unknown>;
   active_slot: number | null;
@@ -5828,6 +5833,11 @@ export class App implements OnInit, OnDestroy {
     }
     const draftSnapshot = this.clonePatch(draft);
     const changedBlocks = forceFullPatch ? [] : this.editorBlocksToApply(this.livePatchSnapshot(), draftSnapshot);
+    const queueKey = forceFullPatch
+      ? 'live-patch:full'
+      : changedBlocks.length > 0
+        ? `live-patch:${changedBlocks.join('+')}`
+        : 'live-patch:full';
     this.pushToast(this.editorPatchApplyToast(changedBlocks, forceFullPatch), 'info');
     this.editorLiveApplyInFlight = true;
     this.editorLiveApplyPending.set(true);
@@ -5844,7 +5854,7 @@ export class App implements OnInit, OnDestroy {
             cache: 'no-store',
             headers: { 'Content-Type': 'application/json' },
             signal: abortController.signal,
-            body: JSON.stringify({ patch_block: blockPayload }),
+            body: JSON.stringify({ patch_block: blockPayload, queue_key: queueKey }),
           });
           const payload = (await response.json()) as LivePatchResponse | { detail?: unknown };
           if (!response.ok || !('patch_json' in payload)) {
@@ -5895,7 +5905,7 @@ export class App implements OnInit, OnDestroy {
         cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
         signal: abortController.signal,
-        body: JSON.stringify({ patch: draftSnapshot }),
+        body: JSON.stringify({ patch: draftSnapshot, queue_key: queueKey }),
       });
       const payload = (await response.json()) as ApplyCurrentPatchResponse | { detail?: unknown };
       if (!response.ok) {
