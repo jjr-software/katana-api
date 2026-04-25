@@ -1,4 +1,4 @@
-export type ParamEncoding = 'int1x7' | 'int2x4' | 'int4x4';
+export type ParamEncoding = 'int1x7' | 'int2x4' | 'int2x7' | 'int4x4';
 export type ParamControlKind = 'range' | 'toggle';
 
 export interface StageParamSchema {
@@ -27,12 +27,12 @@ export const BOOSTER_PARAM_SCHEMA: readonly StageParamSchema[] = [
 
 export const DELAY_PARAM_SCHEMA: readonly StageParamSchema[] = [
   { key: 'type', label: 'Type', rawIndex: 1, size: 'int1x7', min: 0, max: 7, offset: 0 },
-  { key: 'time', label: 'Time', rawIndex: 2, size: 'int4x4', min: 1, max: 2000, offset: 0 },
-  { key: 'feedback', label: 'Feedback', rawIndex: 6, size: 'int1x7', min: 0, max: 100, offset: 0 },
-  { key: 'high_cut', label: 'High Cut', rawIndex: 7, size: 'int1x7', min: 0, max: 14, offset: 0 },
-  { key: 'effect_level', label: 'Effect Level', rawIndex: 8, size: 'int1x7', min: 0, max: 120, offset: 0 },
-  { key: 'direct_level', label: 'Direct Level', rawIndex: 9, size: 'int1x7', min: 0, max: 100, offset: 0 },
-  { key: 'tap_time', label: 'Tap Time', rawIndex: 10, size: 'int1x7', min: 0, max: 100, offset: 0 },
+  { key: 'time', label: 'Time', rawIndex: 3, size: 'int2x7', min: 1, max: 2000, offset: 0 },
+  { key: 'feedback', label: 'Feedback', rawIndex: 5, size: 'int1x7', min: 0, max: 100, offset: 0 },
+  { key: 'high_cut', label: 'High Cut', rawIndex: 6, size: 'int1x7', min: 0, max: 14, offset: 0 },
+  { key: 'effect_level', label: 'Effect Level', rawIndex: 7, size: 'int1x7', min: 0, max: 120, offset: 0 },
+  { key: 'direct_level', label: 'Direct Level', rawIndex: 8, size: 'int1x7', min: 0, max: 100, offset: 0 },
+  { key: 'tap_time', label: 'Tap Time', rawIndex: 9, size: 'int1x7', min: 0, max: 100, offset: 0 },
   { key: 'mod_rate', label: 'Mod Rate', rawIndex: 11, size: 'int1x7', min: 0, max: 100, offset: 0 },
   { key: 'mod_depth', label: 'Mod Depth', rawIndex: 12, size: 'int1x7', min: 0, max: 100, offset: 0 },
   { key: 'lpf', label: 'LPF', rawIndex: 13, size: 'int1x7', min: 0, max: 1, offset: 0 },

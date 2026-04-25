@@ -52,10 +52,10 @@ STAGE_RAW_FIELD_MAP: dict[str, dict[str, int]] = {
     "fx": {"type": 0},
     "delay": {
         "type": 0,
-        "feedback": 5,
-        "high_cut": 6,
-        "effect_level": 7,
-        "direct_level": 8,
+        "feedback": 4,
+        "high_cut": 5,
+        "effect_level": 6,
+        "direct_level": 7,
     },
     "reverb": {
         "type": 0,
@@ -89,8 +89,8 @@ NUMERIC_BLOCK_FIELDS: dict[str, tuple[str, ...]] = {
     "pedalfx": ("position", "type"),
     "gafc_exp1": ("function",),
 }
-DELAY_TIME_RAW_START = 1
-DELAY_TIME_RAW_END = 5
+DELAY_TIME_RAW_START = 2
+DELAY_TIME_RAW_END = 4
 
 
 def patch_object_block_names(patch_object: dict[str, Any]) -> list[str]:

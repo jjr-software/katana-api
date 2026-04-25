@@ -5645,6 +5645,9 @@ export class App implements OnInit, OnDestroy {
     if (encoding === 'int2x4') {
       return 2;
     }
+    if (encoding === 'int2x7') {
+      return 2;
+    }
     return 1;
   }
 
@@ -5659,6 +5662,8 @@ export class App implements OnInit, OnDestroy {
       encoded = raw[start];
     } else if (schema.size === 'int2x4') {
       encoded = (raw[start] << 4) | raw[start + 1];
+    } else if (schema.size === 'int2x7') {
+      encoded = (raw[start] << 7) | raw[start + 1];
     } else {
       encoded = (raw[start] << 12) | (raw[start + 1] << 8) | (raw[start + 2] << 4) | raw[start + 3];
     }
@@ -5679,6 +5684,11 @@ export class App implements OnInit, OnDestroy {
     if (schema.size === 'int2x4') {
       raw[start] = (encoded >> 4) & 0x0f;
       raw[start + 1] = encoded & 0x0f;
+      return true;
+    }
+    if (schema.size === 'int2x7') {
+      raw[start] = (encoded >> 7) & 0x7f;
+      raw[start + 1] = encoded & 0x7f;
       return true;
     }
     raw[start] = (encoded >> 12) & 0x0f;
