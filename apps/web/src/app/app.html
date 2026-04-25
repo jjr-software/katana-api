@@ -514,8 +514,9 @@
                   @if (liveEditorShowsBlock('pedalfx')) {
                   <article class="border rounded p-2 effect-card">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                      <div class="d-flex align-items-center gap-2">
+                      <div class="d-flex align-items-center gap-2 flex-wrap">
                         <h4 class="h6 mb-0">Pedal FX</h4>
+                        <span class="badge rounded-pill text-bg-secondary">{{ editorPedalFxTypeLabel() }}</span>
                       </div>
                       <div class="d-flex gap-2 align-items-center">
                         <label class="form-check-label small d-flex align-items-center gap-1">
@@ -540,9 +541,6 @@
                             <option [value]="option.value">{{ option.label }}</option>
                           }
                         </select>
-                      </div>
-                      <div class="col-12 col-md-4 d-flex align-items-end">
-                        <div class="small text-secondary">Use Pedal Bend for whammy-style pitch movement.</div>
                       </div>
                     </div>
                     @if (editorPedalFxType() === 0) {
@@ -606,39 +604,21 @@
                         </select>
                       </div>
                       <div class="col-12">
-                        <div class="small text-secondary mb-2">The selected function marks the active row, but all assignment rows stay visible so the range fields are not hidden.</div>
-                        @if (editorGafcExp1SelectedFunctionNote(); as note) {
-                          <div class="alert alert-secondary py-2 px-3 mb-2 small">{{ note }}</div>
-                        }
                         <div class="table-responsive border rounded bg-body-tertiary">
                           <table class="table table-sm table-hover align-middle mb-0">
                             <thead class="table-light">
                               <tr>
                                 <th scope="col">Row</th>
-                                <th scope="col">Detail</th>
                                 <th scope="col">Min</th>
                                 <th scope="col">Max</th>
                               </tr>
                             </thead>
                             <tbody>
-                              @for (row of editorGafcExp1AssignmentRows(); track row.key) {
-                                <tr [class.table-primary]="editorGafcExp1SelectedAssignmentRowKey() === row.key">
+                              @for (row of editorGafcExp1VisibleAssignmentRows(); track row.key) {
+                                <tr>
                                   <th scope="row" class="text-nowrap">
                                     <div class="fw-semibold">{{ row.label }}</div>
-                                    @if (editorGafcExp1SelectedAssignmentRowKey() === row.key) {
-                                      <div class="small text-secondary">Active row</div>
-                                    }
                                   </th>
-                                  <td>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      [max]="row.detailMax"
-                                      class="form-control form-control-sm"
-                                      [value]="row.detail"
-                                      (input)="setEditorGafcExp1AssignmentValue(row.key, 'detail', $any($event.target).value)"
-                                    />
-                                  </td>
                                   <td>
                                     <input
                                       type="number"
@@ -659,6 +639,11 @@
                                       (input)="setEditorGafcExp1AssignmentValue(row.key, 'max', $any($event.target).value)"
                                     />
                                   </td>
+                                </tr>
+                              }
+                              @if (editorGafcExp1VisibleAssignmentRows().length === 0) {
+                                <tr>
+                                  <td colspan="3" class="text-secondary small">This function does not use an EXP1 assignment row.</td>
                                 </tr>
                               }
                             </tbody>
