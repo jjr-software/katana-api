@@ -138,7 +138,7 @@
                       <div>
                         <h4 class="h6 mb-1">Routing</h4>
                         <p class="small text-body-secondary mb-0">
-                          Internal signal-path settings. This block changes how the patch is wired, not the amp tone stack.
+                          Signal-path settings. The first control chooses the routing layout; the other two are cabinet/key parameters.
                         </p>
                       </div>
                       <div class="d-flex flex-wrap gap-2">
@@ -151,23 +151,24 @@
                       <div class="col-12 col-lg-4">
                         <div class="border rounded-3 p-3 bg-body-tertiary h-100">
                           <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
-                            <label class="form-label small fw-semibold mb-0">Chain Pattern</label>
+                            <label class="form-label small fw-semibold mb-0">Chain Layout</label>
                             <span class="badge text-bg-primary">{{ routingFieldDisplay('chain_pattern') }}</span>
                           </div>
-                          <p class="small text-body-secondary mb-2">{{ routingFieldHelp('chain_pattern') }}</p>
-                          <div class="editor-range-field">
-                            <input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorRoutingNumber('chain_pattern') ?? 0" (input)="setEditorRoutingNumber('chain_pattern', $any($event.target).value)" />
-                            <input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorRoutingNumber('chain_pattern') ?? 0" (input)="setEditorRoutingNumber('chain_pattern', $any($event.target).value)" />
-                          </div>
+                          <p class="small text-body-secondary mb-2">{{ routingFieldDescription('chain_pattern') }}</p>
+                          <select class="form-select form-select-sm" [value]="editorRoutingNumber('chain_pattern') ?? 0" (change)="setEditorRoutingNumber('chain_pattern', $any($event.target).value)">
+                            @for (opt of routingChainPatternOptions(); track opt.value) {
+                              <option [value]="opt.value" [selected]="editorRoutingNumber('chain_pattern') === opt.value">{{ opt.label }}</option>
+                            }
+                          </select>
                         </div>
                       </div>
                       <div class="col-12 col-lg-4">
                         <div class="border rounded-3 p-3 bg-body-tertiary h-100">
                           <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
-                            <label class="form-label small fw-semibold mb-0">Cab Resonance</label>
+                            <label class="form-label small fw-semibold mb-0">Cabinet Resonance</label>
                             <span class="badge text-bg-secondary">{{ routingFieldDisplay('cabinet_resonance') }}</span>
                           </div>
-                          <p class="small text-body-secondary mb-2">{{ routingFieldHelp('cabinet_resonance') }}</p>
+                          <p class="small text-body-secondary mb-2">{{ routingFieldDescription('cabinet_resonance') }}</p>
                           <div class="editor-range-field">
                             <input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorRoutingNumber('cabinet_resonance') ?? 0" (input)="setEditorRoutingNumber('cabinet_resonance', $any($event.target).value)" />
                             <input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorRoutingNumber('cabinet_resonance') ?? 0" (input)="setEditorRoutingNumber('cabinet_resonance', $any($event.target).value)" />
@@ -180,7 +181,7 @@
                             <label class="form-label small fw-semibold mb-0">Master Key</label>
                             <span class="badge text-bg-secondary">{{ routingFieldDisplay('master_key') }}</span>
                           </div>
-                          <p class="small text-body-secondary mb-2">{{ routingFieldHelp('master_key') }}</p>
+                          <p class="small text-body-secondary mb-2">{{ routingFieldDescription('master_key') }}</p>
                           <div class="editor-range-field">
                             <input type="range" min="0" max="127" class="form-range editor-range-slider" [value]="editorRoutingNumber('master_key') ?? 0" (input)="setEditorRoutingNumber('master_key', $any($event.target).value)" />
                             <input type="number" min="0" max="127" class="form-control form-control-sm editor-range-value" [value]="editorRoutingNumber('master_key') ?? 0" (input)="setEditorRoutingNumber('master_key', $any($event.target).value)" />

@@ -334,7 +334,7 @@ function buildLiveMeterBands(centersHz: readonly number[], labels: readonly stri
 }
 
 const TONE_BLOCK_DISPLAY: Record<ToneBlockKey, ToneBlockDisplay> = {
-  routing: { label: 'Routing', glyph: 'RT', subtitle: 'Signal path, cab resonance, and key routing' },
+  routing: { label: 'Routing', glyph: 'RT', subtitle: 'Signal path and cabinet settings' },
   amp: { label: 'Amp', glyph: 'AMP', subtitle: 'Gain, tone stack, and volume' },
   booster: { label: 'Booster', glyph: 'BST', subtitle: 'Boost and drive stage' },
   mod: { label: 'Mod', glyph: 'MOD', subtitle: 'Modulation block' },
@@ -3833,14 +3833,18 @@ export class App implements OnInit, OnDestroy {
     return `${value}`;
   }
 
-  routingFieldHelp(field: RoutingFieldName): string {
+  routingFieldDescription(field: RoutingFieldName): string {
     if (field === 'chain_pattern') {
-      return 'Selects the internal chain layout used by the patch.';
+      return 'Chooses the routing preset used for the internal signal chain.';
     }
     if (field === 'cabinet_resonance') {
-      return 'Controls the cab/resonance value associated with the patch.';
+      return 'Adjusts the cabinet resonance voicing for this patch.';
     }
-    return 'Global key parameter exposed in the BTS routing block.';
+    return 'Patch key reference used by key-aware features.';
+  }
+
+  routingChainPatternOptions(): TypeOption[] {
+    return ROUTING_CHAIN_PATTERN_NAMES.map((label, value) => ({ value, label }));
   }
 
   setEditorRoutingNumber(field: RoutingFieldName, value: string): void {
