@@ -623,6 +623,7 @@
                             <option [value]="option.value" [selected]="gafcFunction === option.value">{{ option.label }}</option>
                           }
                         </select>
+                        <div class="small text-body-secondary mt-1">Detail chooses which parameter inside the target type this assignment controls.</div>
                       </div>
                       <div class="col-12">
                         <div class="table-responsive border rounded bg-body-tertiary">
@@ -630,6 +631,7 @@
                             <thead class="table-light">
                               <tr>
                                 <th scope="col">Control</th>
+                                <th scope="col">Detail</th>
                                 <th scope="col">Min</th>
                                 <th scope="col">Max</th>
                               </tr>
@@ -640,6 +642,22 @@
                                   <th scope="row" class="text-nowrap">
                                     <div class="fw-semibold">{{ row.label }}</div>
                                   </th>
+                                  <td class="text-nowrap">
+                                    @if (row.detailOptions.length > 0) {
+                                      <select
+                                        class="form-select form-select-sm"
+                                        [value]="row.detail"
+                                        (change)="setEditorGafcExp1AssignmentValue(row.key, 'detail', $any($event.target).value)"
+                                      >
+                                        @for (option of row.detailOptions; track option.value) {
+                                          <option [value]="option.value" [selected]="row.detail === option.value">{{ option.label }}</option>
+                                        }
+                                      </select>
+                                      <div class="small text-body-secondary mt-1">Selected: {{ row.detailLabel }}</div>
+                                    } @else {
+                                      <span class="small text-body-secondary">{{ row.detailLabel }}</span>
+                                    }
+                                  </td>
                                   <td>
                                     <input
                                       type="number"
@@ -664,7 +682,7 @@
                               }
                               @if (gafcRows.length === 0) {
                                 <tr>
-                                  <td colspan="3" class="text-secondary small">This function has no EXP1 control mapping.</td>
+                                  <td colspan="4" class="text-secondary small">This function has no EXP1 control mapping.</td>
                                 </tr>
                               }
                             </tbody>

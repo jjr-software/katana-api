@@ -124,6 +124,8 @@ interface GafcExp1AssignmentSpec {
 
 interface GafcExp1AssignmentRow extends GafcExp1AssignmentSpec {
   detail: number;
+  detailLabel: string;
+  detailOptions: readonly ValueOption[];
   min: number;
   max: number;
 }
@@ -185,6 +187,13 @@ const PEDAL_FX_WAH_TYPE_OPTIONS: ReadonlyArray<ValueOption> = [
   { value: 4, label: '7-String Wah' },
   { value: 5, label: 'Reso Wah' },
 ];
+const GAFC_EXP1_DETAIL_OPTION_LABELS_BY_KEY: Readonly<Record<string, readonly string[]>> = {
+  booster: BOOSTER_PARAM_SCHEMA.map((schema) => schema.label),
+  delay: DELAY_PARAM_SCHEMA.slice(0, 8).map((schema) => schema.label),
+  reverb: REVERB_PARAM_SCHEMA.slice(0, 8).map((schema) => schema.label),
+  pedal_wah: PEDAL_FX_WAH_TYPE_OPTIONS.map((option) => option.label),
+  wah_95e: PEDAL_FX_WAH_TYPE_OPTIONS.map((option) => option.label),
+};
 const EQ_PEQ_LOW_CUT_LABELS = ['Flat', '20 Hz', '25 Hz', '31.5 Hz', '40 Hz', '50 Hz', '63 Hz', '80 Hz', '100 Hz', '125 Hz', '160 Hz', '200 Hz', '250 Hz', '315 Hz', '400 Hz', '500 Hz', '630 Hz', '800 Hz'];
 const EQ_PEQ_MID_FREQ_LABELS = ['20 Hz', '25 Hz', '31.5 Hz', '40 Hz', '50 Hz', '63 Hz', '80 Hz', '100 Hz', '125 Hz', '160 Hz', '200 Hz', '250 Hz', '315 Hz', '400 Hz', '500 Hz', '630 Hz', '800 Hz', '1.00 kHz', '1.25 kHz', '1.60 kHz', '2.00 kHz', '2.50 kHz', '3.15 kHz', '4.00 kHz', '5.00 kHz', '6.30 kHz', '8.00 kHz', '10.0 kHz'];
 const EQ_PEQ_Q_LABELS = ['0.5', '1', '2', '4', '8', '16'];
@@ -4443,12 +4452,17 @@ export class App implements OnInit, OnDestroy {
     const detailRaw = this.readNumericArray(block, 'detail_raw') ?? [];
     const minRaw = this.readNumericArray(block, 'min_raw') ?? [];
     const maxRaw = this.readNumericArray(block, 'max_raw') ?? [];
-    return GAFC_EXP1_ASSIGNMENT_SCHEMA.map((spec, index) => ({
-      ...spec,
-      detail: this.decodeRolandValue(detailRaw.slice(index, index + 1)),
-      min: this.decodeRolandValue(minRaw.slice(spec.minOffset, spec.minOffset + spec.minSize)),
-      max: this.decodeRolandValue(maxRaw.slice(spec.maxOffset, spec.maxOffset + spec.maxSize)),
-    }));
+    return GAFC_EXP1_ASSIGNMENT_SCHEMA.map((spec, index) => {
+      const detail = this.decodeRolandValue(detailRaw.slice(index, index + 1));
+      return {
+        ...spec,
+        detail,
+        detailLabel: this.editorGafcExp1DetailLabel(spec.key, detail),
+        detailOptions: this.editorGafcExp1DetailOptions(spec.key),
+        min: this.decodeRolandValue(minRaw.slice(spec.minOffset, spec.minOffset + spec.minSize)),
+        max: this.decodeRolandValue(maxRaw.slice(spec.maxOffset, spec.maxOffset + spec.maxSize)),
+      };
+    });
   }
 
   editorGafcExp1VisibleAssignmentRows(): readonly GafcExp1AssignmentRow[] {
@@ -4492,6 +4506,22 @@ export class App implements OnInit, OnDestroy {
       }
       block[rawKey] = raw;
     });
+  }
+
+  editorGafcExp1DetailOptions(key: string): readonly ValueOption[] {
+    const labels = GAFC_EXP1_DETAIL_OPTION_LABELS_BY_KEY[key];
+    if (!labels) {
+      return [];
+    }
+    return buildValueOptions(labels);
+  }
+
+  editorGafcExp1DetailLabel(key: string, value: number): string {
+    const options = this.editorGafcExp1DetailOptions(key);
+    if (options.length === 0) {
+      return 'n/a';
+    }
+    return options.find((option) => option.value === value)?.label ?? 'Unknown';
   }
 
   editorStageOn(stageName: StageName): boolean {
