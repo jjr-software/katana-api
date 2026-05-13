@@ -1,4 +1,5 @@
 import asyncio
+import re
 import time
 from contextlib import suppress
 from dataclasses import dataclass
@@ -150,12 +151,13 @@ class AmpClient:
 
     def __init__(self, midi_port: str, timeout_seconds: float, rq1_timeout_seconds: float) -> None:
         self._midi_port = midi_port
+        self._resolved_midi_port: str | None = None
         self._timeout_seconds = timeout_seconds
         self._rq1_timeout_seconds = rq1_timeout_seconds
 
     @property
     def midi_port(self) -> str:
-        return self._midi_port
+        return self._resolved_midi_port or self._midi_port
 
     async def test_connection(self) -> AmpConnectionResult:
         async with self._port_lock():
@@ -169,7 +171,7 @@ class AmpClient:
                 raise AmpClientError(f"Non-SysEx response received: {response_hex}")
 
             return AmpConnectionResult(
-                midi_port=self._midi_port,
+                midi_port=self.midi_port,
                 request_hex=IDENTITY_REQUEST_HEX,
                 response_hex=response_hex,
             )
@@ -320,13 +322,14 @@ class AmpClient:
     async def read_device_status(self) -> AmpDeviceStatus:
         if self._port_lock().locked():
             return AmpDeviceStatus(
-                midi_port=self._midi_port,
+                midi_port=self.midi_port,
                 busy=True,
                 available=False,
                 detail="Amp port busy: another API amp operation is in progress",
             )
+        midi_port = await self._resolve_midi_port()
         return AmpDeviceStatus(
-            midi_port=self._midi_port,
+            midi_port=midi_port,
             busy=False,
             available=True,
             detail="Amp port idle",
@@ -1143,6 +1146,37 @@ class AmpClient:
         stderr = stderr_bytes.decode("utf-8", errors="replace")
         return proc.returncode, stdout, stderr
 
+    async def _resolve_midi_port(self) -> str:
+        if self._resolved_midi_port is not None:
+            return self._resolved_midi_port
+        configured = self._midi_port.strip()
+        if configured and configured.lower() != "auto":
+            self._resolved_midi_port = configured
+            return self._resolved_midi_port
+
+        returncode, stdout, stderr = await self._run_amidi(["-l"], timeout_seconds=self._timeout_seconds)
+        if returncode != 0:
+            raise AmpClientError(f"amidi port listing failed: {(stderr.strip() or stdout.strip())}")
+        self._resolved_midi_port = self._resolve_katana_port_from_listing(stdout)
+        return self._resolved_midi_port
+
+    @staticmethod
+    def _resolve_katana_port_from_listing(listing: str) -> str:
+        matches: list[tuple[str, str]] = []
+        for line in listing.splitlines():
+            parsed = re.match(r"^\s*(?:IO|I|O)\s+(hw:\S+)\s+(.+?)\s*$", line)
+            if parsed is None:
+                continue
+            port, name = parsed.groups()
+            if "KATANA" in name.upper():
+                matches.append((port, name))
+        if not matches:
+            raise AmpClientError(f"Katana MIDI port not found in amidi listing: {listing.strip()}")
+        if len(matches) > 1:
+            rendered = "; ".join(f"{port} {name}" for port, name in matches)
+            raise AmpClientError(f"Multiple Katana MIDI ports found; set KATANA_MIDI_PORT explicitly: {rendered}")
+        return matches[0][0]
+
     def _port_lock(self) -> asyncio.Lock:
         lock = _PORT_LOCKS.get(self._midi_port)
         if lock is None:
@@ -1151,8 +1185,9 @@ class AmpClient:
         return lock
 
     async def _send_and_read(self, sysex_hex: str, timeout_seconds: float) -> str:
+        midi_port = await self._resolve_midi_port()
         returncode, stdout, stderr = await self._run_amidi(
-            ["-p", self._midi_port, "-d", "-t", str(timeout_seconds), "-S", sysex_hex],
+            ["-p", midi_port, "-d", "-t", str(timeout_seconds), "-S", sysex_hex],
             timeout_seconds=timeout_seconds,
         )
         if returncode != 0:
@@ -1160,8 +1195,9 @@ class AmpClient:
         return stdout
 
     async def _send_only(self, sysex_hex: str) -> None:
+        midi_port = await self._resolve_midi_port()
         returncode, stdout, stderr = await self._run_amidi(
-            ["-p", self._midi_port, "-S", sysex_hex],
+            ["-p", midi_port, "-S", sysex_hex],
             timeout_seconds=5.0,
         )
         if returncode != 0:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 
 from .sysex import build_dt1, build_rq1, extract_sysex_frames, parse_dt1
 
@@ -13,9 +14,10 @@ PATCH_WRITE_ADDR = (0x7F, 0x00, 0x01, 0x04)
 class AmidiTransport:
     RQ1_MAX_CHUNK_SIZE = 225
 
-    def __init__(self, port: str = "hw:1,0,0", timeout_sec: float = 2.0) -> None:
+    def __init__(self, port: str = "auto", timeout_sec: float = 2.0) -> None:
         self.port = port
         self.timeout_sec = float(timeout_sec)
+        self._resolved_port: str | None = None
 
     async def _run(self, *args: str) -> tuple[int, str, str]:
         proc = await asyncio.create_subprocess_exec(
@@ -27,16 +29,49 @@ class AmidiTransport:
         return proc.returncode, out.decode("utf-8", errors="replace"), err.decode("utf-8", errors="replace")
 
     async def send_hex(self, sysex_hex: str) -> None:
-        rc, _out, err = await self._run("amidi", "-p", self.port, "-S", sysex_hex)
+        port = await self.resolve_port()
+        rc, _out, err = await self._run("amidi", "-p", port, "-S", sysex_hex)
         if rc != 0:
             raise RuntimeError(f"amidi send failed rc={rc}: {err.strip()}")
 
     async def query_hex(self, sysex_hex: str, timeout_sec: float | None = None) -> str:
         timeout = self.timeout_sec if timeout_sec is None else timeout_sec
-        rc, out, err = await self._run("amidi", "-p", self.port, "-d", "-t", f"{timeout:g}", "-S", sysex_hex)
+        port = await self.resolve_port()
+        rc, out, err = await self._run("amidi", "-p", port, "-d", "-t", f"{timeout:g}", "-S", sysex_hex)
         if rc != 0:
             raise RuntimeError(f"amidi query failed rc={rc}: {err.strip()}")
         return out
+
+    async def resolve_port(self) -> str:
+        if self._resolved_port is not None:
+            return self._resolved_port
+        configured = self.port.strip()
+        if configured and configured.lower() != "auto":
+            self._resolved_port = configured
+            return self._resolved_port
+
+        rc, out, err = await self._run("amidi", "-l")
+        if rc != 0:
+            raise RuntimeError(f"amidi port listing failed rc={rc}: {err.strip() or out.strip()}")
+        self._resolved_port = self._resolve_katana_port_from_listing(out)
+        return self._resolved_port
+
+    @staticmethod
+    def _resolve_katana_port_from_listing(listing: str) -> str:
+        matches: list[tuple[str, str]] = []
+        for line in listing.splitlines():
+            parsed = re.match(r"^\s*(?:IO|I|O)\s+(hw:\S+)\s+(.+?)\s*$", line)
+            if parsed is None:
+                continue
+            port, name = parsed.groups()
+            if "KATANA" in name.upper():
+                matches.append((port, name))
+        if not matches:
+            raise RuntimeError(f"Katana MIDI port not found in amidi listing:\n{listing.strip()}")
+        if len(matches) > 1:
+            rendered = "\n".join(f"{port} {name}" for port, name in matches)
+            raise RuntimeError(f"Multiple Katana MIDI ports found; pass --port explicitly:\n{rendered}")
+        return matches[0][0]
 
     async def set_editor_mode(self, enabled: bool = True) -> None:
         if enabled:

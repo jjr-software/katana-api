@@ -71,7 +71,7 @@ class StatusSpinner:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Katana patch save/pull/apply/auto-level tool (asyncio-first)")
-    parser.add_argument("--port", default="hw:1,0,0", help="amidi port")
+    parser.add_argument("--port", default="auto", help="amidi port, or 'auto' to detect the Katana port")
     parser.add_argument("--timeout-sec", type=float, default=2.0, help="amidi read timeout")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
@@ -353,8 +353,9 @@ async def _run_test_connection(args: argparse.Namespace, transport: AmidiTranspo
     if slot < 0 or slot > 8:
         raise ValueError(f"--slot must be 0..8, got {slot}")
 
+    resolved_port = await transport.resolve_port()
     result: dict[str, object] = {
-        "port": transport.port,
+        "port": resolved_port,
         "timeout_sec": transport.timeout_sec,
         "identity_reply": "",
         "editor_mode": None,
@@ -381,7 +382,7 @@ async def _run_test_connection(args: argparse.Namespace, transport: AmidiTranspo
     if args.json:
         print(json.dumps(result, indent=2))
     else:
-        print(f"Port: {transport.port}")
+        print(f"Port: {resolved_port}")
         print(f"Identity reply: {result['identity_reply'] or 'none'}")
         print(f"Editor mode readback: {result['editor_mode']}")
         if slot > 0:

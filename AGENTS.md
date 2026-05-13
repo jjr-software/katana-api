@@ -69,6 +69,20 @@
   - where key files/commands live,
   - current status and next recommended step.
 
+## Session Update - 2026-05-13 (Automatic Katana MIDI Port Resolution)
+- Fixed recurring manual port drift:
+  - the Katana can move between ALSA card numbers (`hw:1,0,0`, `hw:3,0,0`, etc.) when other USB MIDI devices are present.
+  - the toolkit and API now default to `KATANA_MIDI_PORT=auto`.
+- Runtime behavior:
+  - CLI `AmidiTransport` resolves the current Katana port from `amidi -l` by selecting the single MIDI port whose name contains `KATANA`.
+  - API `AmpClient` uses the same runtime resolution, so web/API actions no longer depend on a stale Compose `.env` value.
+  - explicit override remains available with `--port hw:X,Y,Z` for CLI debugging, or by setting a non-`auto` API setting.
+- Compose change:
+  - `compose.yml` now sets `KATANA_MIDI_PORT: auto` and no longer requires running `scripts/resolve_katana_midi.py` before startup.
+- Current expected quick check:
+  - `python3 python/katana_patch_tool.py test-connection --json`
+  - response should report the resolved current port, for example `hw:3,0,0`, with `"ok": true`.
+
 ## Session Update - 2026-03-24
 - Confirmed patch tool exists and is active at:
   - `python/katana_patch_tool.py`

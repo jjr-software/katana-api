@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://katana:katana@db:5432/katana"
     pipewire_socket: str = "/run/user/1000/pipewire-0"
     midi_device_dir: str = "/dev/snd"
-    katana_midi_port: str = "hw:1,0,0"
+    katana_midi_port: str = "auto"
     amidi_timeout_seconds: float = 2.0
     amidi_rq1_timeout_seconds: float = 0.12
     full_sync_timeout_seconds: float = 120.0

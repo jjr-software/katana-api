@@ -8,7 +8,6 @@ This stack is Traefik/dockerips-first:
 ## Start
 
 ```bash
-eval "$(python3 scripts/resolve_katana_midi.py --shell)"
 docker compose -f compose.yml up -d --build
 ```
 
@@ -26,7 +25,6 @@ docker compose -f compose.yml up -d --build
 
 1. Start the stack:
 ```bash
-eval "$(python3 scripts/resolve_katana_midi.py --shell)"
 docker compose -f compose.yml up -d --build
 ```
 2. Open `https://katana.ryzen.jjrsoftware.co.uk`.
@@ -35,11 +33,12 @@ docker compose -f compose.yml up -d --build
 
 ## Katana Port Resolution
 
-- Resolve the current Katana ALSA card/port before startup:
+- The API resolves the current Katana ALSA MIDI port at runtime from `amidi -l`.
+- Manual resolution is only needed for debugging:
 ```bash
 python3 scripts/resolve_katana_midi.py --shell
 ```
-- This exports:
+- This prints:
   - `KATANA_CARD_INDEX`
-  - `KATANA_MIDI_PORT` (used by API, e.g. `hw:3,0,0`)
+  - `KATANA_MIDI_PORT` (for example `hw:3,0,0`)
   - `KATANA_MIDI_DEVNODE`

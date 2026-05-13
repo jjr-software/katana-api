@@ -15,10 +15,12 @@ Note on CLI framework choice:
 
 Use `python/katana_patch_tool.py`:
 
+The CLI auto-detects the current Katana ALSA MIDI port from `amidi -l`.
+Pass `--port hw:X,Y,Z` only when you intentionally want to override detection.
+
 ```bash
 # Save current patch state from amp into a snapshot file
 python3 python/katana_patch_tool.py save \
-  --port hw:1,0,0 \
   --out setups/backups/current-patch-backup.json
 ```
 
@@ -27,14 +29,12 @@ python3 python/katana_patch_tool.py save \
 ```bash
 # Apply an existing snapshot to the amp
 python3 python/katana_patch_tool.py apply \
-  --port hw:1,0,0 \
   --patch setups/variations/mixed/manual-brit-hybrid-rat-20260323-184750/snapshot.json
 ```
 
 ```bash
 # Program exactly 5 consecutive slots from 5 snapshots, then verify
 python3 python/katana_patch_tool.py setup-5 \
-  --port hw:1,0,0 \
   --start-slot 1 \
   --patch setups/variations/good/solid-clean-20260324-134019/snapshot.json \
   --patch setups/variations/level-matched/coxon-character-safe-quieter-v02-20260324-135740/snapshot.json \
@@ -47,7 +47,6 @@ python3 python/katana_patch_tool.py setup-5 \
 ```bash
 # Cycle those 5 slots while auditioning
 python3 python/katana_patch_tool.py cycle-5 \
-  --port hw:1,0,0 \
   --start-slot 1 \
   --dwell-sec 2.0 \
   --cycles 3
@@ -60,13 +59,12 @@ python3 python/katana_patch_tool.py match-5
 
 ```bash
 # Full amp-state download (all channels), saved to dated cache JSON by default
-python3 python/katana_patch_tool.py dump-amp-state --port hw:1,0,0
+python3 python/katana_patch_tool.py dump-amp-state
 ```
 
 ```bash
 # Full amp-state download with explicit output path
 python3 python/katana_patch_tool.py dump-amp-state \
-  --port hw:1,0,0 \
   --out setups/backups/amp-state-manual.json
 ```
 
@@ -79,12 +77,12 @@ for quicker convergence.
 
 ```bash
 # Fast USB MIDI connection sanity check (identity + editor mode readback)
-python3 python/katana_patch_tool.py test-connection --port hw:1,0,0
+python3 python/katana_patch_tool.py test-connection
 ```
 
 ```bash
 # Optional: include a specific slot probe
-python3 python/katana_patch_tool.py test-connection --port hw:1,0,0 --slot 1 --json
+python3 python/katana_patch_tool.py test-connection --slot 1 --json
 ```
 
 ```bash
@@ -143,7 +141,6 @@ python3 python/katana_patch_tool.py sample \
 # 1) bypass stomp blocks for core gain match,
 # 2) restore active blocks progressively and trim.
 python3 python/katana_patch_tool.py level \
-  --port hw:1,0,0 \
   --patch setups/variations/mixed/manual-brit-hybrid-rat-20260323-184750/snapshot.json \
           setups/variations/by-pedal/manual-90s-20260323-182418/snapshot.json \
   --target-dbfs -29.0 \
@@ -154,7 +151,6 @@ python3 python/katana_patch_tool.py level \
 ```bash
 # Legacy/full-chain mode (disable staged bypass workflow)
 python3 python/katana_patch_tool.py level \
-  --port hw:1,0,0 \
   --patch setups/variations/mixed/manual-brit-hybrid-rat-20260323-184750/snapshot.json \
   --no-bypass-stomps
 ```
