@@ -1961,3 +1961,20 @@
   - wah vs whammy helper patches
   - when to use `Pedal Bend`, `Pedal Wah`, and `WAH 95E`
 - Keep pointing future Katana pedal-mode questions at that willdocs page instead of re-deriving the same distinction here.
+
+## Session Update - 2026-05-15 (EXP Assignment Field Mapping UI)
+- Fixed live editor EXP assignment UI around the BTS-style function/detail/min/max mapping.
+- `EXP Pedal` and `GA-FC EXP1` now filter the min/max/detail table from the selected function while preserving field-level assignment controls:
+  - `Pedal FX` / `Pedal FX + FV` show Pedal FX target rows (`Pedal Wah`, `Pedal Bend`, `WAH 95E`),
+  - `Booster`, `Delay`, `Delay 2`, and `Reverb` show only their matching assignment row,
+  - `MOD` and `FX` resolve to the currently selected effect type and show only that target row.
+- Corrected detail dropdown labels so they name assignable fields rather than unrelated type choices:
+  - `Pedal Wah` and `WAH 95E` detail options are now `Preset`, `Pedal Position`, `Pedal Min`, `Pedal Max`, `Effect Level`, `Direct Mix`.
+  - `Pedal Bend` detail options are now `Preset`, `Pedal Position`, `Pitch`, `Effect Level`, `Direct Mix`.
+- Files changed:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
+- Browser check:
+  - Playwright MCP loaded `https://katana.ryzen.jjrsoftware.co.uk/` and confirmed the rebuilt app rendered.

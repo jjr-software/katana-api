@@ -99,6 +99,51 @@ const GAFC_EXP1_FUNCTION_OPTIONS: ReadonlyArray<ValueOption> = [
   { value: 8, label: 'Delay 2' },
   { value: 9, label: 'Reverb' },
 ];
+const EXP_ASSIGNMENT_FUNCTION = {
+  VOLUME: 0,
+  FOOT_VOLUME: 1,
+  PEDAL_FX: 2,
+  PEDAL_FX_AND_FOOT_VOLUME: 3,
+  BOOSTER: 4,
+  MOD: 5,
+  FX: 6,
+  DELAY: 7,
+  DELAY2: 8,
+  REVERB: 9,
+} as const;
+const FX_ASSIGNMENT_KEYS_BY_TYPE: ReadonlyArray<string> = [
+  't_wah',
+  'auto_wah',
+  'pedal_wah',
+  'comp',
+  'limiter',
+  'geq',
+  'peq',
+  'guitar_sim',
+  'slow_gear',
+  'wave_synth',
+  'octave',
+  'pitch_shifter',
+  'harmonist',
+  'ac_processor',
+  'phaser',
+  'flanger',
+  'tremolo',
+  'rotary',
+  'univ',
+  'slicer',
+  'vibrato',
+  'ring_mod',
+  'humanizer',
+  'chorus',
+  'ac_guitar_sim',
+  'phase_90e',
+  'flanger_117e',
+  'wah_95e',
+  'dc_30',
+  'heavy_oct',
+  'pedal_bend',
+];
 interface GafcExp1AssignmentSpec {
   key: string;
   label: string;
@@ -175,12 +220,22 @@ const PEDAL_FX_WAH_TYPE_OPTIONS: ReadonlyArray<ValueOption> = [
   { value: 4, label: '7-String Wah' },
   { value: 5, label: 'Reso Wah' },
 ];
+const ASSIGN_DETAIL_PRESET_LABEL = 'Preset';
+const PEDAL_WAH_ASSIGN_DETAIL_LABELS = [
+  ASSIGN_DETAIL_PRESET_LABEL,
+  'Pedal Position',
+  'Pedal Min',
+  'Pedal Max',
+  'Effect Level',
+  'Direct Mix',
+] as const;
 const GAFC_EXP1_DETAIL_OPTION_LABELS_BY_KEY: Readonly<Record<string, readonly string[]>> = {
-  booster: BOOSTER_PARAM_SCHEMA.map((schema) => schema.label),
-  delay: DELAY_PARAM_SCHEMA.slice(0, 8).map((schema) => schema.label),
-  reverb: REVERB_PARAM_SCHEMA.slice(0, 8).map((schema) => schema.label),
-  pedal_wah: PEDAL_FX_WAH_TYPE_OPTIONS.map((option) => option.label),
-  wah_95e: PEDAL_FX_WAH_TYPE_OPTIONS.map((option) => option.label),
+  booster: [ASSIGN_DETAIL_PRESET_LABEL, ...BOOSTER_PARAM_SCHEMA.slice(1).map((schema) => schema.label)],
+  delay: [ASSIGN_DETAIL_PRESET_LABEL, ...DELAY_PARAM_SCHEMA.slice(1, 8).map((schema) => schema.label)],
+  reverb: [ASSIGN_DETAIL_PRESET_LABEL, ...REVERB_PARAM_SCHEMA.slice(2, 8).map((schema) => schema.label), 'Direct Mix'],
+  pedal_wah: PEDAL_WAH_ASSIGN_DETAIL_LABELS,
+  wah_95e: PEDAL_WAH_ASSIGN_DETAIL_LABELS,
+  pedal_bend: [ASSIGN_DETAIL_PRESET_LABEL, 'Pedal Position', 'Pitch', 'Effect Level', 'Direct Mix'],
 };
 const EQ_PEQ_LOW_CUT_LABELS = ['Flat', '20 Hz', '25 Hz', '31.5 Hz', '40 Hz', '50 Hz', '63 Hz', '80 Hz', '100 Hz', '125 Hz', '160 Hz', '200 Hz', '250 Hz', '315 Hz', '400 Hz', '500 Hz', '630 Hz', '800 Hz'];
 const EQ_PEQ_MID_FREQ_LABELS = ['20 Hz', '25 Hz', '31.5 Hz', '40 Hz', '50 Hz', '63 Hz', '80 Hz', '100 Hz', '125 Hz', '160 Hz', '200 Hz', '250 Hz', '315 Hz', '400 Hz', '500 Hz', '630 Hz', '800 Hz', '1.00 kHz', '1.25 kHz', '1.60 kHz', '2.00 kHz', '2.50 kHz', '3.15 kHz', '4.00 kHz', '5.00 kHz', '6.30 kHz', '8.00 kHz', '10.0 kHz'];
@@ -4455,7 +4510,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   editorGafcExp1VisibleAssignmentRows(): readonly GafcExp1AssignmentRow[] {
-    return this.editorGafcExp1AssignmentRows();
+    return this.visibleExpAssignmentRows(this.editorGafcExp1Function(), 'gafc_exp1');
   }
 
   setEditorGafcExp1AssignmentValue(key: string, field: 'detail' | 'min' | 'max', value: string): void {
@@ -4545,7 +4600,76 @@ export class App implements OnInit, OnDestroy {
   }
 
   editorExpPedalVisibleAssignmentRows(): readonly GafcExp1AssignmentRow[] {
-    return this.editorExpPedalAssignmentRows();
+    return this.visibleExpAssignmentRows(this.editorExpPedalFunction(), 'exp_pedal');
+  }
+
+  editorExpPedalAssignmentEmptyMessage(): string {
+    return this.expAssignmentEmptyMessage(this.editorExpPedalFunction());
+  }
+
+  editorGafcExp1AssignmentEmptyMessage(): string {
+    return this.expAssignmentEmptyMessage(this.editorGafcExp1Function());
+  }
+
+  private visibleExpAssignmentRows(functionValue: number | null, blockName: 'exp_pedal' | 'gafc_exp1'): readonly GafcExp1AssignmentRow[] {
+    const allRows = blockName === 'exp_pedal' ? this.editorExpPedalAssignmentRows() : this.editorGafcExp1AssignmentRows();
+    const visibleKeys = this.expAssignmentKeysForFunction(functionValue);
+    if (visibleKeys.length === 0) {
+      return [];
+    }
+    const visibleKeySet = new Set(visibleKeys);
+    return allRows.filter((row) => visibleKeySet.has(row.key));
+  }
+
+  private expAssignmentKeysForFunction(functionValue: number | null): readonly string[] {
+    if (functionValue === null) {
+      return [];
+    }
+    switch (functionValue) {
+      case EXP_ASSIGNMENT_FUNCTION.BOOSTER:
+        return ['booster'];
+      case EXP_ASSIGNMENT_FUNCTION.MOD:
+        return this.assignmentKeysForFxStage('mod');
+      case EXP_ASSIGNMENT_FUNCTION.FX:
+        return this.assignmentKeysForFxStage('fx');
+      case EXP_ASSIGNMENT_FUNCTION.PEDAL_FX:
+      case EXP_ASSIGNMENT_FUNCTION.PEDAL_FX_AND_FOOT_VOLUME:
+        return ['pedal_wah', 'pedal_bend', 'wah_95e'];
+      case EXP_ASSIGNMENT_FUNCTION.DELAY:
+      case EXP_ASSIGNMENT_FUNCTION.DELAY2:
+        return ['delay'];
+      case EXP_ASSIGNMENT_FUNCTION.REVERB:
+        return ['reverb'];
+      default:
+        return [];
+    }
+  }
+
+  private assignmentKeysForFxStage(stageName: 'mod' | 'fx'): readonly string[] {
+    const type = this.editorStageType(stageName);
+    if (type === null || type < 0 || type >= FX_ASSIGNMENT_KEYS_BY_TYPE.length) {
+      return [];
+    }
+    return [FX_ASSIGNMENT_KEYS_BY_TYPE[type]];
+  }
+
+  private expAssignmentEmptyMessage(functionValue: number | null): string {
+    switch (functionValue) {
+      case EXP_ASSIGNMENT_FUNCTION.VOLUME:
+        return 'The pedal drives patch volume directly; there is no per-effect target mapping.';
+      case EXP_ASSIGNMENT_FUNCTION.FOOT_VOLUME:
+        return 'The pedal drives foot volume directly; there is no per-effect target mapping.';
+      case EXP_ASSIGNMENT_FUNCTION.PEDAL_FX:
+        return 'Select the Pedal FX row and detail field this pedal should control.';
+      case EXP_ASSIGNMENT_FUNCTION.PEDAL_FX_AND_FOOT_VOLUME:
+        return 'Select the Pedal FX row and detail field this pedal should control alongside foot volume.';
+      case EXP_ASSIGNMENT_FUNCTION.MOD:
+        return 'The selected MOD type has no mapped EXP pedal target row.';
+      case EXP_ASSIGNMENT_FUNCTION.FX:
+        return 'The selected FX type has no mapped EXP pedal target row.';
+      default:
+        return 'Select a pedal function to show its target parameter mapping.';
+    }
   }
 
   setEditorExpPedalAssignmentValue(key: string, field: 'detail' | 'min' | 'max', value: string): void {

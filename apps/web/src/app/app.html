@@ -622,7 +622,7 @@
                             <option [value]="option.value" [selected]="expPedalFunction === option.value">{{ option.label }}</option>
                           }
                         </select>
-                        <div class="small text-body-secondary mt-1">This is the field the pedal drives.</div>
+                        <div class="small text-body-secondary mt-1">This is the target the expression pedal activates.</div>
                       </div>
                       <div class="col-12">
                         <div class="table-responsive border rounded bg-body-tertiary">
@@ -681,7 +681,7 @@
                               }
                               @if (expPedalRows.length === 0) {
                                 <tr>
-                                  <td colspan="4" class="text-secondary small">This function has no EXP pedal control mapping.</td>
+                                  <td colspan="4" class="text-secondary small">{{ editorExpPedalAssignmentEmptyMessage() }}</td>
                                 </tr>
                               }
                             </tbody>
@@ -710,7 +710,7 @@
                             <option [value]="option.value" [selected]="gafcFunction === option.value">{{ option.label }}</option>
                           }
                         </select>
-                        <div class="small text-body-secondary mt-1">Detail chooses which parameter inside the target type this assignment controls.</div>
+                        <div class="small text-body-secondary mt-1">This is the target the GA-FC expression pedal activates.</div>
                       </div>
                       <div class="col-12">
                         <div class="table-responsive border rounded bg-body-tertiary">
@@ -769,7 +769,7 @@
                               }
                               @if (gafcRows.length === 0) {
                                 <tr>
-                                  <td colspan="4" class="text-secondary small">This function has no EXP1 control mapping.</td>
+                                  <td colspan="4" class="text-secondary small">{{ editorGafcExp1AssignmentEmptyMessage() }}</td>
                                 </tr>
                               }
                             </tbody>
