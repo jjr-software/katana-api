@@ -665,6 +665,12 @@ interface TypeOption {
   label: string;
 }
 
+interface RoutingChainBlockDisplay {
+  id: RoutingChainBlockId;
+  label: string;
+  state: 'active' | 'bypassed' | 'fixed';
+}
+
 interface StageParam {
   id: string;
   key: string;
@@ -3887,7 +3893,7 @@ export class App implements OnInit, OnDestroy {
 
   routingFieldDescription(field: RoutingFieldName): string {
     if (field === 'chain_pattern') {
-      return 'Chooses the routing preset used for the internal signal chain.';
+      return 'Chooses the signal path order for the amp, effects, delay, loop, foot volume, and reverb blocks.';
     }
     if (field === 'cabinet_resonance') {
       return 'Adjusts the cabinet resonance voicing for this patch.';
@@ -3896,11 +3902,34 @@ export class App implements OnInit, OnDestroy {
   }
 
   routingChainPatternOptions(): TypeOption[] {
-    return ROUTING_CHAIN_PATTERN_NAMES.map((label, value) => ({ value, label }));
+    return ROUTING_CHAIN_PATTERN_NAMES.map((label, value) => ({
+      value,
+      label: `${label}: ${this.routingChainPreview(value)}`,
+    }));
   }
 
   editorRoutingChainOrder(): readonly RoutingChainBlockId[] {
     const chainPattern = this.editorRoutingNumber('chain_pattern') ?? 0;
+    return this.editorRoutingChainOrderForPattern(chainPattern);
+  }
+
+  editorRoutingChainBlocks(): readonly RoutingChainBlockDisplay[] {
+    return this.editorRoutingChainOrder().map((blockId) => ({
+      id: blockId,
+      label: this.routingChainBlockRealLabel(blockId),
+      state: this.routingChainBlockState(blockId),
+    }));
+  }
+
+  editorRoutingChainSummary(): string {
+    const blocks = this.editorRoutingChainBlocks();
+    if (blocks.length === 0) {
+      return 'Unknown signal path';
+    }
+    return blocks.map((block) => block.label).join(' > ');
+  }
+
+  private editorRoutingChainOrderForPattern(chainPattern: number): readonly RoutingChainBlockId[] {
     const pedalFxPosition = this.editorPedalFxPosition() ?? 0;
     const sendReturnPosition = this.editorSendReturnNumber('position') ?? 0;
     const eq1Position = this.editorEqNumber('eq1', 'position') ?? 0;
@@ -3916,6 +3945,125 @@ export class App implements OnInit, OnDestroy {
 
   routingChainOrderLabel(blockId: RoutingChainBlockId): string {
     return routingChainBlockLabel(blockId);
+  }
+
+  routingChainBlockBadgeClass(block: RoutingChainBlockDisplay): string {
+    if (block.state === 'active') {
+      return 'text-bg-light border border-primary';
+    }
+    if (block.state === 'bypassed') {
+      return 'text-bg-secondary';
+    }
+    return 'text-bg-dark';
+  }
+
+  private routingChainPreview(chainPattern: number): string {
+    const order = this.editorRoutingChainOrderForPattern(chainPattern);
+    if (order.length === 0) {
+      return 'unknown signal path';
+    }
+    return order.map((blockId) => this.routingChainBlockPreviewLabel(blockId)).join(' > ');
+  }
+
+  private routingChainBlockPreviewLabel(blockId: RoutingChainBlockId): string {
+    if (blockId === 'amp') {
+      return 'Amp';
+    }
+    return routingChainBlockLabel(blockId);
+  }
+
+  private routingChainBlockRealLabel(blockId: RoutingChainBlockId): string {
+    switch (blockId) {
+      case 'input':
+        return 'Input';
+      case 'pdl':
+        return this.editorPedalFxTypeLabelForChain();
+      case 'bst':
+        return this.stageTypeChainLabel('booster', 'Booster');
+      case 'mod':
+        return this.stageTypeChainLabel('mod', 'MOD');
+      case 'fx':
+        return this.stageTypeChainLabel('fx', 'FX');
+      case 'fv':
+        return 'Foot Volume';
+      case 'sr':
+        return 'Send/Return';
+      case 'dly1':
+        return this.stageTypeChainLabel('delay', 'Delay 1');
+      case 'dly2':
+        return this.stageTypeChainLabel('delay', 'Delay 2');
+      case 'rev':
+        return this.stageTypeChainLabel('reverb', 'Reverb');
+      case 'eq':
+        return this.eqTypeChainLabel('eq1', 'EQ1');
+      case 'eq2':
+        return this.eqTypeChainLabel('eq2', 'EQ2');
+      case 'amp':
+        return this.ampTypeChainLabel();
+      case 'speaker':
+        return 'Speaker';
+    }
+  }
+
+  private routingChainBlockState(blockId: RoutingChainBlockId): RoutingChainBlockDisplay['state'] {
+    switch (blockId) {
+      case 'pdl':
+        return this.editorPedalFxOn() ? 'active' : 'bypassed';
+      case 'bst':
+        return this.editorStageOn('booster') ? 'active' : 'bypassed';
+      case 'mod':
+        return this.editorStageOn('mod') ? 'active' : 'bypassed';
+      case 'fx':
+        return this.editorStageOn('fx') ? 'active' : 'bypassed';
+      case 'dly1':
+        return this.editorStageOn('delay') ? 'active' : 'bypassed';
+      case 'dly2':
+        return this.editorDelay2On() ? 'active' : 'bypassed';
+      case 'rev':
+        return this.editorStageOn('reverb') ? 'active' : 'bypassed';
+      case 'eq':
+        return this.editorEqOn('eq1') ? 'active' : 'bypassed';
+      case 'eq2':
+        return this.editorEqOn('eq2') ? 'active' : 'bypassed';
+      case 'sr':
+        return this.editorSendReturnOn() ? 'active' : 'bypassed';
+      default:
+        return 'fixed';
+    }
+  }
+
+  private editorPedalFxTypeLabelForChain(): string {
+    const typeLabel = this.editorPedalFxTypeLabel();
+    if (typeLabel === 'n/a') {
+      return 'Pedal FX';
+    }
+    const type = this.editorPedalFxType();
+    if (type === 0 || type === 2) {
+      const wahTypeLabel = this.editorPedalFxWahTypeLabel();
+      return wahTypeLabel === 'n/a' ? `Pedal FX: ${typeLabel}` : `Pedal FX: ${typeLabel} (${wahTypeLabel})`;
+    }
+    return `Pedal FX: ${typeLabel}`;
+  }
+
+  private stageTypeChainLabel(stageName: StageName, fallback: string): string {
+    const typeLabel = this.editorStageTypeLabel(stageName);
+    return typeLabel === 'n/a' ? fallback : `${fallback}: ${typeLabel}`;
+  }
+
+  private eqTypeChainLabel(eqName: EqStageName, fallback: string): string {
+    const type = this.editorEqType(eqName);
+    return type === null ? fallback : `${fallback}: ${this.eqTypeLabel(type)}`;
+  }
+
+  private ampTypeChainLabel(): string {
+    const amp = this.readObject(this.editorPatchDraft(), 'amp');
+    const type = this.readAmpField(amp, 'amp_type');
+    if (type === null) {
+      return 'Amp';
+    }
+    const index = Math.max(0, Math.trunc(type));
+    const typeLabel = AMP_TYPE_NAMES[index] ?? 'Unknown';
+    return `Amp: ${typeLabel}`;
   }
 
   editorPedalWahPlacement(stageName: 'mod' | 'fx'): string | null {

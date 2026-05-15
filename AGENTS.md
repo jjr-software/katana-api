@@ -1978,3 +1978,17 @@
   - `docker compose up -d --build`
 - Browser check:
   - Playwright MCP loaded `https://katana.ryzen.jjrsoftware.co.uk/` and confirmed the rebuilt app rendered.
+
+## Session Update - 2026-05-15 (Real Chain Path Display)
+- Made the live editor `Routing` chain control show real signal-path context rather than only BTS preset names.
+- The chain selector now appends a preview path to each `CHAIN*` option, using the same BTS-derived chain mapping as `routing-chain.ts`.
+- The routing panel now shows a `Real signal path` summary with actual current block types, for example:
+  - `Booster: Marshall Guv'nor Distortion > Amp: Clean > EQ1: Parametric EQ > ...`
+- Chain block badges now show actual stage names/types and indicate bypassed vs fixed path blocks.
+- Files changed:
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/app.html`
+- Rebuilt/restarted stack:
+  - `docker compose up -d --build`
+- Browser check:
+  - Playwright MCP loaded `https://katana.ryzen.jjrsoftware.co.uk/`, selected all editor blocks, and confirmed `Real signal path` rendered with `Amp: Clean`.

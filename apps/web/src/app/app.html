@@ -162,14 +162,15 @@
                           </select>
                           @if (editorRoutingChainOrder().length > 0) {
                             <div class="mt-3">
-                              <p class="small fw-semibold text-secondary mb-2">Effective chain order</p>
+                              <p class="small fw-semibold text-secondary mb-2">Real signal path</p>
+                              <p class="small mb-2">{{ editorRoutingChainSummary() }}</p>
                               <div class="d-flex flex-wrap gap-1">
-                                @for (block of editorRoutingChainOrder(); track block) {
-                                  <span class="badge text-bg-light border">{{ routingChainOrderLabel(block) }}</span>
+                                @for (block of editorRoutingChainBlocks(); track block.id) {
+                                  <span class="badge {{ routingChainBlockBadgeClass(block) }}">{{ block.label }}</span>
                                 }
                               </div>
                               <p class="small text-body-secondary mt-2 mb-0">
-                                Pedal wah placement follows this order. Use it to tell whether MOD or FX wah sits before or after the amp.
+                                Grey blocks are currently bypassed; dark blocks are fixed parts of the path.
                               </p>
                             </div>
                           }
