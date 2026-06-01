@@ -1992,3 +1992,25 @@
   - `docker compose up -d --build`
 - Browser check:
   - Playwright MCP loaded `https://katana.ryzen.jjrsoftware.co.uk/`, selected all editor blocks, and confirmed `Real signal path` rendered with `Amp: Clean`.
+
+## Session Update - 2026-06-01 (Targeted Live Editor Writes)
+- Fixed live editor single-block updates so they no longer replay the full current patch to the amp.
+- `PATCH /api/v1/live-patch/blocks/{block_name}` now queues `apply_current_patch_block`.
+- Backend behavior:
+  - merges the edited block into the cached live patch,
+  - diffs previous vs edited raw bytes for that block,
+  - sends only changed DT1 byte ranges to the amp,
+  - leaves full-patch replay for the existing `/api/v1/amp/current-patch/live-apply` path.
+- Example verified locally:
+  - changing `amp.raw[1]` generates one write at `0x20000601` with the new value, instead of writing the whole patch.
+- Also fixed frontend color-block payload compatibility:
+  - sparse block payloads containing `color.index` now merge into backend `color_index` correctly.
+- Files changed:
+  - `apps/api/app/katana/client.py`
+  - `apps/api/app/amp_queue.py`
+  - `apps/api/app/api/tone.py`
+  - `apps/api/app/patch_objects.py`
+- Verification:
+  - `python -m compileall apps/api/app`
+  - targeted diff smoke checks with `PYTHONPATH=apps/api python -c ...`
+  - `docker compose up -d --build`

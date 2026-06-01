@@ -23,6 +23,7 @@ JobOperation = Literal[
     "test_connection",
     "current_patch",
     "apply_current_patch",
+    "apply_current_patch_block",
     "sync_slot",
     "write_slot",
     "full_dump",
@@ -44,6 +45,8 @@ class AmpQueueJob:
     result_connection: AmpConnectionResult | None = None
     result_current_patch: dict | None = None
     request_patch: dict | None = None
+    request_previous_patch: dict | None = None
+    request_block_name: str | None = None
     result_applied_patch: dict | None = None
     result_slot: SlotPatchSummary | None = None
     result_dump: FullAmpDumpSnapshot | None = None
@@ -92,6 +95,22 @@ class AmpJobQueue:
     async def enqueue_apply_current_patch(self, patch: dict, queue_key: str | None = None) -> AmpQueueJob:
         return await self._enqueue("apply_current_patch", request_patch=patch, queue_key=queue_key)
 
+    async def enqueue_apply_current_patch_block(
+        self,
+        *,
+        block_name: str,
+        previous_patch: dict,
+        patch: dict,
+        queue_key: str | None = None,
+    ) -> AmpQueueJob:
+        return await self._enqueue(
+            "apply_current_patch_block",
+            request_patch=patch,
+            request_previous_patch=previous_patch,
+            request_block_name=block_name,
+            queue_key=queue_key,
+        )
+
     async def enqueue_full_dump(self) -> AmpQueueJob:
         return await self._enqueue("full_dump")
 
@@ -100,6 +119,8 @@ class AmpJobQueue:
         operation: JobOperation,
         slot: int | None = None,
         request_patch: dict | None = None,
+        request_previous_patch: dict | None = None,
+        request_block_name: str | None = None,
         queue_key: str | None = None,
     ) -> AmpQueueJob:
         async with self._jobs_lock:
@@ -116,6 +137,8 @@ class AmpJobQueue:
                     queued_job.operation = operation
                     queued_job.slot = slot
                     queued_job.request_patch = request_patch
+                    queued_job.request_previous_patch = request_previous_patch
+                    queued_job.request_block_name = request_block_name
                     return queued_job
 
             job = AmpQueueJob(
@@ -126,6 +149,8 @@ class AmpJobQueue:
                 queue_key=queue_key,
                 slot=slot,
                 request_patch=request_patch,
+                request_previous_patch=request_previous_patch,
+                request_block_name=request_block_name,
             )
             self._jobs[job.job_id] = job
             self._prune_jobs_locked()
@@ -198,6 +223,26 @@ class AmpJobQueue:
                     raise RuntimeError("apply_current_patch operation missing request patch")
                 applied_patch_result = await asyncio.wait_for(
                     client.apply_current_patch(job.request_patch),
+                    timeout=max(5.0, settings.full_sync_timeout_seconds),
+                )
+                connection_result = None
+                current_patch_result = None
+                slot_result = None
+                dump_result = None
+                slots_result = None
+            elif job.operation == "apply_current_patch_block":
+                if job.request_patch is None:
+                    raise RuntimeError("apply_current_patch_block operation missing request patch")
+                if job.request_previous_patch is None:
+                    raise RuntimeError("apply_current_patch_block operation missing previous patch")
+                if job.request_block_name is None:
+                    raise RuntimeError("apply_current_patch_block operation missing block name")
+                applied_patch_result = await asyncio.wait_for(
+                    client.apply_current_patch_block(
+                        block_name=job.request_block_name,
+                        previous_payload=job.request_previous_patch,
+                        patch_payload=job.request_patch,
+                    ),
                     timeout=max(5.0, settings.full_sync_timeout_seconds),
                 )
                 connection_result = None

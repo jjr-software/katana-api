@@ -204,6 +204,24 @@ class AmpClient:
             payload["config_hash_sha256"] = self._config_hash(payload)
             return CurrentPatchSnapshot(payload=payload)
 
+    async def apply_current_patch_block(
+        self,
+        *,
+        block_name: str,
+        previous_payload: dict[str, Any],
+        patch_payload: dict[str, Any],
+    ) -> CurrentPatchSnapshot:
+        async with self._port_lock():
+            await self._send_only(EDITOR_MODE_ON)
+            writes = self._build_selected_patch_block_writes(block_name, previous_payload, patch_payload)
+            if not writes:
+                raise AmpClientError(f"No changed bytes found for live patch block: {block_name}")
+            for addr, data in writes:
+                await self._send_only(build_dt1(addr, data))
+            payload = self._clone_patch_payload(patch_payload)
+            payload["config_hash_sha256"] = self._config_hash(payload)
+            return CurrentPatchSnapshot(payload=payload)
+
     async def read_slots_state(self, synced_at: str) -> SlotsStateSnapshot:
         dump = await self.full_amp_dump(synced_at=synced_at)
         slots: list[SlotPatchSummary] = [
@@ -970,8 +988,348 @@ class AmpClient:
                             field_name_prefix="stages.gafc_exp1.max_raw",
                             expected_size=49,
                         ),
+                )
+            )
+
+    def _build_selected_patch_block_writes(
+        self,
+        block_name: str,
+        previous: dict[str, Any],
+        current: dict[str, Any],
+    ) -> list[tuple[tuple[int, int, int, int], list[int]]]:
+        if block_name == "routing":
+            return self._diff_compact_fields(
+                previous.get("routing"),
+                current.get("routing"),
+                ADDR_PATCH_OTHER,
+                ("chain_pattern", "cabinet_resonance", "master_key"),
+                "routing",
+            )
+        if block_name == "amp":
+            return self._diff_raw(
+                self._required_raw_from_object(previous.get("amp"), "raw", 10, "previous.amp.raw"),
+                self._required_raw_from_object(current.get("amp"), "raw", 10, "amp.raw"),
+                ADDR_PATCH_AMP,
+            )
+
+        stages_previous = previous.get("stages")
+        stages_current = current.get("stages")
+        if not isinstance(stages_previous, dict) or not isinstance(stages_current, dict):
+            raise AmpClientError("Invalid live patch state: stages must be objects")
+        previous_stage = stages_previous.get(block_name)
+        current_stage = stages_current.get(block_name)
+        if not isinstance(previous_stage, dict) or not isinstance(current_stage, dict):
+            raise AmpClientError(f"Invalid live patch state: stages.{block_name} must be objects")
+
+        writes: list[tuple[tuple[int, int, int, int], list[int]]] = []
+        if block_name in {"booster", "mod", "fx", "delay", "reverb"}:
+            sw_index_by_block = {"booster": 0, "mod": 1, "fx": 2, "delay": 3, "reverb": 5}
+            color_index_by_block = {"booster": 0, "mod": 1, "fx": 2, "delay": 3, "reverb": 4}
+            previous_sw = self._stage_switch_data(previous)
+            current_sw = self._stage_switch_data(current)
+            sw_index = sw_index_by_block[block_name]
+            if previous_sw[sw_index] != current_sw[sw_index]:
+                writes.extend(self._diff_raw(previous_sw, current_sw, ADDR_PATCH_SW))
+            if block_name == "delay" and previous_sw[4] != current_sw[4]:
+                writes.extend(self._diff_raw(previous_sw, current_sw, ADDR_PATCH_SW))
+
+            previous_colors = self._stage_color_data(previous)
+            current_colors = self._stage_color_data(current)
+            color_data_index = color_index_by_block[block_name]
+            if previous_colors[color_data_index] != current_colors[color_data_index]:
+                writes.extend(self._diff_raw(previous_colors, current_colors, ADDR_PATCH_COLOR))
+
+            color_index = current_colors[color_data_index]
+            if block_name == "booster":
+                writes.extend(
+                    self._diff_raw(
+                        self._required_raw_from_object(previous_stage, "raw", 8, "previous.stages.booster.raw"),
+                        self._required_raw_from_object(current_stage, "raw", 8, "stages.booster.raw"),
+                        addr_add(ADDR_PATCH_BOOSTER_1, 0x200 * color_index),
                     )
                 )
+            elif block_name == "mod":
+                writes.extend(
+                    self._diff_fx_raw(
+                        previous_stage,
+                        current_stage,
+                        color_index,
+                        ADDR_PATCH_FX_1,
+                        ADDR_PATCH_FX_DETAIL_1,
+                        "stages.mod.raw",
+                    )
+                )
+            elif block_name == "fx":
+                writes.extend(
+                    self._diff_fx_raw(
+                        previous_stage,
+                        current_stage,
+                        color_index,
+                        ADDR_PATCH_FX_4,
+                        ADDR_PATCH_FX_DETAIL_4,
+                        "stages.fx.raw",
+                    )
+                )
+            elif block_name == "delay":
+                writes.extend(
+                    self._diff_raw(
+                        self._required_raw_from_object(previous_stage, "raw", 17, "previous.stages.delay.raw"),
+                        self._required_raw_from_object(current_stage, "raw", 17, "stages.delay.raw"),
+                        addr_add(ADDR_PATCH_DELAY_1, 0x200 * color_index),
+                    )
+                )
+                if isinstance(previous_stage.get("delay2_raw"), list) or isinstance(current_stage.get("delay2_raw"), list):
+                    writes.extend(
+                        self._diff_raw(
+                            self._required_raw_from_object(previous_stage, "delay2_raw", 17, "previous.stages.delay.delay2_raw"),
+                            self._required_raw_from_object(current_stage, "delay2_raw", 17, "stages.delay.delay2_raw"),
+                            addr_add(ADDR_PATCH_DELAY_4, 0x200 * color_index),
+                        )
+                    )
+            else:
+                writes.extend(
+                    self._diff_raw(
+                        self._required_raw_from_object(previous_stage, "raw", 13, "previous.stages.reverb.raw"),
+                        self._required_raw_from_object(current_stage, "raw", 13, "stages.reverb.raw"),
+                        addr_add(ADDR_PATCH_REVERB_1, 0x200 * color_index),
+                    )
+                )
+            return self._dedupe_writes(writes)
+
+        if block_name == "eq1":
+            writes.extend(self._diff_eq_block(previous_stage, current_stage, ADDR_PATCH_EQ_EACH_1, ADDR_PATCH_EQ_PEQ_1, ADDR_PATCH_EQ_GE10_1, "eq1"))
+        elif block_name == "eq2":
+            writes.extend(self._diff_eq_block(previous_stage, current_stage, ADDR_PATCH_EQ_EACH_2, ADDR_PATCH_EQ_PEQ_2, ADDR_PATCH_EQ_GE10_2, "eq2"))
+        elif block_name == "ns":
+            writes.extend(
+                self._diff_raw(
+                    self._required_raw_from_object(previous_stage, "raw", 3, "previous.stages.ns.raw"),
+                    self._required_raw_from_object(current_stage, "raw", 3, "stages.ns.raw"),
+                    ADDR_PATCH_NS,
+                )
+            )
+        elif block_name == "send_return":
+            writes.extend(
+                self._diff_raw(
+                    self._required_raw_from_object(previous_stage, "raw", 5, "previous.stages.send_return.raw"),
+                    self._required_raw_from_object(current_stage, "raw", 5, "stages.send_return.raw"),
+                    ADDR_PATCH_SENDRETURN,
+                )
+            )
+        elif block_name == "solo":
+            writes.extend(
+                self._diff_raw(
+                    self._required_raw_from_object(previous_stage, "raw", 2, "previous.stages.solo.raw"),
+                    self._required_raw_from_object(current_stage, "raw", 2, "stages.solo.raw"),
+                    ADDR_PATCH_SOLO_COM,
+                )
+            )
+        elif block_name == "pedalfx":
+            writes.extend(
+                self._diff_raw(
+                    self._required_raw_from_object(previous_stage, "raw_com", 3, "previous.stages.pedalfx.raw_com"),
+                    self._required_raw_from_object(current_stage, "raw_com", 3, "stages.pedalfx.raw_com"),
+                    ADDR_PATCH_PEDALFX_COM,
+                )
+            )
+            writes.extend(
+                self._diff_raw(
+                    self._required_raw_from_object(previous_stage, "raw", 15, "previous.stages.pedalfx.raw"),
+                    self._required_raw_from_object(current_stage, "raw", 15, "stages.pedalfx.raw"),
+                    ADDR_PATCH_PEDALFX,
+                )
+            )
+        elif block_name == "exp_pedal":
+            writes.extend(self._diff_assign_block(previous_stage, current_stage, ADDR_PATCH_EXPPDL_FUNC, ADDR_PATCH_EXPPDL_DETAIL, ADDR_PATCH_EXPPDL_MIN, ADDR_PATCH_EXPPDL_MAX, "exp_pedal"))
+        elif block_name == "gafc_exp1":
+            writes.extend(self._diff_assign_block(previous_stage, current_stage, ADDR_PATCH_GAFC_EXP1_FUNC, ADDR_PATCH_GAFC_EXP1_DETAIL, ADDR_PATCH_GAFC_EXP1_MIN, ADDR_PATCH_GAFC_EXP1_MAX, "gafc_exp1"))
+        else:
+            raise AmpClientError(f"Unsupported live patch block: {block_name}")
+        return self._dedupe_writes(writes)
+
+    def _diff_eq_block(
+        self,
+        previous_stage: dict[str, Any],
+        current_stage: dict[str, Any],
+        each_addr: tuple[int, int, int, int],
+        peq_addr: tuple[int, int, int, int],
+        ge10_addr: tuple[int, int, int, int],
+        field_prefix: str,
+    ) -> list[tuple[tuple[int, int, int, int], list[int]]]:
+        writes = self._diff_compact_fields(
+            previous_stage,
+            current_stage,
+            each_addr,
+            ("position", "on", "type"),
+            f"stages.{field_prefix}",
+        )
+        if isinstance(previous_stage.get("peq_raw"), list) or isinstance(current_stage.get("peq_raw"), list):
+            writes.extend(
+                self._diff_raw(
+                    self._required_raw_from_object(previous_stage, "peq_raw", 11, f"previous.stages.{field_prefix}.peq_raw"),
+                    self._required_raw_from_object(current_stage, "peq_raw", 11, f"stages.{field_prefix}.peq_raw"),
+                    peq_addr,
+                )
+            )
+        if isinstance(previous_stage.get("ge10_raw"), list) or isinstance(current_stage.get("ge10_raw"), list):
+            writes.extend(
+                self._diff_raw(
+                    self._required_raw_from_object(previous_stage, "ge10_raw", 11, f"previous.stages.{field_prefix}.ge10_raw"),
+                    self._required_raw_from_object(current_stage, "ge10_raw", 11, f"stages.{field_prefix}.ge10_raw"),
+                    ge10_addr,
+                )
+            )
+        return writes
+
+    def _diff_assign_block(
+        self,
+        previous_stage: dict[str, Any],
+        current_stage: dict[str, Any],
+        func_addr: tuple[int, int, int, int],
+        detail_addr: tuple[int, int, int, int],
+        min_addr: tuple[int, int, int, int],
+        max_addr: tuple[int, int, int, int],
+        field_prefix: str,
+    ) -> list[tuple[tuple[int, int, int, int], list[int]]]:
+        writes = self._diff_raw(
+            self._required_raw_from_object(previous_stage, "raw", 1, f"previous.stages.{field_prefix}.raw"),
+            self._required_raw_from_object(current_stage, "raw", 1, f"stages.{field_prefix}.raw"),
+            func_addr,
+        )
+        for key, addr, size in (
+            ("detail_raw", detail_addr, 34),
+            ("min_raw", min_addr, 49),
+            ("max_raw", max_addr, 49),
+        ):
+            if isinstance(previous_stage.get(key), list) or isinstance(current_stage.get(key), list):
+                writes.extend(
+                    self._diff_raw(
+                        self._required_raw_from_object(previous_stage, key, size, f"previous.stages.{field_prefix}.{key}"),
+                        self._required_raw_from_object(current_stage, key, size, f"stages.{field_prefix}.{key}"),
+                        addr,
+                    )
+                )
+        return writes
+
+    def _diff_fx_raw(
+        self,
+        previous_stage: dict[str, Any],
+        current_stage: dict[str, Any],
+        color_index: int,
+        type_base_addr: tuple[int, int, int, int],
+        detail_base_addr: tuple[int, int, int, int],
+        field_name: str,
+    ) -> list[tuple[tuple[int, int, int, int], list[int]]]:
+        previous_raw = self._required_fx_raw(previous_stage, f"previous.{field_name}")
+        current_raw = self._required_fx_raw(current_stage, field_name)
+        variant_offset = 0x200 * color_index
+        writes = self._diff_raw(previous_raw[:1], current_raw[:1], addr_add(type_base_addr, variant_offset))
+        if len(previous_raw) > 1 or len(current_raw) > 1:
+            if len(previous_raw) != self.FX_DETAIL_SIZE + 1 or len(current_raw) != self.FX_DETAIL_SIZE + 1:
+                raise AmpClientError(f"Invalid payload: {field_name} must include full FX detail to diff detail bytes")
+            writes.extend(self._diff_raw(previous_raw[1:], current_raw[1:], addr_add(detail_base_addr, variant_offset)))
+        return writes
+
+    def _diff_compact_fields(
+        self,
+        previous_obj: Any,
+        current_obj: Any,
+        base_addr: tuple[int, int, int, int],
+        field_names: tuple[str, ...],
+        field_name_prefix: str,
+    ) -> list[tuple[tuple[int, int, int, int], list[int]]]:
+        if not isinstance(previous_obj, dict) or not isinstance(current_obj, dict):
+            raise AmpClientError(f"Invalid payload: {field_name_prefix} must be an object")
+        return self._diff_raw(
+            self._read_compact_raw_block(previous_obj, None, field_names, f"previous.{field_name_prefix}"),
+            self._read_compact_raw_block(current_obj, None, field_names, field_name_prefix),
+            base_addr,
+        )
+
+    def _diff_raw(
+        self,
+        previous_data: list[int],
+        current_data: list[int],
+        base_addr: tuple[int, int, int, int],
+    ) -> list[tuple[tuple[int, int, int, int], list[int]]]:
+        if len(previous_data) != len(current_data):
+            raise AmpClientError(f"Cannot diff raw payloads with different lengths: {len(previous_data)} != {len(current_data)}")
+        writes: list[tuple[tuple[int, int, int, int], list[int]]] = []
+        start: int | None = None
+        segment: list[int] = []
+        for index, (old, new) in enumerate(zip(previous_data, current_data, strict=True)):
+            if old == new:
+                if start is not None:
+                    writes.append((addr_add(base_addr, start), segment))
+                    start = None
+                    segment = []
+                continue
+            if start is None:
+                start = index
+            segment.append(new)
+        if start is not None:
+            writes.append((addr_add(base_addr, start), segment))
+        return writes
+
+    def _stage_switch_data(self, payload: dict[str, Any]) -> list[int]:
+        stages = payload.get("stages")
+        if not isinstance(stages, dict):
+            raise AmpClientError("Invalid live patch state: stages must be an object")
+        values: list[int] = []
+        for field_name in ("booster", "mod", "fx", "delay", "delay2", "reverb"):
+            stage_name = "delay" if field_name == "delay2" else field_name
+            stage = stages.get(stage_name)
+            if not isinstance(stage, dict):
+                raise AmpClientError(f"Invalid live patch state: stages.{stage_name} must be an object")
+            bool_key = "delay2_on" if field_name == "delay2" else "on"
+            value = stage.get(bool_key)
+            if not isinstance(value, bool):
+                raise AmpClientError(f"Invalid live patch state: stages.{stage_name}.{bool_key} must be boolean")
+            values.append(1 if value else 0)
+        return values
+
+    def _stage_color_data(self, payload: dict[str, Any]) -> list[int]:
+        colors = payload.get("colors")
+        if not isinstance(colors, dict):
+            raise AmpClientError("Invalid live patch state: colors must be an object")
+        values: list[int] = []
+        for stage_name in ("booster", "mod", "fx", "delay", "reverb"):
+            color = colors.get(stage_name)
+            if not isinstance(color, dict):
+                raise AmpClientError(f"Invalid live patch state: colors.{stage_name} must be an object")
+            value = self._coerce_int_value(color.get("index"), f"colors.{stage_name}.index")
+            if value < 0 or value > 2:
+                raise AmpClientError(f"Invalid live patch state: colors.{stage_name}.index out of range 0..2")
+            values.append(value)
+        return values
+
+    def _required_raw_from_object(self, source: Any, raw_key: str, expected_size: int, field_name: str) -> list[int]:
+        if not isinstance(source, dict):
+            raise AmpClientError(f"Invalid payload: {field_name} parent must be an object")
+        return self._to_int_list(source.get(raw_key), expected_size=expected_size, field_name=field_name)
+
+    def _required_fx_raw(self, source: dict[str, Any], field_name: str) -> list[int]:
+        raw = source.get("raw")
+        if not isinstance(raw, list):
+            raise AmpClientError(f"Invalid payload: {field_name} must be a list")
+        if len(raw) not in {1, self.FX_DETAIL_SIZE + 1}:
+            raise AmpClientError(
+                f"Invalid payload: {field_name} must have length 1 or {self.FX_DETAIL_SIZE + 1} (got {len(raw)})"
+            )
+        return self._to_int_list(raw, expected_size=len(raw), field_name=field_name)
+
+    @staticmethod
+    def _dedupe_writes(
+        writes: list[tuple[tuple[int, int, int, int], list[int]]],
+    ) -> list[tuple[tuple[int, int, int, int], list[int]]]:
+        out: list[tuple[tuple[int, int, int, int], list[int]]] = []
+        seen: set[tuple[tuple[int, int, int, int], tuple[int, ...]]] = set()
+        for addr, data in writes:
+            key = (addr, tuple(data))
+            if key not in seen:
+                out.append((addr, data))
+                seen.add(key)
+        return out
 
     @staticmethod
     def _required_bool_flag(stages_obj: dict[str, Any], stage_name: str, field_name: str) -> int:

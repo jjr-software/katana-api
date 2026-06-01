@@ -245,8 +245,13 @@ def _canonicalize_block(block_name: str, block: dict[str, Any]) -> dict[str, Any
                 out[key] = _coerce_int_value(value, f"amp.{key}")
         return out
 
-    if block_name in COLOR_BLOCKS and "color_index" in block:
-        out["color_index"] = _coerce_int_value(block["color_index"], f"{block_name}.color_index")
+    if block_name in COLOR_BLOCKS:
+        if "color_index" in block:
+            out["color_index"] = _coerce_int_value(block["color_index"], f"{block_name}.color_index")
+        else:
+            color = block.get("color")
+            if isinstance(color, dict) and "index" in color:
+                out["color_index"] = _coerce_int_value(color["index"], f"{block_name}.color.index")
 
     if "on" in block:
         out["on"] = bool(block["on"])

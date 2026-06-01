@@ -814,8 +814,10 @@ async def patch_live_patch_block(
     sparse_patch_object = {block_name: payload.patch_block}
     rendered = merge_patch_object_into_full_patch(live_patch_json, sparse_patch_object)
     rendered["patch_name"] = live_patch_name
-    applied = await _queued_apply_current_patch(
-        rendered,
+    applied = await _queued_apply_current_patch_block(
+        block_name=block_name,
+        previous_patch=live_patch_json,
+        patch=rendered,
         queue_key=payload.queue_key or f"live-patch:block:{block_name}",
     )
     applied_at = datetime.now().isoformat(timespec="seconds")
@@ -1390,6 +1392,25 @@ async def _queued_apply_current_patch(
     settled = await _await_terminal_job(job.job_id, timeout_seconds=120.0)
     if settled.status != "succeeded" or settled.result_applied_patch is None:
         raise HTTPException(status_code=502, detail={"message": "Failed to apply current patch", "error": settled.error})
+    return settled.result_applied_patch
+
+
+async def _queued_apply_current_patch_block(
+    *,
+    block_name: str,
+    previous_patch: dict[str, Any],
+    patch: dict[str, Any],
+    queue_key: str | None = None,
+) -> dict[str, Any]:
+    job = await amp_job_queue.enqueue_apply_current_patch_block(
+        block_name=block_name,
+        previous_patch=previous_patch,
+        patch=patch,
+        queue_key=queue_key,
+    )
+    settled = await _await_terminal_job(job.job_id, timeout_seconds=120.0)
+    if settled.status != "succeeded" or settled.result_applied_patch is None:
+        raise HTTPException(status_code=502, detail={"message": "Failed to apply current patch block", "error": settled.error})
     return settled.result_applied_patch
 
 
