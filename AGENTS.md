@@ -2030,3 +2030,21 @@
 - Verification:
   - `docker compose up -d --build`
   - Playwright MCP loaded `https://katana.ryzen.jjrsoftware.co.uk/` with title `Katana Patch Manager`.
+
+## Session Update - 2026-06-01 (Pedal Wah Type Labels)
+- Confirmed Pedal Wah wah-type names from extracted BTS `resource.js`:
+  - `0 = Cry Wah`
+  - `1 = VO Wah`
+  - `2 = Fat Wah`
+  - `3 = Light Wah`
+  - `4 = 7-String Wah`
+  - `5 = Reso Wah`
+- Fixed the normal MOD/FX `Pedal Wah` parameter UI so `wah_type` renders as a select with those labels instead of a numeric `0..5` range/number input.
+- The dedicated `Pedal FX > Pedal Wah` control already used the same labels.
+- Files changed:
+  - `apps/web/src/app/app.html`
+  - `apps/web/src/app/app.ts`
+  - `apps/web/src/app/pedal-schemas.ts`
+- Verification:
+  - `docker compose up -d --build`
+  - Angular build succeeded; current bundle budget warning is `500.11 kB` vs `500.00 kB`.

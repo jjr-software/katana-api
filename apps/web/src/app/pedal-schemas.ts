@@ -1,5 +1,5 @@
 export type ParamEncoding = 'int1x7' | 'int2x4' | 'int2x7' | 'int4x4';
-export type ParamControlKind = 'range' | 'toggle';
+export type ParamControlKind = 'range' | 'select' | 'toggle';
 
 export interface StageParamSchema {
   key: string;

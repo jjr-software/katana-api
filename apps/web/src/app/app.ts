@@ -684,6 +684,7 @@ interface StageParam {
   min: number;
   max: number;
   control: ParamControlKind;
+  options: readonly ValueOption[];
   offLabel: string;
   onLabel: string;
 }
@@ -5083,6 +5084,7 @@ export class App implements OnInit, OnDestroy {
         min: schema.min,
         max: schema.max,
         control: this.stageParamControl(schema),
+        options: this.stageParamOptions(stageName, schema),
         offLabel: schema.offLabel ?? 'Off',
         onLabel: schema.onLabel ?? 'On',
       });
@@ -5092,6 +5094,10 @@ export class App implements OnInit, OnDestroy {
 
   stageParamIsToggle(param: StageParam): boolean {
     return param.control === 'toggle';
+  }
+
+  stageParamIsSelect(param: StageParam): boolean {
+    return param.control === 'select';
   }
 
   stageParamToggleLabel(param: StageParam): string {
@@ -6102,6 +6108,13 @@ export class App implements OnInit, OnDestroy {
       return 'toggle';
     }
     return 'range';
+  }
+
+  private stageParamOptions(stageName: StageName, schema: StageParamSchema): readonly ValueOption[] {
+    if ((stageName === 'mod' || stageName === 'fx') && schema.key === 'wah_type') {
+      return PEDAL_FX_WAH_TYPE_OPTIONS;
+    }
+    return [];
   }
 
   private stageParamArrayIndex(stageName: StageName, schema: StageParamSchema): number {

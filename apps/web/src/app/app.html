@@ -306,6 +306,17 @@
                                 />
                                 <span class="small text-secondary">{{ stageParamToggleLabel(param) }}</span>
                               </div>
+                            } @else if (stageParamIsSelect(param)) {
+                              <label class="form-label small mb-1">{{ param.label }}</label>
+                              <select
+                                class="form-select form-select-sm"
+                                [value]="param.value"
+                                (change)="setEditorStageParam($any(stageName), param.key, $any($event.target).value)"
+                              >
+                                @for (option of param.options; track option.value) {
+                                  <option [value]="option.value" [selected]="param.value === option.value">{{ option.label }}</option>
+                                }
+                              </select>
                             } @else {
                               <label class="form-label small mb-1">{{ param.label }} <span class="text-secondary">[{{ param.min }}..{{ param.max }}]</span></label>
                               <div class="editor-range-field">
