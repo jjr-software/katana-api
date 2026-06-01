@@ -237,6 +237,11 @@ const GAFC_EXP1_DETAIL_OPTION_LABELS_BY_KEY: Readonly<Record<string, readonly st
   wah_95e: PEDAL_WAH_ASSIGN_DETAIL_LABELS,
   pedal_bend: [ASSIGN_DETAIL_PRESET_LABEL, 'Pedal Position', 'Pitch', 'Effect Level', 'Direct Mix'],
 };
+const EXP_PEDAL_POSITION_DETAIL_BY_KEY: Readonly<Record<string, number>> = {
+  pedal_wah: 1,
+  wah_95e: 1,
+  pedal_bend: 1,
+};
 const EQ_PEQ_LOW_CUT_LABELS = ['Flat', '20 Hz', '25 Hz', '31.5 Hz', '40 Hz', '50 Hz', '63 Hz', '80 Hz', '100 Hz', '125 Hz', '160 Hz', '200 Hz', '250 Hz', '315 Hz', '400 Hz', '500 Hz', '630 Hz', '800 Hz'];
 const EQ_PEQ_MID_FREQ_LABELS = ['20 Hz', '25 Hz', '31.5 Hz', '40 Hz', '50 Hz', '63 Hz', '80 Hz', '100 Hz', '125 Hz', '160 Hz', '200 Hz', '250 Hz', '315 Hz', '400 Hz', '500 Hz', '630 Hz', '800 Hz', '1.00 kHz', '1.25 kHz', '1.60 kHz', '2.00 kHz', '2.50 kHz', '3.15 kHz', '4.00 kHz', '5.00 kHz', '6.30 kHz', '8.00 kHz', '10.0 kHz'];
 const EQ_PEQ_Q_LABELS = ['0.5', '1', '2', '4', '8', '16'];
@@ -4628,6 +4633,7 @@ export class App implements OnInit, OnDestroy {
       const block = this.ensureObject(stages, 'gafc_exp1');
       block['function'] = parsed;
       this.syncNumericRawField(block, 'raw', 0, parsed);
+      this.applyExpAssignmentDefaults(draft, 'gafc_exp1', parsed);
     });
   }
 
@@ -4718,6 +4724,7 @@ export class App implements OnInit, OnDestroy {
       const block = this.ensureObject(stages, 'exp_pedal');
       block['function'] = parsed;
       this.syncNumericRawField(block, 'raw', 0, parsed);
+      this.applyExpAssignmentDefaults(draft, 'exp_pedal', parsed);
     });
   }
 
@@ -4780,9 +4787,10 @@ export class App implements OnInit, OnDestroy {
         return this.assignmentKeysForFxStage('mod');
       case EXP_ASSIGNMENT_FUNCTION.FX:
         return this.assignmentKeysForFxStage('fx');
-      case EXP_ASSIGNMENT_FUNCTION.PEDAL_FX:
       case EXP_ASSIGNMENT_FUNCTION.PEDAL_FX_AND_FOOT_VOLUME:
         return ['pedal_wah', 'pedal_bend', 'wah_95e'];
+      case EXP_ASSIGNMENT_FUNCTION.PEDAL_FX:
+        return [];
       case EXP_ASSIGNMENT_FUNCTION.DELAY:
       case EXP_ASSIGNMENT_FUNCTION.DELAY2:
         return ['delay'];
@@ -4808,7 +4816,7 @@ export class App implements OnInit, OnDestroy {
       case EXP_ASSIGNMENT_FUNCTION.FOOT_VOLUME:
         return 'The pedal drives foot volume directly; there is no per-effect target mapping.';
       case EXP_ASSIGNMENT_FUNCTION.PEDAL_FX:
-        return 'Select the Pedal FX row and detail field this pedal should control.';
+        return 'The pedal directly drives the dedicated Pedal FX block; enable Pedal FX and choose the Pedal FX type.';
       case EXP_ASSIGNMENT_FUNCTION.PEDAL_FX_AND_FOOT_VOLUME:
         return 'Select the Pedal FX row and detail field this pedal should control alongside foot volume.';
       case EXP_ASSIGNMENT_FUNCTION.MOD:
@@ -4817,6 +4825,99 @@ export class App implements OnInit, OnDestroy {
         return 'The selected FX type has no mapped EXP pedal target row.';
       default:
         return 'Select a pedal function to show its target parameter mapping.';
+    }
+  }
+
+  private expAssignmentKeysForFunctionInDraft(draft: Record<string, unknown>, functionValue: number | null): readonly string[] {
+    if (functionValue === null) {
+      return [];
+    }
+    switch (functionValue) {
+      case EXP_ASSIGNMENT_FUNCTION.BOOSTER:
+        return ['booster'];
+      case EXP_ASSIGNMENT_FUNCTION.MOD:
+        return this.assignmentKeysForFxStageInDraft(draft, 'mod');
+      case EXP_ASSIGNMENT_FUNCTION.FX:
+        return this.assignmentKeysForFxStageInDraft(draft, 'fx');
+      case EXP_ASSIGNMENT_FUNCTION.PEDAL_FX_AND_FOOT_VOLUME:
+        return ['pedal_wah', 'pedal_bend', 'wah_95e'];
+      case EXP_ASSIGNMENT_FUNCTION.DELAY:
+      case EXP_ASSIGNMENT_FUNCTION.DELAY2:
+        return ['delay'];
+      case EXP_ASSIGNMENT_FUNCTION.REVERB:
+        return ['reverb'];
+      default:
+        return [];
+    }
+  }
+
+  private assignmentKeysForFxStageInDraft(draft: Record<string, unknown>, stageName: 'mod' | 'fx'): readonly string[] {
+    const stages = this.readObject(draft, 'stages');
+    const stage = this.readObject(stages, stageName);
+    const directType = this.readNumber(stage, 'type');
+    const raw = this.readNumericArray(stage, 'raw');
+    const type = directType ?? (raw && raw.length > 0 ? raw[0] : null);
+    if (type === null || type < 0 || type >= FX_ASSIGNMENT_KEYS_BY_TYPE.length) {
+      return [];
+    }
+    return [FX_ASSIGNMENT_KEYS_BY_TYPE[type]];
+  }
+
+  private applyExpAssignmentDefaults(
+    draft: Record<string, unknown>,
+    blockName: 'exp_pedal' | 'gafc_exp1',
+    functionValue: number | null,
+  ): void {
+    const keys = this.expAssignmentKeysForFunctionInDraft(draft, functionValue);
+    if (keys.length === 0) {
+      return;
+    }
+    const stages = this.ensureObject(draft, 'stages');
+    const block = this.ensureObject(stages, blockName);
+    const detailRaw = this.ensureRawArray(block, 'detail_raw', GAFC_EXP1_ASSIGNMENT_SCHEMA.length);
+    const minRaw = this.ensureRawArray(block, 'min_raw', GAFC_EXP1_ASSIGNMENT_RAW_LENGTH);
+    const maxRaw = this.ensureRawArray(block, 'max_raw', GAFC_EXP1_ASSIGNMENT_RAW_LENGTH);
+    for (const key of keys) {
+      const defaultDetail = EXP_PEDAL_POSITION_DETAIL_BY_KEY[key];
+      if (defaultDetail === undefined) {
+        continue;
+      }
+      const specIndex = GAFC_EXP1_ASSIGNMENT_SCHEMA.findIndex((entry) => entry.key === key);
+      if (specIndex < 0) {
+        continue;
+      }
+      const spec = GAFC_EXP1_ASSIGNMENT_SCHEMA[specIndex];
+      if (detailRaw[specIndex] === 0) {
+        detailRaw[specIndex] = defaultDetail;
+      }
+      const min = this.decodeRolandValue(minRaw.slice(spec.minOffset, spec.minOffset + spec.minSize));
+      const max = this.decodeRolandValue(maxRaw.slice(spec.maxOffset, spec.maxOffset + spec.maxSize));
+      if (min === 0 && max === 0) {
+        this.writeEncodedExpAssignmentValue(minRaw, spec.minOffset, spec.minSize, 0);
+        this.writeEncodedExpAssignmentValue(maxRaw, spec.maxOffset, spec.maxSize, Math.min(100, spec.valueMax));
+      }
+    }
+    block['detail_raw'] = detailRaw;
+    block['min_raw'] = minRaw;
+    block['max_raw'] = maxRaw;
+  }
+
+  private refreshExpAssignmentDefaultsForFxStage(draft: Record<string, unknown>, stageName: 'mod' | 'fx'): void {
+    const targetFunction = stageName === 'mod' ? EXP_ASSIGNMENT_FUNCTION.MOD : EXP_ASSIGNMENT_FUNCTION.FX;
+    const stages = this.readObject(draft, 'stages');
+    for (const blockName of ['exp_pedal', 'gafc_exp1'] as const) {
+      const block = this.readObject(stages, blockName);
+      const functionValue = this.readNumber(block, 'function');
+      if (functionValue === targetFunction) {
+        this.applyExpAssignmentDefaults(draft, blockName, functionValue);
+      }
+    }
+  }
+
+  private writeEncodedExpAssignmentValue(raw: number[], offset: number, size: number, value: number): void {
+    const encoded = this.encodeRolandValue(value, size);
+    for (let idx = 0; idx < encoded.length; idx += 1) {
+      raw[offset + idx] = encoded[idx];
     }
   }
 
@@ -4891,6 +4992,9 @@ export class App implements OnInit, OnDestroy {
         this.initializePedalWahDefaults(stage);
       }
       this.syncStageDerivedFields(stageName, stage);
+      if (stageName === 'mod' || stageName === 'fx') {
+        this.refreshExpAssignmentDefaultsForFxStage(draft, stageName);
+      }
     });
   }
 

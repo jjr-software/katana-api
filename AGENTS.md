@@ -2014,3 +2014,19 @@
   - `python -m compileall apps/api/app`
   - targeted diff smoke checks with `PYTHONPATH=apps/api python -c ...`
   - `docker compose up -d --build`
+
+## Session Update - 2026-06-01 (GA-FC EXP1 Wah Assignment Defaults)
+- Fixed a likely no-effect GA-FC EXP1 wah workflow in the live editor.
+- BTS contract clarified from extracted `assign_controller.js`:
+  - `Pedal FX` function is a direct mode for the dedicated Pedal FX block and does not use the normal assign detail/min/max table.
+  - normal MOD/FX wah control should use function `MOD` or `FX`, then assign the active wah row to `Pedal Position`.
+- UI changes:
+  - function `Pedal FX` now shows direct-mode guidance instead of misleading wah assignment rows.
+  - when `EXP Pedal` or `GA-FC EXP1` is set to `MOD`/`FX` while the selected stage is `Pedal Wah`, `WAH 95E`, or `Pedal Bend`, the editor defaults the detail row to `Pedal Position`.
+  - if the row had an empty `0..0` range, the editor defaults it to `0..100`.
+  - changing a MOD/FX stage type also refreshes those defaults for any expression assignment currently targeting that stage.
+- File changed:
+  - `apps/web/src/app/app.ts`
+- Verification:
+  - `docker compose up -d --build`
+  - Playwright MCP loaded `https://katana.ryzen.jjrsoftware.co.uk/` with title `Katana Patch Manager`.
