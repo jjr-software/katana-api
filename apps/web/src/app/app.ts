@@ -87,6 +87,20 @@ const AMP_TYPE_NAMES = ['Acoustic', 'Clean', 'Pushed', 'Crunch', 'Lead', 'Brown'
 const REVERB_TYPE_NAMES = ['Plate Reverb', 'Room Reverb', 'Hall Reverb', 'Spring Reverb', 'Modulate Reverb'];
 const ROUTING_CHAIN_PATTERN_NAMES = ['CHAIN1', 'CHAIN2-1', 'CHAIN3-1', 'CHAIN4-1', 'CHAIN2-2', 'CHAIN3-2', 'CHAIN4-2'] as const;
 type RoutingFieldName = 'chain_pattern' | 'cabinet_resonance' | 'master_key';
+const MASTER_KEY_OPTIONS: ReadonlyArray<ValueOption> = [
+  { value: 0, label: 'C (Am)' },
+  { value: 1, label: 'Db (Bbm)' },
+  { value: 2, label: 'D (Bm)' },
+  { value: 3, label: 'Eb (Cm)' },
+  { value: 4, label: 'E (C#m)' },
+  { value: 5, label: 'F (Dm)' },
+  { value: 6, label: 'F# (D#m)' },
+  { value: 7, label: 'G (Em)' },
+  { value: 8, label: 'Ab (Fm)' },
+  { value: 9, label: 'A (F#m)' },
+  { value: 10, label: 'Bb (Gm)' },
+  { value: 11, label: 'B (G#m)' },
+];
 const GAFC_EXP1_FUNCTION_OPTIONS: ReadonlyArray<ValueOption> = [
   { value: 0, label: 'Volume' },
   { value: 1, label: 'Foot Volume' },
@@ -3894,6 +3908,9 @@ export class App implements OnInit, OnDestroy {
     if (field === 'chain_pattern') {
       return this.routingChoiceLabel(ROUTING_CHAIN_PATTERN_NAMES, value);
     }
+    if (field === 'master_key') {
+      return this.routingValueOptionLabel(MASTER_KEY_OPTIONS, value);
+    }
     return `${value}`;
   }
 
@@ -3904,7 +3921,7 @@ export class App implements OnInit, OnDestroy {
     if (field === 'cabinet_resonance') {
       return 'Adjusts the cabinet resonance voicing for this patch.';
     }
-    return 'Patch key reference used by key-aware features.';
+    return 'Song key used by Harmonist and other pitch-aware effects.';
   }
 
   routingChainPatternOptions(): TypeOption[] {
@@ -3912,6 +3929,10 @@ export class App implements OnInit, OnDestroy {
       value,
       label: `${label}: ${this.routingChainPreview(value)}`,
     }));
+  }
+
+  routingMasterKeyOptions(): readonly ValueOption[] {
+    return MASTER_KEY_OPTIONS;
   }
 
   editorRoutingChainOrder(): readonly RoutingChainBlockId[] {
@@ -4095,6 +4116,10 @@ export class App implements OnInit, OnDestroy {
 
   private routingChoiceLabel(labels: readonly string[], value: number): string {
     return labels[value] ?? 'Unknown';
+  }
+
+  private routingValueOptionLabel(options: readonly ValueOption[], value: number): string {
+    return options.find((option) => option.value === value)?.label ?? 'Unknown';
   }
 
   editorDelay2On(): boolean {

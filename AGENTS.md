@@ -2048,3 +2048,20 @@
 - Verification:
   - `docker compose up -d --build`
   - Angular build succeeded; current bundle budget warning is `500.11 kB` vs `500.00 kB`.
+
+## Session Update - 2026-06-01 (Routing Song Key UI)
+- Clarified the live editor routing `master_key` field:
+  - BTS exposes it as `PATCH_OTHER_MASTER_KEY` at `PATCH_OTHER + 0x02`.
+  - The valid range is `0..11`, matching musical song keys used by Harmonist/pitch-aware effects.
+- UI changes:
+  - renamed the card label from `Master Key` to `Song Key`.
+  - replaced the raw `0..127` range/number control with a key dropdown.
+  - display labels now use BTS-style values: `C (Am)`, `Db (Bbm)`, through `B (G#m)`.
+  - description now states that it is the song key used by Harmonist and pitch-aware effects.
+- Files changed:
+  - `apps/web/src/app/app.html`
+  - `apps/web/src/app/app.ts`
+- Verification:
+  - `docker compose up -d --build`
+  - Angular build succeeded; current bundle budget warning is `500.65 kB` vs `500.00 kB`.
+  - Playwright MCP loaded `https://katana.ryzen.jjrsoftware.co.uk/` with title `Katana Patch Manager`.
