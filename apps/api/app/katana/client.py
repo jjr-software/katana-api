@@ -51,6 +51,7 @@ from app.katana.protocol import (
     PATCH_SELECT_ADDR,
     ADDR_PATCH_COM,
     addr_add,
+    addr_add_7bit_data,
     slot_label,
 )
 from app.katana.sysex import build_dt1, build_rq1, extract_hex_pairs, extract_sysex_frames, parse_dt1
@@ -1268,7 +1269,7 @@ class AmpClient:
         for index, (old, new) in enumerate(zip(previous_data, current_data, strict=True)):
             if old == new:
                 if start is not None:
-                    writes.append((addr_add(base_addr, start), segment))
+                    writes.append((addr_add_7bit_data(base_addr, start), segment))
                     start = None
                     segment = []
                 continue
@@ -1276,7 +1277,7 @@ class AmpClient:
                 start = index
             segment.append(new)
         if start is not None:
-            writes.append((addr_add(base_addr, start), segment))
+            writes.append((addr_add_7bit_data(base_addr, start), segment))
         return writes
 
     def _stage_switch_data(self, payload: dict[str, Any]) -> list[int]:
@@ -1581,7 +1582,7 @@ class AmpClient:
         offset = 0
         while remaining > 0:
             chunk_size = min(remaining, self.RQ1_MAX_CHUNK_SIZE)
-            chunk_addr = self._addr_add_7bit(addr, offset)
+            chunk_addr = addr_add_7bit_data(addr, offset)
             out.extend(await self._read_rq1_chunk(chunk_addr, chunk_size))
             offset += chunk_size
             remaining -= chunk_size
@@ -1695,22 +1696,6 @@ class AmpClient:
     @staticmethod
     def _addr_to_int(addr: tuple[int, int, int, int]) -> int:
         return (int(addr[0]) << 24) | (int(addr[1]) << 16) | (int(addr[2]) << 8) | int(addr[3])
-
-    @staticmethod
-    def _addr_add_7bit(addr: tuple[int, int, int, int], offset: int) -> tuple[int, int, int, int]:
-        base = (
-            int(addr[0]) * (128**3)
-            + int(addr[1]) * (128**2)
-            + int(addr[2]) * 128
-            + int(addr[3])
-        )
-        total = base + int(offset)
-        return (
-            (total // (128**3)) % 128,
-            (total // (128**2)) % 128,
-            (total // 128) % 128,
-            total % 128,
-        )
 
     @staticmethod
     def _config_hash(payload: dict[str, Any]) -> str:

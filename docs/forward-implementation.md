@@ -238,6 +238,29 @@ Module ownership:
 - `audio_capture` owns PipeWire capture and deterministic audio calculations. It exposes the fixed-band energy algorithm and the ITU-R BS.1770-4 K-weighted loudness calculation; it does not know amp or UI concepts.
 - `katana.client` owns canonical live-patch and active-slot reads. `amp_queue` serializes that device work.
 - `spectrum_compare` owns the bounded measurement orchestration and translates the canonical structured patch payload into a compact typed display contract. It does not persist a second patch representation.
+
+## 5.0.3 Live MOD/FX Editing
+
+Primary user: a guitarist shaping the active MOD or FX block while hearing the current Live Patch.
+
+Outcome: each visible control changes the intended Katana Gen 3 parameter or variant, including algorithms whose detail data lies beyond the first 128 bytes of the block.
+
+Requirements:
+
+1. The editor presents the active MOD and FX block as independent `Enabled`, `Colour`, `Type`, and type-specific parameter controls. `Colour` selects the canonical green, red, or yellow variant already held by the patch; it is not derived from a label or duplicated as a new state model.
+2. Type-specific parameter labels, ranges, encodings, and select options are defined by the existing typed frontend schema indexed by the canonical numeric algorithm type. Pedal Wah `Wah Type` is a named six-option select: Cry, VO, Fat, Light, 7-string, and Reso.
+3. Selecting a colour updates the editor's active raw stage data from that stage's existing canonical `variants_raw` entry before the existing targeted live-block write. The backend remains the sole owner of how the selected variant is addressed and written to the amp.
+4. The FastAPI `PATCH /api/v1/live-patch/blocks/{block_name}` boundary continues to accept the existing canonical sparse patch-block contract and merges it through `patch_objects`; no parallel persisted patch or compatibility representation is introduced.
+5. `katana.protocol` owns Roland address arithmetic. It exposes distinct helpers for known map/block offsets and for offsets within transmitted 7-bit data addresses. `katana.client` uses the 7-bit helper only when constructing changed-byte writes within an already-selected block, preserving existing block and colour-variant address selection.
+6. A changed FX detail byte at offset 182 from `20 00 22 00` must target `20 00 23 36`, not `20 00 22 B6`. Existing on/off, type, colour selection, and full-block write behaviour remain unchanged.
+
+Module ownership:
+
+- `apps/web/src/app/pedal-schemas.ts` owns typed, user-facing algorithm parameter metadata.
+- `apps/web/src/app/app.ts` owns editor draft interaction and derives the selected stage raw data from canonical `variants_raw`.
+- `app.patch_objects` owns merging a sparse stage block into the canonical Live Patch.
+- `app.katana.protocol` owns address representations and arithmetic.
+- `app.katana.client` owns the concrete Katana read/write operation and must not infer UI labels or create state outside the patch payload.
 - `api/spectrum_compare` is the thin HTTP transport boundary.
 - the Angular Spectrum Compare page owns browser-local measurement persistence, deletion, the ordered two-card selection, deterministic `B − A` calculations, the explicit distinction between raw level, perceived level, and spectral redistribution, and their Bootstrap presentation.
 

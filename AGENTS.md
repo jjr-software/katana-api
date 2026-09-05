@@ -2129,3 +2129,16 @@
   - Live `POST /api/v1/spectrum-compare/measure` returned HTTP `200` for `Clean Whammy 6`, `A:1`, eight bands, 13 stage states, and `k_weighted_lufs: -47.71`.
   - Central Playwright inspected desktop and `390 × 844` mobile views with no horizontal overflow.
   - The acceptance fixture (`Raw energy = -1.97 dB`, Presence `-13.30 dB`, Brilliance `-17.71 dB`) rendered `B quieter than A` with perceived difference `-8.79 LU` as the dominant result.
+
+## Session Update - 2026-09-05 (Live MOD/FX Addressing and Variant Editing)
+- Corrected targeted MOD/FX detail writes after a read-only contract audit:
+  - `apps/api/app/katana/protocol.py` now owns `addr_add_7bit_data()` for Roland transmitted data-address carry.
+  - `apps/api/app/katana/client.py` uses it for changed-byte segments, including FX-detail offsets at or beyond 128; existing block/colour variant base-address selection remains unchanged.
+  - verified in the API container: FX detail base `20 00 22 00` plus offset `182` resolves to `20 00 23 36`.
+- Live editor improvements:
+  - colour-aware stages now expose Green, Red, and Yellow selectors and switch the editor to the corresponding canonical stored variant raw data;
+  - Delay also switches its paired Delay 2 variant;
+  - Pedal Wah `Wah Type` now renders as a named select: Cry, VO, Fat, Light, 7-string, or Reso.
+- Verification:
+  - `docker compose up -d --build` completed successfully; only existing Angular size-budget warnings remain.
+  - Central Playwright inspected `https://katana.ryzen.jjrsoftware.co.uk/` at desktop and `390 × 844`; the Colour control is present and mobile has no horizontal overflow.

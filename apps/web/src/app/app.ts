@@ -5271,6 +5271,39 @@ export class App implements OnInit, OnDestroy {
     });
   }
 
+  stageSupportsColor(stageName: StageName): boolean {
+    return stageName === 'booster' || stageName === 'mod' || stageName === 'fx' || stageName === 'delay' || stageName === 'reverb';
+  }
+
+  editorStageColor(stageName: StageName): number {
+    const colors = this.readObject(this.editorPatchDraft(), 'colors');
+    const color = this.readObject(colors, stageName);
+    return this.clampInteger(this.parseUnknownNumber(color?.['index']), 0, 2);
+  }
+
+  setEditorStageColor(stageName: StageName, value: string): void {
+    const colorIndex = this.clampInteger(this.parseInteger(value), 0, 2);
+    this.updateEditorPatch((draft) => {
+      const colors = this.ensureObject(draft, 'colors');
+      const color = this.ensureObject(colors, stageName);
+      color['index'] = colorIndex;
+
+      const stages = this.ensureObject(draft, 'stages');
+      const stage = this.ensureObject(stages, stageName);
+      const variants = stage['variants_raw'];
+      if (Array.isArray(variants) && Array.isArray(variants[colorIndex])) {
+        stage['raw'] = [...variants[colorIndex]];
+        this.syncStageDerivedFields(stageName, stage);
+      }
+      if (stageName === 'delay') {
+        const delayVariants = stage['variants2_raw'];
+        if (Array.isArray(delayVariants) && Array.isArray(delayVariants[colorIndex])) {
+          stage['delay2_raw'] = [...delayVariants[colorIndex]];
+        }
+      }
+    });
+  }
+
   editorStageType(stageName: StageName): number | null {
     const stages = this.readObject(this.editorPatchDraft(), 'stages');
     const stage = this.readObject(stages, stageName);

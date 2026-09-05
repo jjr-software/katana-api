@@ -75,7 +75,7 @@ export const FX_PARAM_SCHEMAS_BY_TYPE: ReadonlyArray<readonly StageParamSchema[]
     { key: 'effect_level', label: 'Effect Level', rawIndex: 14, size: 'int1x7', min: 0, max: 100, offset: 0 },
   ],
   [
-    { key: 'wah_type', label: 'Wah Type', rawIndex: 15, size: 'int1x7', min: 0, max: 5, offset: 0 },
+    { key: 'wah_type', label: 'Wah Type', rawIndex: 15, size: 'int1x7', min: 0, max: 5, offset: 0, control: 'select' },
     { key: 'pedal_position', label: 'Pedal Position', rawIndex: 16, size: 'int1x7', min: 0, max: 100, offset: 0 },
     { key: 'pedal_min', label: 'Pedal Min', rawIndex: 17, size: 'int1x7', min: 0, max: 100, offset: 0 },
     { key: 'pedal_max', label: 'Pedal Max', rawIndex: 18, size: 'int1x7', min: 0, max: 100, offset: 0 },

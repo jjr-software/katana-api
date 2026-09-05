@@ -78,6 +78,23 @@ def addr_add(addr: tuple[int, int, int, int], offset: int) -> tuple[int, int, in
     return ((out >> 24) & 0xFF, (out >> 16) & 0xFF, (out >> 8) & 0xFF, out & 0xFF)
 
 
+def addr_add_7bit_data(addr: tuple[int, int, int, int], offset: int) -> tuple[int, int, int, int]:
+    """Offset a Roland transmitted data address, whose digits carry in base 128."""
+    value = (
+        int(addr[0]) * (128**3)
+        + int(addr[1]) * (128**2)
+        + int(addr[2]) * 128
+        + int(addr[3])
+        + int(offset)
+    )
+    return (
+        (value // (128**3)) % 128,
+        (value // (128**2)) % 128,
+        (value // 128) % 128,
+        value % 128,
+    )
+
+
 def slot_label(slot: int) -> str:
     slot_val = max(1, min(8, int(slot)))
     bank = "A" if slot_val <= 4 else "B"
