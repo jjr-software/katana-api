@@ -2177,3 +2177,13 @@
   - API and web containers are running, and the public SSE endpoint immediately returned `retry: 3000`, `event: amp-state`, canonical queue state, and Live Patch `A:1`;
   - central Playwright rendered the public app at desktop and `390 × 844` mobile, showing `A:1` with no horizontal overflow;
   - an API-only restart left the page rendered and the API returned healthy; EventSource reconnect is implemented through native browser semantics without an app retry timer.
+
+## Session Update - 2026-09-05 (MOD Wah Form Audit)
+- Audited the canonical Roland MOD detail maps and clarified the two wah forms:
+  - Pedal Wah exposes Wah Model, Pedal Position, Heel Position, Toe Position, Output Level, and Dry Mix at its type-2 detail bytes.
+  - Cry Baby Wah 95 / WAH 95E exposes Pedal Position, Heel Position, Toe Position, Output Level, and Dry Mix at its distinct type-27 detail bytes.
+- `Output Level` is the guitarist-facing label for Roland's effect-level setting. It is separate from pedal position and from expression-pedal assignment.
+- Live hardware verification on the active Cry Baby Wah 95 path:
+  - wrote output level `100 -> 99`, read back `99` from the amp, then restored and read back `100`.
+  - the UI presented only the expected Cry Baby controls at the public page; no internal raw-byte terminology appeared.
+- Rebuilt/restarted with `docker compose up -d --build`; existing Angular size-budget warnings remain non-fatal.
