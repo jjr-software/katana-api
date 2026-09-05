@@ -1,19 +1,24 @@
 import asyncio
+import json
+from collections.abc import AsyncIterator
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.amp_queue import amp_job_queue
+from app.db import SessionLocal
 from app.deps import get_amp_client, get_db
 from app.katana import AmpClient, LineOutSnapshot, SlotDump, SlotPatchSummary, slot_label
 from app.katana import AmpClientError
-from app.live_patch_state import upsert_live_patch_state
+from app.live_patch_state import live_patch_status_payload, upsert_live_patch_state
 from app.models import AmpSyncHistory, LivePatchState, PatchConfig, PatchSet, PatchSetMember
 from app.patch_objects import merge_patch_object_into_full_patch
+from app.schemas import LivePatchStatusResponse
 
 router = APIRouter(prefix="/api/v1/amp", tags=["amp"])
 
@@ -230,6 +235,12 @@ class QueueStateResponse(BaseModel):
     jobs: list[QueueJobSummaryResponse]
 
 
+class AmpOperationalStateResponse(BaseModel):
+    generated_at: str
+    queue: QueueStateResponse
+    live_patch: LivePatchStatusResponse | None = None
+
+
 class SyncHistoryItemResponse(BaseModel):
     id: int
     job_id: str
@@ -333,6 +344,7 @@ async def current_patch(
         amp_confirmed_at=datetime.now().isoformat(timespec="seconds"),
         source_type="amp_sync",
     )
+    await amp_job_queue.publish_state_change()
     return CurrentPatchResponse(
         created_at=datetime.now().isoformat(timespec="seconds"),
         patch=settled.result_current_patch,
@@ -396,6 +408,7 @@ async def apply_current_patch_live(
             amp_confirmed_at=synced_at,
             source_type="amp_sync",
         )
+        await amp_job_queue.publish_state_change()
     rendered = merge_patch_object_into_full_patch(live_row.patch_json, payload.patch)
     patch_name = rendered.get("patch_name")
     if not isinstance(patch_name, str) or not patch_name.strip():
@@ -427,6 +440,7 @@ async def apply_current_patch_live(
         amp_confirmed_at=applied_at,
         source_type="manual_apply",
     )
+    await amp_job_queue.publish_state_change()
     return ApplyCurrentPatchResponse(
         applied_at=applied_at,
         patch=settled.result_applied_patch,
@@ -582,6 +596,34 @@ async def write_single_slot(
 
 @router.get("/queue", response_model=QueueStateResponse)
 async def queue_state() -> QueueStateResponse:
+    return await _queue_state_response()
+
+
+@router.get("/operations/events")
+async def operational_state_events(request: Request) -> StreamingResponse:
+    async def event_stream() -> AsyncIterator[str]:
+        revision = await amp_job_queue.get_state_revision()
+        yield _sse_amp_state(await _operational_state_response())
+        while not await request.is_disconnected():
+            next_revision = await amp_job_queue.wait_for_state_change(revision, timeout_seconds=15.0)
+            if next_revision == revision:
+                yield ": keep-alive\n\n"
+                continue
+            revision = next_revision
+            yield _sse_amp_state(await _operational_state_response())
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+async def _queue_state_response() -> QueueStateResponse:
     jobs = await amp_job_queue.list_jobs(limit=25)
     running_job_id = await amp_job_queue.get_running_job_id()
     queued_count = len([job for job in jobs if job.status == "queued"])
@@ -591,6 +633,22 @@ async def queue_state() -> QueueStateResponse:
         running_job_id=running_job_id,
         jobs=[QueueJobSummaryResponse(**_queue_job_summary(job)) for job in jobs],
     )
+
+
+async def _operational_state_response() -> AmpOperationalStateResponse:
+    queue = await _queue_state_response()
+    with SessionLocal() as db:
+        live_row = db.get(LivePatchState, 1)
+        live_patch = None if live_row is None else LivePatchStatusResponse(**live_patch_status_payload(db, live_row))
+    return AmpOperationalStateResponse(
+        generated_at=datetime.now().isoformat(timespec="seconds"),
+        queue=queue,
+        live_patch=live_patch,
+    )
+
+
+def _sse_amp_state(state: AmpOperationalStateResponse) -> str:
+    return f"retry: 3000\nevent: amp-state\ndata: {json.dumps(state.model_dump(mode='json'))}\n\n"
 
 
 @router.get("/sync-history", response_model=list[SyncHistoryItemResponse])

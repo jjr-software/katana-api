@@ -266,6 +266,36 @@ Module ownership:
 - `api/spectrum_compare` is the thin HTTP transport boundary.
 - the Angular Spectrum Compare page owns browser-local measurement persistence, deletion, the ordered two-card selection, deterministic `B − A` calculations, the explicit distinction between raw level, perceived level, and spectral redistribution, and their Bootstrap presentation.
 
+## 5.0.4 Live Editor Operational Updates
+
+Primary user: a guitarist who needs the Live Patch and operation feedback to settle quietly and promptly after an amp action, without the browser repeatedly probing a device that may be unavailable.
+
+Outcome: the web app receives the current operation snapshot when it connects and receives authoritative changes as queued work starts or reaches a terminal result. It does not periodically request queue or active-slot status.
+
+Existing behaviour being replaced:
+
+1. The Angular app currently requests `GET /api/v1/amp/queue` at startup and every second. Failed requests are discarded and the next interval retries, so a gateway or amp failure can create a visible retry storm while delaying the actual terminal result.
+2. It also requests `GET /api/v1/amp/current-slot` at startup and every 1.5 seconds. That route performs a direct MIDI read through `katana.client`; errors are ignored and the UI retains its previous selection. Its only additional UI behaviour is detection of a changed selected slot and the existing conflict prompt.
+3. `GET /api/v1/live-patch` is already a one-time read of persisted last-known state, while `POST /api/v1/live-patch/sync` and user actions deliberately perform their own bounded amp reads or writes. Those user-triggered operations remain available.
+
+Requirements:
+
+1. Replace both periodic operational reads with one typed SSE stream at `GET /api/v1/amp/operations/events`. The route is transport only: it must not read MIDI, write state, enqueue work, or derive a parallel cache.
+2. Each named `amp-state` event contains one complete `AmpOperationalStateResponse` snapshot: the canonical `amp_queue` job summary and the persisted `Live Patch` status when known. `amp_queue` remains the owner of job state; `live_patch_state` remains the owner of last-known Live Patch and active-slot state.
+3. The stream emits an initial snapshot on connection, then a new snapshot whenever the queue changes state or an amp-facing operation records new Live Patch state. Its only timeout output may be an SSE comment heartbeat to preserve an otherwise idle connection; it must not become a status poll or a device probe.
+4. The Angular `AmpOperationalStateService` owns one `EventSource` lifecycle. It parses only the typed `amp-state` event, runs callbacks inside Angular's zone, marks the connection unavailable on an error, relies on standard EventSource reconnection, and explicitly closes the source when the app component is destroyed. No application retry timer or polling fallback is permitted.
+5. The app consumes snapshots without replacing an in-progress editor draft. Queue transitions continue to produce the existing completion/failure notices. A newer streamed active-slot value follows the same existing conflict handling and derived commit-status calculation.
+6. The status is intentionally last-known, not an unsolicited hardware monitor. A GA-FC or front-panel slot change that occurs outside a user-triggered app operation becomes visible after the next deliberate sync, readback, or amp operation records it. The Katana connection supplies no usable push notification, and adding server-side polling would recreate the failure mode this change removes.
+7. The separate user-started live audio meter remains its own SSE workflow. Its audio frames are not operational state and are outside this migration.
+
+Module ownership:
+
+- `app.amp_queue` owns queue state transitions and the in-process change signal that wakes SSE listeners; the signal has no business snapshot or persistence of its own.
+- `app.live_patch_state` owns persisted Live Patch state and its status projection.
+- `api/amp` owns typed HTTP/SSE serialization only.
+- `apps/web/src/app/amp-operational-state.service.ts` owns browser stream connection and closure.
+- `apps/web/src/app/app.ts` owns presentation, notification, and conflict handling from received typed state.
+
 Typed measurement contract:
 
 - `POST /api/v1/spectrum-compare/measure` has no semantic text input and returns `SpectrumMeasurementResponse`.

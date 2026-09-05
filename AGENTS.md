@@ -2158,3 +2158,22 @@
 - Verification:
   - `docker compose up -d --build` completed; API and web are running.
   - Central Playwright reached the freshly served `main-QXDG27OU.js` bundle at the public URL. Desktop and `390 x 844` mobile screenshots were captured; the Delay 2 selector includes Digital Delay and mobile has no horizontal overflow. During inspection the app presented its existing patch-change decision modal after the physical amp changed from `A:4` to `A:1`; the amp was left untouched and the GUI was reloaded from the amp.
+
+## Session Update - 2026-09-05 (Operational SSE)
+- Replaced Angular's periodic operational reads with one SSE stream:
+  - retired the one-second `GET /api/v1/amp/queue` interval;
+  - retired the 1.5-second `GET /api/v1/amp/current-slot` MIDI probe;
+  - added `GET /api/v1/amp/operations/events`, which sends an initial and change-driven `amp-state` snapshot containing canonical queue state plus persisted last-known Live Patch state.
+- Ownership remains directional:
+  - `amp_queue` owns queue transitions and its in-process wake signal;
+  - `live_patch_state` owns the persisted Live Patch projection;
+  - the SSE route only serializes those canonical sources and never reads MIDI;
+  - `apps/web/src/app/amp-operational-state.service.ts` owns one `EventSource`, native reconnect handling, and explicit close on component destruction.
+- The editor consumes stream updates without replacing an in-progress draft. Completion/failure toasts retain their existing queue-transition behaviour. Front-panel/GA-FC changes remain last-known until a deliberate sync/readback or other amp operation records them; no server-side poll was added.
+- Container runtime correction included:
+  - isolated worktree files are mode `600`, so the API image now makes copied source readable by its configured non-root runtime user and the web image copies Caddyfile as mode `644`.
+- Verification:
+  - `docker compose -p katana-api --env-file /home/will/dev/katana-api/.env up -d --build` completed with the existing Angular size-budget warnings only;
+  - API and web containers are running, and the public SSE endpoint immediately returned `retry: 3000`, `event: amp-state`, canonical queue state, and Live Patch `A:1`;
+  - central Playwright rendered the public app at desktop and `390 × 844` mobile, showing `A:1` with no horizontal overflow;
+  - an API-only restart left the page rendered and the API returned healthy; EventSource reconnect is implemented through native browser semantics without an app retry timer.

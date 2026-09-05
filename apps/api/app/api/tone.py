@@ -33,6 +33,7 @@ from app.patch_objects import (
     merge_patch_object_into_full_patch,
     patch_object_block_names,
 )
+from app.schemas import LivePatchStatusResponse
 from app.settings import Settings, get_settings
 
 router = APIRouter(prefix="/api/v1", tags=["tone"])
@@ -137,18 +138,6 @@ class GroupReadResponse(BaseModel):
     description: str
     created_at: str
     updated_at: str
-
-
-class LivePatchReadResponse(BaseModel):
-    patch_json: dict
-    active_slot: int | None = None
-    amp_confirmed_at: str
-    source_type: str
-    exact_patch_object: dict | None = None
-    partial_patch_objects: list[dict]
-    exact_amp_slot: dict | None = None
-    partial_amp_slots: list[dict]
-    compat_hash_sha256: str
 
 
 class ApplyPatchObjectRequest(BaseModel):
@@ -732,19 +721,19 @@ async def ai_preview_patch_objects(
     return AiPreviewPatchObjectsResponse(summary=str(result["summary"]), candidates=candidates)
 
 
-@router.get("/live-patch", response_model=LivePatchReadResponse)
-def get_live_patch(db: Session = Depends(get_db)) -> LivePatchReadResponse:
+@router.get("/live-patch", response_model=LivePatchStatusResponse)
+def get_live_patch(db: Session = Depends(get_db)) -> LivePatchStatusResponse:
     row = db.get(LivePatchState, 1)
     if row is None:
         raise HTTPException(status_code=404, detail={"message": "Live Patch has not been synced yet"})
-    return LivePatchReadResponse(**live_patch_status_payload(db, row))
+    return LivePatchStatusResponse(**live_patch_status_payload(db, row))
 
 
-@router.post("/live-patch/sync", response_model=LivePatchReadResponse)
+@router.post("/live-patch/sync", response_model=LivePatchStatusResponse)
 async def sync_live_patch(
     db: Session = Depends(get_db),
     client: AmpClient = Depends(get_amp_client),
-) -> LivePatchReadResponse:
+) -> LivePatchStatusResponse:
     synced_at = datetime.now().isoformat(timespec="seconds")
     patch = await _queued_current_patch()
     active = await client.read_active_slot()
@@ -763,15 +752,17 @@ async def sync_live_patch(
             full_patch=patch,
             amp_confirmed_at=synced_at,
         )
-    return LivePatchReadResponse(**live_patch_status_payload(db, row))
+    response = LivePatchStatusResponse(**live_patch_status_payload(db, row))
+    await amp_job_queue.publish_state_change()
+    return response
 
 
-@router.post("/live-patch/apply-patch-object", response_model=LivePatchReadResponse)
+@router.post("/live-patch/apply-patch-object", response_model=LivePatchStatusResponse)
 async def apply_patch_object_to_live_patch(
     payload: ApplyPatchObjectRequest,
     db: Session = Depends(get_db),
     client: AmpClient = Depends(get_amp_client),
-) -> LivePatchReadResponse:
+) -> LivePatchStatusResponse:
     patch_object = db.get(PatchObject, payload.patch_object_id)
     if patch_object is None:
         raise HTTPException(status_code=404, detail={"message": "Patch object not found", "patch_object_id": payload.patch_object_id})
@@ -794,16 +785,18 @@ async def apply_patch_object_to_live_patch(
             amp_confirmed_at=applied_at,
             source_type="ai_apply" if patch_object_source_type == "ai" else "manual_apply",
         )
-        return LivePatchReadResponse(**live_patch_status_payload(write_db, row))
+        response = LivePatchStatusResponse(**live_patch_status_payload(write_db, row))
+    await amp_job_queue.publish_state_change()
+    return response
 
 
-@router.patch("/live-patch/blocks/{block_name}", response_model=LivePatchReadResponse)
+@router.patch("/live-patch/blocks/{block_name}", response_model=LivePatchStatusResponse)
 async def patch_live_patch_block(
     block_name: str,
     payload: PatchLiveBlockRequest,
     db: Session = Depends(get_db),
     client: AmpClient = Depends(get_amp_client),
-) -> LivePatchReadResponse:
+) -> LivePatchStatusResponse:
     if block_name not in ALLOWED_BLOCKS:
         raise HTTPException(status_code=400, detail={"message": "Unknown block", "block": block_name})
     live_row = await _resolve_live_patch_row(db, client)
@@ -829,14 +822,16 @@ async def patch_live_patch_block(
             amp_confirmed_at=applied_at,
             source_type="manual_apply",
         )
-        return LivePatchReadResponse(**live_patch_status_payload(write_db, row))
+        response = LivePatchStatusResponse(**live_patch_status_payload(write_db, row))
+    await amp_job_queue.publish_state_change()
+    return response
 
 
-@router.post("/live-patch/store-to-slot", response_model=LivePatchReadResponse)
+@router.post("/live-patch/store-to-slot", response_model=LivePatchStatusResponse)
 async def store_live_patch_to_slot(
     payload: StoreLivePatchToSlotRequest,
     db: Session = Depends(get_db),
-) -> LivePatchReadResponse:
+) -> LivePatchStatusResponse:
     live_row = db.get(LivePatchState, 1)
     if live_row is None:
         raise HTTPException(status_code=404, detail={"message": "Live Patch has not been synced yet"})
@@ -866,7 +861,9 @@ async def store_live_patch_to_slot(
             amp_confirmed_at=slot_item.synced_at,
             source_type=live_source_type,
         )
-        return LivePatchReadResponse(**live_patch_status_payload(write_db, row))
+        response = LivePatchStatusResponse(**live_patch_status_payload(write_db, row))
+    await amp_job_queue.publish_state_change()
+    return response
 
 
 def _patch_object_response(
@@ -1421,13 +1418,15 @@ async def _resolve_live_patch_row(db: Session, client: AmpClient) -> LivePatchSt
     synced_at = datetime.now().isoformat(timespec="seconds")
     patch = await _read_live_patch_from_amp(client)
     active = await client.read_active_slot()
-    return upsert_live_patch_state(
+    row = upsert_live_patch_state(
         db,
         full_patch=patch,
         active_slot=active.slot,
         amp_confirmed_at=synced_at,
         source_type="amp_sync",
     )
+    await amp_job_queue.publish_state_change()
+    return row
 
 
 async def _read_live_patch_from_amp(client: AmpClient) -> dict[str, Any]:

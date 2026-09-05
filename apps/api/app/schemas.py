@@ -74,3 +74,15 @@ class PatchSetMemberRead(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class LivePatchStatusResponse(BaseModel):
+    patch_json: dict
+    active_slot: int | None = None
+    amp_confirmed_at: str
+    source_type: str
+    exact_patch_object: dict | None = None
+    partial_patch_objects: list[dict]
+    exact_amp_slot: dict | None = None
+    partial_amp_slots: list[dict]
+    compat_hash_sha256: str

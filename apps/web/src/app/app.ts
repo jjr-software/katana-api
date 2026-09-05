@@ -12,6 +12,11 @@ import {
   type StageParamSchema,
 } from './pedal-schemas';
 import { buildRoutingChainOrder, routingChainBlockLabel, type RoutingChainBlockId } from './routing-chain';
+import {
+  AmpOperationalStateService,
+  type AmpOperationalLivePatch,
+  type AmpOperationalState,
+} from './amp-operational-state.service';
 
 const BOOSTER_TYPE_NAMES = [
   'Mid Boost',
@@ -455,14 +460,6 @@ interface CurrentPatchResponse {
   patch: Record<string, unknown>;
 }
 
-interface ActiveSlotResponse {
-  patch_number: number;
-  slot: number | null;
-  slot_label: string;
-  patch_name: string;
-  read_at: string;
-}
-
 interface ApplyCurrentPatchResponse {
   applied_at: string;
   patch: Record<string, unknown>;
@@ -710,13 +707,6 @@ interface QueueJobSummary {
   error: string | null;
 }
 
-interface QueueStateResponse {
-  generated_at: string;
-  queued_count: number;
-  running_job_id: string | null;
-  jobs: QueueJobSummary[];
-}
-
 interface ToastMessage {
   id: number;
   text: string;
@@ -869,6 +859,7 @@ export class App implements OnInit, OnDestroy {
   @ViewChild('ampStateConflictModalTpl') private ampStateConflictModalTpl?: TemplateRef<unknown>;
   private readonly modalService = inject(NgbModal);
   private readonly ngZone = inject(NgZone);
+  private readonly ampOperationalState = inject(AmpOperationalStateService);
   private readonly modalRefs: Partial<Record<ModalKey, NgbModalRef>> = {};
 
   private readonly storedSpectrumMeasurements = loadStoredSpectrumMeasurements();
@@ -949,8 +940,6 @@ export class App implements OnInit, OnDestroy {
   isMeasuringActivePatch = signal(false);
   measureCountdownSec = signal(0);
   busyActions = signal<Record<string, boolean>>({});
-  queuePollHandle: ReturnType<typeof setInterval> | null = null;
-  activeSlotPollHandle: ReturnType<typeof setInterval> | null = null;
   liveMeterSource: EventSource | null = null;
   liveMeterReconnectHandle: ReturnType<typeof setTimeout> | null = null;
   patchSamplesModalTitle = signal('');
@@ -992,6 +981,7 @@ export class App implements OnInit, OnDestroy {
   editorLiveApplyQueuedFingerprint: string | null = null;
   editorLiveApplyAbortController: AbortController | null = null;
   livePatchSnapshot = signal<Record<string, unknown> | null>(null);
+  operationalUpdatesConnected = signal(false);
   tonePatchObjects = signal<TonePatchObjectResponse[]>([]);
   toneSets = signal<TonePatchObjectSetResponse[]>([]);
   toneSaveName = signal('');
@@ -1016,7 +1006,6 @@ export class App implements OnInit, OnDestroy {
   toneManualSetDescription = signal('');
   toneManualSetSlots = signal<Record<number, string>>({});
   toneSetSlotAssignments = signal<Record<string, string>>({});
-  private activeSlotPollInFlight = false;
   private liveMeterShouldRun = false;
   private toastCounter = 0;
   private readonly toastTimers = new Map<number, ReturnType<typeof setTimeout>>();
@@ -1096,36 +1085,21 @@ export class App implements OnInit, OnDestroy {
   ngOnInit(): void {
     window.addEventListener('popstate', this.onPopState);
     this.loadGlobalNormalizeTargetRms();
-    void this.refreshQueueState();
     void this.loadRecentAudioSamples();
     void this.loadToneLabData();
     if (this.isLineOutPage()) {
     void this.loadLineOutState();
     }
-    void this.refreshActiveSlot();
-    void this.refreshLivePatchStatus();
-    void this.bootstrapLivePatchEditor();
-    this.ngZone.runOutsideAngular(() => {
-      this.queuePollHandle = setInterval(() => {
-        void this.refreshQueueState();
-      }, 1000);
-      this.activeSlotPollHandle = setInterval(() => {
-        void this.refreshActiveSlot();
-      }, 1500);
+    this.ampOperationalState.connect({
+      state: (state) => this.applyOperationalState(state),
+      connection: (connected) => this.operationalUpdatesConnected.set(connected),
     });
   }
 
   ngOnDestroy(): void {
     window.removeEventListener('popstate', this.onPopState);
     this.modalService.dismissAll();
-    if (this.queuePollHandle !== null) {
-      clearInterval(this.queuePollHandle);
-      this.queuePollHandle = null;
-    }
-    if (this.activeSlotPollHandle !== null) {
-      clearInterval(this.activeSlotPollHandle);
-      this.activeSlotPollHandle = null;
-    }
+    this.ampOperationalState.close();
     for (const timer of this.toastTimers.values()) {
       clearTimeout(timer);
     }
@@ -1400,24 +1374,6 @@ export class App implements OnInit, OnDestroy {
       this.applyLivePatchStatus(payload as LivePatchResponse);
     } catch {
       // Ignore background Live Patch summary failures.
-    }
-  }
-
-  private async bootstrapLivePatchEditor(): Promise<void> {
-    try {
-      const response = await fetch('/api/v1/live-patch', {
-        method: 'GET',
-        cache: 'no-store',
-      });
-      const payload = (await response.json()) as LivePatchResponse | { detail?: unknown };
-      if (!response.ok || !('patch_json' in payload)) {
-        return;
-      }
-      const live = payload as LivePatchResponse;
-      this.applyLivePatchStatus(live);
-      this.loadLivePatchIntoEditorState(live, false);
-    } catch {
-      // Silent bootstrap path.
     }
   }
 
@@ -5503,23 +5459,6 @@ export class App implements OnInit, OnDestroy {
     });
   }
 
-  async refreshQueueState(): Promise<void> {
-    try {
-      const response = await fetch('/api/v1/amp/queue', {
-        method: 'GET',
-        cache: 'no-store',
-      });
-      const payload = (await response.json()) as QueueStateResponse | { detail: unknown };
-      if (!response.ok) {
-        return;
-      }
-      const queue = payload as QueueStateResponse;
-      this.notifyQueueTransitions(queue.jobs);
-    } catch {
-      // no-op: queue notifications resume on next successful poll
-    }
-  }
-
   dismissToast(toastId: number): void {
     const timer = this.toastTimers.get(toastId);
     if (timer !== undefined) {
@@ -5605,6 +5544,35 @@ export class App implements OnInit, OnDestroy {
     }
     this.queueJobStatusById = next;
     this.queueNotificationsInitialized = true;
+  }
+
+  private applyOperationalState(state: AmpOperationalState): void {
+    this.notifyQueueTransitions(state.queue.jobs);
+    if (state.live_patch === null) {
+      return;
+    }
+    this.applyOperationalLivePatchStatus(state.live_patch);
+  }
+
+  private applyOperationalLivePatchStatus(payload: AmpOperationalLivePatch): void {
+    const previousSlot = this.selectedAmpSlot();
+    if (previousSlot !== null && payload.active_slot !== previousSlot) {
+      this.currentAmpPatchHash.set('');
+      this.currentAmpCommitState.set('unknown');
+      this.editorLiveApplyQueuedFingerprint = null;
+      if (!this.isAmpStateConflictModalOpen()) {
+        this.openAmpStateConflictModal(previousSlot, payload.active_slot);
+      } else {
+        this.ampStateConflictPreviousSlotLabel.set(this.setLabelForSlot(previousSlot));
+        this.ampStateConflictCurrentSlotLabel.set(payload.active_slot === null ? 'n/a' : this.setLabelForSlot(payload.active_slot));
+        this.ampStateConflictDetectedAt.set(new Date().toISOString());
+      }
+    }
+    this.applyLivePatchStatus(payload);
+    this.refreshCurrentCommitStateFromKnownState();
+    if (this.editorPatchDraft() === null) {
+      this.loadLivePatchIntoEditorState(payload, false);
+    }
   }
 
   slotsForBank(bank: 'A' | 'B'): SlotCard[] {
@@ -7427,10 +7395,10 @@ export class App implements OnInit, OnDestroy {
     this.livePatchPartialDbCount.set(Array.isArray(payload.partial_patch_objects) ? payload.partial_patch_objects.length : 0);
     this.livePatchPartialSlotCount.set(Array.isArray(payload.partial_amp_slots) ? payload.partial_amp_slots.length : 0);
     this.currentAmpPatchHash.set(payload.compat_hash_sha256 || this.currentAmpPatchHash());
-    if (payload.active_slot !== null) {
-      this.selectedAmpSlot.set(payload.active_slot);
-      this.selectedAmpSlotText.set(payload.active_slot <= 4 ? `A:${payload.active_slot}` : `B:${payload.active_slot - 4}`);
-    }
+    this.selectedAmpSlot.set(payload.active_slot);
+    this.selectedAmpSlotText.set(
+      payload.active_slot === null ? 'n/a' : payload.active_slot <= 4 ? `A:${payload.active_slot}` : `B:${payload.active_slot - 4}`,
+    );
   }
 
   private refreshCurrentCommitStateFromKnownState(): void {
@@ -7447,48 +7415,6 @@ export class App implements OnInit, OnDestroy {
       return;
     }
     this.currentAmpCommitState.set(currentHash === selectedHash ? 'committed' : 'uncommitted');
-  }
-
-  private async refreshActiveSlot(): Promise<void> {
-    if (this.activeSlotPollInFlight) {
-      return;
-    }
-    this.activeSlotPollInFlight = true;
-    try {
-      const response = await fetch('/api/v1/amp/current-slot', {
-        method: 'GET',
-        cache: 'no-store',
-      });
-      const payload = await this.readJsonOrTextResponse<ActiveSlotResponse>(response);
-      if (!response.ok) {
-        const detail = this.responseDetailMessage(payload);
-        if (detail) {
-          this.status.set(detail);
-        }
-        return;
-      }
-      const active = payload as ActiveSlotResponse;
-      const previousSlot = this.selectedAmpSlot();
-      if (previousSlot !== null && active.slot !== previousSlot) {
-        this.currentAmpPatchHash.set('');
-        this.currentAmpCommitState.set('unknown');
-        this.editorLiveApplyQueuedFingerprint = null;
-        if (!this.isAmpStateConflictModalOpen()) {
-          this.openAmpStateConflictModal(previousSlot, active.slot);
-        } else {
-          this.ampStateConflictPreviousSlotLabel.set(this.setLabelForSlot(previousSlot));
-          this.ampStateConflictCurrentSlotLabel.set(active.slot === null ? 'n/a' : this.setLabelForSlot(active.slot));
-          this.ampStateConflictDetectedAt.set(new Date().toISOString());
-        }
-      }
-      this.selectedAmpSlot.set(active.slot);
-      this.selectedAmpSlotText.set(active.slot_label || 'n/a');
-      this.refreshCurrentCommitStateFromKnownState();
-    } catch {
-      // Active-slot probe is informational; leave current UI state unchanged on failure.
-    } finally {
-      this.activeSlotPollInFlight = false;
-    }
   }
 
   private nv(value: number | null): string {

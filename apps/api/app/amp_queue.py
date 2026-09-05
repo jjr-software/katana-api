@@ -60,6 +60,8 @@ class AmpJobQueue:
         self._max_job_history = 120
         self._worker_task: asyncio.Task[None] | None = None
         self._jobs_lock = asyncio.Lock()
+        self._state_change = asyncio.Condition()
+        self._state_revision = 0
 
     async def start(self) -> None:
         if self._worker_task is not None and not self._worker_task.done():
@@ -123,6 +125,7 @@ class AmpJobQueue:
         request_block_name: str | None = None,
         queue_key: str | None = None,
     ) -> AmpQueueJob:
+        should_queue = False
         async with self._jobs_lock:
             if queue_key is not None:
                 queued_job = next(
@@ -139,23 +142,53 @@ class AmpJobQueue:
                     queued_job.request_patch = request_patch
                     queued_job.request_previous_patch = request_previous_patch
                     queued_job.request_block_name = request_block_name
-                    return queued_job
+                    job = queued_job
+                else:
+                    job = None
+            else:
+                job = None
 
-            job = AmpQueueJob(
-                job_id=str(uuid4()),
-                operation=operation,
-                status="queued",
-                created_at=datetime.now().isoformat(timespec="seconds"),
-                queue_key=queue_key,
-                slot=slot,
-                request_patch=request_patch,
-                request_previous_patch=request_previous_patch,
-                request_block_name=request_block_name,
-            )
-            self._jobs[job.job_id] = job
-            self._prune_jobs_locked()
-        await self._queue.put(job.job_id)
+            if job is None:
+                job = AmpQueueJob(
+                    job_id=str(uuid4()),
+                    operation=operation,
+                    status="queued",
+                    created_at=datetime.now().isoformat(timespec="seconds"),
+                    queue_key=queue_key,
+                    slot=slot,
+                    request_patch=request_patch,
+                    request_previous_patch=request_previous_patch,
+                    request_block_name=request_block_name,
+                )
+                self._jobs[job.job_id] = job
+                self._prune_jobs_locked()
+                should_queue = True
+        if should_queue:
+            await self._queue.put(job.job_id)
+        await self.publish_state_change()
         return job
+
+    async def get_state_revision(self) -> int:
+        async with self._state_change:
+            return self._state_revision
+
+    async def wait_for_state_change(self, known_revision: int, timeout_seconds: float) -> int:
+        async with self._state_change:
+            if self._state_revision != known_revision:
+                return self._state_revision
+            try:
+                await asyncio.wait_for(
+                    self._state_change.wait_for(lambda: self._state_revision != known_revision),
+                    timeout=timeout_seconds,
+                )
+            except asyncio.TimeoutError:
+                pass
+            return self._state_revision
+
+    async def publish_state_change(self) -> None:
+        async with self._state_change:
+            self._state_revision += 1
+            self._state_change.notify_all()
 
     async def get_job(self, job_id: str) -> AmpQueueJob | None:
         async with self._jobs_lock:
@@ -190,6 +223,7 @@ class AmpJobQueue:
             job.status = "running"
             job.started_at = datetime.now().isoformat(timespec="seconds")
             job.error = None
+        await self.publish_state_change()
 
         settings = get_settings()
         client = AmpClient(
@@ -312,6 +346,7 @@ class AmpJobQueue:
                 )
                 failed.finished_at = datetime.now().isoformat(timespec="seconds")
             await self._persist_sync_history_with_guard(failed)
+            await self.publish_state_change()
             return
         except AmpClientError as exc:
             async with self._jobs_lock:
@@ -322,6 +357,7 @@ class AmpJobQueue:
                 failed.error = str(exc)
                 failed.finished_at = datetime.now().isoformat(timespec="seconds")
             await self._persist_sync_history_with_guard(failed)
+            await self.publish_state_change()
             return
         except Exception as exc:
             async with self._jobs_lock:
@@ -332,6 +368,7 @@ class AmpJobQueue:
                 failed.error = f"Unhandled queue error: {exc}"
                 failed.finished_at = datetime.now().isoformat(timespec="seconds")
             await self._persist_sync_history_with_guard(failed)
+            await self.publish_state_change()
             return
 
         async with self._jobs_lock:
@@ -357,6 +394,7 @@ class AmpJobQueue:
                 failed.status = "failed"
                 failed.error = f"Sync history persistence failed: {exc}"
                 failed.finished_at = datetime.now().isoformat(timespec="seconds")
+        await self.publish_state_change()
 
     async def _persist_sync_history_if_needed(self, job: AmpQueueJob) -> None:
         if not self._is_sync_operation(job.operation):
