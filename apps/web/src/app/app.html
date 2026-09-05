@@ -250,12 +250,23 @@
                   <article class="border rounded p-2 effect-card">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <div class="d-flex align-items-center gap-2">
-                        <h4 class="h6 mb-0">Delay Extras</h4>
+                        <h4 class="h6 mb-0">Delay 2</h4>
                       </div>
                       <label class="form-check-label small d-flex align-items-center gap-1">
                         <input class="form-check-input m-0" type="checkbox" [checked]="editorDelay2On()" (change)="setEditorDelay2On($any($event.target).checked)" />
-                        <span>Delay2 Enabled</span>
+                        <span>Delay 2 Enabled</span>
                       </label>
+                    </div>
+                    <div class="row g-2">
+                      <div class="col-12 col-md-6">
+                        <label class="form-label small mb-1">Type</label>
+                        <select class="form-select form-select-sm" (change)="setEditorDelay2Type($any($event.target).value)">
+                          @for (opt of stageTypeOptions('delay'); track opt.value) {
+                            <option [value]="opt.value" [selected]="editorDelay2Type() === opt.value">{{ opt.label }}</option>
+                          }
+                        </select>
+                        <div class="small text-body-secondary mt-1">Selected: {{ editorDelay2TypeLabel() }}</div>
+                      </div>
                     </div>
                   </article>
                   }

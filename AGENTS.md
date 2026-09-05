@@ -2149,3 +2149,12 @@
   - the editor interpreted this safe no-op as failure and immediately retried its unchanged pending draft.
 - Fixed `AmpClient.apply_current_patch_block()` so an empty targeted diff returns the canonical requested patch successfully without sending a DT1 MIDI write. This lets the editor settle its write-through fingerprint and stops the retry loop.
 - Rebuilt/restarted with `docker compose up -d --build`; post-restart queue inspection found no new failed delay jobs.
+
+## Session Update - 2026-09-05 (Independent Digital Delay Selection)
+- Corrected the live Delay editor so both canonical delay paths are selectable:
+  - Delay 1 and Delay 2 now each expose their own algorithm Type selector while continuing to share the selected delay colour.
+  - Digital Delay is type `0`; selecting it when it is already active is a successful no-op, not a failed apply.
+- Live-state inspection showed the current Amp on `A:1` with both Delay 1 and Delay 2 set to Digital Delay and bypassed. The editor does not alter either state until the user changes and applies it.
+- Verification:
+  - `docker compose up -d --build` completed; API and web are running.
+  - Central Playwright reached the freshly served `main-QXDG27OU.js` bundle at the public URL. Desktop and `390 x 844` mobile screenshots were captured; the Delay 2 selector includes Digital Delay and mobile has no horizontal overflow. During inspection the app presented its existing patch-change decision modal after the physical amp changed from `A:4` to `A:1`; the amp was left untouched and the GUI was reloaded from the amp.

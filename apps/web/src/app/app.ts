@@ -4418,6 +4418,32 @@ export class App implements OnInit, OnDestroy {
     });
   }
 
+  editorDelay2Type(): number | null {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const delay = this.readObject(stages, 'delay');
+    const raw = delay?.['delay2_raw'];
+    if (!Array.isArray(raw) || raw.length === 0) {
+      return null;
+    }
+    return this.parseUnknownNumber(raw[0]);
+  }
+
+  setEditorDelay2Type(value: string): void {
+    const type = this.clampInteger(this.parseInteger(value), 0, DELAY_TYPE_NAMES.length - 1);
+    this.updateEditorPatch((draft) => {
+      const stages = this.ensureObject(draft, 'stages');
+      const delay = this.ensureObject(stages, 'delay');
+      const raw = this.ensureRawArray(delay, 'delay2_raw', 17);
+      raw[0] = type;
+      delay['delay2_raw'] = raw;
+    });
+  }
+
+  editorDelay2TypeLabel(): string {
+    const type = this.editorDelay2Type();
+    return type === null ? 'n/a' : this.effectTypeLabel('delay', type);
+  }
+
   editorEqNumber(eqName: EqStageName, field: 'position' | 'type'): number | null {
     const stages = this.readObject(this.editorPatchDraft(), 'stages');
     const eq = this.readObject(stages, eqName);
