@@ -2187,3 +2187,17 @@
   - wrote output level `100 -> 99`, read back `99` from the amp, then restored and read back `100`.
   - the UI presented only the expected Cry Baby controls at the public page; no internal raw-byte terminology appeared.
 - Rebuilt/restarted with `docker compose up -d --build`; existing Angular size-budget warnings remain non-fatal.
+
+## Session Update - 2026-09-05 (Digital Delay Canonical Write Fix)
+- Corrected the complete Digital Delay layout from the extracted Gen 3 address map:
+  - time is the four-nibble value at raw offsets `1..4`;
+  - feedback, high cut, effect level, and direct level are raw offsets `5..8`.
+- Delay 1 and Delay 2 now both present the complete editable delay parameter set, not only a Delay 2 type selector.
+- Fixed the editor write-through authority path:
+  - changing any colour-backed effect control now updates the selected canonical variant in the same draft mutation;
+  - a submitted raw block remains authoritative at the FastAPI patch merge boundary, while compact fields are derived from it rather than overwriting it.
+- Verification:
+  - `docker compose up -d --build` succeeded with only the existing Angular bundle-budget warnings;
+  - central Playwright loaded the fresh public bundle and the Delay 2 card exposed all delay controls;
+  - changing Delay 1 time produced the targeted canonical `PATCH /api/v1/live-patch/blocks/delay` payload with only the selected red variant's time byte changed.
+- Current live patch has Delay 1 bypassed. The API persisted the corrected change, while the immediate hardware readback of that bypassed delay block retained its previous value; leave Delay 1 bypassed and use a deliberate enabled-delay audition to establish any device-specific deferred-update behaviour before treating that as a control-map issue.

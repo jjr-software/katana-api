@@ -54,10 +54,10 @@ STAGE_RAW_FIELD_MAP: dict[str, dict[str, int]] = {
     "fx": {"type": 0},
     "delay": {
         "type": 0,
-        "feedback": 4,
-        "high_cut": 5,
-        "effect_level": 6,
-        "direct_level": 7,
+        "feedback": 5,
+        "high_cut": 6,
+        "effect_level": 7,
+        "direct_level": 8,
     },
     "reverb": {
         "type": 0,
@@ -93,8 +93,8 @@ NUMERIC_BLOCK_FIELDS: dict[str, tuple[str, ...]] = {
     "exp_pedal": ("function",),
     "gafc_exp1": ("function",),
 }
-DELAY_TIME_RAW_START = 2
-DELAY_TIME_RAW_END = 4
+DELAY_TIME_RAW_START = 1
+DELAY_TIME_RAW_END = 5
 
 
 def patch_object_block_names(patch_object: dict[str, Any]) -> list[str]:
@@ -405,14 +405,15 @@ def _sync_stage_raw_from_compact(block_name: str, target: dict[str, Any], patch_
     raw_map = STAGE_RAW_FIELD_MAP.get(block_name, {})
     raw = target.get("raw")
     if isinstance(raw, list):
-        for key, index in raw_map.items():
-            if key in patch_block and 0 <= index < len(raw) and isinstance(target.get(key), (int, float)):
-                raw[index] = int(target[key])
-        if block_name == "delay":
-            time_raw = target.get("time_raw")
-            if isinstance(time_raw, list) and len(raw) >= DELAY_TIME_RAW_END:
-                for raw_index, value in enumerate(time_raw[: DELAY_TIME_RAW_END - DELAY_TIME_RAW_START], start=DELAY_TIME_RAW_START):
-                    raw[raw_index] = int(value)
+        if "raw" not in patch_block:
+            for key, index in raw_map.items():
+                if key in patch_block and 0 <= index < len(raw) and isinstance(target.get(key), (int, float)):
+                    raw[index] = int(target[key])
+            if block_name == "delay":
+                time_raw = target.get("time_raw")
+                if isinstance(time_raw, list) and len(raw) >= DELAY_TIME_RAW_END:
+                    for raw_index, value in enumerate(time_raw[: DELAY_TIME_RAW_END - DELAY_TIME_RAW_START], start=DELAY_TIME_RAW_START):
+                        raw[raw_index] = int(value)
     elif block_name in {"ns", "send_return", "solo"}:
         max_index = max(raw_map.values(), default=0)
         raw = [0] * (max_index + 1)

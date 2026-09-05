@@ -4392,12 +4392,41 @@ export class App implements OnInit, OnDestroy {
       const raw = this.ensureRawArray(delay, 'delay2_raw', 17);
       raw[0] = type;
       delay['delay2_raw'] = raw;
+      this.syncStageSelectedVariant(draft, 'delay', delay);
     });
   }
 
   editorDelay2TypeLabel(): string {
     const type = this.editorDelay2Type();
     return type === null ? 'n/a' : this.effectTypeLabel('delay', type);
+  }
+
+  editorDelay2Params(): StageParam[] {
+    const stages = this.readObject(this.editorPatchDraft(), 'stages');
+    const delay = this.readObject(stages, 'delay');
+    const rawUnknown = delay?.['delay2_raw'];
+    if (!Array.isArray(rawUnknown) || rawUnknown.length !== 17) {
+      return [];
+    }
+    const raw = rawUnknown.map((item) => this.parseUnknownNumber(item));
+    return this.delayParamsFromRaw(raw, 'delay2');
+  }
+
+  setEditorDelay2Param(paramKey: string, value: string | number): void {
+    const schema = this.findStageParamSchema('delay', paramKey);
+    if (!schema) {
+      return;
+    }
+    const parsed = this.clampInteger(this.parseInteger(value), schema.min, schema.max);
+    this.updateEditorPatch((draft) => {
+      const stages = this.ensureObject(draft, 'stages');
+      const delay = this.ensureObject(stages, 'delay');
+      const raw = this.ensureRawArray(delay, 'delay2_raw', 17);
+      if (this.writeStageParamValue('delay', raw, schema, parsed)) {
+        delay['delay2_raw'] = raw;
+        this.syncStageSelectedVariant(draft, 'delay', delay);
+      }
+    });
   }
 
   editorEqNumber(eqName: EqStageName, field: 'position' | 'type'): number | null {
@@ -5315,6 +5344,7 @@ export class App implements OnInit, OnDestroy {
         this.initializePedalWahDefaults(stage);
       }
       this.syncStageDerivedFields(stageName, stage);
+      this.syncStageSelectedVariant(draft, stageName, stage);
       if (stageName === 'mod' || stageName === 'fx') {
         this.refreshExpAssignmentDefaultsForFxStage(draft, stageName);
       }
@@ -5392,6 +5422,9 @@ export class App implements OnInit, OnDestroy {
     if (raw.length <= 1) {
       return [];
     }
+    if (stageName === 'delay') {
+      return this.delayParamsFromRaw(raw, 'delay');
+    }
     const params: StageParam[] = [];
     for (const schema of this.stageParamSchema(stageName)) {
       const decoded = this.readStageParamValue(stageName, raw, schema);
@@ -5407,6 +5440,29 @@ export class App implements OnInit, OnDestroy {
         max: schema.max,
         control: this.stageParamControl(schema),
         options: this.stageParamOptions(stageName, schema),
+        offLabel: schema.offLabel ?? 'Off',
+        onLabel: schema.onLabel ?? 'On',
+      });
+    }
+    return params;
+  }
+
+  private delayParamsFromRaw(raw: readonly number[], idPrefix: 'delay' | 'delay2'): StageParam[] {
+    const params: StageParam[] = [];
+    for (const schema of this.stageParamSchema('delay')) {
+      const decoded = this.readStageParamValue('delay', raw, schema);
+      if (decoded === null) {
+        continue;
+      }
+      params.push({
+        id: `${idPrefix}-${schema.key}`,
+        key: schema.key,
+        label: schema.label,
+        value: decoded,
+        min: schema.min,
+        max: schema.max,
+        control: this.stageParamControl(schema),
+        options: this.stageParamOptions('delay', schema),
         offLabel: schema.offLabel ?? 'Off',
         onLabel: schema.onLabel ?? 'On',
       });
@@ -5456,7 +5512,29 @@ export class App implements OnInit, OnDestroy {
       }
       stage['raw'] = raw;
       this.syncStageDerivedFields(stageName, stage);
+      this.syncStageSelectedVariant(draft, stageName, stage);
     });
+  }
+
+  private syncStageSelectedVariant(draft: Record<string, unknown>, stageName: StageName, stage: Record<string, unknown>): void {
+    const colors = this.readObject(draft, 'colors');
+    const color = this.readObject(colors, stageName);
+    const colorIndex = this.clampInteger(this.parseUnknownNumber(color?.['index']), 0, 2);
+    const raw = stage['raw'];
+    const variants = stage['variants_raw'];
+    if (Array.isArray(raw) && Array.isArray(variants) && Array.isArray(variants[colorIndex])) {
+      variants[colorIndex] = [...raw.map((item) => this.parseUnknownNumber(item))];
+      stage['variants_raw'] = variants;
+    }
+    if (stageName !== 'delay') {
+      return;
+    }
+    const delay2Raw = stage['delay2_raw'];
+    const delay2Variants = stage['variants2_raw'];
+    if (Array.isArray(delay2Raw) && Array.isArray(delay2Variants) && Array.isArray(delay2Variants[colorIndex])) {
+      delay2Variants[colorIndex] = [...delay2Raw.map((item) => this.parseUnknownNumber(item))];
+      stage['variants2_raw'] = delay2Variants;
+    }
   }
 
   dismissToast(toastId: number): void {
@@ -6317,8 +6395,12 @@ export class App implements OnInit, OnDestroy {
       if (raw.length > 0) {
         stage['type'] = raw[0];
       }
-      if (raw.length > 7) {
+      if (raw.length > 8) {
+        stage['time_raw'] = raw.slice(1, 5);
+        stage['feedback'] = raw[5];
+        stage['high_cut'] = raw[6];
         stage['effect_level'] = raw[7];
+        stage['direct_level'] = raw[8];
       }
       return;
     }
@@ -6471,7 +6553,7 @@ export class App implements OnInit, OnDestroy {
     return 1;
   }
 
-  private readStageParamValue(stageName: StageName, raw: number[], schema: StageParamSchema): number | null {
+  private readStageParamValue(stageName: StageName, raw: readonly number[], schema: StageParamSchema): number | null {
     const start = this.stageParamArrayIndex(stageName, schema);
     const width = this.stageParamWidth(schema.size);
     if (start < 0 || start + width > raw.length) {
