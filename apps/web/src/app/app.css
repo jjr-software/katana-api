@@ -139,7 +139,6 @@
   vertical-align: -0.1rem;
 }
 
-.spectrum-difference-key-overall { background: #6f42c1; }
 .spectrum-difference-key-positive { background: #198754; }
 .spectrum-difference-key-negative { background: #dc3545; }
 
@@ -161,7 +160,7 @@
 
 .spectrum-difference-buckets {
   display: grid;
-  grid-template-columns: repeat(9, minmax(3.5rem, 1fr));
+  grid-template-columns: repeat(8, minmax(3.5rem, 1fr));
   gap: 0.55rem;
   min-width: 0;
 }
@@ -172,11 +171,6 @@
   gap: 0.3rem;
   min-width: 0;
   text-align: center;
-}
-
-.spectrum-difference-bucket-overall {
-  padding-right: 0.55rem;
-  border-right: 2px solid #dee2e6;
 }
 
 .spectrum-difference-meter {
@@ -201,7 +195,6 @@
 
 .spectrum-difference-positive { bottom: 50%; background: #198754; }
 .spectrum-difference-negative { top: 50%; background: #dc3545; }
-.spectrum-difference-overall { background: #6f42c1; }
 
 .spectrum-difference-value,
 .spectrum-difference-label {
@@ -305,9 +298,8 @@
   .spectrum-band-label { font-size: 0.62rem; }
   .spectrum-band-range { font-size: 0.55rem; }
   .spectrum-difference-chart { grid-template-columns: 1.85rem minmax(0, 1fr); gap: 0.25rem; }
-  .spectrum-difference-buckets { grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 0.2rem; }
+  .spectrum-difference-buckets { grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 0.2rem; }
   .spectrum-difference-bucket { grid-template-rows: 8rem auto auto; }
-  .spectrum-difference-bucket-overall { padding-right: 0.2rem; }
   .spectrum-difference-axis { height: 8rem; }
   .spectrum-difference-value { font-size: 0.6rem; }
   .spectrum-difference-label { font-size: 0.55rem; }

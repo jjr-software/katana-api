@@ -584,6 +584,7 @@ interface SpectrumMeasurementResponse {
   capture_duration_sec: number;
   rms_dbfs: number;
   peak_dbfs: number;
+  k_weighted_lufs: number | null;
   patch_name: string;
   active_slot_label: string;
   bands: SpectrumBand[];
@@ -594,12 +595,13 @@ interface SpectrumDifferenceBucket {
   id: string;
   label: string;
   deltaDb: number;
-  overall: boolean;
 }
 
 interface SpectrumComparison {
   baseline: SpectrumMeasurementResponse;
   compared: SpectrumMeasurementResponse;
+  rawLevelDeltaDb: number;
+  perceivedLevelDeltaLu: number | null;
   buckets: SpectrumDifferenceBucket[];
   scaleDb: number;
 }
@@ -648,6 +650,7 @@ function isSpectrumMeasurement(value: unknown): value is SpectrumMeasurementResp
     && isFiniteNumber(measurement.capture_duration_sec)
     && isFiniteNumber(measurement.rms_dbfs)
     && isFiniteNumber(measurement.peak_dbfs)
+    && (measurement.k_weighted_lufs === undefined || measurement.k_weighted_lufs === null || isFiniteNumber(measurement.k_weighted_lufs))
     && typeof measurement.patch_name === 'string'
     && typeof measurement.active_slot_label === 'string'
     && Array.isArray(measurement.bands)
@@ -667,7 +670,13 @@ function loadStoredSpectrumMeasurements(): StoredSpectrumMeasurements {
     if (!Array.isArray(value) || !value.every(isSpectrumMeasurement)) {
       return { measurements: [], error: 'Saved spectrum history has an invalid format and was not loaded.' };
     }
-    return { measurements: value, error: '' };
+    return {
+      measurements: value.map((measurement) => ({
+        ...measurement,
+        k_weighted_lufs: isFiniteNumber(measurement.k_weighted_lufs) ? measurement.k_weighted_lufs : null,
+      })),
+      error: '',
+    };
   } catch {
     return { measurements: [], error: 'Saved spectrum history could not be read.' };
   }
@@ -880,21 +889,24 @@ export class App implements OnInit, OnDestroy {
       return null;
     }
     const buckets: SpectrumDifferenceBucket[] = [
-      {
-        id: 'overall',
-        label: 'Overall Level',
-        deltaDb: compared.rms_dbfs - baseline.rms_dbfs,
-        overall: true,
-      },
       ...baseline.bands.map((band, index) => ({
         id: band.id,
         label: band.label,
         deltaDb: compared.bands[index].energy_dbfs - band.energy_dbfs,
-        overall: false,
       })),
     ];
     const scaleDb = Math.max(3, Math.ceil(Math.max(...buckets.map((bucket) => Math.abs(bucket.deltaDb)))));
-    return { baseline, compared, buckets, scaleDb };
+    const perceivedLevelDeltaLu = baseline.k_weighted_lufs !== null && compared.k_weighted_lufs !== null
+      ? compared.k_weighted_lufs - baseline.k_weighted_lufs
+      : null;
+    return {
+      baseline,
+      compared,
+      rawLevelDeltaDb: compared.rms_dbfs - baseline.rms_dbfs,
+      perceivedLevelDeltaLu,
+      buckets,
+      scaleDb,
+    };
   });
   spectrumMeasuring = signal(false);
   spectrumError = signal(this.storedSpectrumMeasurements.error);
@@ -3493,6 +3505,46 @@ export class App implements OnInit, OnDestroy {
   spectrumSignedValue(value: number): string {
     const rounded = Math.abs(value) < 0.005 ? 0 : value;
     return `${rounded > 0 ? '+' : ''}${rounded.toFixed(2)}`;
+  }
+
+  spectrumSignedDb(value: number): string {
+    return `${this.spectrumSignedValue(value)} dB`;
+  }
+
+  spectrumSignedLu(value: number | null): string {
+    return value === null ? 'Not available' : `${this.spectrumSignedValue(value)} LU`;
+  }
+
+  spectrumPerceivedHeadline(value: number | null): string {
+    if (value === null) {
+      return 'Perceived loudness unavailable';
+    }
+    const rounded = Math.abs(value) < 0.005 ? 0 : value;
+    return rounded > 0 ? 'B louder than A' : rounded < 0 ? 'B quieter than A' : 'B matches A';
+  }
+
+  spectrumPerceivedToneClass(value: number | null): string {
+    if (value === null) {
+      return 'text-secondary';
+    }
+    const rounded = Math.abs(value) < 0.005 ? 0 : value;
+    return rounded > 0 ? 'text-success' : rounded < 0 ? 'text-danger' : 'text-secondary';
+  }
+
+  spectrumPerceivedBorderClass(value: number | null): string {
+    if (value === null) {
+      return 'border-secondary';
+    }
+    const rounded = Math.abs(value) < 0.005 ? 0 : value;
+    return rounded > 0 ? 'border-success' : rounded < 0 ? 'border-danger' : 'border-secondary';
+  }
+
+  formatLufs(value: number | null): string {
+    return value === null ? 'Not available' : `${value.toFixed(2)} LUFS`;
+  }
+
+  spectrumPeakHeadroom(value: number): string {
+    return `Peak ${this.formatDb(value)} · ${Math.max(0, -value).toFixed(2)} dB headroom`;
   }
 
   clearSpectrumMeasurements(): void {

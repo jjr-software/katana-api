@@ -224,26 +224,27 @@ Authoritative workflow:
 
 1. The guitarist opens Spectrum Compare and presses **Measure**.
 2. The page immediately tells them to play. The API reads the canonical `Live Patch` and active-slot state through the existing amp queue, allows a fixed 0.5-second settle, then captures a fixed 4-second PipeWire window from the configured Katana source.
-3. The API returns one typed measurement: RMS/peak loudness, exactly eight fixed band-energy readings, and a typed summary of the captured patch identity and every relevant pipeline stage state.
+3. The API returns one typed measurement with three distinct audio measures: raw broadband RMS in dBFS, peak in dBFS, and ITU-R BS.1770-4 K-weighted integrated loudness in LUFS; it also returns exactly eight fixed band-energy readings and a typed summary of the captured patch identity and every relevant pipeline stage state.
 4. The page stores returned measurement cards in browser local storage so they remain available after reload on that browser. No server-side spectrum record or second patch-state authority is introduced.
 5. The guitarist can delete one stored measurement or delete all measurements. Deleting a selected card also removes it from the active comparison without affecting the remaining cards.
 6. Cards use one shared 0 to -90 dBFS visual scale and each card can be selected for comparison.
-7. The first selected card is comparison A (baseline) and the second is comparison B. Once exactly two are selected, the page shows `B − A` for overall RMS and each of the eight bands.
-8. Overall RMS is the first, visually separated difference bucket and uses indigo. The eight spectral buckets use one symmetric scale: positive differences extend above zero in green and negative differences extend below zero in red. Exact signed dB values remain visible so colour and bar length are not the only evidence.
-9. Stage state remains visible on the source cards so the guitarist can relate a measured difference to the captured pedal and pipeline state.
+7. The first selected card is comparison A (baseline) and the second is comparison B. Once exactly two are selected, the first and dominant result is `B − A` Perceived loudness: the ITU-R BS.1770-4 K-weighted integrated-loudness difference, expressed as a signed LU value and exact typed `B louder` or `B quieter` wording.
+8. Raw energy is the secondary direct broadband RMS/dBFS measurement. Perceived loudness is measured in LUFS across the fixed capture using `pyloudnorm` rather than an application-defined weighting; it is the comparison authority, without qualitative thresholds or claims of perfect human perception. Peak/headroom stays compact on each source card because it is diagnostic rather than the primary match target.
+9. The spectral-redistribution chart contains only the eight bands and uses one symmetric scale: positive differences extend above zero in green and negative differences extend below zero in red. Each band delta is an independent logarithmic ratio; it must not be added to or averaged into Raw energy or Perceived loudness. A large loss of Presence or Brilliance can make B clearly feel quieter even when its raw-energy difference is small, as in the accepted `−1.97 dB` raw-energy / `−13.30 dB` Presence / `−17.71 dB` Brilliance example.
+10. Stage state remains visible on the source cards so the guitarist can relate a measured difference to the captured pedal and pipeline state.
 
 Module ownership:
 
-- `audio_capture` owns PipeWire capture and the deterministic audio calculation. It exposes the fixed-band energy algorithm; it does not know amp or UI concepts.
+- `audio_capture` owns PipeWire capture and deterministic audio calculations. It exposes the fixed-band energy algorithm and the ITU-R BS.1770-4 K-weighted loudness calculation; it does not know amp or UI concepts.
 - `katana.client` owns canonical live-patch and active-slot reads. `amp_queue` serializes that device work.
 - `spectrum_compare` owns the bounded measurement orchestration and translates the canonical structured patch payload into a compact typed display contract. It does not persist a second patch representation.
 - `api/spectrum_compare` is the thin HTTP transport boundary.
-- the Angular Spectrum Compare page owns browser-local measurement persistence, deletion, the ordered two-card selection, deterministic `B − A` calculations, and their Bootstrap presentation.
+- the Angular Spectrum Compare page owns browser-local measurement persistence, deletion, the ordered two-card selection, deterministic `B − A` calculations, the explicit distinction between raw level, perceived level, and spectral redistribution, and their Bootstrap presentation.
 
 Typed measurement contract:
 
 - `POST /api/v1/spectrum-compare/measure` has no semantic text input and returns `SpectrumMeasurementResponse`.
-- A response contains capture timing, `rms_dbfs`, `peak_dbfs`, an exact ordered list of eight `{id, label, low_hz, high_hz, energy_dbfs}`, patch name and active-slot label, and structured stage `{id, label, active, detail}` summaries.
+- A response contains capture timing, `rms_dbfs`, `peak_dbfs`, `k_weighted_lufs` (or null where the standard meter has no reportable gated loudness), an exact ordered list of eight `{id, label, low_hz, high_hz, energy_dbfs}`, patch name and active-slot label, and structured stage `{id, label, active, detail}` summaries.
 - Stage state derives only from canonical typed boolean/enumeration fields returned by the amp client; no label matching or text inference is used.
 
 Fixed spectrum bands (lower bound inclusive, upper bound exclusive except the final band):
@@ -259,7 +260,7 @@ Fixed spectrum bands (lower bound inclusive, upper bound exclusive except the fi
 | Brilliance | 4,000–8,000 Hz |
 | Air | 8,000–16,000 Hz |
 
-The band algorithm uses Hann-windowed fixed 8,192-sample FFT frames across the fixed capture, sums bin power inside each range, averages it across complete frames, and reports the square-root power as dBFS. This preserves a stable typed physical measure rather than a semantic quality score.
+The band algorithm uses Hann-windowed fixed 8,192-sample FFT frames across the fixed capture, sums bin power inside each range, averages it across complete frames, and reports the square-root power as dBFS. This preserves a stable typed physical measure rather than a semantic quality score. The loudness algorithm uses the established `pyloudnorm` implementation of ITU-R BS.1770-4 K-weighted gated integrated loudness on the same captured samples; its LUFS result is deliberately not derived from the eight band values.
 
 ## 5.0.1 Fast Live Design Loop
 Target workflow:

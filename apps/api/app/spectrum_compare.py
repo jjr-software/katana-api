@@ -11,6 +11,7 @@ from app.audio_capture import (
     KATANA_CAPTURE_RATE,
     SPECTRUM_COMPARE_BANDS,
     capture_audio_sample,
+    k_weighted_integrated_lufs,
     spectrum_compare_band_energies,
 )
 
@@ -24,7 +25,7 @@ class SpectrumBandResponse(BaseModel):
     label: str
     low_hz: int = Field(ge=0)
     high_hz: int = Field(gt=0)
-    energy_dbfs: float = Field(ge=-120, le=0)
+    energy_dbfs: float = Field(le=0)
 
 
 class SpectrumStageResponse(BaseModel):
@@ -44,6 +45,7 @@ class SpectrumMeasurementResponse(BaseModel):
     capture_duration_sec: float
     rms_dbfs: float = Field(ge=-120, le=0)
     peak_dbfs: float = Field(ge=-120, le=0)
+    k_weighted_lufs: float | None = None
     patch_name: str
     active_slot_label: str
     bands: list[SpectrumBandResponse] = Field(min_length=8, max_length=8)
@@ -62,6 +64,7 @@ async def capture_spectrum_measurement() -> SpectrumMeasurementResponse:
         channels=KATANA_CAPTURE_CHANNELS,
     )
     energies = spectrum_compare_band_energies(captured.samples, rate=captured.metrics.rate)
+    k_weighted_lufs = k_weighted_integrated_lufs(captured.samples, rate=captured.metrics.rate)
     bands = [
         SpectrumBandResponse(id=band_id, label=label, low_hz=low_hz, high_hz=high_hz, energy_dbfs=energy)
         for (band_id, label, low_hz, high_hz), energy in zip(SPECTRUM_COMPARE_BANDS, energies, strict=True)
@@ -72,6 +75,7 @@ async def capture_spectrum_measurement() -> SpectrumMeasurementResponse:
         capture_duration_sec=SPECTRUM_CAPTURE_DURATION_SEC,
         rms_dbfs=captured.metrics.rms_dbfs,
         peak_dbfs=captured.metrics.peak_dbfs,
+        k_weighted_lufs=k_weighted_lufs,
         patch_name=_display_patch_name(patch),
         active_slot_label=_active_slot_label(patch),
         bands=bands,

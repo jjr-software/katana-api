@@ -899,7 +899,7 @@
           <div class="alert alert-danger mb-0" role="alert">{{ spectrumError() }}</div>
         } @else {
           <div class="spectrum-legend small text-secondary">
-            <span><span class="spectrum-scale-swatch"></span>Band energy: 0 dBFS at the top, −90 dBFS at the bottom.</span>
+            <span><span class="spectrum-scale-swatch"></span>Band energy: actual spectral energy, 0 dBFS at the top and −90 dBFS at the bottom.</span>
             <span><span class="spectrum-stage-dot spectrum-stage-dot-on"></span>Active</span>
             <span><span class="spectrum-stage-dot spectrum-stage-dot-off"></span>Bypassed</span>
             <span>Select two cards to see B − A.</span>
@@ -918,7 +918,7 @@
           <div class="card-body d-grid gap-3">
             <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
               <div>
-                <h3 class="h5 mb-1">Difference: B − A</h3>
+                <h3 class="h5 mb-1">A/B comparison</h3>
                 <p class="small text-secondary mb-0">
                   <strong>A</strong> {{ comparison.baseline.patch_name }} · {{ comparison.baseline.active_slot_label }}
                   <span class="mx-1">→</span>
@@ -926,35 +926,61 @@
                 </p>
               </div>
               <div class="d-flex flex-wrap gap-2 small text-secondary">
-                <span><span class="spectrum-difference-key spectrum-difference-key-overall"></span>Overall level</span>
                 <span><span class="spectrum-difference-key spectrum-difference-key-positive"></span>B has more</span>
                 <span><span class="spectrum-difference-key spectrum-difference-key-negative"></span>B has less</span>
               </div>
             </div>
 
-            <div class="spectrum-difference-chart" aria-label="Difference between selected measurements in decibels">
-              <div class="spectrum-difference-axis" aria-hidden="true">
-                <span>+{{ comparison.scaleDb }}</span><span>0</span><span>−{{ comparison.scaleDb }}</span>
-              </div>
-              <div class="spectrum-difference-buckets">
-                @for (bucket of comparison.buckets; track bucket.id) {
-                  <div class="spectrum-difference-bucket" [class.spectrum-difference-bucket-overall]="bucket.overall">
-                    <div class="spectrum-difference-meter">
-                      <div class="spectrum-difference-zero"></div>
-                      <div
-                        class="spectrum-difference-fill"
-                        [class.spectrum-difference-positive]="bucket.deltaDb >= 0"
-                        [class.spectrum-difference-negative]="bucket.deltaDb < 0"
-                        [class.spectrum-difference-overall]="bucket.overall"
-                        [style.height.%]="spectrumDifferenceHeight(bucket.deltaDb, comparison.scaleDb)"
-                      ></div>
-                    </div>
-                    <strong class="spectrum-difference-value">
-                      {{ spectrumSignedValue(bucket.deltaDb) }}<span class="d-block d-sm-inline"> dB</span>
-                    </strong>
-                    <span class="spectrum-difference-label text-wrap">{{ bucket.label }}</span>
+            <div class="row g-2">
+              <div class="col-12">
+                <div class="border border-3 rounded p-3" [class]="spectrumPerceivedBorderClass(comparison.perceivedLevelDeltaLu)">
+                  <div class="small text-secondary">Perceived loudness · K-weighted integrated loudness</div>
+                  <div class="d-flex justify-content-between align-items-end gap-3 flex-wrap">
+                    <strong class="fs-3" [class]="spectrumPerceivedToneClass(comparison.perceivedLevelDeltaLu)">{{ spectrumPerceivedHeadline(comparison.perceivedLevelDeltaLu) }}</strong>
+                    <strong class="fs-2" [class]="spectrumPerceivedToneClass(comparison.perceivedLevelDeltaLu)">{{ spectrumSignedLu(comparison.perceivedLevelDeltaLu) }}</strong>
                   </div>
-                }
+                  @if (comparison.perceivedLevelDeltaLu !== null) {
+                    <div class="small text-secondary mt-1">A {{ formatLufs(comparison.baseline.k_weighted_lufs) }} → B {{ formatLufs(comparison.compared.k_weighted_lufs) }}</div>
+                  } @else {
+                    <div class="small text-secondary mt-1">Capture again to calculate LUFS for both cards.</div>
+                  }
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="border rounded p-2">
+                  <div class="small text-secondary">Raw energy · broadband RMS (secondary)</div>
+                  <strong>{{ spectrumSignedDb(comparison.rawLevelDeltaDb) }}</strong>
+                  <span class="small text-secondary ms-2">A {{ formatDb(comparison.baseline.rms_dbfs) }} → B {{ formatDb(comparison.compared.rms_dbfs) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h4 class="h6 mb-1">Spectral redistribution: B − A</h4>
+              <p class="small text-secondary mb-2">Each band delta is independent. Do not add or average these values into Raw or Perceived level; a strong mid/presence change can sound more prominent without changing broadband level by the same amount.</p>
+              <div class="spectrum-difference-chart" aria-label="Spectral redistribution between selected measurements in decibels">
+                <div class="spectrum-difference-axis" aria-hidden="true">
+                  <span>+{{ comparison.scaleDb }}</span><span>0</span><span>−{{ comparison.scaleDb }}</span>
+                </div>
+                <div class="spectrum-difference-buckets">
+                  @for (bucket of comparison.buckets; track bucket.id) {
+                    <div class="spectrum-difference-bucket">
+                      <div class="spectrum-difference-meter">
+                        <div class="spectrum-difference-zero"></div>
+                        <div
+                          class="spectrum-difference-fill"
+                          [class.spectrum-difference-positive]="bucket.deltaDb >= 0"
+                          [class.spectrum-difference-negative]="bucket.deltaDb < 0"
+                          [style.height.%]="spectrumDifferenceHeight(bucket.deltaDb, comparison.scaleDb)"
+                        ></div>
+                      </div>
+                      <strong class="spectrum-difference-value">
+                        {{ spectrumSignedValue(bucket.deltaDb) }}<span class="d-block d-sm-inline"> dB</span>
+                      </strong>
+                      <span class="spectrum-difference-label text-wrap">{{ bucket.label }}</span>
+                    </div>
+                  }
+                </div>
               </div>
             </div>
           </div>
@@ -979,8 +1005,10 @@
                   <p class="small text-secondary mb-0">{{ measurement.active_slot_label }} · {{ spectrumMeasuredAt(measurement.captured_at) }}</p>
                 </div>
                 <div class="text-end">
-                  <div class="small text-secondary">Overall level</div>
+                  <div class="small text-secondary">Raw energy</div>
                   <strong>{{ formatDb(measurement.rms_dbfs) }}</strong>
+                  <div class="small text-secondary mt-1">Perceived: {{ formatLufs(measurement.k_weighted_lufs) }}</div>
+                  <div class="small text-secondary">{{ spectrumPeakHeadroom(measurement.peak_dbfs) }}</div>
                   <div class="d-flex justify-content-end gap-1 mt-2">
                     <button
                       type="button"

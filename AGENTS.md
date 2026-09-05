@@ -2111,3 +2111,21 @@
   - The live DOM showed nine difference buckets, the required indigo/green/red colors, two-card selection locking, and no mobile horizontal overflow.
   - A stored three-card browser fixture reloaded successfully; deleting one card updated local storage to two cards and the two remaining cards survived another reload.
 - Persistence remains intentionally browser-local: measurements are not shared between browsers or devices and clearing browser site data removes them.
+
+## Session Update - 2026-09-05 (Perception-Weighted Spectrum Compare)
+- Reworked the A/B comparison authority around perceived loudness:
+  - `Perceived loudness` is now the dominant answer, using signed ITU-R BS.1770-4 K-weighted integrated-loudness difference in LU.
+  - exact typed sign drives `B louder than A`, `B quieter than A`, or `B matches A`; no qualitative threshold was added.
+  - `Raw energy · broadband RMS` is secondary, while Peak/headroom remains compact on source cards.
+- Added standard loudness measurement at the canonical audio boundary:
+  - `apps/api/app/audio_capture.py` uses `pyloudnorm==0.2.0` to calculate `k_weighted_lufs` from the captured PipeWire samples.
+  - `POST /api/v1/spectrum-compare/measure` now returns `k_weighted_lufs`; it is null when the standard gated meter has no reportable loudness.
+- The comparison chart is now exactly the eight spectral bands, labelled `Spectral redistribution: B − A`.
+  - copy explicitly says band deltas are independent and must not be added to or averaged into either overall measure.
+  - the former overall-difference chart bucket was removed to avoid implying that band deltas compose into overall loudness.
+- Corrected the typed response boundary so valid low-energy bands below `-120 dBFS` are returned rather than rejected; the display still uses the fixed `0` to `-90 dBFS` card scale.
+- Verification:
+  - `docker compose up -d --build` succeeded with `pyloudnorm`, NumPy, and SciPy installed in the API image.
+  - Live `POST /api/v1/spectrum-compare/measure` returned HTTP `200` for `Clean Whammy 6`, `A:1`, eight bands, 13 stage states, and `k_weighted_lufs: -47.71`.
+  - Central Playwright inspected desktop and `390 × 844` mobile views with no horizontal overflow.
+  - The acceptance fixture (`Raw energy = -1.97 dB`, Presence `-13.30 dB`, Brilliance `-17.71 dB`) rendered `B quieter than A` with perceived difference `-8.79 LU` as the dominant result.

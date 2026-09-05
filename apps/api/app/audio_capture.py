@@ -7,6 +7,9 @@ import wave
 from dataclasses import dataclass
 from typing import Any
 
+import numpy as np
+import pyloudnorm as pyln
+
 KATANA_CAPTURE_RATE = 48_000
 KATANA_CAPTURE_CHANNELS = 1
 
@@ -171,6 +174,12 @@ def spectrum_compare_band_energies(samples: list[float], rate: int) -> list[floa
             power_totals[band_index] += (2.0 * power) / (fft_size * window_energy)
 
     return [round(_linear_to_dbfs(math.sqrt(total / frame_count)), 2) for total in power_totals]
+
+
+def k_weighted_integrated_lufs(samples: list[float], rate: int) -> float | None:
+    """Measure gated integrated loudness with the ITU-R BS.1770-4 K-weighted meter."""
+    loudness = float(pyln.Meter(rate).integrated_loudness(np.asarray(samples, dtype=np.float64)))
+    return round(loudness, 2) if math.isfinite(loudness) else None
 
 
 def analyze_f32le_metrics(raw: bytes, rate: int = KATANA_CAPTURE_RATE) -> LiveAudioMetrics | None:
