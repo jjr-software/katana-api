@@ -2142,3 +2142,10 @@
 - Verification:
   - `docker compose up -d --build` completed successfully; only existing Angular size-budget warnings remain.
   - Central Playwright inspected `https://katana.ryzen.jjrsoftware.co.uk/` at desktop and `390 × 844`; the Colour control is present and mobile has no horizontal overflow.
+
+## Session Update - 2026-09-05 (Live Editor No-Op Apply)
+- Diagnosed repeated `502` responses from `PATCH /api/v1/live-patch/blocks/delay`:
+  - queue history recorded `No changed bytes found for live patch block: delay`;
+  - the editor interpreted this safe no-op as failure and immediately retried its unchanged pending draft.
+- Fixed `AmpClient.apply_current_patch_block()` so an empty targeted diff returns the canonical requested patch successfully without sending a DT1 MIDI write. This lets the editor settle its write-through fingerprint and stops the retry loop.
+- Rebuilt/restarted with `docker compose up -d --build`; post-restart queue inspection found no new failed delay jobs.

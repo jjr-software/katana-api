@@ -224,7 +224,9 @@ class AmpClient:
             await self._send_only(EDITOR_MODE_ON)
             writes = self._build_selected_patch_block_writes(block_name, previous_payload, patch_payload)
             if not writes:
-                raise AmpClientError(f"No changed bytes found for live patch block: {block_name}")
+                payload = self._clone_patch_payload(patch_payload)
+                payload["config_hash_sha256"] = self._config_hash(payload)
+                return CurrentPatchSnapshot(payload=payload)
             for addr, data in writes:
                 await self._send_only(build_dt1(addr, data))
             payload = self._clone_patch_payload(patch_payload)

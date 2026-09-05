@@ -253,6 +253,7 @@ Requirements:
 4. The FastAPI `PATCH /api/v1/live-patch/blocks/{block_name}` boundary continues to accept the existing canonical sparse patch-block contract and merges it through `patch_objects`; no parallel persisted patch or compatibility representation is introduced.
 5. `katana.protocol` owns Roland address arithmetic. It exposes distinct helpers for known map/block offsets and for offsets within transmitted 7-bit data addresses. `katana.client` uses the 7-bit helper only when constructing changed-byte writes within an already-selected block, preserving existing block and colour-variant address selection.
 6. A changed FX detail byte at offset 182 from `20 00 22 00` must target `20 00 23 36`, not `20 00 22 B6`. Existing on/off, type, colour selection, and full-block write behaviour remain unchanged.
+7. A targeted block apply whose canonical patch data is already current is successful without a MIDI DT1 write. It must return the canonical requested patch so the editor can settle its write-through state rather than retrying a safe no-op.
 
 Module ownership:
 
