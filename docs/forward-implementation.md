@@ -214,6 +214,49 @@ Target workflow:
    - or nothing known.
 5. App also shows when this status was last confirmed from the amp.
 
+## 5.0.2 Spectrum Compare
+
+Primary user: a guitarist level-matching Katana patches while playing.
+
+Outcome: make loudness and spectral balance comparable across patch changes and live pedal-style block toggles, without asking the guitarist to interpret raw device data.
+
+Authoritative workflow:
+
+1. The guitarist opens Spectrum Compare and presses **Measure**.
+2. The page immediately tells them to play. The API reads the canonical `Live Patch` and active-slot state through the existing amp queue, allows a fixed 0.5-second settle, then captures a fixed 4-second PipeWire window from the configured Katana source.
+3. The API returns one typed measurement: RMS/peak loudness, exactly eight fixed band-energy readings, and a typed summary of the captured patch identity and every relevant pipeline stage state.
+4. The page retains returned cards for its current browser session only. A guitarist changes patch or toggles a physical/controller block and repeats the same action.
+5. Cards use one shared 0 to -90 dBFS visual scale, making changes in overall loudness and spectral balance directly comparable.
+
+Module ownership:
+
+- `audio_capture` owns PipeWire capture and the deterministic audio calculation. It exposes the fixed-band energy algorithm; it does not know amp or UI concepts.
+- `katana.client` owns canonical live-patch and active-slot reads. `amp_queue` serializes that device work.
+- `spectrum_compare` owns the bounded measurement orchestration and translates the canonical structured patch payload into a compact typed display contract. It does not persist a second patch representation.
+- `api/spectrum_compare` is the thin HTTP transport boundary.
+- the Angular Spectrum Compare page owns current-browser-session cards and their shared-scale Bootstrap presentation.
+
+Typed measurement contract:
+
+- `POST /api/v1/spectrum-compare/measure` has no semantic text input and returns `SpectrumMeasurementResponse`.
+- A response contains capture timing, `rms_dbfs`, `peak_dbfs`, an exact ordered list of eight `{id, label, low_hz, high_hz, energy_dbfs}`, patch name and active-slot label, and structured stage `{id, label, active, detail}` summaries.
+- Stage state derives only from canonical typed boolean/enumeration fields returned by the amp client; no label matching or text inference is used.
+
+Fixed spectrum bands (lower bound inclusive, upper bound exclusive except the final band):
+
+| Band | Range |
+| --- | --- |
+| Sub | 40–125 Hz |
+| Bass | 125–250 Hz |
+| Low Mid | 250–500 Hz |
+| Mid | 500–1,000 Hz |
+| Upper Mid | 1,000–2,000 Hz |
+| Presence | 2,000–4,000 Hz |
+| Brilliance | 4,000–8,000 Hz |
+| Air | 8,000–16,000 Hz |
+
+The band algorithm uses Hann-windowed fixed 8,192-sample FFT frames across the fixed capture, sums bin power inside each range, averages it across complete frames, and reports the square-root power as dBFS. This preserves a stable typed physical measure rather than a semantic quality score.
+
 ## 5.0.1 Fast Live Design Loop
 Target workflow:
 1. User asks AI for candidate ideas.

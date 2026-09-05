@@ -10,6 +10,17 @@ from typing import Any
 KATANA_CAPTURE_RATE = 48_000
 KATANA_CAPTURE_CHANNELS = 1
 
+SPECTRUM_COMPARE_BANDS: tuple[tuple[str, str, int, int], ...] = (
+    ("sub", "Sub", 40, 125),
+    ("bass", "Bass", 125, 250),
+    ("low_mid", "Low Mid", 250, 500),
+    ("mid", "Mid", 500, 1_000),
+    ("upper_mid", "Upper Mid", 1_000, 2_000),
+    ("presence", "Presence", 2_000, 4_000),
+    ("brilliance", "Brilliance", 4_000, 8_000),
+    ("air", "Air", 8_000, 16_000),
+)
+
 
 @dataclass(frozen=True)
 class AudioSampleMetrics:
@@ -26,6 +37,7 @@ class AudioSampleMetrics:
 class AudioCaptureResult:
     metrics: AudioSampleMetrics
     wav_bytes: bytes
+    samples: list[float]
 
 
 @dataclass(frozen=True)
@@ -136,6 +148,29 @@ def _build_fft_bins_db(samples: list[float], rate: int, bin_count: int = 64) -> 
         db = 20.0 * math.log10(bucket_amp)
         out.append(round(max(-120.0, min(0.0, db)), 2))
     return out
+
+
+def spectrum_compare_band_energies(samples: list[float], rate: int) -> list[float]:
+    """Return fixed-band RMS energy in dBFS over complete Hann-windowed frames."""
+    fft_size = 8192
+    frame_count = len(samples) // fft_size
+    if frame_count == 0:
+        raise RuntimeError("spectrum capture must contain at least one complete 8192-sample frame")
+
+    window = [0.5 - 0.5 * math.cos((2.0 * math.pi * index) / (fft_size - 1)) for index in range(fft_size)]
+    window_energy = sum(value * value for value in window)
+    power_totals = [0.0] * len(SPECTRUM_COMPARE_BANDS)
+    for frame_index in range(frame_count):
+        start = frame_index * fft_size
+        values = [complex(samples[start + index] * window[index], 0.0) for index in range(fft_size)]
+        _fft_inplace(values)
+        for band_index, (_, _, low_hz, high_hz) in enumerate(SPECTRUM_COMPARE_BANDS):
+            start_bin = max(1, math.ceil(low_hz * fft_size / rate))
+            end_bin = min((fft_size // 2) - 1, math.ceil(high_hz * fft_size / rate) - 1)
+            power = sum(abs(values[bin_index]) ** 2 for bin_index in range(start_bin, end_bin + 1))
+            power_totals[band_index] += (2.0 * power) / (fft_size * window_energy)
+
+    return [round(_linear_to_dbfs(math.sqrt(total / frame_count)), 2) for total in power_totals]
 
 
 def analyze_f32le_metrics(raw: bytes, rate: int = KATANA_CAPTURE_RATE) -> LiveAudioMetrics | None:
@@ -343,6 +378,7 @@ async def capture_audio_sample(
     return AudioCaptureResult(
         metrics=metrics,
         wav_bytes=_encode_wav_bytes(samples, rate=rate, channels=channels),
+        samples=samples,
     )
 
 

@@ -563,6 +563,33 @@ interface AudioSampleResponse {
   created_at: string;
 }
 
+interface SpectrumBand {
+  id: string;
+  label: string;
+  low_hz: number;
+  high_hz: number;
+  energy_dbfs: number;
+}
+
+interface SpectrumStage {
+  id: string;
+  label: string;
+  active: boolean;
+  detail: string | null;
+}
+
+interface SpectrumMeasurementResponse {
+  captured_at: string;
+  prompt: string;
+  capture_duration_sec: number;
+  rms_dbfs: number;
+  peak_dbfs: number;
+  patch_name: string;
+  active_slot_label: string;
+  bands: SpectrumBand[];
+  stages: SpectrumStage[];
+}
+
 interface AiPatchAdviceChange {
   field: string;
   current_value: string | number;
@@ -752,8 +779,11 @@ export class App implements OnInit, OnDestroy {
   private readonly ngZone = inject(NgZone);
   private readonly modalRefs: Partial<Record<ModalKey, NgbModalRef>> = {};
 
-  currentPage = signal<'dashboard' | 'lineout' | 'samples'>(this.resolvePageFromPath());
+  currentPage = signal<'dashboard' | 'lineout' | 'samples' | 'spectrum'>(this.resolvePageFromPath());
   status = signal('Idle');
+  spectrumMeasurements = signal<SpectrumMeasurementResponse[]>([]);
+  spectrumMeasuring = signal(false);
+  spectrumError = signal('');
   responseJson = signal('');
   slots = signal<SlotCard[]>(defaultSlotCards());
   selectedAmpSlot = signal<number | null>(null);
@@ -3263,8 +3293,8 @@ export class App implements OnInit, OnDestroy {
     return payload as AiPatchAdviceResponse;
   }
 
-  navigateToPage(page: 'dashboard' | 'lineout' | 'samples'): void {
-    const targetPath = page === 'samples' ? '/samples' : page === 'lineout' ? '/line-out' : '/';
+  navigateToPage(page: 'dashboard' | 'lineout' | 'samples' | 'spectrum'): void {
+    const targetPath = page === 'samples' ? '/samples' : page === 'lineout' ? '/line-out' : page === 'spectrum' ? '/spectrum-compare' : '/';
     if (window.location.pathname !== targetPath) {
       window.history.pushState({}, '', targetPath);
     }
@@ -3287,6 +3317,44 @@ export class App implements OnInit, OnDestroy {
 
   isLineOutPage(): boolean {
     return this.currentPage() === 'lineout';
+  }
+
+  isSpectrumPage(): boolean {
+    return this.currentPage() === 'spectrum';
+  }
+
+  async measureSpectrum(): Promise<void> {
+    if (this.spectrumMeasuring()) {
+      return;
+    }
+    this.spectrumMeasuring.set(true);
+    this.spectrumError.set('Play now — listening for four seconds...');
+    try {
+      const response = await fetch('/api/v1/spectrum-compare/measure', { method: 'POST' });
+      const payload = (await response.json()) as SpectrumMeasurementResponse | { detail?: unknown };
+      if (!response.ok || !('bands' in payload)) {
+        throw new Error(this.responseDetailMessage(payload) || 'Spectrum capture failed.');
+      }
+      this.spectrumMeasurements.update((measurements) => [...measurements, payload]);
+      this.spectrumError.set('');
+      this.status.set(`Captured spectrum for ${payload.patch_name}.`);
+    } catch (error) {
+      this.spectrumError.set(error instanceof Error ? error.message : 'Spectrum capture failed.');
+    } finally {
+      this.spectrumMeasuring.set(false);
+    }
+  }
+
+  spectrumBarHeight(value: number): number {
+    return Math.max(0, Math.min(100, ((value + 90) / 90) * 100));
+  }
+
+  spectrumMeasuredAt(value: string): string {
+    return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  clearSpectrumMeasurements(): void {
+    this.spectrumMeasurements.set([]);
   }
 
   async loadLineOutState(): Promise<void> {
@@ -3788,12 +3856,15 @@ export class App implements OnInit, OnDestroy {
     });
   }
 
-  private resolvePageFromPath(): 'dashboard' | 'lineout' | 'samples' {
+  private resolvePageFromPath(): 'dashboard' | 'lineout' | 'samples' | 'spectrum' {
     if (window.location.pathname === '/samples') {
       return 'samples';
     }
     if (window.location.pathname === '/line-out') {
       return 'lineout';
+    }
+    if (window.location.pathname === '/spectrum-compare') {
+      return 'spectrum';
     }
     return 'dashboard';
   }

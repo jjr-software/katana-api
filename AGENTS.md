@@ -2075,3 +2075,21 @@
   - API and web containers are running.
   - `https://katana.ryzen.jjrsoftware.co.uk/` returns HTTP `200`.
 - No application code or Compose configuration changed. Next recommended step: use the web app normally and run a MIDI connection check only when the Katana is connected.
+
+## Session Update - 2026-09-05 (Spectrum Compare)
+- Added a guitarist-facing Spectrum Compare page at:
+  - `https://katana.ryzen.jjrsoftware.co.uk/spectrum-compare`
+- Workflow:
+  - press `Measure`, play a consistent phrase during the fixed four-second PipeWire capture, then compare retained cards in the current browser session.
+  - each card shows named live patch and slot, overall RMS, exactly eight fixed bands, and graphical active/bypassed indicators for the full live pipeline.
+- Backend boundary:
+  - `POST /api/v1/spectrum-compare/measure`
+  - reads the canonical live patch and active slot together through the existing amp queue, then captures audio without durable Spectrum Compare persistence.
+- Fixed frequency bands:
+  - Sub `40–125 Hz`, Bass `125–250 Hz`, Low Mid `250–500 Hz`, Mid `500–1,000 Hz`, Upper Mid `1,000–2,000 Hz`, Presence `2,000–4,000 Hz`, Brilliance `4,000–8,000 Hz`, Air `8,000–16,000 Hz`.
+- Verification:
+  - `docker compose up -d --build` completed successfully.
+  - Live Playwright capture returned `Clean Whammy 6on` with eight bands and 13 pipeline indicators; a second capture appeared alongside it.
+  - Desktop layout and a 390px mobile viewport were checked. The mobile grid and navigation have no horizontal overflow.
+- Known limitation:
+  - the feature intentionally retains comparisons only for the current browser session; reload or `Clear session` removes them.

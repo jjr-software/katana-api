@@ -1,7 +1,7 @@
 <main class="container-fluid py-3 app-shell">
   <header class="mb-3">
     <h1 class="h3 mb-1">Katana Gen 3 Tone Lab</h1>
-    <div class="d-flex gap-2 mt-2">
+    <div class="d-flex flex-wrap gap-2 mt-2">
       <button type="button" class="btn btn-sm" [class.btn-primary]="isDashboardPage()" [class.btn-outline-primary]="!isDashboardPage()" (click)="navigateToPage('dashboard')">
         Dashboard
       </button>
@@ -10,6 +10,9 @@
       </button>
       <button type="button" class="btn btn-sm" [class.btn-primary]="isLineOutPage()" [class.btn-outline-primary]="!isLineOutPage()" (click)="navigateToPage('lineout')">
         Line Out
+      </button>
+      <button type="button" class="btn btn-sm" [class.btn-primary]="isSpectrumPage()" [class.btn-outline-primary]="!isSpectrumPage()" (click)="navigateToPage('spectrum')">
+        Spectrum Compare
       </button>
     </div>
   </header>
@@ -870,6 +873,90 @@
       </div>
     </div>
 
+  } @else if (isSpectrumPage()) {
+  <section class="spectrum-page d-grid gap-3" aria-labelledby="spectrum-heading">
+    <article class="card shadow-sm">
+      <div class="card-body d-grid gap-3">
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+          <div>
+            <h2 id="spectrum-heading" class="h4 mb-1">Spectrum Compare</h2>
+            <p class="text-secondary mb-0">Play the same phrase after each patch or pedal change. Every card uses the same energy scale.</p>
+          </div>
+          <div class="d-flex gap-2 flex-wrap">
+            <button type="button" class="btn btn-primary" (click)="measureSpectrum()" [disabled]="spectrumMeasuring()" data-pw="spectrum-measure">
+              {{ spectrumMeasuring() ? 'Measuring…' : 'Measure' }}
+            </button>
+            @if (spectrumMeasurements().length > 0) {
+              <button type="button" class="btn btn-outline-secondary" (click)="clearSpectrumMeasurements()">Clear session</button>
+            }
+          </div>
+        </div>
+        @if (spectrumMeasuring()) {
+          <div class="alert alert-primary mb-0" role="status" aria-live="assertive">
+            <strong>Play now.</strong> Listening for four seconds; keep your phrase and playing level consistent.
+          </div>
+        } @else if (spectrumError()) {
+          <div class="alert alert-danger mb-0" role="alert">{{ spectrumError() }}</div>
+        } @else {
+          <div class="spectrum-legend small text-secondary">
+            <span><span class="spectrum-scale-swatch"></span>Band energy: 0 dBFS at the top, −90 dBFS at the bottom.</span>
+            <span><span class="spectrum-stage-dot spectrum-stage-dot-on"></span>Active</span>
+            <span><span class="spectrum-stage-dot spectrum-stage-dot-off"></span>Bypassed</span>
+          </div>
+        }
+      </div>
+    </article>
+
+    @if (spectrumMeasurements().length === 0) {
+      <article class="card">
+        <div class="card-body text-secondary">No measurements yet. Select the sound you want to compare, then press Measure and play.</div>
+      </article>
+    } @else {
+      <div class="spectrum-comparison-grid">
+        @for (measurement of spectrumMeasurements(); track $index) {
+          <article class="card spectrum-measurement-card">
+            <div class="card-body d-grid gap-3">
+              <div class="d-flex justify-content-between align-items-start gap-2">
+                <div>
+                  <h3 class="h5 mb-1">{{ measurement.patch_name }}</h3>
+                  <p class="small text-secondary mb-0">{{ measurement.active_slot_label }} · {{ spectrumMeasuredAt(measurement.captured_at) }}</p>
+                </div>
+                <div class="text-end">
+                  <div class="small text-secondary">Overall level</div>
+                  <strong>{{ formatDb(measurement.rms_dbfs) }}</strong>
+                </div>
+              </div>
+
+              <div class="spectrum-chart" aria-label="Eight-band energy chart on a shared zero to minus ninety dBFS scale">
+                <div class="spectrum-axis" aria-hidden="true"><span>0</span><span>−45</span><span>−90</span></div>
+                <div class="spectrum-bars">
+                  @for (band of measurement.bands; track band.id) {
+                    <div class="spectrum-band">
+                      <div class="spectrum-meter" [attr.aria-label]="band.label + ' ' + band.energy_dbfs + ' dBFS'">
+                        <div class="spectrum-meter-fill" [style.height.%]="spectrumBarHeight(band.energy_dbfs)"></div>
+                      </div>
+                      <strong class="spectrum-band-value">{{ formatDb(band.energy_dbfs) }}</strong>
+                      <span class="spectrum-band-label">{{ band.label }}</span>
+                      <span class="spectrum-band-range">{{ band.low_hz }}–{{ band.high_hz >= 1000 ? (band.high_hz / 1000) + 'k' : band.high_hz }} Hz</span>
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <div class="spectrum-stage-grid" aria-label="Captured live pipeline state">
+                @for (stage of measurement.stages; track stage.id) {
+                  <span class="spectrum-stage" [title]="stage.label + ': ' + (stage.active ? 'active' : 'bypassed')">
+                    <span class="spectrum-stage-dot" [class.spectrum-stage-dot-on]="stage.active" [class.spectrum-stage-dot-off]="!stage.active" [attr.aria-label]="stage.active ? 'active' : 'bypassed'"></span>
+                    <span>{{ stage.label }}</span>
+                  </span>
+                }
+              </div>
+            </div>
+          </article>
+        }
+      </div>
+    }
+  </section>
   } @else if (isLineOutPage()) {
   <section class="card">
     <div class="card-body d-grid gap-3">

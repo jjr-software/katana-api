@@ -88,6 +88,131 @@
   width: 100%;
 }
 
+.spectrum-page {
+  max-width: 120rem;
+  margin: 0 auto;
+}
+
+.spectrum-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  align-items: center;
+}
+
+.spectrum-scale-swatch {
+  display: inline-block;
+  width: 1.5rem;
+  height: 0.55rem;
+  margin-right: 0.35rem;
+  border-radius: 0.2rem;
+  background: linear-gradient(90deg, #0d6efd, #8bc5ff);
+  vertical-align: middle;
+}
+
+.spectrum-comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(32rem, 1fr));
+  gap: 1rem;
+}
+
+.spectrum-measurement-card {
+  min-width: 0;
+}
+
+.spectrum-chart {
+  display: grid;
+  grid-template-columns: 2.25rem minmax(0, 1fr);
+  gap: 0.5rem;
+  min-height: 14rem;
+}
+
+.spectrum-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 0.2rem 0 2.8rem;
+  color: #6c757d;
+  font-size: 0.72rem;
+  text-align: right;
+}
+
+.spectrum-bars {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(2.9rem, 1fr));
+  gap: 0.45rem;
+  align-items: end;
+  min-width: 0;
+}
+
+.spectrum-band {
+  display: grid;
+  grid-template-rows: 9rem auto auto auto;
+  gap: 0.25rem;
+  min-width: 0;
+  text-align: center;
+}
+
+.spectrum-meter {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #ced4da;
+  border-radius: 0.4rem;
+  background-image: linear-gradient(to bottom, rgba(108, 117, 125, 0.22) 1px, transparent 1px);
+  background-size: 100% 50%;
+}
+
+.spectrum-meter-fill {
+  position: absolute;
+  inset: auto 0 0;
+  background: linear-gradient(180deg, #6ea8fe 0%, #0d6efd 100%);
+}
+
+.spectrum-band-value,
+.spectrum-band-label,
+.spectrum-band-range {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spectrum-band-value { font-size: 0.75rem; }
+.spectrum-band-label { font-size: 0.72rem; line-height: 1.1; }
+.spectrum-band-range { font-size: 0.65rem; color: #6c757d; }
+
+.spectrum-stage-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+}
+
+.spectrum-stage {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: #495057;
+  font-size: 0.78rem;
+}
+
+.spectrum-stage-dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border: 1px solid #6c757d;
+  border-radius: 50%;
+}
+
+.spectrum-stage-dot-on { background: #198754; border-color: #198754; }
+.spectrum-stage-dot-off { background: #fff; }
+
+@media (max-width: 575.98px) {
+  .spectrum-comparison-grid { grid-template-columns: minmax(0, 1fr); }
+  .spectrum-chart { grid-template-columns: 1.85rem minmax(0, 1fr); gap: 0.25rem; }
+  .spectrum-bars { grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 0.2rem; }
+  .spectrum-band { grid-template-rows: 7.75rem auto auto auto; }
+  .spectrum-band-label { font-size: 0.62rem; }
+  .spectrum-band-range { font-size: 0.55rem; }
+}
+
 .patch-summary {
   overflow-wrap: anywhere;
 }
