@@ -2065,3 +2065,13 @@
   - `docker compose up -d --build`
   - Angular build succeeded; current bundle budget warning is `500.65 kB` vs `500.00 kB`.
   - Playwright MCP loaded `https://katana.ryzen.jjrsoftware.co.uk/` with title `Katana Patch Manager`.
+
+## Session Update - 2026-09-05 (Stack Restart)
+- Restored the Katana Patch Manager Compose stack after it was fully down; the public route was returning `404` because no stack services were running.
+- Canonical restart completed from the repository root:
+  - `docker compose up -d --build`
+- Runtime status after startup:
+  - PostgreSQL is healthy.
+  - API and web containers are running.
+  - `https://katana.ryzen.jjrsoftware.co.uk/` returns HTTP `200`.
+- No application code or Compose configuration changed. Next recommended step: use the web app normally and run a MIDI connection check only when the Katana is connected.
