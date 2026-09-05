@@ -590,6 +590,89 @@ interface SpectrumMeasurementResponse {
   stages: SpectrumStage[];
 }
 
+interface SpectrumDifferenceBucket {
+  id: string;
+  label: string;
+  deltaDb: number;
+  overall: boolean;
+}
+
+interface SpectrumComparison {
+  baseline: SpectrumMeasurementResponse;
+  compared: SpectrumMeasurementResponse;
+  buckets: SpectrumDifferenceBucket[];
+  scaleDb: number;
+}
+
+interface StoredSpectrumMeasurements {
+  measurements: SpectrumMeasurementResponse[];
+  error: string;
+}
+
+const SPECTRUM_MEASUREMENTS_STORAGE_KEY = 'katana.spectrum-compare.measurements.v1';
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isSpectrumBand(value: unknown): value is SpectrumBand {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  const band = value as Partial<SpectrumBand>;
+  return typeof band.id === 'string'
+    && typeof band.label === 'string'
+    && isFiniteNumber(band.low_hz)
+    && isFiniteNumber(band.high_hz)
+    && isFiniteNumber(band.energy_dbfs);
+}
+
+function isSpectrumStage(value: unknown): value is SpectrumStage {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  const stage = value as Partial<SpectrumStage>;
+  return typeof stage.id === 'string'
+    && typeof stage.label === 'string'
+    && typeof stage.active === 'boolean'
+    && (stage.detail === null || typeof stage.detail === 'string');
+}
+
+function isSpectrumMeasurement(value: unknown): value is SpectrumMeasurementResponse {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  const measurement = value as Partial<SpectrumMeasurementResponse>;
+  return typeof measurement.captured_at === 'string'
+    && typeof measurement.prompt === 'string'
+    && isFiniteNumber(measurement.capture_duration_sec)
+    && isFiniteNumber(measurement.rms_dbfs)
+    && isFiniteNumber(measurement.peak_dbfs)
+    && typeof measurement.patch_name === 'string'
+    && typeof measurement.active_slot_label === 'string'
+    && Array.isArray(measurement.bands)
+    && measurement.bands.length === 8
+    && measurement.bands.every(isSpectrumBand)
+    && Array.isArray(measurement.stages)
+    && measurement.stages.every(isSpectrumStage);
+}
+
+function loadStoredSpectrumMeasurements(): StoredSpectrumMeasurements {
+  const raw = window.localStorage.getItem(SPECTRUM_MEASUREMENTS_STORAGE_KEY);
+  if (raw === null) {
+    return { measurements: [], error: '' };
+  }
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (!Array.isArray(value) || !value.every(isSpectrumMeasurement)) {
+      return { measurements: [], error: 'Saved spectrum history has an invalid format and was not loaded.' };
+    }
+    return { measurements: value, error: '' };
+  } catch {
+    return { measurements: [], error: 'Saved spectrum history could not be read.' };
+  }
+}
+
 interface AiPatchAdviceChange {
   field: string;
   current_value: string | number;
@@ -779,11 +862,42 @@ export class App implements OnInit, OnDestroy {
   private readonly ngZone = inject(NgZone);
   private readonly modalRefs: Partial<Record<ModalKey, NgbModalRef>> = {};
 
+  private readonly storedSpectrumMeasurements = loadStoredSpectrumMeasurements();
+
   currentPage = signal<'dashboard' | 'lineout' | 'samples' | 'spectrum'>(this.resolvePageFromPath());
   status = signal('Idle');
-  spectrumMeasurements = signal<SpectrumMeasurementResponse[]>([]);
+  spectrumMeasurements = signal<SpectrumMeasurementResponse[]>(this.storedSpectrumMeasurements.measurements);
+  spectrumComparisonSelection = signal<number[]>([]);
+  spectrumComparison = computed<SpectrumComparison | null>(() => {
+    const [baselineIndex, comparedIndex] = this.spectrumComparisonSelection();
+    if (baselineIndex === undefined || comparedIndex === undefined) {
+      return null;
+    }
+    const measurements = this.spectrumMeasurements();
+    const baseline = measurements[baselineIndex];
+    const compared = measurements[comparedIndex];
+    if (!baseline || !compared) {
+      return null;
+    }
+    const buckets: SpectrumDifferenceBucket[] = [
+      {
+        id: 'overall',
+        label: 'Overall Level',
+        deltaDb: compared.rms_dbfs - baseline.rms_dbfs,
+        overall: true,
+      },
+      ...baseline.bands.map((band, index) => ({
+        id: band.id,
+        label: band.label,
+        deltaDb: compared.bands[index].energy_dbfs - band.energy_dbfs,
+        overall: false,
+      })),
+    ];
+    const scaleDb = Math.max(3, Math.ceil(Math.max(...buckets.map((bucket) => Math.abs(bucket.deltaDb)))));
+    return { baseline, compared, buckets, scaleDb };
+  });
   spectrumMeasuring = signal(false);
-  spectrumError = signal('');
+  spectrumError = signal(this.storedSpectrumMeasurements.error);
   responseJson = signal('');
   slots = signal<SlotCard[]>(defaultSlotCards());
   selectedAmpSlot = signal<number | null>(null);
@@ -3335,8 +3449,8 @@ export class App implements OnInit, OnDestroy {
       if (!response.ok || !('bands' in payload)) {
         throw new Error(this.responseDetailMessage(payload) || 'Spectrum capture failed.');
       }
-      this.spectrumMeasurements.update((measurements) => [...measurements, payload]);
       this.spectrumError.set('');
+      this.setSpectrumMeasurements([...this.spectrumMeasurements(), payload]);
       this.status.set(`Captured spectrum for ${payload.patch_name}.`);
     } catch (error) {
       this.spectrumError.set(error instanceof Error ? error.message : 'Spectrum capture failed.');
@@ -3353,8 +3467,53 @@ export class App implements OnInit, OnDestroy {
     return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   }
 
+  spectrumSelectionLabel(index: number): string | null {
+    const position = this.spectrumComparisonSelection().indexOf(index);
+    return position === 0 ? 'A · Baseline' : position === 1 ? 'B · Compared' : null;
+  }
+
+  canSelectSpectrumMeasurement(index: number): boolean {
+    const selection = this.spectrumComparisonSelection();
+    return selection.includes(index) || selection.length < 2;
+  }
+
+  toggleSpectrumMeasurement(index: number): void {
+    this.spectrumComparisonSelection.update((selection) => {
+      if (selection.includes(index)) {
+        return selection.filter((selectedIndex) => selectedIndex !== index);
+      }
+      return selection.length < 2 ? [...selection, index] : selection;
+    });
+  }
+
+  spectrumDifferenceHeight(deltaDb: number, scaleDb: number): number {
+    return Math.min(50, (Math.abs(deltaDb) / scaleDb) * 50);
+  }
+
+  spectrumSignedValue(value: number): string {
+    const rounded = Math.abs(value) < 0.005 ? 0 : value;
+    return `${rounded > 0 ? '+' : ''}${rounded.toFixed(2)}`;
+  }
+
   clearSpectrumMeasurements(): void {
-    this.spectrumMeasurements.set([]);
+    this.setSpectrumMeasurements([]);
+    this.spectrumComparisonSelection.set([]);
+  }
+
+  deleteSpectrumMeasurement(index: number): void {
+    this.setSpectrumMeasurements(this.spectrumMeasurements().filter((_, measurementIndex) => measurementIndex !== index));
+    this.spectrumComparisonSelection.update((selection) => selection
+      .filter((selectedIndex) => selectedIndex !== index)
+      .map((selectedIndex) => selectedIndex > index ? selectedIndex - 1 : selectedIndex));
+  }
+
+  private setSpectrumMeasurements(measurements: SpectrumMeasurementResponse[]): void {
+    this.spectrumMeasurements.set(measurements);
+    try {
+      window.localStorage.setItem(SPECTRUM_MEASUREMENTS_STORAGE_KEY, JSON.stringify(measurements));
+    } catch {
+      this.spectrumError.set('Spectrum history changed on this page but could not be saved in this browser.');
+    }
   }
 
   async loadLineOutState(): Promise<void> {

@@ -120,6 +120,99 @@
   min-width: 0;
 }
 
+.spectrum-measurement-selected-a {
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.18);
+}
+
+.spectrum-measurement-selected-b {
+  border-color: #ffc107;
+  box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.24);
+}
+
+.spectrum-difference-key {
+  display: inline-block;
+  width: 0.8rem;
+  height: 0.8rem;
+  margin-right: 0.3rem;
+  border-radius: 0.2rem;
+  vertical-align: -0.1rem;
+}
+
+.spectrum-difference-key-overall { background: #6f42c1; }
+.spectrum-difference-key-positive { background: #198754; }
+.spectrum-difference-key-negative { background: #dc3545; }
+
+.spectrum-difference-chart {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+.spectrum-difference-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 11rem;
+  color: #6c757d;
+  font-size: 0.72rem;
+  text-align: right;
+}
+
+.spectrum-difference-buckets {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(3.5rem, 1fr));
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.spectrum-difference-bucket {
+  display: grid;
+  grid-template-rows: 11rem auto auto;
+  gap: 0.3rem;
+  min-width: 0;
+  text-align: center;
+}
+
+.spectrum-difference-bucket-overall {
+  padding-right: 0.55rem;
+  border-right: 2px solid #dee2e6;
+}
+
+.spectrum-difference-meter {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #ced4da;
+  border-radius: 0.4rem;
+  background: #f8f9fa;
+}
+
+.spectrum-difference-zero {
+  position: absolute;
+  inset: 50% 0 auto;
+  border-top: 1px solid #495057;
+  z-index: 1;
+}
+
+.spectrum-difference-fill {
+  position: absolute;
+  inset-inline: 0;
+}
+
+.spectrum-difference-positive { bottom: 50%; background: #198754; }
+.spectrum-difference-negative { top: 50%; background: #dc3545; }
+.spectrum-difference-overall { background: #6f42c1; }
+
+.spectrum-difference-value,
+.spectrum-difference-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spectrum-difference-value { font-size: 0.78rem; }
+.spectrum-difference-label { font-size: 0.72rem; color: #495057; }
+
 .spectrum-chart {
   display: grid;
   grid-template-columns: 2.25rem minmax(0, 1fr);
@@ -211,6 +304,13 @@
   .spectrum-band { grid-template-rows: 7.75rem auto auto auto; }
   .spectrum-band-label { font-size: 0.62rem; }
   .spectrum-band-range { font-size: 0.55rem; }
+  .spectrum-difference-chart { grid-template-columns: 1.85rem minmax(0, 1fr); gap: 0.25rem; }
+  .spectrum-difference-buckets { grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 0.2rem; }
+  .spectrum-difference-bucket { grid-template-rows: 8rem auto auto; }
+  .spectrum-difference-bucket-overall { padding-right: 0.2rem; }
+  .spectrum-difference-axis { height: 8rem; }
+  .spectrum-difference-value { font-size: 0.6rem; }
+  .spectrum-difference-label { font-size: 0.55rem; }
 }
 
 .patch-summary {

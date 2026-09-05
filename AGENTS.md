@@ -2093,3 +2093,21 @@
   - Desktop layout and a 390px mobile viewport were checked. The mobile grid and navigation have no horizontal overflow.
 - Known limitation:
   - the feature intentionally retains comparisons only for the current browser session; reload or `Clear session` removes them.
+
+## Session Update - 2026-09-05 (Persistent Spectrum Difference View)
+- Spectrum measurements now persist in browser local storage and survive page reloads on that browser.
+- Added per-card `Delete` and page-level `Delete all` actions; deletion also keeps the active comparison selection coherent.
+- Added an ordered two-card comparison workflow:
+  - first selected card is `A · Baseline`;
+  - second selected card is `B · Compared`;
+  - the difference chart displays `B − A` on one symmetric dB scale.
+- The difference chart contains nine display buckets:
+  - `Overall Level` first in indigo;
+  - the fixed eight spectral bands in green for positive differences and red for negative differences;
+  - each bucket includes its exact signed dB difference.
+- Verification:
+  - `docker compose up -d --build` completed successfully; PostgreSQL is healthy and API/web are running.
+  - Central Playwright checked the live page at desktop and `390 × 844` mobile viewports.
+  - The live DOM showed nine difference buckets, the required indigo/green/red colors, two-card selection locking, and no mobile horizontal overflow.
+  - A stored three-card browser fixture reloaded successfully; deleting one card updated local storage to two cards and the two remaining cards survived another reload.
+- Persistence remains intentionally browser-local: measurements are not shared between browsers or devices and clearing browser site data removes them.
