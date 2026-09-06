@@ -2201,3 +2201,18 @@
   - central Playwright loaded the fresh public bundle and the Delay 2 card exposed all delay controls;
   - changing Delay 1 time produced the targeted canonical `PATCH /api/v1/live-patch/blocks/delay` payload with only the selected red variant's time byte changed.
 - Current live patch has Delay 1 bypassed. The API persisted the corrected change, while the immediate hardware readback of that bypassed delay block retained its previous value; leave Delay 1 bypassed and use a deliberate enabled-delay audition to establish any device-specific deferred-update behaviour before treating that as a control-map issue.
+
+## Session Update - 2026-09-06 (Focused Maintenance Pass)
+- Corrected the root README to identify `docs/forward-implementation.md` as the authoritative plan and to describe the active Live Patch-centred runtime; the legacy Tauri material remains reference-only.
+- Consolidated Global Target RMS ownership in `apps/web/src/app/app.ts`:
+  - the dashboard panel now receives and edits the parent value through typed input/output bindings,
+  - browser-local persistence remains only in the parent, which also owns normalization,
+  - removed unused effect-name catalogues and option helpers from `dashboard-sticky-panel.component.ts`.
+- Required container rebuild/restart completed with `docker compose up -d --build`.
+  - API and web containers are running; PostgreSQL is healthy.
+  - Angular production build passed with the existing initial bundle and component-style budget warnings.
+  - public read-only `/api/healthz` and `/api/v1/live-patch` checks succeeded.
+- Public browser acceptance check completed through the shared Playwright runner:
+  - Dashboard rendered at `1440 × 900` and `390 × 844` with no horizontal overflow.
+  - Global Target RMS was visible at both sizes and no visual collision was observed.
+  - `networkidle` remained active because of the intended SSE connection; `domcontentloaded` and rendered-page checks succeeded.

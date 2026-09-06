@@ -41,6 +41,7 @@
       <div class="col-12 col-xl-3 dashboard-sticky-panel-column">
         <app-dashboard-sticky-panel
           [model]="stickyPanelVm()"
+          [globalNormalizeTargetRms]="globalNormalizeTargetRms()"
           (testAmpConnection)="testAmpConnection()"
           (syncLivePatch)="syncLivePatch()"
           (reapplyCurrentSettingsToAmp)="reapplyCurrentSettingsToAmp()"

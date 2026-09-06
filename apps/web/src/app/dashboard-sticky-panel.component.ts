@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component, NgZone, OnDestroy, OnInit, inject, input, output, signal } from '@angular/core';
 
 const DEFAULT_TARGET_RMS_DBFS = -35.0;
-const GLOBAL_NORMALIZE_TARGET_STORAGE_KEY = 'katana.globalNormalizeTargetRms';
 const LIVE_TOTAL_LEVEL_ZOOM_DB = 3.0;
 const LIVE_RMS_HISTORY_LIMIT = 240;
 const LIVE_TOTAL_LEVEL_GRAPH_WIDTH = 1000;
@@ -49,99 +48,12 @@ export interface DashboardStickyPanelViewModel {
   aiDesignerLabel: string;
 }
 
-const BOOSTER_TYPE_NAMES = [
-  'Mid Boost',
-  'Clean Boost',
-  'Treble Boost',
-  'Crunch Overdrive',
-  'Natural Overdrive',
-  'Warm Overdrive',
-  'Fat Distortion',
-  'Metal Distortion',
-  'Octave Fuzz',
-  'Blues Drive',
-  'Overdrive',
-  'Tube Screamer',
-  'Turbo Overdrive',
-  'Distortion',
-  'ProCo RAT',
-  "Marshall Guv'nor Distortion",
-  'MXR Distortion+',
-  'Boss Metal Zone',
-  '1960s Fuzz',
-  'Electro-Harmonix Big Muff Fuzz',
-  'Boss HM-2 Heavy Metal',
-  'Boss Metal Core',
-  'Centaur Overdrive',
-];
-
-const FX_TYPE_NAMES = [
-  'Touch Wah',
-  'Auto Wah',
-  'Pedal Wah',
-  'Compressor',
-  'Limiter',
-  'Graphic EQ',
-  'Parametric EQ',
-  'Guitar Simulator',
-  'Slow Gear',
-  'Wave Synth',
-  'Octave',
-  'Pitch Shifter',
-  'Harmonist',
-  'Acoustic Processor',
-  'Phaser',
-  'Flanger',
-  'Tremolo',
-  'Rotary Speaker',
-  'Uni-Vibe',
-  'Slicer',
-  'Vibrato',
-  'Ring Modulator',
-  'Humanizer',
-  'Chorus',
-  'Acoustic Guitar Simulator',
-  'MXR Phase 90',
-  'MXR Flanger 117',
-  'Cry Baby Wah 95',
-  'Boss DC-30',
-  'Heavy Octave',
-  'Pedal Bend',
-];
-
-const DELAY_TYPE_NAMES = [
-  'Digital Delay',
-  'Pan Delay',
-  'Stereo Delay',
-  'Analog Delay',
-  'Tape Echo',
-  'Reverse Delay',
-  'Modulate Delay',
-  'Roland SDE-3000 Delay',
-];
-const AMP_TYPE_NAMES = ['Acoustic', 'Clean', 'Pushed', 'Crunch', 'Lead', 'Brown'];
-const REVERB_TYPE_NAMES = ['Plate Reverb', 'Room Reverb', 'Hall Reverb', 'Spring Reverb', 'Modulate Reverb'];
-
-interface ValueOption {
-  value: number;
-  label: string;
-}
-
 interface LiveRmsHistoryBar {
   x: number;
   y: number;
   width: number;
   height: number;
   tone: 'above' | 'below';
-}
-
-interface TypeOption {
-  value: number;
-  label: string;
-}
-
-function buildValueOptions(labels: readonly string[]): ValueOption[] {
-  return labels.map((label, value) => ({ value, label }));
 }
 
 @Component({
@@ -201,7 +113,7 @@ function buildValueOptions(labels: readonly string[]): ValueOption[] {
               <div class="small text-secondary mt-2 w-100">Zoom {{ formatDb(liveTotalLevelWindowMin()) }} to {{ formatDb(liveTotalLevelWindowMax()) }}</div>
               <div class="d-flex flex-wrap align-items-center gap-2 mt-3 w-100">
                 <span class="small text-secondary">Global Target RMS</span>
-                <input type="number" step="0.1" class="form-control form-control-sm" style="width: 7.5rem;" [value]="globalNormalizeTargetRms()" (input)="globalNormalizeTargetRms.set($any($event.target).value); globalNormalizeTargetRmsChange.emit($any($event.target).value)" (blur)="commitGlobalNormalizeTargetRms(); globalNormalizeTargetRmsCommit.emit()" />
+                <input type="number" step="0.1" class="form-control form-control-sm" style="width: 7.5rem;" [value]="globalNormalizeTargetRms()" (input)="globalNormalizeTargetRmsChange.emit($any($event.target).value)" (blur)="globalNormalizeTargetRmsCommit.emit()" />
               </div>
             </div>
           </div>
@@ -212,6 +124,7 @@ function buildValueOptions(labels: readonly string[]): ValueOption[] {
 })
 export class DashboardStickyPanelComponent implements OnInit, OnDestroy {
   readonly model = input.required<DashboardStickyPanelViewModel>();
+  readonly globalNormalizeTargetRms = input.required<string>();
   readonly testAmpConnection = output<void>();
   readonly syncLivePatch = output<void>();
   readonly reapplyCurrentSettingsToAmp = output<void>();
@@ -222,7 +135,6 @@ export class DashboardStickyPanelComponent implements OnInit, OnDestroy {
   readonly globalNormalizeTargetRmsChange = output<string>();
   readonly globalNormalizeTargetRmsCommit = output<void>();
 
-  readonly globalNormalizeTargetRms = signal(DEFAULT_TARGET_RMS_DBFS.toFixed(2));
   readonly liveRmsDbfs = signal<number | null>(null);
   readonly liveRmsMaxDbfs = signal<number | null>(null);
   readonly liveRmsHistory = signal<number[]>([]);
@@ -233,8 +145,6 @@ export class DashboardStickyPanelComponent implements OnInit, OnDestroy {
   private liveMeterShouldRun = false;
 
   ngOnInit(): void {
-    this.loadGlobalNormalizeTargetRms();
-    this.globalNormalizeTargetRmsChange.emit(this.globalNormalizeTargetRms());
     this.startLiveMeter();
   }
 
@@ -307,34 +217,6 @@ export class DashboardStickyPanelComponent implements OnInit, OnDestroy {
         };
       })
       .filter((bar): bar is LiveRmsHistoryBar => bar !== null);
-  }
-
-  commitGlobalNormalizeTargetRms(): void {
-    const parsed = Number.parseFloat(this.globalNormalizeTargetRms());
-    const normalized = Number.isFinite(parsed) ? parsed : DEFAULT_TARGET_RMS_DBFS;
-    const text = normalized.toFixed(2);
-    this.globalNormalizeTargetRms.set(text);
-    try {
-      window.localStorage.setItem(GLOBAL_NORMALIZE_TARGET_STORAGE_KEY, text);
-    } catch {
-      // local storage is best-effort only
-    }
-  }
-
-  private loadGlobalNormalizeTargetRms(): void {
-    try {
-      const saved = window.localStorage.getItem(GLOBAL_NORMALIZE_TARGET_STORAGE_KEY);
-      if (!saved) {
-        return;
-      }
-      const parsed = Number.parseFloat(saved);
-      if (!Number.isFinite(parsed)) {
-        return;
-      }
-      this.globalNormalizeTargetRms.set(parsed.toFixed(2));
-    } catch {
-      // local storage is best-effort only
-    }
   }
 
   private startLiveMeter(): void {

@@ -10,8 +10,9 @@ Runtime target:
 The `tauri/` folder is retained as a reverse-engineering source/reference for extracted JS assets, not as the primary runtime UI.
 
 Primary planning doc:
-- `docs/webapp-implementation-plan.md`
-- `docs/hash-first-patch-platform-design.md`
+- `docs/forward-implementation.md`
+
+The active product is a Live Patch-centred tone-discovery workflow: design and audition settings on the current amp edit buffer, then save or commit worthwhile results. The legacy Tauri material below is retained only as reverse-engineering reference; it is not the runtime or development path for this app.
 
 Phase 1 scaffold paths:
 - `apps/api`
