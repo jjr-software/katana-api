@@ -3,7 +3,7 @@
 ## Hard Rule: Web Build/Run Path
 - Do not run host-local frontend tooling (`npm run ...`, `ng ...`) for this repo.
 - Web build/verification must use the containerized path only (`docker compose ...`).
-- If host tooling is missing, fail hard and switch to Compose; do not use host fallbacks.
+- If host tooling is missing, use the authoritative Compose path and report any missing Compose prerequisite through its existing operation contract; do not use host fallbacks.
 - After each code change, always rebuild and restart the stack with:
   - `docker compose up -d --build`
 - For browser and UI testing, use `https://katana.ryzen.jjrsoftware.co.uk/` rather than `localhost`.
