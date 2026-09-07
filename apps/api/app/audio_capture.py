@@ -51,6 +51,10 @@ class LiveAudioMetrics:
     fft_bins_db: list[float]
 
 
+class KatanaPipeWireSourceUnavailable(RuntimeError):
+    """Raised when PipeWire has no Katana input source to capture."""
+
+
 def _linear_to_dbfs(value: float) -> float:
     if value <= 1e-12:
         return -120.0
@@ -338,7 +342,7 @@ async def resolve_katana_pipewire_source(requested_source: str | None = None) ->
 
     if best_source is None or best_score <= 0 or "katana" not in best_source.lower():
         available = ", ".join(available_sources) if available_sources else "none"
-        raise RuntimeError(f"Katana PipeWire source not found; available sources: {available}")
+        raise KatanaPipeWireSourceUnavailable(f"Katana PipeWire source not found; available sources: {available}")
     return best_source
 
 

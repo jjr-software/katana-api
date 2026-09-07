@@ -363,6 +363,7 @@ const LIVE_FFT_BANDS = buildLiveMeterBands(LIVE_GE10_BAND_CENTERS_HZ, EQ_GE10_BA
 const DEFAULT_TARGET_RMS_DBFS = -35.0;
 const LIVE_TOTAL_LEVEL_ZOOM_DB = 3.0;
 const LIVE_METER_WINDOW_SEC = 2.0;
+const LIVE_METER_UNAVAILABLE_RECONNECT_DELAY_MS = 30_000;
 const LIVE_RMS_HISTORY_LIMIT = 240;
 const LIVE_TOTAL_LEVEL_GRAPH_WIDTH = 1000;
 const LIVE_TOTAL_LEVEL_GRAPH_HEIGHT = 72;
@@ -941,7 +942,7 @@ export class App implements OnInit, OnDestroy {
   measureCountdownSec = signal(0);
   busyActions = signal<Record<string, boolean>>({});
   liveMeterSource: EventSource | null = null;
-  liveMeterReconnectHandle: ReturnType<typeof setTimeout> | null = null;
+  liveMeterUnavailableReconnectHandle: ReturnType<typeof setTimeout> | null = null;
   patchSamplesModalTitle = signal('');
   patchSamplesRows = signal<AudioSampleResponse[]>([]);
   aiModalMode = signal<'general' | 'level'>('general');
@@ -1006,7 +1007,6 @@ export class App implements OnInit, OnDestroy {
   toneManualSetDescription = signal('');
   toneManualSetSlots = signal<Record<number, string>>({});
   toneSetSlotAssignments = signal<Record<string, string>>({});
-  private liveMeterShouldRun = false;
   private toastCounter = 0;
   private readonly toastTimers = new Map<number, ReturnType<typeof setTimeout>>();
   private lastStatusToast = '';
@@ -3748,7 +3748,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   startLiveMeter(): void {
-    this.liveMeterShouldRun = true;
+    this.clearLiveMeterUnavailableReconnect();
     this.disconnectLiveMeter();
     const source = new EventSource(`/api/v1/audio/live/sse?window_sec=${LIVE_METER_WINDOW_SEC}`);
     source.onmessage = (event: MessageEvent<string>) => {
@@ -3761,6 +3761,13 @@ export class App implements OnInit, OnDestroy {
             this.liveMeterRate.set(rate);
           }
           this.liveMeterConnected.set(true);
+          return;
+        }
+        if (eventType === 'unavailable') {
+          this.liveMeterConnected.set(false);
+          this.resetLiveMeterDisplay();
+          this.disconnectLiveMeter();
+          this.scheduleLiveMeterUnavailableReconnect();
           return;
         }
         if (eventType !== 'audio_metrics') {
@@ -3799,8 +3806,6 @@ export class App implements OnInit, OnDestroy {
     };
     source.onerror = () => {
       this.liveMeterConnected.set(false);
-      this.disconnectLiveMeter();
-      this.scheduleLiveMeterReconnect();
     };
     this.liveMeterSource = source;
   }
@@ -3814,8 +3819,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   private shutdownLiveMeter(): void {
-    this.liveMeterShouldRun = false;
-    this.clearLiveMeterReconnect();
+    this.clearLiveMeterUnavailableReconnect();
     this.disconnectLiveMeter();
     this.resetLiveMeterDisplay();
   }
@@ -3830,23 +3834,20 @@ export class App implements OnInit, OnDestroy {
     this.liveMeterAt.set('');
   }
 
-  private scheduleLiveMeterReconnect(): void {
-    if (!this.liveMeterShouldRun || this.liveMeterReconnectHandle !== null) {
+  private scheduleLiveMeterUnavailableReconnect(): void {
+    if (this.liveMeterUnavailableReconnectHandle !== null) {
       return;
     }
-    this.liveMeterReconnectHandle = setTimeout(() => {
-      this.liveMeterReconnectHandle = null;
-      if (!this.liveMeterShouldRun || this.liveMeterSource !== null) {
-        return;
-      }
+    this.liveMeterUnavailableReconnectHandle = setTimeout(() => {
+      this.liveMeterUnavailableReconnectHandle = null;
       this.startLiveMeter();
-    }, 1000);
+    }, LIVE_METER_UNAVAILABLE_RECONNECT_DELAY_MS);
   }
 
-  private clearLiveMeterReconnect(): void {
-    if (this.liveMeterReconnectHandle !== null) {
-      clearTimeout(this.liveMeterReconnectHandle);
-      this.liveMeterReconnectHandle = null;
+  private clearLiveMeterUnavailableReconnect(): void {
+    if (this.liveMeterUnavailableReconnectHandle !== null) {
+      clearTimeout(this.liveMeterUnavailableReconnectHandle);
+      this.liveMeterUnavailableReconnectHandle = null;
     }
   }
 

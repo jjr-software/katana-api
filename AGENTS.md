@@ -2216,3 +2216,18 @@
   - Dashboard rendered at `1440 × 900` and `390 × 844` with no horizontal overflow.
   - Global Target RMS was visible at both sizes and no visual collision was observed.
   - `networkidle` remained active because of the intended SSE connection; `domcontentloaded` and rendered-page checks succeeded.
+
+## Session Update - 2026-09-07 (Live Meter Source Unavailable)
+- Fixed expected Katana USB-audio absence at the live-meter boundary:
+  - `app.audio_capture` now raises `KatanaPipeWireSourceUnavailable` only when the Katana PipeWire source cannot be resolved.
+  - `GET /api/v1/audio/live/sse` returns one clean `unavailable` SSE message with `retry: 30000`, no source inventory, and no audio values for that condition.
+  - Other capture and stream failures still propagate through the existing runtime path.
+- Browser behaviour:
+  - both live-meter consumers clear stale values on `unavailable`, close that known-unavailable connection, and schedule one cancellable 30-second reopen;
+  - normal stream errors retain native EventSource handling and do not start an app retry timer.
+- Verification:
+  - three direct public absent-source stream requests each returned the one expected `unavailable` event; API logs contained no unhandled ASGI traceback.
+  - a shared Playwright probe received one unavailable message over 5.5 seconds, and the public dashboard rendered `n/a` for the unavailable meter without device inventory or horizontal overflow.
+  - `docker compose up -d --build` completed; API/web are running and PostgreSQL is healthy. Existing Angular bundle-budget warnings remain non-fatal.
+- Current limitation:
+  - the Katana audio source was absent during verification, so a physical disconnect/reconnect cycle could not be exercised. When it returns, the next bounded meter reconnect is the live hardware check to perform.

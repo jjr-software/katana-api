@@ -239,6 +239,26 @@ Module ownership:
 - `katana.client` owns canonical live-patch and active-slot reads. `amp_queue` serializes that device work.
 - `spectrum_compare` owns the bounded measurement orchestration and translates the canonical structured patch payload into a compact typed display contract. It does not persist a second patch representation.
 
+## 5.0.2.1 Live Meter Availability
+
+Primary user: a guitarist leaving Tone Lab open while the Katana USB audio device is disconnected or later becomes available.
+
+Outcome: the live meter is honestly unavailable without producing server trace noise or opening repeated client connections; it resumes naturally after the Katana PipeWire source returns.
+
+Requirements:
+
+1. The capture boundary distinguishes a missing Katana PipeWire source from capture and process failures. It must never select another available audio device or fabricate a meter reading.
+2. `GET /api/v1/audio/live/sse` translates only that expected missing-source condition into one existing SSE-stream message with `type: "unavailable"` and a 30-second native EventSource retry delay, then ends the current stream cleanly. The message contains no device inventory.
+3. A normal connected stream resets the native retry delay to its normal three seconds before emitting `connected` and `audio_metrics` messages. On its typed `unavailable` message, each Angular consumer closes that known-unavailable stream and schedules exactly one 30-second reopen; it cancels that timer when the owning workflow closes or deliberately restarts the meter. This is the only availability retry and avoids reconnect churn while allowing recovery when the Katana source appears.
+4. Any other meter start, capture, or stream error remains an error through the existing runtime path; it is not relabelled as unavailable.
+5. The Angular live-meter consumers render no audio reading while unavailable. They use no timer-based retry loop for ordinary stream failures and retain no competing connections; only the one bounded unavailable-source reopen is permitted.
+
+Module ownership:
+
+- `app.audio_capture` owns detection of the Katana PipeWire source and the typed unavailable condition.
+- `api.audio` owns the SSE translation for that condition and no capture policy.
+- the Angular live-meter consumers own their `EventSource` lifecycle and displayed meter state; they do not decide audio-device availability.
+
 ## 5.0.3 Live MOD/FX Editing
 
 Primary user: a guitarist shaping the active MOD or FX block while hearing the current Live Patch.

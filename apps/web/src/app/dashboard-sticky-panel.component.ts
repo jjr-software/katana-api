@@ -8,6 +8,7 @@ const LIVE_TOTAL_LEVEL_GRAPH_HEIGHT = 288;
 const LIVE_TOTAL_LEVEL_BAR_STEP = 14;
 const LIVE_TOTAL_LEVEL_BAR_WIDTH = 10;
 const LIVE_METER_WINDOW_SEC = 2.0;
+const LIVE_METER_UNAVAILABLE_RECONNECT_DELAY_MS = 30_000;
 
 type ToneBlockKey =
   | 'routing'
@@ -141,8 +142,7 @@ export class DashboardStickyPanelComponent implements OnInit, OnDestroy {
 
   private readonly ngZone = inject(NgZone);
   private liveMeterSource: EventSource | null = null;
-  private liveMeterReconnectHandle: ReturnType<typeof setTimeout> | null = null;
-  private liveMeterShouldRun = false;
+  private liveMeterUnavailableReconnectHandle: ReturnType<typeof setTimeout> | null = null;
 
   ngOnInit(): void {
     this.startLiveMeter();
@@ -220,7 +220,7 @@ export class DashboardStickyPanelComponent implements OnInit, OnDestroy {
   }
 
   private startLiveMeter(): void {
-    this.liveMeterShouldRun = true;
+    this.clearLiveMeterUnavailableReconnect();
     this.disconnectLiveMeter();
     this.ngZone.runOutsideAngular(() => {
       const source = new EventSource(`/api/v1/audio/live/sse?window_sec=${LIVE_METER_WINDOW_SEC}`);
@@ -228,6 +228,12 @@ export class DashboardStickyPanelComponent implements OnInit, OnDestroy {
         try {
           const payload = JSON.parse(event.data) as Record<string, unknown>;
           const eventType = String(payload['type'] ?? '');
+          if (eventType === 'unavailable') {
+            this.resetLiveMeterDisplay();
+            this.disconnectLiveMeter();
+            this.scheduleLiveMeterUnavailableReconnect();
+            return;
+          }
           if (eventType !== 'audio_metrics') {
             return;
           }
@@ -241,10 +247,6 @@ export class DashboardStickyPanelComponent implements OnInit, OnDestroy {
           // Keep the panel stable if one event is malformed.
         }
       };
-      source.onerror = () => {
-        this.disconnectLiveMeter();
-        this.scheduleLiveMeterReconnect();
-      };
       this.liveMeterSource = source;
     });
   }
@@ -257,8 +259,7 @@ export class DashboardStickyPanelComponent implements OnInit, OnDestroy {
   }
 
   private shutdownLiveMeter(): void {
-    this.liveMeterShouldRun = false;
-    this.clearLiveMeterReconnect();
+    this.clearLiveMeterUnavailableReconnect();
     this.disconnectLiveMeter();
     this.resetLiveMeterDisplay();
   }
@@ -269,23 +270,20 @@ export class DashboardStickyPanelComponent implements OnInit, OnDestroy {
     this.liveRmsHistory.set([]);
   }
 
-  private scheduleLiveMeterReconnect(): void {
-    if (!this.liveMeterShouldRun || this.liveMeterReconnectHandle !== null) {
+  private scheduleLiveMeterUnavailableReconnect(): void {
+    if (this.liveMeterUnavailableReconnectHandle !== null) {
       return;
     }
-    this.liveMeterReconnectHandle = setTimeout(() => {
-      this.liveMeterReconnectHandle = null;
-      if (!this.liveMeterShouldRun || this.liveMeterSource !== null) {
-        return;
-      }
+    this.liveMeterUnavailableReconnectHandle = setTimeout(() => {
+      this.liveMeterUnavailableReconnectHandle = null;
       this.startLiveMeter();
-    }, 1000);
+    }, LIVE_METER_UNAVAILABLE_RECONNECT_DELAY_MS);
   }
 
-  private clearLiveMeterReconnect(): void {
-    if (this.liveMeterReconnectHandle !== null) {
-      clearTimeout(this.liveMeterReconnectHandle);
-      this.liveMeterReconnectHandle = null;
+  private clearLiveMeterUnavailableReconnect(): void {
+    if (this.liveMeterUnavailableReconnectHandle !== null) {
+      clearTimeout(this.liveMeterUnavailableReconnectHandle);
+      this.liveMeterUnavailableReconnectHandle = null;
     }
   }
 

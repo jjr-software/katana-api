@@ -1,5 +1,6 @@
 import asyncio
 import json
+from collections.abc import AsyncIterator
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,6 +13,7 @@ from starlette.responses import Response, StreamingResponse
 from app.audio_capture import (
     KATANA_CAPTURE_CHANNELS,
     KATANA_CAPTURE_RATE,
+    KatanaPipeWireSourceUnavailable,
     PipeWireLiveMeter,
     capture_audio_sample,
 )
@@ -139,8 +141,9 @@ class AudioLevelMarkerCaptureRequest(BaseModel):
     channels: int = Field(default=KATANA_CAPTURE_CHANNELS, ge=1, le=2)
 
 
-def _sse_event(payload: dict) -> str:
-    return f"data: {json.dumps(payload, separators=(',', ':'))}\n\n"
+def _sse_event(payload: dict[str, object], retry_ms: int | None = None) -> str:
+    retry = f"retry: {retry_ms}\n" if retry_ms is not None else ""
+    return f"{retry}data: {json.dumps(payload, separators=(',', ':'))}\n\n"
 
 
 def _audio_sample_response(row: AudioSample, db: Session) -> AudioSampleResponse:
@@ -268,9 +271,20 @@ async def stream_live_audio_measurement_sse(
         window_sec=bounded_window,
     )
 
-    async def event_stream() -> object:
-        await meter.start()
+    async def event_stream() -> AsyncIterator[str]:
         try:
+            try:
+                await meter.start()
+            except KatanaPipeWireSourceUnavailable:
+                yield _sse_event(
+                    {
+                        "type": "unavailable",
+                        "reason": "katana_source_unavailable",
+                        "ts": datetime.now().isoformat(timespec="seconds"),
+                    },
+                    retry_ms=30_000,
+                )
+                return
             yield _sse_event(
                 {
                     "type": "connected",
@@ -279,7 +293,8 @@ async def stream_live_audio_measurement_sse(
                     "rate": bounded_rate,
                     "channels": bounded_channels,
                     "ts": datetime.now().isoformat(timespec="seconds"),
-                }
+                },
+                retry_ms=3_000,
             )
             while True:
                 if await request.is_disconnected():
