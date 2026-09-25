@@ -79,6 +79,8 @@ class AmpJobQueue:
         self._jobs_lock = asyncio.Lock()
         self._state_change = asyncio.Condition()
         self._state_revision = 0
+        # A persisted row alone cannot prove the live buffer after a process restart.
+        self._live_baseline_valid = False
 
     async def start(self) -> None:
         if self._worker_task is not None and not self._worker_task.done():
@@ -225,6 +227,20 @@ class AmpJobQueue:
             return live_patch_status_payload(db, row)
 
     @staticmethod
+    def _load_live_patch() -> dict | None:
+        with SessionLocal() as db:
+            row = db.get(LivePatchState, 1)
+            return None if row is None else row.patch_json
+
+    async def _persist_live_patch(self, patch: dict, *, source_type: str, confirmed_at: str) -> dict:
+        status = await asyncio.to_thread(
+            self._save_live_patch, patch,
+            source_type=source_type, confirmed_at=confirmed_at,
+        )
+        self._live_baseline_valid = True
+        return status
+
+    @staticmethod
     def _save_slot_snapshots(slots: list[SlotPatchSummary | SlotDump]) -> None:
         with SessionLocal() as db:
             for slot_result in slots:
@@ -241,10 +257,21 @@ class AmpJobQueue:
         timeout_seconds: float = 60.0,
     ) -> dict:
         current = await asyncio.wait_for(client.read_current_patch(), timeout=timeout_seconds)
-        return await asyncio.to_thread(
-            self._save_live_patch, current.payload,
+        return await self._persist_live_patch(
+            current.payload,
             source_type=source_type, confirmed_at=synced_at,
         )
+
+    async def _confirm_live_after_slot_operation(
+        self, client: AmpClient, synced_at: str, operation: str, timeout_seconds: float,
+    ) -> tuple[dict | None, str | None]:
+        try:
+            status = await self._refresh_live_patch(
+                client, synced_at, timeout_seconds=timeout_seconds,
+            )
+            return status, None
+        except Exception as exc:
+            return None, f"{operation} completed; Live Patch refresh unavailable: {exc}"
 
     async def list_jobs(self, limit: int = 25) -> list[AmpQueueJob]:
         max_items = max(1, min(int(limit), 200))
@@ -301,12 +328,13 @@ class AmpJobQueue:
                 dump_result = None
                 slots_result = None
             elif job.operation == "current_patch":
+                self._live_baseline_valid = False
                 current_patch_result = await asyncio.wait_for(
                     client.read_current_patch(),
                     timeout=max(5.0, settings.quick_sync_timeout_seconds),
                 )
-                live_status_result = await asyncio.to_thread(
-                    self._save_live_patch, current_patch_result.payload,
+                live_status_result = await self._persist_live_patch(
+                    current_patch_result.payload,
                     source_type="amp_sync", confirmed_at=synced_at,
                 )
                 connection_result = None
@@ -325,6 +353,7 @@ class AmpJobQueue:
             elif job.operation == "activate_slot":
                 if job.slot is None:
                     raise RuntimeError("activate_slot operation missing slot")
+                self._live_baseline_valid = False
                 activate_ms_result = await asyncio.wait_for(
                     client.activate_slot(job.slot), timeout=max(5.0, settings.quick_sync_timeout_seconds),
                 )
@@ -333,8 +362,8 @@ class AmpJobQueue:
                     current_patch_result = await asyncio.wait_for(
                         client.read_current_patch(), timeout=max(5.0, settings.full_sync_timeout_seconds),
                     )
-                    live_status_result = await asyncio.to_thread(
-                        self._save_live_patch, current_patch_result.payload,
+                    live_status_result = await self._persist_live_patch(
+                        current_patch_result.payload,
                         source_type="amp_sync", confirmed_at=synced_at,
                     )
                 except Exception as exc:
@@ -346,11 +375,15 @@ class AmpJobQueue:
             elif job.operation == "readback_slot":
                 if job.slot is None:
                     raise RuntimeError("readback_slot operation missing slot")
+                self._live_baseline_valid = False
                 slot_result = await asyncio.wait_for(
                     client.read_slot_state(slot=job.slot, synced_at=synced_at),
                     timeout=max(5.0, settings.full_sync_timeout_seconds),
                 )
                 await asyncio.to_thread(self._save_slot_snapshots, [slot_result])
+                live_status_result, warning_result = await self._confirm_live_after_slot_operation(
+                    client, synced_at, "Slot readback", max(5.0, settings.full_sync_timeout_seconds),
+                )
                 connection_result = None
                 current_patch_result = None
                 dump_result = None
@@ -379,15 +412,21 @@ class AmpJobQueue:
             elif job.operation == "edit_current_patch":
                 if job.request_patch is None:
                     raise RuntimeError("edit_current_patch operation missing patch edit")
-                previous = (await asyncio.wait_for(
-                    client.read_current_patch(),
-                    timeout=max(5.0, settings.quick_sync_timeout_seconds),
-                )).payload
+                previous = await asyncio.to_thread(self._load_live_patch) if self._live_baseline_valid else None
+                if previous is None:
+                    previous = (await asyncio.wait_for(
+                        client.read_current_patch(),
+                        timeout=max(5.0, settings.quick_sync_timeout_seconds),
+                    )).payload
+                    await self._persist_live_patch(
+                        previous, source_type="amp_sync", confirmed_at=synced_at,
+                    )
                 rendered = merge_patch_object_into_full_patch(previous, job.request_patch)
                 rendered["patch_name"] = (
                     job.request_patch_name[:16] if job.request_patch_name is not None
                     else str(previous.get("patch_name", ""))[:16]
                 )
+                self._live_baseline_valid = False
                 if job.request_block_name is None:
                     applied_patch_result = await asyncio.wait_for(
                         client.apply_current_patch(rendered),
@@ -401,8 +440,8 @@ class AmpJobQueue:
                         ),
                         timeout=max(5.0, settings.full_sync_timeout_seconds),
                     )
-                live_status_result = await asyncio.to_thread(
-                    self._save_live_patch, applied_patch_result.payload,
+                live_status_result = await self._persist_live_patch(
+                    applied_patch_result.payload,
                     source_type=job.request_source_type, confirmed_at=synced_at,
                 )
                 connection_result = None
@@ -414,11 +453,15 @@ class AmpJobQueue:
                 slot_target = job.slot
                 if slot_target is None:
                     raise RuntimeError("sync_slot operation missing slot")
+                self._live_baseline_valid = False
                 slot_result = await asyncio.wait_for(
                     client.read_slot_state(slot=slot_target, synced_at=synced_at),
                     timeout=max(5.0, settings.full_sync_timeout_seconds),
                 )
                 await asyncio.to_thread(self._save_slot_snapshots, [slot_result])
+                live_status_result, warning_result = await self._confirm_live_after_slot_operation(
+                    client, synced_at, "Slot sync", max(5.0, settings.full_sync_timeout_seconds),
+                )
                 connection_result = None
                 current_patch_result = None
                 dump_result = None
@@ -430,6 +473,7 @@ class AmpJobQueue:
                     raise RuntimeError("write_slot operation missing slot")
                 if job.request_patch is None:
                     raise RuntimeError("write_slot operation missing request patch")
+                self._live_baseline_valid = False
                 slot_result = await asyncio.wait_for(
                     client.write_slot_state(slot=slot_target, patch_payload=job.request_patch, synced_at=synced_at),
                     timeout=max(5.0, settings.full_sync_timeout_seconds),
@@ -438,6 +482,11 @@ class AmpJobQueue:
                     await asyncio.to_thread(self._save_slot_snapshots, [slot_result])
                 except Exception as exc:
                     warning_result = f"Slot written; snapshot persistence failed: {exc}"
+                live_status_result, refresh_warning = await self._confirm_live_after_slot_operation(
+                    client, synced_at, "Slot write", max(5.0, settings.full_sync_timeout_seconds),
+                )
+                if refresh_warning:
+                    warning_result = f"{warning_result}; {refresh_warning}" if warning_result else refresh_warning
                 connection_result = None
                 current_patch_result = None
                 dump_result = None
@@ -449,15 +498,20 @@ class AmpJobQueue:
                     raise RuntimeError("store_live_patch operation missing slot")
                 with SessionLocal() as db:
                     live_row = db.get(LivePatchState, 1)
-                    source_type = live_row.source_type if live_row is not None else "amp_sync"
-                live_patch = (await asyncio.wait_for(
-                    client.read_current_patch(),
-                    timeout=max(5.0, settings.quick_sync_timeout_seconds),
-                )).payload
-                live_status_result = await asyncio.to_thread(
-                    self._save_live_patch, live_patch,
-                    source_type=source_type, confirmed_at=synced_at,
-                )
+                    source_type = live_row.source_type if live_row is not None and self._live_baseline_valid else "amp_sync"
+                    live_patch = live_row.patch_json if live_row is not None and self._live_baseline_valid else None
+                    if live_patch is not None:
+                        live_status_result = live_patch_status_payload(db, live_row)
+                if live_patch is None:
+                    live_patch = (await asyncio.wait_for(
+                        client.read_current_patch(),
+                        timeout=max(5.0, settings.quick_sync_timeout_seconds),
+                    )).payload
+                    live_status_result = await self._persist_live_patch(
+                        live_patch,
+                        source_type=source_type, confirmed_at=synced_at,
+                    )
+                self._live_baseline_valid = False
                 slot_result = await asyncio.wait_for(
                     client.write_slot_state(slot=slot_target, patch_payload=live_patch, synced_at=synced_at),
                     timeout=max(5.0, settings.full_sync_timeout_seconds),
@@ -480,22 +534,30 @@ class AmpJobQueue:
                 slots_result = None
                 applied_patch_result = None
             elif job.operation == "full_dump":
+                self._live_baseline_valid = False
                 dump_result = await asyncio.wait_for(
                     client.full_amp_dump_via_export(synced_at=synced_at),
                     timeout=max(5.0, settings.full_sync_timeout_seconds),
                 )
                 await asyncio.to_thread(self._save_slot_snapshots, dump_result.slots)
+                live_status_result, warning_result = await self._confirm_live_after_slot_operation(
+                    client, synced_at, "Full dump", max(5.0, settings.full_sync_timeout_seconds),
+                )
                 connection_result = None
                 current_patch_result = None
                 slot_result = None
                 slots_result = None
                 applied_patch_result = None
             elif job.operation == "full_sync_slots":
+                self._live_baseline_valid = False
                 slots_result = await asyncio.wait_for(
                     client.read_slots_state(synced_at=synced_at),
                     timeout=max(5.0, settings.full_sync_timeout_seconds),
                 )
                 await asyncio.to_thread(self._save_slot_snapshots, slots_result.slots)
+                live_status_result, warning_result = await self._confirm_live_after_slot_operation(
+                    client, synced_at, "Full slot sync", max(5.0, settings.full_sync_timeout_seconds),
+                )
                 connection_result = None
                 current_patch_result = None
                 slot_result = None
