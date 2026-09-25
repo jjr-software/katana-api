@@ -1455,7 +1455,7 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
-  private loadLivePatchIntoEditorState(live: LivePatchResponse, replaceLoadedPatch: boolean, resetScopeToAll: boolean = false): void {
+  private loadLivePatchIntoEditorState(live: LivePatchResponse, replaceLoadedPatch: boolean, resetScopeToAll: boolean = false, resetSelectedBlock: boolean = true): void {
     const draft = this.clonePatch(live.patch_json);
     const draftAmp = this.readObject(draft, 'amp');
     if (draftAmp) {
@@ -1474,7 +1474,9 @@ export class App implements OnInit, OnDestroy {
     this.editorSlotLabel.set('Live Patch');
     this.editorTargetIsActive.set(true);
     this.editorPatchDraft.set(draft);
-    this.liveEditorSelectedBlock.set('amp');
+    if (resetSelectedBlock) {
+      this.liveEditorSelectedBlock.set('amp');
+    }
     this.editorLiveApplyLastAppliedFingerprint = this.patchFingerprint(draft);
     this.editorLiveApplyQueuedFingerprint = null;
     // An earlier apply can still be running when the editor is reloaded.
@@ -6090,7 +6092,7 @@ export class App implements OnInit, OnDestroy {
     this.applyLivePatchStatus(payload);
     this.refreshCurrentCommitStateFromKnownState();
     if (this.editorPatchDraft() === null || reloadCleanDraft) {
-      this.loadLivePatchIntoEditorState(payload, false);
+      this.loadLivePatchIntoEditorState(payload, false, false, false);
     }
   }
 
