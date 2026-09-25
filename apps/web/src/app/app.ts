@@ -1027,7 +1027,6 @@ export class App implements OnInit, OnDestroy {
   editorLiveApplyInFlight = false;
   editorLiveApplyLastAppliedFingerprint = '';
   editorLiveApplyQueuedFingerprint: string | null = null;
-  editorLiveApplyAbortController: AbortController | null = null;
   livePatchSnapshot = signal<Record<string, unknown> | null>(null);
   operationalUpdatesConnected = signal(false);
   tonePatchObjects = signal<TonePatchObjectResponse[]>([]);
@@ -1450,8 +1449,7 @@ export class App implements OnInit, OnDestroy {
     this.liveEditorSelectedBlock.set('amp');
     this.editorLiveApplyLastAppliedFingerprint = this.patchFingerprint(draft);
     this.editorLiveApplyQueuedFingerprint = null;
-    this.editorLiveApplyInFlight = false;
-    this.editorLiveApplyPending.set(false);
+    // An earlier apply can still be running when the editor is reloaded.
     this.editorLiveApplyError.set('');
     this.editorLiveApplyReadbackAt.set('');
     if (resetScopeToAll) {
@@ -7128,7 +7126,6 @@ export class App implements OnInit, OnDestroy {
     }
     this.editorLiveApplyQueuedFingerprint = draftFingerprint;
     if (this.editorLiveApplyInFlight) {
-      this.editorLiveApplyAbortController?.abort();
       return;
     }
     void this.flushEditorLiveApplyQueue();
@@ -7162,6 +7159,9 @@ export class App implements OnInit, OnDestroy {
     if (!forceFullPatch && currentFingerprint === this.editorLiveApplyLastAppliedFingerprint) {
       return false;
     }
+    if (this.editorLiveApplyQueuedFingerprint === expectedFingerprint) {
+      this.editorLiveApplyQueuedFingerprint = null;
+    }
     const draftSnapshot = this.clonePatch(draft);
     const changedBlocks = forceFullPatch ? [] : this.editorBlocksToApply(this.livePatchSnapshot(), draftSnapshot);
     const queueKey = forceFullPatch
@@ -7173,8 +7173,7 @@ export class App implements OnInit, OnDestroy {
     this.editorLiveApplyInFlight = true;
     this.editorLiveApplyPending.set(true);
     this.editorLiveApplyReadbackAt.set('');
-    const abortController = new AbortController();
-    this.editorLiveApplyAbortController = abortController;
+    let requestSettled = false;
     try {
       if (!forceFullPatch && changedBlocks.length === 1) {
         const blockName = changedBlocks[0];
@@ -7184,11 +7183,16 @@ export class App implements OnInit, OnDestroy {
             method: 'PATCH',
             cache: 'no-store',
             headers: { 'Content-Type': 'application/json' },
-            signal: abortController.signal,
             body: JSON.stringify({ patch_block: blockPayload, queue_key: queueKey }),
           });
-          const payload = (await response.json()) as LivePatchResponse | { detail?: unknown };
-          if (!response.ok || !('patch_json' in payload)) {
+          requestSettled = response.status !== 504;
+          let payload = (await response.json()) as LivePatchResponse | { detail?: unknown };
+          if (response.status === 504) {
+            payload = await this.recoverTimedOutEditorLiveApply(payload, () => {
+              requestSettled = true;
+            });
+          }
+          if ((!response.ok && response.status !== 504) || !('patch_json' in payload)) {
             this.editorLiveApplyError.set(typeof payload === 'object' ? JSON.stringify(payload) : 'live apply failed');
             return false;
           }
@@ -7200,9 +7204,6 @@ export class App implements OnInit, OnDestroy {
             this.editorPatchDraft.set(this.clonePatch(applied.patch_json));
           }
           this.editorLiveApplyLastAppliedFingerprint = appliedFingerprint;
-          if (this.editorLiveApplyQueuedFingerprint === expectedFingerprint) {
-            this.editorLiveApplyQueuedFingerprint = null;
-          }
           this.applyLivePatchStatus(applied);
           this.currentAmpCommitState.set('uncommitted');
           this.editorLiveApplyReadbackAt.set(applied.amp_confirmed_at);
@@ -7235,20 +7236,22 @@ export class App implements OnInit, OnDestroy {
         method: 'POST',
         cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
-        signal: abortController.signal,
         body: JSON.stringify({ patch: draftSnapshot, queue_key: queueKey }),
       });
-      const payload = (await response.json()) as ApplyCurrentPatchResponse | { detail?: unknown };
-      if (!response.ok) {
+      requestSettled = response.status !== 504;
+      let payload = (await response.json()) as ApplyCurrentPatchResponse | { detail?: unknown };
+      if (response.status === 504) {
+        const live = await this.recoverTimedOutEditorLiveApply(payload, () => {
+          requestSettled = true;
+        });
+        payload = { patch: live.patch_json, applied_at: live.amp_confirmed_at };
+      } else if (!response.ok) {
         this.editorLiveApplyError.set(typeof payload === 'object' ? JSON.stringify(payload) : 'live apply failed');
         return false;
       }
       const applied = payload as ApplyCurrentPatchResponse;
       const stagedFingerprint = expectedFingerprint;
       this.editorLiveApplyLastAppliedFingerprint = stagedFingerprint;
-      if (this.editorLiveApplyQueuedFingerprint === expectedFingerprint) {
-        this.editorLiveApplyQueuedFingerprint = null;
-      }
       const appliedPatch = this.clonePatch(applied.patch);
       const patchName = this.readString(appliedPatch, 'patch_name') ?? this.readString(draftSnapshot, 'patch_name') ?? '';
       const hash = this.readString(appliedPatch, 'config_hash_sha256') ?? '';
@@ -7278,23 +7281,54 @@ export class App implements OnInit, OnDestroy {
       this.currentAmpPatchHash.set(hash);
       this.currentAmpCommitState.set('uncommitted');
       this.editorLiveApplyReadbackAt.set(applied.applied_at);
+      this.editorLiveApplyError.set('');
       void this.refreshLivePatchStatus();
       return true;
     } catch (error: unknown) {
-      if (this.isAbortError(error)) {
-        return false;
-      }
       this.editorLiveApplyError.set(String(error));
       return false;
     } finally {
       this.editorLiveApplyInFlight = false;
       this.editorLiveApplyPending.set(false);
-      if (this.editorLiveApplyAbortController === abortController) {
-        this.editorLiveApplyAbortController = null;
+      if (!requestSettled) {
+        this.editorLiveApplyQueuedFingerprint = null;
       }
-      if (this.editorLiveApplyQueuedFingerprint && this.editorLiveApplyQueuedFingerprint !== this.editorLiveApplyLastAppliedFingerprint) {
+      if (this.editorLiveApplyQueuedFingerprint && this.editorLiveApplyQueuedFingerprint !== expectedFingerprint && this.editorLiveApplyQueuedFingerprint !== this.editorLiveApplyLastAppliedFingerprint) {
         void this.flushEditorLiveApplyQueue();
       }
+    }
+  }
+
+  private async recoverTimedOutEditorLiveApply(payload: unknown, onSettled: () => void): Promise<LivePatchResponse> {
+    const detail = payload && typeof payload === 'object' && 'detail' in payload ? payload.detail : null;
+    const jobId = detail && typeof detail === 'object' && 'job_id' in detail ? detail.job_id : null;
+    if (typeof jobId !== 'string' || !jobId) {
+      throw new Error('Amp apply timed out without a job ID. Sync the live patch before editing again.');
+    }
+    while (true) {
+      const response = await fetch('/api/v1/amp/queue', { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`Could not check whether the amp apply has finished: HTTP ${response.status}. Sync the live patch before editing again.`);
+      }
+      const queue = (await response.json()) as { jobs: QueueJobSummary[] };
+      const job = queue.jobs.find((item) => item.job_id === jobId);
+      if (!job) {
+        throw new Error('The amp apply is no longer visible. Sync the live patch before editing again.');
+      }
+      if (job.status === 'failed') {
+        onSettled();
+        throw new Error(job.error || 'Amp apply failed');
+      }
+      if (job.status === 'succeeded') {
+        onSettled();
+        const syncResponse = await fetch('/api/v1/live-patch/sync', { method: 'POST', cache: 'no-store' });
+        const live = (await syncResponse.json()) as LivePatchResponse | { detail?: unknown };
+        if (!syncResponse.ok || !('patch_json' in live)) {
+          throw new Error(`Amp apply completed, but live patch sync failed: ${JSON.stringify(live)}`);
+        }
+        return live;
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 500));
     }
   }
 
