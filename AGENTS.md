@@ -2236,3 +2236,8 @@
 - Added a selected-passage comparison from stored mono PCM WAV using the existing K-weighted integrated LUFS helper. The API returns clean and dirty LUFS, dirty-minus-clean LU, and exact PCM RMS dBFS. Passages shorter than 0.4 seconds or silent return unavailable LUFS.
 - Added recent-take metadata and waveform read endpoints so the Spectrum page can reopen a saved take after reload, replay selected passages, and request a fresh comparison.
 - Synthetic passage and reopen-contract tests pass in the API image; API and web image builds pass. Real-playing loudness acceptance and stack startup remain with the integrating session.
+
+## Session Update - 2026-09-25 (Saved Take Passage Playback)
+- The saved-take WAV endpoint now supports single HTTP byte ranges so the browser can fetch and seek into recorded audio.
+- Play clean/dirty waits for audio metadata and the requested seek before playback, then stops at the selected end; a newer selection cancels any pending start.
+- API range tests and isolated API/web image builds pass. The integrating checkout still owns live browser playback acceptance and stack restart.

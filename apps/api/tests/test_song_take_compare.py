@@ -6,9 +6,10 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import numpy as np
+from starlette.requests import Request
 
 from app.song_take_compare import compare_passages
-from app.api.audio import get_song_take, recent_song_takes
+from app.api.audio import get_song_take, get_song_take_wav, recent_song_takes
 
 
 def sine_take(first_amplitude: float, second_amplitude: float, rate: int = 48_000) -> bytes:
@@ -67,3 +68,35 @@ class SongTakeCompareTests(unittest.TestCase):
         self.assertEqual(recent[0].id, opened.id)
         self.assertEqual(opened.audio_url, '/api/v1/audio/take/saved-take/wav')
         self.assertEqual(opened.waveform[0].rms_dbfs, -20.0)
+
+    def test_saved_wav_supports_browser_byte_ranges(self) -> None:
+        audio = sine_take(0.1, 0.2)
+
+        class FakeDb:
+            def get(self, _model: object, _id: str) -> object:
+                return SimpleNamespace(audio_wav=audio)
+
+        def request(range_header: str | None) -> Request:
+            headers = [(b'range', range_header.encode())] if range_header else []
+            return Request({'type': 'http', 'method': 'GET', 'path': '/take/saved-take/wav', 'headers': headers})
+
+        full = get_song_take_wav('saved-take', request(None), FakeDb())  # type: ignore[arg-type]
+        self.assertEqual(full.status_code, 200)
+        self.assertEqual(full.headers['accept-ranges'], 'bytes')
+        self.assertEqual(full.body, audio)
+
+        first = get_song_take_wav('saved-take', request('bytes=0-99'), FakeDb())  # type: ignore[arg-type]
+        self.assertEqual(first.status_code, 206)
+        self.assertEqual(first.headers['content-range'], f'bytes 0-99/{len(audio)}')
+        self.assertEqual(first.body, audio[:100])
+
+        later = get_song_take_wav('saved-take', request('bytes=100-'), FakeDb())  # type: ignore[arg-type]
+        self.assertEqual(later.status_code, 206)
+        self.assertEqual(later.body, audio[100:])
+
+        suffix = get_song_take_wav('saved-take', request('bytes=-32'), FakeDb())  # type: ignore[arg-type]
+        self.assertEqual(suffix.body, audio[-32:])
+
+        missing = get_song_take_wav('saved-take', request(f'bytes={len(audio)}-'), FakeDb())  # type: ignore[arg-type]
+        self.assertEqual(missing.status_code, 416)
+        self.assertEqual(missing.headers['content-range'], f'bytes */{len(audio)}')

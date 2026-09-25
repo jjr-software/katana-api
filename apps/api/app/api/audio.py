@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 from collections.abc import AsyncIterator
 from datetime import datetime
 
@@ -114,14 +115,35 @@ def get_song_take(take_id: str, db: Session = Depends(get_db)) -> SongTakeStopRe
 
 
 @router.get("/take/{take_id}/wav")
-def get_song_take_wav(take_id: str, db: Session = Depends(get_db)) -> Response:
+def get_song_take_wav(take_id: str, request: Request, db: Session = Depends(get_db)) -> Response:
     row = db.get(SongTake, take_id)
     if row is None:
         raise HTTPException(status_code=404, detail={"message": "Song take not found", "id": take_id})
+    audio = row.audio_wav
+    size = len(audio)
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Disposition": f'inline; filename="song-take-{take_id}.wav"',
+    }
+    range_header = request.headers.get("range")
+    match = re.fullmatch(r"bytes=(\d*)-(\d*)", range_header) if range_header else None
+    if match and (match[1] or match[2]):
+        if match[1]:
+            start = int(match[1])
+            end = int(match[2]) if match[2] else size - 1
+        else:
+            suffix = int(match[2])
+            start = max(0, size - suffix)
+            end = size - 1
+        if start >= size or start > end or (not match[1] and not suffix):
+            return Response(status_code=416, headers={**headers, "Content-Range": f"bytes */{size}"})
+        end = min(end, size - 1)
+        headers["Content-Range"] = f"bytes {start}-{end}/{size}"
+        return Response(content=audio[start:end + 1], status_code=206, media_type="audio/wav", headers=headers)
     return Response(
-        content=row.audio_wav,
+        content=audio,
         media_type="audio/wav",
-        headers={"Content-Disposition": f'inline; filename="song-take-{take_id}.wav"'},
+        headers=headers,
     )
 
 

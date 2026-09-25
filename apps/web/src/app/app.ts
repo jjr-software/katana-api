@@ -868,6 +868,9 @@ export class App implements OnInit, OnDestroy {
   private takeTimer: ReturnType<typeof setInterval> | null = null;
   private takeStartedAt = 0;
   private takeRangeDrag: { pointerId: number; takeId: string; kind: 'clean' | 'dirty'; anchor: number; previous: [number, number] } | null = null;
+  private takePlaybackAbort?: AbortController;
+  private takePlaybackEnd: number | null = null;
+  private takePlaybackStopTimer: ReturnType<typeof setInterval> | null = null;
   private readonly modalRefs: Partial<Record<ModalKey, NgbModalRef>> = {};
 
   private readonly storedSpectrumMeasurements = loadStoredSpectrumMeasurements();
@@ -1131,6 +1134,7 @@ export class App implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.clearTakeTimer();
+    this.stopTakeRangePlayback();
     window.removeEventListener('popstate', this.onPopState);
     this.modalService.dismissAll();
     this.ampOperationalState.close();
@@ -3442,8 +3446,7 @@ export class App implements OnInit, OnDestroy {
     this.takeError.set('');
     try {
       await this.audioTakeService.start();
-      this.takePlayer?.nativeElement.pause();
-      this.playingTakeRange.set(null);
+      this.stopTakeRangePlayback();
       this.completedTake.set(null);
       this.takePerceivedComparison.set(null);
       this.takeCompareError.set('');
@@ -3498,8 +3501,7 @@ export class App implements OnInit, OnDestroy {
     this.takeError.set('');
     try {
       const take = await this.audioTakeService.get(takeId);
-      this.takePlayer?.nativeElement.pause();
-      this.playingTakeRange.set(null);
+      this.stopTakeRangePlayback();
       this.completedTake.set(take);
       this.cleanRange.set([0, take.duration_sec / 2]);
       this.dirtyRange.set([take.duration_sec / 2, take.duration_sec]);
@@ -3600,25 +3602,70 @@ export class App implements OnInit, OnDestroy {
     const range = kind === 'clean' ? this.cleanRange() : this.dirtyRange();
     const player = this.takePlayer?.nativeElement;
     if (!range || !player || range[1] <= range[0]) return;
-    player.pause();
-    player.currentTime = range[0];
-    this.playingTakeRange.set(kind);
+    this.stopTakeRangePlayback();
+    const controller = new AbortController();
+    this.takePlaybackAbort = controller;
     try {
+      if (player.error) throw new Error('The saved recording could not be loaded.');
+      if (player.readyState < HTMLMediaElement.HAVE_METADATA) {
+        await this.waitForTakeMediaEvent(player, 'loadedmetadata', controller.signal);
+      }
+      if (controller.signal.aborted) return;
+      player.currentTime = range[0];
+      if (player.seeking) {
+        await this.waitForTakeMediaEvent(player, 'seeked', controller.signal);
+      }
+      if (controller.signal.aborted) return;
+      this.takePlaybackEnd = range[1];
+      this.playingTakeRange.set(kind);
       await player.play();
+      if (controller.signal.aborted) return;
+      this.takePlaybackStopTimer = setInterval(() => this.onTakePlaybackTimeUpdate(), 50);
+      this.onTakePlaybackTimeUpdate();
     } catch (error) {
-      this.playingTakeRange.set(null);
-      this.takeError.set(error instanceof Error ? error.message : 'Playback could not start.');
+      if (!controller.signal.aborted) {
+        this.stopTakeRangePlayback();
+        this.takeError.set(error instanceof Error ? error.message : 'Playback could not start.');
+      }
     }
   }
 
   onTakePlaybackTimeUpdate(): void {
-    const kind = this.playingTakeRange();
-    const range = kind === 'clean' ? this.cleanRange() : kind === 'dirty' ? this.dirtyRange() : null;
     const player = this.takePlayer?.nativeElement;
-    if (range && player && player.currentTime >= range[1]) {
-      player.pause();
-      this.playingTakeRange.set(null);
+    if (player?.paused && this.takePlaybackStopTimer !== null) {
+      this.stopTakeRangePlayback();
+      return;
     }
+    if (player && this.takePlaybackEnd !== null && player.currentTime >= this.takePlaybackEnd) {
+      this.stopTakeRangePlayback();
+    }
+  }
+
+  private stopTakeRangePlayback(): void {
+    this.takePlaybackAbort?.abort();
+    this.takePlaybackAbort = undefined;
+    if (this.takePlaybackStopTimer !== null) clearInterval(this.takePlaybackStopTimer);
+    this.takePlaybackStopTimer = null;
+    this.takePlaybackEnd = null;
+    this.takePlayer?.nativeElement.pause();
+    this.playingTakeRange.set(null);
+  }
+
+  private waitForTakeMediaEvent(player: HTMLAudioElement, eventName: 'loadedmetadata' | 'seeked', signal: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const cleanup = () => {
+        player.removeEventListener(eventName, onReady);
+        player.removeEventListener('error', onError);
+        signal.removeEventListener('abort', onAbort);
+      };
+      const onReady = () => { cleanup(); resolve(); };
+      const onError = () => { cleanup(); reject(new Error('The saved recording could not be loaded.')); };
+      const onAbort = () => { cleanup(); reject(new DOMException('Playback cancelled.', 'AbortError')); };
+      player.addEventListener(eventName, onReady);
+      player.addEventListener('error', onError);
+      signal.addEventListener('abort', onAbort);
+      if (signal.aborted) onAbort();
+    });
   }
 
   takeTime(value: number): string {
