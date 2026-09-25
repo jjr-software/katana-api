@@ -1,6 +1,6 @@
 import asyncio
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Literal
 from uuid import uuid4
 
@@ -11,21 +11,31 @@ from app.katana import (
     AmpClient,
     AmpClientError,
     AmpConnectionResult,
+    ActiveSlotSnapshot,
     FullAmpDumpSnapshot,
+    LineOutSnapshot,
+    SlotDump,
     SlotPatchSummary,
     SlotsStateSnapshot,
 )
-from app.models import AmpSyncHistory
+from app.live_patch_state import live_patch_status_payload, upsert_amp_slot_snapshot, upsert_live_patch_state
+from app.models import AmpSyncHistory, LivePatchState
+from app.patch_objects import merge_patch_object_into_full_patch
 from app.settings import get_settings
 
 JobStatus = Literal["queued", "running", "succeeded", "failed"]
 JobOperation = Literal[
     "test_connection",
     "current_patch",
-    "apply_current_patch",
-    "apply_current_patch_block",
+    "active_slot",
+    "activate_slot",
+    "readback_slot",
+    "read_line_out",
+    "write_line_out",
+    "edit_current_patch",
     "sync_slot",
     "write_slot",
+    "store_live_patch",
     "full_dump",
     "full_sync_slots",
 ]
@@ -43,10 +53,16 @@ class AmpQueueJob:
     finished_at: str | None = None
     error: str | None = None
     result_connection: AmpConnectionResult | None = None
+    result_active_slot: ActiveSlotSnapshot | None = None
+    result_activate_ms: int | None = None
+    result_line_out: LineOutSnapshot | None = None
+    result_live_patch_status: dict | None = None
     result_current_patch: dict | None = None
     request_patch: dict | None = None
-    request_previous_patch: dict | None = None
     request_block_name: str | None = None
+    request_patch_name: str | None = None
+    request_source_type: str = "manual_apply"
+    request_line_out: dict | None = None
     result_applied_patch: dict | None = None
     result_slot: SlotPatchSummary | None = None
     result_dump: FullAmpDumpSnapshot | None = None
@@ -57,6 +73,7 @@ class AmpJobQueue:
     def __init__(self) -> None:
         self._queue: asyncio.Queue[str] = asyncio.Queue()
         self._jobs: dict[str, AmpQueueJob] = {}
+        self._completion: dict[str, asyncio.Event] = {}
         self._max_job_history = 120
         self._worker_task: asyncio.Task[None] | None = None
         self._jobs_lock = asyncio.Lock()
@@ -88,82 +105,69 @@ class AmpJobQueue:
     async def enqueue_slot_write(self, slot: int, patch: dict) -> AmpQueueJob:
         return await self._enqueue("write_slot", slot=slot, request_patch=patch)
 
+    async def enqueue_store_live_patch(self, slot: int) -> AmpQueueJob:
+        return await self._enqueue("store_live_patch", slot=slot)
+
     async def enqueue_test_connection(self) -> AmpQueueJob:
         return await self._enqueue("test_connection")
 
     async def enqueue_current_patch(self) -> AmpQueueJob:
         return await self._enqueue("current_patch")
 
-    async def enqueue_apply_current_patch(self, patch: dict, queue_key: str | None = None) -> AmpQueueJob:
-        return await self._enqueue("apply_current_patch", request_patch=patch, queue_key=queue_key)
+    async def enqueue_active_slot(self) -> AmpQueueJob:
+        return await self._enqueue("active_slot")
 
-    async def enqueue_apply_current_patch_block(
-        self,
-        *,
-        block_name: str,
-        previous_patch: dict,
-        patch: dict,
-        queue_key: str | None = None,
-    ) -> AmpQueueJob:
-        return await self._enqueue(
-            "apply_current_patch_block",
-            request_patch=patch,
-            request_previous_patch=previous_patch,
-            request_block_name=block_name,
-            queue_key=queue_key,
-        )
+    async def enqueue_activate_slot(self, slot: int) -> AmpQueueJob:
+        return await self._enqueue("activate_slot", slot=slot)
+
+    async def enqueue_slot_readback(self, slot: int) -> AmpQueueJob:
+        return await self._enqueue("readback_slot", slot=slot)
+
+    async def enqueue_line_out_read(self) -> AmpQueueJob:
+        return await self._enqueue("read_line_out")
+
+    async def enqueue_line_out_write(self, state: dict) -> AmpQueueJob:
+        return await self._enqueue("write_line_out", request_line_out=state)
 
     async def enqueue_full_dump(self) -> AmpQueueJob:
         return await self._enqueue("full_dump")
+
+    async def enqueue_patch_edit(
+        self, *, patch: dict, block_name: str | None = None,
+        patch_name: str | None = None, source_type: str = "manual_apply",
+        queue_key: str | None = None,
+    ) -> AmpQueueJob:
+        # Every accepted edit retains its own identity and executes in order.
+        return await self._enqueue(
+            "edit_current_patch", request_patch=patch, request_block_name=block_name,
+            request_patch_name=patch_name, request_source_type=source_type,
+            queue_key=queue_key,
+        )
 
     async def _enqueue(
         self,
         operation: JobOperation,
         slot: int | None = None,
         request_patch: dict | None = None,
-        request_previous_patch: dict | None = None,
         request_block_name: str | None = None,
         queue_key: str | None = None,
+        request_patch_name: str | None = None,
+        request_source_type: str = "manual_apply",
+        request_line_out: dict | None = None,
     ) -> AmpQueueJob:
-        should_queue = False
         async with self._jobs_lock:
-            if queue_key is not None:
-                queued_job = next(
-                    (
-                        job
-                        for job in self._jobs.values()
-                        if job.queue_key == queue_key and job.status == "queued"
-                    ),
-                    None,
-                )
-                if queued_job is not None:
-                    queued_job.operation = operation
-                    queued_job.slot = slot
-                    queued_job.request_patch = request_patch
-                    queued_job.request_previous_patch = request_previous_patch
-                    queued_job.request_block_name = request_block_name
-                    job = queued_job
-                else:
-                    job = None
-            else:
-                job = None
-
-            if job is None:
-                job = AmpQueueJob(
-                    job_id=str(uuid4()),
-                    operation=operation,
-                    status="queued",
-                    created_at=datetime.now().isoformat(timespec="seconds"),
-                    queue_key=queue_key,
-                    slot=slot,
-                    request_patch=request_patch,
-                    request_previous_patch=request_previous_patch,
-                    request_block_name=request_block_name,
-                )
-                self._jobs[job.job_id] = job
-                self._prune_jobs_locked()
-                should_queue = True
-        if should_queue:
+            job = AmpQueueJob(
+                job_id=str(uuid4()), operation=operation, status="queued",
+                created_at=datetime.now().isoformat(timespec="seconds"),
+                queue_key=queue_key, slot=slot, request_patch=request_patch,
+                request_block_name=request_block_name,
+                request_patch_name=request_patch_name,
+                request_source_type=request_source_type,
+                request_line_out=request_line_out,
+            )
+            self._jobs[job.job_id] = job
+            self._completion[job.job_id] = asyncio.Event()
+            self._prune_jobs_locked()
             await self._queue.put(job.job_id)
         await self.publish_state_change()
         return job
@@ -193,6 +197,54 @@ class AmpJobQueue:
     async def get_job(self, job_id: str) -> AmpQueueJob | None:
         async with self._jobs_lock:
             return self._jobs.get(job_id)
+
+    async def wait_for_job(self, job_id: str, timeout_seconds: float) -> AmpQueueJob | None:
+        async with self._jobs_lock:
+            completion = self._completion.get(job_id)
+            job = self._jobs.get(job_id)
+        if job is None or completion is None:
+            return None
+        try:
+            await asyncio.wait_for(completion.wait(), timeout=timeout_seconds)
+        except asyncio.TimeoutError:
+            pass
+        return await self.get_job(job_id)
+
+    @staticmethod
+    def _active_slot(patch: dict) -> int | None:
+        active = patch.get("active_slot")
+        return active.get("slot") if isinstance(active, dict) else None
+
+    @staticmethod
+    def _save_live_patch(patch: dict, *, source_type: str, confirmed_at: str) -> dict:
+        with SessionLocal() as db:
+            row = upsert_live_patch_state(
+                db, full_patch=patch, active_slot=AmpJobQueue._active_slot(patch),
+                amp_confirmed_at=confirmed_at, source_type=source_type,
+            )
+            return live_patch_status_payload(db, row)
+
+    @staticmethod
+    def _save_slot_snapshots(slots: list[SlotPatchSummary | SlotDump]) -> None:
+        with SessionLocal() as db:
+            for slot_result in slots:
+                if slot_result.payload is None:
+                    continue
+                upsert_amp_slot_snapshot(
+                    db, slot=slot_result.slot,
+                    patch_name=str(slot_result.payload.get("patch_name", "")),
+                    full_patch=slot_result.payload, amp_confirmed_at=slot_result.synced_at,
+                )
+
+    async def _refresh_live_patch(
+        self, client: AmpClient, synced_at: str, source_type: str = "amp_sync",
+        timeout_seconds: float = 60.0,
+    ) -> dict:
+        current = await asyncio.wait_for(client.read_current_patch(), timeout=timeout_seconds)
+        return await asyncio.to_thread(
+            self._save_live_patch, current.payload,
+            source_type=source_type, confirmed_at=synced_at,
+        )
 
     async def list_jobs(self, limit: int = 25) -> list[AmpQueueJob]:
         max_items = max(1, min(int(limit), 200))
@@ -234,6 +286,11 @@ class AmpJobQueue:
         synced_at = datetime.now().isoformat(timespec="seconds")
         try:
             applied_patch_result = None
+            active_slot_result = None
+            activate_ms_result = None
+            line_out_result = None
+            live_status_result = None
+            warning_result = None
             if job.operation == "test_connection":
                 connection_result = await asyncio.wait_for(
                     client.test_connection(),
@@ -248,15 +305,70 @@ class AmpJobQueue:
                     client.read_current_patch(),
                     timeout=max(5.0, settings.quick_sync_timeout_seconds),
                 )
+                live_status_result = await asyncio.to_thread(
+                    self._save_live_patch, current_patch_result.payload,
+                    source_type="amp_sync", confirmed_at=synced_at,
+                )
                 connection_result = None
                 slot_result = None
                 dump_result = None
                 slots_result = None
-            elif job.operation == "apply_current_patch":
-                if job.request_patch is None:
-                    raise RuntimeError("apply_current_patch operation missing request patch")
-                applied_patch_result = await asyncio.wait_for(
-                    client.apply_current_patch(job.request_patch),
+            elif job.operation == "active_slot":
+                active_slot_result = await asyncio.wait_for(
+                    client.read_active_slot(), timeout=max(5.0, settings.quick_sync_timeout_seconds),
+                )
+                connection_result = None
+                current_patch_result = None
+                slot_result = None
+                dump_result = None
+                slots_result = None
+            elif job.operation == "activate_slot":
+                if job.slot is None:
+                    raise RuntimeError("activate_slot operation missing slot")
+                activate_ms_result = await asyncio.wait_for(
+                    client.activate_slot(job.slot), timeout=max(5.0, settings.quick_sync_timeout_seconds),
+                )
+                current_patch_result = None
+                try:
+                    current_patch_result = await asyncio.wait_for(
+                        client.read_current_patch(), timeout=max(5.0, settings.full_sync_timeout_seconds),
+                    )
+                    live_status_result = await asyncio.to_thread(
+                        self._save_live_patch, current_patch_result.payload,
+                        source_type="amp_sync", confirmed_at=synced_at,
+                    )
+                except Exception as exc:
+                    warning_result = f"Slot activated; Live Patch refresh unavailable: {exc}"
+                connection_result = None
+                slot_result = None
+                dump_result = None
+                slots_result = None
+            elif job.operation == "readback_slot":
+                if job.slot is None:
+                    raise RuntimeError("readback_slot operation missing slot")
+                slot_result = await asyncio.wait_for(
+                    client.read_slot_state(slot=job.slot, synced_at=synced_at),
+                    timeout=max(5.0, settings.full_sync_timeout_seconds),
+                )
+                await asyncio.to_thread(self._save_slot_snapshots, [slot_result])
+                connection_result = None
+                current_patch_result = None
+                dump_result = None
+                slots_result = None
+            elif job.operation == "read_line_out":
+                line_out_result = await asyncio.wait_for(
+                    client.read_line_out_state(), timeout=max(5.0, settings.quick_sync_timeout_seconds),
+                )
+                connection_result = None
+                current_patch_result = None
+                slot_result = None
+                dump_result = None
+                slots_result = None
+            elif job.operation == "write_line_out":
+                if job.request_line_out is None:
+                    raise RuntimeError("write_line_out operation missing state")
+                line_out_result = await asyncio.wait_for(
+                    client.write_line_out_state(job.request_line_out),
                     timeout=max(5.0, settings.full_sync_timeout_seconds),
                 )
                 connection_result = None
@@ -264,20 +376,34 @@ class AmpJobQueue:
                 slot_result = None
                 dump_result = None
                 slots_result = None
-            elif job.operation == "apply_current_patch_block":
+            elif job.operation == "edit_current_patch":
                 if job.request_patch is None:
-                    raise RuntimeError("apply_current_patch_block operation missing request patch")
-                if job.request_previous_patch is None:
-                    raise RuntimeError("apply_current_patch_block operation missing previous patch")
+                    raise RuntimeError("edit_current_patch operation missing patch edit")
+                previous = (await asyncio.wait_for(
+                    client.read_current_patch(),
+                    timeout=max(5.0, settings.quick_sync_timeout_seconds),
+                )).payload
+                rendered = merge_patch_object_into_full_patch(previous, job.request_patch)
+                rendered["patch_name"] = (
+                    job.request_patch_name[:16] if job.request_patch_name is not None
+                    else str(previous.get("patch_name", ""))[:16]
+                )
                 if job.request_block_name is None:
-                    raise RuntimeError("apply_current_patch_block operation missing block name")
-                applied_patch_result = await asyncio.wait_for(
-                    client.apply_current_patch_block(
-                        block_name=job.request_block_name,
-                        previous_payload=job.request_previous_patch,
-                        patch_payload=job.request_patch,
-                    ),
-                    timeout=max(5.0, settings.full_sync_timeout_seconds),
+                    applied_patch_result = await asyncio.wait_for(
+                        client.apply_current_patch(rendered),
+                        timeout=max(5.0, settings.full_sync_timeout_seconds),
+                    )
+                else:
+                    applied_patch_result = await asyncio.wait_for(
+                        client.apply_current_patch_block(
+                            block_name=job.request_block_name,
+                            previous_payload=previous, patch_payload=rendered,
+                        ),
+                        timeout=max(5.0, settings.full_sync_timeout_seconds),
+                    )
+                live_status_result = await asyncio.to_thread(
+                    self._save_live_patch, applied_patch_result.payload,
+                    source_type=job.request_source_type, confirmed_at=synced_at,
                 )
                 connection_result = None
                 current_patch_result = None
@@ -292,6 +418,7 @@ class AmpJobQueue:
                     client.read_slot_state(slot=slot_target, synced_at=synced_at),
                     timeout=max(5.0, settings.full_sync_timeout_seconds),
                 )
+                await asyncio.to_thread(self._save_slot_snapshots, [slot_result])
                 connection_result = None
                 current_patch_result = None
                 dump_result = None
@@ -307,6 +434,46 @@ class AmpJobQueue:
                     client.write_slot_state(slot=slot_target, patch_payload=job.request_patch, synced_at=synced_at),
                     timeout=max(5.0, settings.full_sync_timeout_seconds),
                 )
+                try:
+                    await asyncio.to_thread(self._save_slot_snapshots, [slot_result])
+                except Exception as exc:
+                    warning_result = f"Slot written; snapshot persistence failed: {exc}"
+                connection_result = None
+                current_patch_result = None
+                dump_result = None
+                slots_result = None
+                applied_patch_result = None
+            elif job.operation == "store_live_patch":
+                slot_target = job.slot
+                if slot_target is None:
+                    raise RuntimeError("store_live_patch operation missing slot")
+                with SessionLocal() as db:
+                    live_row = db.get(LivePatchState, 1)
+                    source_type = live_row.source_type if live_row is not None else "amp_sync"
+                live_patch = (await asyncio.wait_for(
+                    client.read_current_patch(),
+                    timeout=max(5.0, settings.quick_sync_timeout_seconds),
+                )).payload
+                live_status_result = await asyncio.to_thread(
+                    self._save_live_patch, live_patch,
+                    source_type=source_type, confirmed_at=synced_at,
+                )
+                slot_result = await asyncio.wait_for(
+                    client.write_slot_state(slot=slot_target, patch_payload=live_patch, synced_at=synced_at),
+                    timeout=max(5.0, settings.full_sync_timeout_seconds),
+                )
+                try:
+                    await asyncio.to_thread(self._save_slot_snapshots, [slot_result])
+                except Exception as exc:
+                    warning_result = f"Slot stored; snapshot persistence failed: {exc}"
+                try:
+                    live_status_result = await self._refresh_live_patch(
+                        client, synced_at, source_type,
+                        timeout_seconds=max(5.0, settings.full_sync_timeout_seconds),
+                    )
+                except Exception as exc:
+                    refresh_warning = f"Slot stored; Live Patch refresh unavailable: {exc}"
+                    warning_result = f"{warning_result}; {refresh_warning}" if warning_result else refresh_warning
                 connection_result = None
                 current_patch_result = None
                 dump_result = None
@@ -317,6 +484,7 @@ class AmpJobQueue:
                     client.full_amp_dump_via_export(synced_at=synced_at),
                     timeout=max(5.0, settings.full_sync_timeout_seconds),
                 )
+                await asyncio.to_thread(self._save_slot_snapshots, dump_result.slots)
                 connection_result = None
                 current_patch_result = None
                 slot_result = None
@@ -327,6 +495,7 @@ class AmpJobQueue:
                     client.read_slots_state(synced_at=synced_at),
                     timeout=max(5.0, settings.full_sync_timeout_seconds),
                 )
+                await asyncio.to_thread(self._save_slot_snapshots, slots_result.slots)
                 connection_result = None
                 current_patch_result = None
                 slot_result = None
@@ -347,6 +516,7 @@ class AmpJobQueue:
                 failed.finished_at = datetime.now().isoformat(timespec="seconds")
             await self._persist_sync_history_with_guard(failed)
             await self.publish_state_change()
+            self._completion[job_id].set()
             return
         except AmpClientError as exc:
             async with self._jobs_lock:
@@ -358,6 +528,7 @@ class AmpJobQueue:
                 failed.finished_at = datetime.now().isoformat(timespec="seconds")
             await self._persist_sync_history_with_guard(failed)
             await self.publish_state_change()
+            self._completion[job_id].set()
             return
         except Exception as exc:
             async with self._jobs_lock:
@@ -369,6 +540,7 @@ class AmpJobQueue:
                 failed.finished_at = datetime.now().isoformat(timespec="seconds")
             await self._persist_sync_history_with_guard(failed)
             await self.publish_state_change()
+            self._completion[job_id].set()
             return
 
         async with self._jobs_lock:
@@ -377,24 +549,28 @@ class AmpJobQueue:
                 return
             done.status = "succeeded"
             done.result_connection = connection_result
+            done.result_active_slot = active_slot_result
+            done.result_activate_ms = activate_ms_result
+            done.result_line_out = line_out_result
+            done.result_live_patch_status = live_status_result
             done.result_current_patch = current_patch_result.payload if current_patch_result is not None else None
             done.result_applied_patch = applied_patch_result.payload if applied_patch_result is not None else None
             done.result_slot = slot_result
             done.result_dump = dump_result
             done.result_slots = slots_result
+            done.error = warning_result
             done.finished_at = datetime.now().isoformat(timespec="seconds")
-            self._prune_jobs_locked()
         try:
             await self._persist_sync_history_if_needed(done)
         except Exception as exc:
             async with self._jobs_lock:
-                failed = self._jobs.get(job_id)
-                if failed is None:
+                completed = self._jobs.get(job_id)
+                if completed is None:
                     return
-                failed.status = "failed"
-                failed.error = f"Sync history persistence failed: {exc}"
-                failed.finished_at = datetime.now().isoformat(timespec="seconds")
+                history_warning = f"Sync history persistence failed: {exc}"
+                completed.error = f"{completed.error}; {history_warning}" if completed.error else history_warning
         await self.publish_state_change()
+        self._completion[job_id].set()
 
     async def _persist_sync_history_if_needed(self, job: AmpQueueJob) -> None:
         if not self._is_sync_operation(job.operation):
@@ -414,7 +590,7 @@ class AmpJobQueue:
 
     @staticmethod
     def _is_sync_operation(operation: JobOperation) -> bool:
-        return operation in {"sync_slot", "write_slot", "full_dump", "full_sync_slots"}
+        return operation in {"sync_slot", "readback_slot", "write_slot", "store_live_patch", "full_dump", "full_sync_slots"}
 
     def _prune_jobs_locked(self) -> None:
         if len(self._jobs) <= self._max_job_history:
@@ -427,11 +603,14 @@ class AmpJobQueue:
                 job
                 for job in self._jobs.values()
                 if job.status in {"succeeded", "failed"}
+                and job.finished_at is not None
+                and datetime.fromisoformat(job.finished_at) <= datetime.now() - timedelta(minutes=10)
             ),
             key=lambda item: item.created_at,
         )
         for job in removable[:overflow]:
             self._jobs.pop(job.job_id, None)
+            self._completion.pop(job.job_id, None)
 
     @staticmethod
     def _persist_sync_history(job: AmpQueueJob) -> None:

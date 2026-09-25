@@ -84,18 +84,14 @@ async def capture_spectrum_measurement() -> SpectrumMeasurementResponse:
 
 
 async def _await_current_patch(job_id: str) -> dict[str, Any]:
-    deadline = asyncio.get_running_loop().time() + 60.0
-    while True:
-        job = await amp_job_queue.get_job(job_id)
-        if job is None:
-            raise HTTPException(status_code=404, detail={"message": "Amp read job was not found"})
-        if job.status == "succeeded" and job.result_current_patch is not None:
-            return job.result_current_patch
-        if job.status == "failed":
-            raise HTTPException(status_code=502, detail={"message": "Failed to read current patch", "error": job.error})
-        if asyncio.get_running_loop().time() >= deadline:
-            raise HTTPException(status_code=504, detail={"message": "Timed out reading current patch"})
-        await asyncio.sleep(0.1)
+    job = await amp_job_queue.wait_for_job(job_id, 60.0)
+    if job is None:
+        raise HTTPException(status_code=404, detail={"message": "Amp read job was not found", "job_id": job_id})
+    if job.status in {"queued", "running"}:
+        raise HTTPException(status_code=504, detail={"message": "Amp read job still in progress", "job_id": job_id, "status": job.status})
+    if job.status == "failed" or job.result_current_patch is None:
+        raise HTTPException(status_code=502, detail={"message": "Failed to read current patch", "error": job.error, "job_id": job_id})
+    return job.result_current_patch
 
 
 def _display_patch_name(patch: dict[str, Any]) -> str:

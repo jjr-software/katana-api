@@ -1,4 +1,3 @@
-import asyncio
 import json
 from collections.abc import AsyncIterator
 from datetime import datetime
@@ -14,10 +13,8 @@ from app.amp_queue import amp_job_queue
 from app.db import SessionLocal
 from app.deps import get_amp_client, get_db
 from app.katana import AmpClient, LineOutSnapshot, SlotDump, SlotPatchSummary, slot_label
-from app.katana import AmpClientError
-from app.live_patch_state import live_patch_status_payload, upsert_live_patch_state
+from app.live_patch_state import live_patch_status_payload
 from app.models import AmpSyncHistory, LivePatchState, PatchConfig, PatchSet, PatchSetMember
-from app.patch_objects import merge_patch_object_into_full_patch
 from app.schemas import LivePatchStatusResponse
 
 router = APIRouter(prefix="/api/v1/amp", tags=["amp"])
@@ -254,33 +251,6 @@ class SyncHistoryItemResponse(BaseModel):
     created_at: str
 
 
-def _is_amp_unavailable_error(exc: AmpClientError) -> bool:
-    text = str(exc).lower()
-    return any(
-        needle in text
-        for needle in (
-            "cannot open port",
-            "no such file or directory",
-            "no dt1 response",
-            "no sysex response bytes detected",
-            "amidi send failed",
-            "amidi query failed",
-        )
-    )
-
-
-def _raise_amp_read_error(message: str, exc: AmpClientError) -> None:
-    status_code = 503 if _is_amp_unavailable_error(exc) else 502
-    detail_message = "Amp is unavailable or powered off" if status_code == 503 else message
-    raise HTTPException(
-        status_code=status_code,
-        detail={
-            "message": detail_message,
-            "error": str(exc),
-        },
-    ) from exc
-
-
 @router.get("/test-connection", response_model=AmpConnectionTestResponse)
 async def test_connection() -> AmpConnectionTestResponse:
     job = await amp_job_queue.enqueue_test_connection()
@@ -317,10 +287,7 @@ async def device_status(client: AmpClient = Depends(get_amp_client)) -> AmpDevic
 
 
 @router.get("/current-patch", response_model=CurrentPatchResponse)
-async def current_patch(
-    db: Session = Depends(get_db),
-    client: AmpClient = Depends(get_amp_client),
-) -> CurrentPatchResponse:
+async def current_patch() -> CurrentPatchResponse:
     job = await amp_job_queue.enqueue_current_patch()
     settled = await _await_terminal_job(job.job_id, timeout_seconds=60.0)
     if settled.status != "succeeded" or settled.result_current_patch is None:
@@ -333,18 +300,6 @@ async def current_patch(
             },
         )
 
-    try:
-        active = await client.read_active_slot()
-    except AmpClientError as exc:
-        _raise_amp_read_error("Failed to read active slot after current patch read", exc)
-    upsert_live_patch_state(
-        db,
-        full_patch=settled.result_current_patch,
-        active_slot=active.slot,
-        amp_confirmed_at=datetime.now().isoformat(timespec="seconds"),
-        source_type="amp_sync",
-    )
-    await amp_job_queue.publish_state_change()
     return CurrentPatchResponse(
         created_at=datetime.now().isoformat(timespec="seconds"),
         patch=settled.result_current_patch,
@@ -352,12 +307,16 @@ async def current_patch(
 
 
 @router.get("/current-slot", response_model=ActiveSlotResponse)
-async def current_slot(client: AmpClient = Depends(get_amp_client)) -> ActiveSlotResponse:
+async def current_slot() -> ActiveSlotResponse:
     read_at = datetime.now().isoformat(timespec="seconds")
-    try:
-        active = await client.read_active_slot()
-    except AmpClientError as exc:
-        _raise_amp_read_error("Failed to read active amp slot", exc)
+    job = await amp_job_queue.enqueue_active_slot()
+    settled = await _await_terminal_job(job.job_id, timeout_seconds=60.0)
+    if settled.status != "succeeded" or settled.result_active_slot is None:
+        raise HTTPException(
+            status_code=502,
+            detail={"message": "Failed to read active amp slot", "error": settled.error, "job_id": job.job_id},
+        )
+    active = settled.result_active_slot
     return ActiveSlotResponse(
         patch_number=active.patch_number,
         slot=active.slot,
@@ -368,54 +327,35 @@ async def current_slot(client: AmpClient = Depends(get_amp_client)) -> ActiveSlo
 
 
 @router.get("/line-out", response_model=LineOutStateResponse)
-async def read_line_out(client: AmpClient = Depends(get_amp_client)) -> LineOutStateResponse:
+async def read_line_out() -> LineOutStateResponse:
     read_at = datetime.now().isoformat(timespec="seconds")
-    try:
-        state = await client.read_line_out_state()
-    except AmpClientError as exc:
-        _raise_amp_read_error("Failed to read line-out state", exc)
-    return _line_out_response(state=state, read_at=read_at)
+    job = await amp_job_queue.enqueue_line_out_read()
+    settled = await _await_terminal_job(job.job_id, timeout_seconds=60.0)
+    if settled.status != "succeeded" or settled.result_line_out is None:
+        raise HTTPException(status_code=502, detail={"message": "Failed to read line-out state", "error": settled.error, "job_id": job.job_id})
+    return _line_out_response(state=settled.result_line_out, read_at=read_at)
 
 
 @router.put("/line-out", response_model=LineOutStateResponse)
 async def write_line_out(
     payload: LineOutStateWriteRequest,
-    client: AmpClient = Depends(get_amp_client),
 ) -> LineOutStateResponse:
     read_at = datetime.now().isoformat(timespec="seconds")
-    try:
-        state = await client.write_line_out_state(payload.model_dump())
-    except AmpClientError as exc:
-        _raise_amp_read_error("Failed to write line-out state", exc)
-    return _line_out_response(state=state, read_at=read_at)
+    job = await amp_job_queue.enqueue_line_out_write(payload.model_dump())
+    settled = await _await_terminal_job(job.job_id, timeout_seconds=120.0)
+    if settled.status != "succeeded" or settled.result_line_out is None:
+        raise HTTPException(status_code=502, detail={"message": "Failed to write line-out state", "error": settled.error, "job_id": job.job_id})
+    return _line_out_response(state=settled.result_line_out, read_at=read_at)
 
 
 @router.post("/current-patch/live-apply", response_model=ApplyCurrentPatchResponse)
 async def apply_current_patch_live(
     payload: ApplyCurrentPatchRequest,
-    db: Session = Depends(get_db),
-    client: AmpClient = Depends(get_amp_client),
 ) -> ApplyCurrentPatchResponse:
-    live_row = db.get(LivePatchState, 1)
-    if live_row is None:
-        synced_at = datetime.now().isoformat(timespec="seconds")
-        live_patch = await client.read_current_patch()
-        active = await client.read_active_slot()
-        live_row = upsert_live_patch_state(
-            db,
-            full_patch=live_patch.payload,
-            active_slot=active.slot,
-            amp_confirmed_at=synced_at,
-            source_type="amp_sync",
-        )
-        await amp_job_queue.publish_state_change()
-    rendered = merge_patch_object_into_full_patch(live_row.patch_json, payload.patch)
-    patch_name = rendered.get("patch_name")
-    if not isinstance(patch_name, str) or not patch_name.strip():
-        patch_name = str(live_row.patch_json.get("patch_name", ""))
-    rendered["patch_name"] = patch_name[:16]
-    job = await amp_job_queue.enqueue_apply_current_patch(
-        rendered,
+    requested_name = payload.patch.get("patch_name")
+    job = await amp_job_queue.enqueue_patch_edit(
+        patch=payload.patch,
+        patch_name=requested_name if isinstance(requested_name, str) and requested_name.strip() else None,
         queue_key=payload.queue_key or "live-patch",
     )
     settled = await _await_terminal_job(job.job_id, timeout_seconds=120.0)
@@ -428,21 +368,8 @@ async def apply_current_patch_live(
                 "job_id": settled.job_id,
             },
         )
-    applied_at = datetime.now().isoformat(timespec="seconds")
-    try:
-        active = await client.read_active_slot()
-    except AmpClientError as exc:
-        _raise_amp_read_error("Failed to read active slot after live apply", exc)
-    upsert_live_patch_state(
-        db,
-        full_patch=settled.result_applied_patch,
-        active_slot=active.slot,
-        amp_confirmed_at=applied_at,
-        source_type="manual_apply",
-    )
-    await amp_job_queue.publish_state_change()
     return ApplyCurrentPatchResponse(
-        applied_at=applied_at,
+        applied_at=settled.finished_at or datetime.now().isoformat(timespec="seconds"),
         patch=settled.result_applied_patch,
     )
 
@@ -528,15 +455,20 @@ async def sync_single_slot(
 @router.post("/slots/{slot:int}/activate", response_model=SlotActivateResponse)
 async def activate_single_slot(
     slot: int,
-    client: AmpClient = Depends(get_amp_client),
 ) -> SlotActivateResponse:
     activated_at = datetime.now().isoformat(timespec="seconds")
-    activate_ms = await client.activate_slot(slot)
+    job = await amp_job_queue.enqueue_activate_slot(slot)
+    settled = await _await_terminal_job(job.job_id, timeout_seconds=90.0)
+    if settled.status != "succeeded" or settled.result_activate_ms is None:
+        raise HTTPException(
+            status_code=502,
+            detail={"message": "Failed to activate slot", "error": settled.error, "job_id": job.job_id},
+        )
     return SlotActivateResponse(
         slot=slot,
         slot_label=slot_label(slot),
         activated_at=activated_at,
-        activate_ms=activate_ms,
+        activate_ms=settled.result_activate_ms,
     )
 
 
@@ -544,16 +476,21 @@ async def activate_single_slot(
 async def readback_single_slot(
     slot: int,
     db: Session = Depends(get_db),
-    client: AmpClient = Depends(get_amp_client),
 ) -> SlotSyncResponse:
-    synced_at = datetime.now().isoformat(timespec="seconds")
-    item = await client.read_current_slot_state(slot=slot, synced_at=synced_at)
+    job = await amp_job_queue.enqueue_slot_readback(slot)
+    settled = await _await_terminal_job(job.job_id, timeout_seconds=90.0)
+    if settled.status != "succeeded" or settled.result_slot is None:
+        raise HTTPException(
+            status_code=502,
+            detail={"message": "Failed to read stored slot", "error": settled.error, "job_id": job.job_id},
+        )
+    item = settled.result_slot
     hash_ids = [item.config_hash_sha256]
     curated_by_hash = _load_curation_by_hash(db, hash_ids)
     saved_hashes = _load_saved_hashes(db, hash_ids)
     measurements_by_hash = _load_measurements_by_hash(db, hash_ids)
     return SlotSyncResponse(
-        synced_at=synced_at,
+        synced_at=item.synced_at,
         slot=SlotPatchSummaryResponse(**_slot_to_dict(item, curated_by_hash, saved_hashes, measurements_by_hash)),
     )
 
@@ -597,6 +534,14 @@ async def write_single_slot(
 @router.get("/queue", response_model=QueueStateResponse)
 async def queue_state() -> QueueStateResponse:
     return await _queue_state_response()
+
+
+@router.get("/queue/jobs/{job_id}", response_model=QueueJobSummaryResponse)
+async def queue_job_state(job_id: str) -> QueueJobSummaryResponse:
+    job = await amp_job_queue.get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail={"message": "Queue job not found", "job_id": job_id})
+    return QueueJobSummaryResponse(**_queue_job_summary(job))
 
 
 @router.get("/operations/events")
@@ -930,23 +875,15 @@ def _job_elapsed_ms(job: object) -> int:
 
 
 async def _await_terminal_job(job_id: str, timeout_seconds: float) -> object:
-    loop = asyncio.get_running_loop()
-    deadline = loop.time() + timeout_seconds
-    while True:
-        job = await amp_job_queue.get_job(job_id)
-        if job is None:
-            raise HTTPException(
-                status_code=404,
-                detail={"message": "Queue job not found", "job_id": job_id},
-            )
-        if job.status in {"succeeded", "failed"}:
-            return job
-        if loop.time() >= deadline:
-            raise HTTPException(
-                status_code=504,
-                detail={"message": "Queue job timed out", "job_id": job_id},
-            )
-        await asyncio.sleep(0.2)
+    job = await amp_job_queue.wait_for_job(job_id, timeout_seconds)
+    if job is None:
+        raise HTTPException(status_code=404, detail={"message": "Queue job not found", "job_id": job_id})
+    if job.status in {"queued", "running"}:
+        raise HTTPException(
+            status_code=504,
+            detail={"message": "Queue job still in progress", "job_id": job_id, "status": job.status},
+        )
+    return job
 
 
 def _queue_job_summary(job: object) -> dict:
