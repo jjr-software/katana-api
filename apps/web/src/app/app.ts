@@ -867,6 +867,7 @@ export class App implements OnInit, OnDestroy {
   private readonly audioTakeService = inject(AudioTakeService);
   private takeTimer: ReturnType<typeof setInterval> | null = null;
   private takeStartedAt = 0;
+  private takeRangeDrag: { pointerId: number; takeId: string; kind: 'clean' | 'dirty'; anchor: number; previous: [number, number] } | null = null;
   private readonly modalRefs: Partial<Record<ModalKey, NgbModalRef>> = {};
 
   private readonly storedSpectrumMeasurements = loadStoredSpectrumMeasurements();
@@ -921,6 +922,7 @@ export class App implements OnInit, OnDestroy {
   completedTake = signal<AudioTake | null>(null);
   cleanRange = signal<[number, number] | null>(null);
   dirtyRange = signal<[number, number] | null>(null);
+  takeSelectionMode = signal<'clean' | 'dirty'>('clean');
   playingTakeRange = signal<'clean' | 'dirty' | null>(null);
   takeComparison = computed(() => {
     const take = this.completedTake();
@@ -3449,6 +3451,7 @@ export class App implements OnInit, OnDestroy {
       this.takeCompareError.set('');
       this.cleanRange.set(null);
       this.dirtyRange.set(null);
+      this.takeRangeDrag = null;
       this.takeStartedAt = Date.now();
       this.takeElapsedSec.set(0);
       this.takeRecording.set(true);
@@ -3474,6 +3477,7 @@ export class App implements OnInit, OnDestroy {
       this.takeCompareError.set('');
       this.cleanRange.set([0, take.duration_sec / 2]);
       this.dirtyRange.set([take.duration_sec / 2, take.duration_sec]);
+      this.takeRangeDrag = null;
       void this.loadRecentTakes();
     } catch (error) {
       this.takeError.set(error instanceof Error ? error.message : 'Could not stop the take. Try stopping again.');
@@ -3501,6 +3505,7 @@ export class App implements OnInit, OnDestroy {
       this.completedTake.set(take);
       this.cleanRange.set([0, take.duration_sec / 2]);
       this.dirtyRange.set([take.duration_sec / 2, take.duration_sec]);
+      this.takeRangeDrag = null;
       this.takePerceivedComparison.set(null);
       this.takeCompareError.set('');
     } catch (error) {
@@ -3520,7 +3525,53 @@ export class App implements OnInit, OnDestroy {
     const next: [number, number] = edge === 'start'
       ? [Math.min(value, current[1]), current[1]]
       : [current[0], Math.max(value, current[0])];
-    rangeSignal.set(next);
+    this.updateTakeRange(kind, next);
+  }
+
+  onTakeTimelinePointerDown(event: PointerEvent): void {
+    const take = this.completedTake();
+    if (!take || this.takeRangeDrag || (event.pointerType === 'mouse' && event.button !== 0)) return;
+    const kind = this.takeSelectionMode();
+    const previous = (kind === 'clean' ? this.cleanRange() : this.dirtyRange());
+    if (!previous) return;
+    const timeline = event.currentTarget as HTMLElement;
+    const anchor = this.takeTimelineTime(event, timeline, take.duration_sec);
+    this.takeRangeDrag = { pointerId: event.pointerId, takeId: take.id, kind, anchor, previous };
+    timeline.setPointerCapture(event.pointerId);
+    this.updateTakeRange(kind, [anchor, anchor]);
+  }
+
+  onTakeTimelinePointerMove(event: PointerEvent): void {
+    const drag = this.takeRangeDrag;
+    const take = this.completedTake();
+    if (!drag || event.pointerId !== drag.pointerId || !take || take.id !== drag.takeId) return;
+    const end = this.takeTimelineTime(event, event.currentTarget as HTMLElement, take.duration_sec);
+    this.updateTakeRange(drag.kind, [Math.min(drag.anchor, end), Math.max(drag.anchor, end)]);
+  }
+
+  onTakeTimelinePointerUp(event: PointerEvent): void {
+    const drag = this.takeRangeDrag;
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    this.onTakeTimelinePointerMove(event);
+    const range = (drag.kind === 'clean' ? this.cleanRange() : this.dirtyRange());
+    if (range && range[0] === range[1]) this.updateTakeRange(drag.kind, drag.previous);
+    this.takeRangeDrag = null;
+  }
+
+  onTakeTimelinePointerCancel(event: PointerEvent): void {
+    const drag = this.takeRangeDrag;
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    if (this.completedTake()?.id === drag.takeId) this.updateTakeRange(drag.kind, drag.previous);
+    this.takeRangeDrag = null;
+  }
+
+  private takeTimelineTime(event: PointerEvent, timeline: HTMLElement, duration: number): number {
+    const bounds = timeline.getBoundingClientRect();
+    return Math.max(0, Math.min(duration, (event.clientX - bounds.left) / bounds.width * duration));
+  }
+
+  private updateTakeRange(kind: 'clean' | 'dirty', range: [number, number]): void {
+    (kind === 'clean' ? this.cleanRange : this.dirtyRange).set(range);
     this.takePerceivedComparison.set(null);
     this.takeCompareError.set('');
   }
@@ -3538,8 +3589,10 @@ export class App implements OnInit, OnDestroy {
         this.takePerceivedComparison.set(comparison);
       }
     } catch (error) {
-      this.takePerceivedComparison.set(null);
-      this.takeCompareError.set(error instanceof Error ? error.message : 'Could not compare the selected sections.');
+      if (this.completedTake()?.id === take.id && this.cleanRange() === clean && this.dirtyRange() === dirty) {
+        this.takePerceivedComparison.set(null);
+        this.takeCompareError.set(error instanceof Error ? error.message : 'Could not compare the selected sections.');
+      }
     } finally {
       this.takeCompareBusy.set(false);
     }

@@ -959,13 +959,20 @@
         </div>
         @if (completedTake(); as take) {
           <div class="d-grid gap-3" data-pw="take-result">
+            <div>
+              <div class="btn-group btn-group-sm" role="group" aria-label="Section to select">
+                <button type="button" class="btn" [class.btn-primary]="takeSelectionMode() === 'clean'" [class.btn-outline-primary]="takeSelectionMode() !== 'clean'" [attr.aria-pressed]="takeSelectionMode() === 'clean'" (click)="takeSelectionMode.set('clean')" data-pw="select-clean">Select clean</button>
+                <button type="button" class="btn" [class.btn-danger]="takeSelectionMode() === 'dirty'" [class.btn-outline-danger]="takeSelectionMode() !== 'dirty'" [attr.aria-pressed]="takeSelectionMode() === 'dirty'" (click)="takeSelectionMode.set('dirty')" data-pw="select-dirty">Select dirty</button>
+              </div>
+              <p id="take-selection-help" class="small text-secondary mb-0 mt-1">Choose a section, then drag across the level timeline. Use the sliders below to fine-tune start and end.</p>
+            </div>
             <div class="d-flex justify-content-between small text-secondary"><span>0 s</span><span>{{ takeTime(take.duration_sec) }}</span></div>
-            <div class="take-waveform" role="img" aria-label="Recorded level over time, from 0 to minus 90 dBFS">
+            <div class="take-waveform" role="group" aria-label="Recorded level timeline, from 0 to minus 90 dBFS" aria-describedby="take-selection-help" [class.take-waveform-select-clean]="takeSelectionMode() === 'clean'" [class.take-waveform-select-dirty]="takeSelectionMode() === 'dirty'" (pointerdown)="onTakeTimelinePointerDown($event)" (pointermove)="onTakeTimelinePointerMove($event)" (pointerup)="onTakeTimelinePointerUp($event)" (pointercancel)="onTakeTimelinePointerCancel($event)" (lostpointercapture)="onTakeTimelinePointerCancel($event)" data-pw="take-timeline">
               @if (cleanRange(); as clean) {
-                <div class="take-range take-range-clean" [style.left.%]="takeBarPosition(clean[0], take.duration_sec)" [style.width.%]="takeBarPosition(clean[1] - clean[0], take.duration_sec)"></div>
+                <div class="take-range take-range-clean" [style.left.%]="takeBarPosition(clean[0], take.duration_sec)" [style.width.%]="takeBarPosition(clean[1] - clean[0], take.duration_sec)"><span>Clean</span></div>
               }
               @if (dirtyRange(); as dirty) {
-                <div class="take-range take-range-dirty" [style.left.%]="takeBarPosition(dirty[0], take.duration_sec)" [style.width.%]="takeBarPosition(dirty[1] - dirty[0], take.duration_sec)"></div>
+                <div class="take-range take-range-dirty" [style.left.%]="takeBarPosition(dirty[0], take.duration_sec)" [style.width.%]="takeBarPosition(dirty[1] - dirty[0], take.duration_sec)"><span>Dirty</span></div>
               }
               @for (point of take.waveform; track $index) {
                 <span class="take-waveform-bar" [style.left.%]="takeBarPosition(point.time_sec, take.duration_sec)" [style.height.%]="takeBarHeight(point.rms_dbfs)"></span>
@@ -1022,7 +1029,7 @@
                 <span class="d-block small mt-1">Mean signal power from the displayed RMS windows in each range. This compares level only; playing differences affect the result.</span>
               </div>
             } @else {
-              <p class="small text-secondary mb-0">Move the range handles to include recorded waveform points in both sections.</p>
+              <p class="small text-secondary mb-0">Select sections of the recording that contain playing to see their recorded levels.</p>
             }
           </div>
         }

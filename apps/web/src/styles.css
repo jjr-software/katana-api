@@ -20,9 +20,11 @@ code {
   max-width: 1680px;
 }
 
-.spectrum-page .take-waveform { position: relative; height: 8rem; overflow: hidden; border: 1px solid #ced4da; border-radius: .375rem; background: #f8f9fa; }
+.spectrum-page .take-waveform { position: relative; height: 8rem; overflow: hidden; border: 1px solid #ced4da; border-radius: .375rem; background: #f8f9fa; cursor: crosshair; touch-action: none; user-select: none; }
+.spectrum-page .take-waveform-select-clean { border-color: #0d6efd; }
+.spectrum-page .take-waveform-select-dirty { border-color: #dc3545; }
 .spectrum-page .take-range, .spectrum-page .take-waveform-bar { position: absolute; pointer-events: none; }
-.spectrum-page .take-range { inset-block: 0; }
-.spectrum-page .take-range-clean { background: #0d6efd24; }
-.spectrum-page .take-range-dirty { background: #dc354524; }
+.spectrum-page .take-range { inset-block: 0; z-index: 1; overflow: hidden; text-align: center; font-size: .75rem; font-weight: 600; }
+.spectrum-page .take-range-clean { background: #0d6efd40; border-inline: 2px solid #0d6efd; color: #084298; }
+.spectrum-page .take-range-dirty { background: #dc354540; border-inline: 2px solid #dc3545; color: #842029; }
 .spectrum-page .take-waveform-bar { bottom: 0; width: 2px; background: #364b6b; transform: translateX(-50%); }
