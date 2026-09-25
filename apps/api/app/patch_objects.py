@@ -172,10 +172,26 @@ def merge_patch_object_into_full_patch(full_patch: dict[str, Any], patch_object:
         if not isinstance(stage_target, dict):
             stage_target = {}
             stages[block_name] = stage_target
+        if block_name in COLOR_BLOCKS and isinstance(color_index, int):
+            previous_color = colors.get(block_name)
+            previous_index = previous_color.get("index") if isinstance(previous_color, dict) else None
+            if color_index != previous_index:
+                if "raw" not in block:
+                    _select_variant(stage_target, "raw", "variants_raw", color_index)
+                if block_name == "delay" and "delay2_raw" not in block:
+                    _select_variant(stage_target, "delay2_raw", "variants2_raw", color_index)
         _merge_stage_block(block_name, stage_target, block)
         if block_name in COLOR_BLOCKS and isinstance(color_index, int):
             color_block = colors.setdefault(block_name, {})
             color_block["index"] = color_index
+        if block_name in COLOR_BLOCKS:
+            selected_color = colors.get(block_name)
+            selected_index = selected_color.get("index") if isinstance(selected_color, dict) else None
+            if isinstance(selected_index, int) and not isinstance(selected_index, bool):
+                if "raw" in block or any(field in block for field in STAGE_RAW_FIELD_MAP[block_name]) or (block_name == "delay" and "time_raw" in block):
+                    _sync_selected_variant(stage_target, "raw", "variants_raw", selected_index)
+                if block_name == "delay" and "delay2_raw" in block:
+                    _sync_selected_variant(stage_target, "delay2_raw", "variants2_raw", selected_index)
 
     return merged
 
@@ -401,11 +417,26 @@ def _merge_stage_block(block_name: str, target: dict[str, Any], patch_block: dic
     _sync_stage_compact_from_raw(block_name, target)
 
 
+def _sync_selected_variant(target: dict[str, Any], raw_key: str, variants_key: str, color_index: int) -> None:
+    raw = target.get(raw_key)
+    variants = target.get(variants_key)
+    if isinstance(raw, list) and isinstance(variants, list) and 0 <= color_index < len(variants):
+        variants[color_index] = list(raw)
+
+
+def _select_variant(target: dict[str, Any], raw_key: str, variants_key: str, color_index: int) -> None:
+    variants = target.get(variants_key)
+    if isinstance(variants, list) and 0 <= color_index < len(variants) and isinstance(variants[color_index], list):
+        target[raw_key] = list(variants[color_index])
+
+
 def _sync_stage_raw_from_compact(block_name: str, target: dict[str, Any], patch_block: dict[str, Any]) -> None:
     raw_map = STAGE_RAW_FIELD_MAP.get(block_name, {})
     raw = target.get("raw")
     if isinstance(raw, list):
         if "raw" not in patch_block:
+            if block_name in {"ns", "send_return", "solo"} and "on" in patch_block and raw:
+                raw[0] = 1 if target["on"] else 0
             for key, index in raw_map.items():
                 if key in patch_block and 0 <= index < len(raw) and isinstance(target.get(key), (int, float)):
                     raw[index] = int(target[key])
