@@ -1,4 +1,4 @@
-import { Component, NgZone, OnDestroy, OnInit, TemplateRef, ViewChild, computed, effect, inject, signal } from '@angular/core';
+import { Component, ElementRef, NgZone, OnDestroy, OnInit, TemplateRef, ViewChild, computed, effect, inject, signal } from '@angular/core';
 import { NgbModal, NgbModalModule, NgbModalOptions, NgbModalRef } from '@ng-bootstrap/ng-bootstrap';
 import { PatchSummaryComponent } from './patch-summary.component';
 import { DashboardStickyPanelComponent, type DashboardStickyPanelViewModel } from './dashboard-sticky-panel.component';
@@ -12,6 +12,7 @@ import {
   type StageParamSchema,
 } from './pedal-schemas';
 import { buildRoutingChainOrder, routingChainBlockLabel, type RoutingChainBlockId } from './routing-chain';
+import { AudioTakeService, type AudioTake } from './audio-take.service';
 import {
   AmpOperationalStateService,
   type AmpOperationalLivePatch,
@@ -850,6 +851,7 @@ function defaultSlotCards(): SlotCard[] {
   styleUrl: './app.css',
 })
 export class App implements OnInit, OnDestroy {
+  @ViewChild('takePlayer') private takePlayer?: ElementRef<HTMLAudioElement>;
   @ViewChild('toneSaveModalTpl') private toneSaveModalTpl?: TemplateRef<unknown>;
   @ViewChild('toneDesignerModalTpl') private toneDesignerModalTpl?: TemplateRef<unknown>;
   @ViewChild('toneSetModalTpl') private toneSetModalTpl?: TemplateRef<unknown>;
@@ -861,6 +863,9 @@ export class App implements OnInit, OnDestroy {
   private readonly modalService = inject(NgbModal);
   private readonly ngZone = inject(NgZone);
   private readonly ampOperationalState = inject(AmpOperationalStateService);
+  private readonly audioTakeService = inject(AudioTakeService);
+  private takeTimer: ReturnType<typeof setInterval> | null = null;
+  private takeStartedAt = 0;
   private readonly modalRefs: Partial<Record<ModalKey, NgbModalRef>> = {};
 
   private readonly storedSpectrumMeasurements = loadStoredSpectrumMeasurements();
@@ -902,6 +907,23 @@ export class App implements OnInit, OnDestroy {
   });
   spectrumMeasuring = signal(false);
   spectrumError = signal(this.storedSpectrumMeasurements.error);
+  takeBusy = signal(false);
+  takeRecording = signal(false);
+  takeElapsedSec = signal(0);
+  takeError = signal('');
+  completedTake = signal<AudioTake | null>(null);
+  cleanRange = signal<[number, number] | null>(null);
+  dirtyRange = signal<[number, number] | null>(null);
+  playingTakeRange = signal<'clean' | 'dirty' | null>(null);
+  takeComparison = computed(() => {
+    const take = this.completedTake();
+    const clean = this.cleanRange();
+    const dirty = this.dirtyRange();
+    if (!take || !clean || !dirty) return null;
+    const cleanDb = this.rangeRms(take, clean);
+    const dirtyDb = this.rangeRms(take, dirty);
+    return cleanDb === null || dirtyDb === null ? null : { cleanDb, dirtyDb, deltaDb: dirtyDb - cleanDb };
+  });
   responseJson = signal('');
   slots = signal<SlotCard[]>(defaultSlotCards());
   selectedAmpSlot = signal<number | null>(null);
@@ -1097,6 +1119,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.clearTakeTimer();
     window.removeEventListener('popstate', this.onPopState);
     this.modalService.dismissAll();
     this.ampOperationalState.close();
@@ -3403,6 +3426,109 @@ export class App implements OnInit, OnDestroy {
 
   isSpectrumPage(): boolean {
     return this.currentPage() === 'spectrum';
+  }
+
+  async startTake(): Promise<void> {
+    if (this.takeBusy() || this.takeRecording()) return;
+    this.takeBusy.set(true);
+    this.takeError.set('');
+    try {
+      await this.audioTakeService.start();
+      this.takePlayer?.nativeElement.pause();
+      this.playingTakeRange.set(null);
+      this.completedTake.set(null);
+      this.cleanRange.set(null);
+      this.dirtyRange.set(null);
+      this.takeStartedAt = Date.now();
+      this.takeElapsedSec.set(0);
+      this.takeRecording.set(true);
+      this.takeTimer = setInterval(() => this.takeElapsedSec.set((Date.now() - this.takeStartedAt) / 1000), 100);
+    } catch (error) {
+      this.takeError.set(error instanceof Error ? error.message : 'Could not start the take.');
+    } finally {
+      this.takeBusy.set(false);
+    }
+  }
+
+  async stopTake(): Promise<void> {
+    if (this.takeBusy() || !this.takeRecording()) return;
+    this.takeBusy.set(true);
+    this.takeError.set('');
+    try {
+      const take = await this.audioTakeService.stop();
+      this.clearTakeTimer();
+      this.takeRecording.set(false);
+      this.takeElapsedSec.set(take.duration_sec);
+      this.completedTake.set(take);
+      this.cleanRange.set([0, take.duration_sec / 2]);
+      this.dirtyRange.set([take.duration_sec / 2, take.duration_sec]);
+    } catch (error) {
+      this.takeError.set(error instanceof Error ? error.message : 'Could not stop the take. Try stopping again.');
+    } finally {
+      this.takeBusy.set(false);
+    }
+  }
+
+  setTakeRange(kind: 'clean' | 'dirty', edge: 'start' | 'end', event: Event): void {
+    const take = this.completedTake();
+    if (!take) return;
+    const value = Number((event.target as HTMLInputElement).value);
+    const rangeSignal = kind === 'clean' ? this.cleanRange : this.dirtyRange;
+    const current = rangeSignal();
+    if (!current) return;
+    const next: [number, number] = edge === 'start'
+      ? [Math.min(value, current[1]), current[1]]
+      : [current[0], Math.max(value, current[0])];
+    rangeSignal.set(next);
+  }
+
+  async playTakeRange(kind: 'clean' | 'dirty'): Promise<void> {
+    const range = kind === 'clean' ? this.cleanRange() : this.dirtyRange();
+    const player = this.takePlayer?.nativeElement;
+    if (!range || !player || range[1] <= range[0]) return;
+    player.pause();
+    player.currentTime = range[0];
+    this.playingTakeRange.set(kind);
+    try {
+      await player.play();
+    } catch (error) {
+      this.playingTakeRange.set(null);
+      this.takeError.set(error instanceof Error ? error.message : 'Playback could not start.');
+    }
+  }
+
+  onTakePlaybackTimeUpdate(): void {
+    const kind = this.playingTakeRange();
+    const range = kind === 'clean' ? this.cleanRange() : kind === 'dirty' ? this.dirtyRange() : null;
+    const player = this.takePlayer?.nativeElement;
+    if (range && player && player.currentTime >= range[1]) {
+      player.pause();
+      this.playingTakeRange.set(null);
+    }
+  }
+
+  takeTime(value: number): string {
+    return `${value.toFixed(1)} s`;
+  }
+
+  takeBarPosition(time: number, duration: number): number {
+    return duration > 0 ? Math.max(0, Math.min(100, time / duration * 100)) : 0;
+  }
+
+  takeBarHeight(db: number): number {
+    return Math.max(2, Math.min(100, (db + 90) / 90 * 100));
+  }
+
+  private rangeRms(take: AudioTake, range: [number, number]): number | null {
+    const points = take.waveform.filter(point => point.time_sec >= range[0] && point.time_sec <= range[1] && Number.isFinite(point.rms_dbfs));
+    if (!points.length) return null;
+    const meanPower = points.reduce((sum, point) => sum + Math.pow(10, point.rms_dbfs / 10), 0) / points.length;
+    return meanPower > 0 ? 10 * Math.log10(meanPower) : null;
+  }
+
+  private clearTakeTimer(): void {
+    if (this.takeTimer !== null) clearInterval(this.takeTimer);
+    this.takeTimer = null;
   }
 
   async measureSpectrum(): Promise<void> {

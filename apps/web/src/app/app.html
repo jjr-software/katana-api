@@ -921,6 +921,78 @@
 
   } @else if (isSpectrumPage()) {
   <section class="spectrum-page d-grid gap-3" aria-labelledby="spectrum-heading">
+    <article class="card shadow-sm" aria-labelledby="take-heading" data-pw="audio-take-panel">
+      <div class="card-body d-grid gap-3">
+        <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
+          <div>
+            <h2 id="take-heading" class="h4 mb-1">Record a take</h2>
+            <p class="text-secondary mb-0">Record a phrase, then mark clean and dirty sections to compare their recorded levels.</p>
+          </div>
+          <div class="d-flex align-items-center gap-3">
+            @if (takeRecording()) {
+              <span class="fw-semibold text-danger" role="timer" data-pw="take-elapsed">● {{ takeTime(takeElapsedSec()) }}</span>
+              <button type="button" class="btn btn-danger" [disabled]="takeBusy()" (click)="stopTake()" data-pw="take-stop">{{ takeBusy() ? 'Stopping…' : 'Stop' }}</button>
+            } @else {
+              <button type="button" class="btn btn-primary" [disabled]="takeBusy()" (click)="startTake()" data-pw="take-start">{{ takeBusy() ? 'Starting…' : 'Start recording' }}</button>
+            }
+          </div>
+        </div>
+        @if (takeError()) {
+          <div class="alert alert-danger mb-0" role="alert">{{ takeError() }}</div>
+        }
+        @if (completedTake(); as take) {
+          <div class="d-grid gap-3" data-pw="take-result">
+            <div class="d-flex justify-content-between small text-secondary"><span>0 s</span><span>{{ takeTime(take.duration_sec) }}</span></div>
+            <div class="take-waveform" role="img" aria-label="Recorded level over time, from 0 to minus 90 dBFS">
+              @if (cleanRange(); as clean) {
+                <div class="take-range take-range-clean" [style.left.%]="takeBarPosition(clean[0], take.duration_sec)" [style.width.%]="takeBarPosition(clean[1] - clean[0], take.duration_sec)"></div>
+              }
+              @if (dirtyRange(); as dirty) {
+                <div class="take-range take-range-dirty" [style.left.%]="takeBarPosition(dirty[0], take.duration_sec)" [style.width.%]="takeBarPosition(dirty[1] - dirty[0], take.duration_sec)"></div>
+              }
+              @for (point of take.waveform; track $index) {
+                <span class="take-waveform-bar" [style.left.%]="takeBarPosition(point.time_sec, take.duration_sec)" [style.height.%]="takeBarHeight(point.rms_dbfs)"></span>
+              }
+            </div>
+            <audio #takePlayer class="sample-player" controls preload="metadata" [src]="take.audio_url" (timeupdate)="onTakePlaybackTimeUpdate()" aria-label="Play recorded take" data-pw="take-playback"></audio>
+            <div class="row g-3">
+              @if (cleanRange(); as clean) {
+                <div class="col-12 col-lg-6">
+                  <fieldset class="take-range-controls border rounded p-3 h-100">
+                    <legend class="float-none w-auto fs-6 fw-semibold px-1 mb-1">Clean section</legend>
+                    <label class="form-label small" for="clean-start">Start {{ takeTime(clean[0]) }}</label>
+                    <input id="clean-start" class="form-range" type="range" min="0" [max]="take.duration_sec" step="0.1" [value]="clean[0]" (input)="setTakeRange('clean', 'start', $event)" data-pw="clean-start">
+                    <label class="form-label small" for="clean-end">End {{ takeTime(clean[1]) }}</label>
+                    <input id="clean-end" class="form-range" type="range" min="0" [max]="take.duration_sec" step="0.1" [value]="clean[1]" (input)="setTakeRange('clean', 'end', $event)" data-pw="clean-end">
+                    <button type="button" class="btn btn-outline-primary btn-sm" [disabled]="clean[1] <= clean[0]" (click)="playTakeRange('clean')" data-pw="play-clean">Play clean</button>
+                  </fieldset>
+                </div>
+              }
+              @if (dirtyRange(); as dirty) {
+                <div class="col-12 col-lg-6">
+                  <fieldset class="take-range-controls border rounded p-3 h-100">
+                    <legend class="float-none w-auto fs-6 fw-semibold px-1 mb-1">Dirty section</legend>
+                    <label class="form-label small" for="dirty-start">Start {{ takeTime(dirty[0]) }}</label>
+                    <input id="dirty-start" class="form-range" type="range" min="0" [max]="take.duration_sec" step="0.1" [value]="dirty[0]" (input)="setTakeRange('dirty', 'start', $event)" data-pw="dirty-start">
+                    <label class="form-label small" for="dirty-end">End {{ takeTime(dirty[1]) }}</label>
+                    <input id="dirty-end" class="form-range" type="range" min="0" [max]="take.duration_sec" step="0.1" [value]="dirty[1]" (input)="setTakeRange('dirty', 'end', $event)" data-pw="dirty-end">
+                    <button type="button" class="btn btn-outline-danger btn-sm" [disabled]="dirty[1] <= dirty[0]" (click)="playTakeRange('dirty')" data-pw="play-dirty">Play dirty</button>
+                  </fieldset>
+                </div>
+              }
+            </div>
+            @if (takeComparison(); as comparison) {
+              <div class="alert alert-secondary mb-0" data-pw="take-comparison">
+                <strong>Recorded level:</strong> clean {{ comparison.cleanDb.toFixed(1) }} dBFS · dirty {{ comparison.dirtyDb.toFixed(1) }} dBFS · dirty − clean {{ spectrumSignedDb(comparison.deltaDb) }}.
+                <span class="d-block small mt-1">Mean signal power from the displayed RMS windows in each range. This compares level only; playing differences affect the result.</span>
+              </div>
+            } @else {
+              <p class="small text-secondary mb-0">Move the range handles to include recorded waveform points in both sections.</p>
+            }
+          </div>
+        }
+      </div>
+    </article>
     <article class="card shadow-sm">
       <div class="card-body d-grid gap-3">
         <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">

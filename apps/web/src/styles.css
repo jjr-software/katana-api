@@ -19,3 +19,10 @@ code {
 .app-shell {
   max-width: 1680px;
 }
+
+.spectrum-page .take-waveform { position: relative; height: 8rem; overflow: hidden; border: 1px solid #ced4da; border-radius: .375rem; background: #f8f9fa; }
+.spectrum-page .take-range, .spectrum-page .take-waveform-bar { position: absolute; pointer-events: none; }
+.spectrum-page .take-range { inset-block: 0; }
+.spectrum-page .take-range-clean { background: #0d6efd24; }
+.spectrum-page .take-range-dirty { background: #dc354524; }
+.spectrum-page .take-waveform-bar { bottom: 0; width: 2px; background: #364b6b; transform: translateX(-50%); }
