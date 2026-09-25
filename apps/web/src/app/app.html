@@ -477,7 +477,9 @@
                           <p class="small text-secondary mb-2">Parametric EQ Shape</p>
                           <div class="peq-graph">
                             <div class="peq-graph-cut peq-graph-cut-low" [style.width.px]="editorEqPeqLowCutWidth($any(eqName))"></div>
-                            <div class="peq-graph-cut peq-graph-cut-high" [style.width.px]="editorEqPeqHighCutWidth($any(eqName))"></div>
+                            @if (editorEqPeqHighCutWidth($any(eqName)) > 0) {
+                              <div class="peq-graph-cut peq-graph-cut-high" [style.width.%]="editorEqPeqHighCutWidth($any(eqName))"></div>
+                            }
                             <svg class="peq-graph-svg" viewBox="0 0 512 96" preserveAspectRatio="none" aria-label="Parametric EQ shape">
                               <line x1="0" y1="44" x2="512" y2="44" class="peq-graph-zero" />
                               <line x1="0" y1="16" x2="512" y2="16" class="peq-graph-guide" />

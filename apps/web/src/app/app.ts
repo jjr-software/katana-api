@@ -4886,7 +4886,7 @@ export class App implements OnInit, OnDestroy {
 
   editorEqPeqHighCutWidth(eqName: EqStageName): number {
     const highCut = this.editorEqPeqParamMap(eqName).get('high_cut')?.value ?? 0;
-    return Math.round((highCut / 14) * 96);
+    return highCut === 14 ? 0 : 42 - highCut * 3;
   }
 
   editorEqPeqGainLabel(gain: number): string {
