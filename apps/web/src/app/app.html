@@ -80,34 +80,28 @@
                 </div>
               }
               <div class="d-flex flex-wrap gap-2 align-items-center">
-                <span class="text-uppercase small text-secondary fw-semibold">Stage visibility</span>
-                <button type="button" class="btn btn-sm btn-outline-success" (click)="selectAllLiveEditorBlocks()">Select all</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="selectNoneLiveEditorBlocks()">Select none</button>
+                <span class="text-uppercase small text-secondary fw-semibold">Module</span>
+                <button type="button" class="btn btn-sm btn-outline-secondary" [disabled]="liveEditorSelectedBlock() === null" (click)="clearLiveEditorBlock()">Clear selection</button>
               </div>
               <div class="d-flex flex-wrap gap-2">
                 @for (block of toneBlockOptions(); track block) {
-                  <input
-                    class="btn-check"
-                    type="checkbox"
-                    [id]="toneBlockControlId('live', block)"
-                    [checked]="isToneBlockSelected(block)"
-                    (change)="setToneBlockSelected(block, $any($event.target).checked)"
-                  />
-                  <label
+                  <button
+                    type="button"
                     class="card shadow-sm"
-                    style="flex: 1 1 12rem; min-width: 12rem; cursor: pointer;"
-                    [class.bg-success-subtle]="isToneBlockSelected(block)"
-                    [class.border-success]="isToneBlockSelected(block)"
-                  [for]="toneBlockControlId('live', block)"
+                    style="flex: 1 1 12rem; min-width: 12rem; text-align: left;"
+                    [class.bg-success-subtle]="liveEditorShowsBlock(block)"
+                    [class.border-success]="liveEditorShowsBlock(block)"
+                    [attr.aria-pressed]="liveEditorShowsBlock(block)"
+                    (click)="selectLiveEditorBlock(block)"
                   >
                     <div class="card-body py-2 px-3 d-flex align-items-start gap-2">
                       <span
                         class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0"
                         style="width: 2.5rem; height: 2.5rem; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em;"
-                        [class.bg-success]="isToneBlockSelected(block)"
-                        [class.text-white]="isToneBlockSelected(block)"
-                        [class.bg-body-tertiary]="!isToneBlockSelected(block)"
-                        [class.text-secondary]="!isToneBlockSelected(block)"
+                        [class.bg-success]="liveEditorShowsBlock(block)"
+                        [class.text-white]="liveEditorShowsBlock(block)"
+                        [class.bg-body-tertiary]="!liveEditorShowsBlock(block)"
+                        [class.text-secondary]="!liveEditorShowsBlock(block)"
                       >
                         {{ toneBlockDisplay(block).glyph }}
                       </span>
@@ -123,7 +117,7 @@
                         <div class="small text-secondary">{{ toneBlockDisplay(block).subtitle }}</div>
                       </div>
                     </div>
-                  </label>
+                  </button>
                 }
               </div>
             </div>

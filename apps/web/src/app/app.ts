@@ -1028,6 +1028,7 @@ export class App implements OnInit, OnDestroy {
   toneAiPreviewSummary = signal('');
   toneAiPreviewCandidate = signal<AiPreviewPatchObjectCandidate | null>(null);
   toneSelectedBlocks = signal<Record<string, boolean>>({ amp: true, booster: true, eq1: true });
+  liveEditorSelectedBlock = signal<string | null>('amp');
   toneSaveBlocks = signal<Record<string, boolean>>({});
   toneLoadedPatchObjectId = signal('');
   toneLoadedPatchName = signal('');
@@ -1429,6 +1430,7 @@ export class App implements OnInit, OnDestroy {
     this.editorSlotLabel.set('Live Patch');
     this.editorTargetIsActive.set(true);
     this.editorPatchDraft.set(draft);
+    this.liveEditorSelectedBlock.set('amp');
     this.editorLiveApplyLastAppliedFingerprint = this.patchFingerprint(draft);
     this.editorLiveApplyQueuedFingerprint = null;
     this.editorLiveApplyInFlight = false;
@@ -1551,6 +1553,14 @@ export class App implements OnInit, OnDestroy {
     return Boolean(this.toneSelectedBlocks()[block]);
   }
 
+  selectLiveEditorBlock(block: string): void {
+    this.liveEditorSelectedBlock.set(block);
+  }
+
+  clearLiveEditorBlock(): void {
+    this.liveEditorSelectedBlock.set(null);
+  }
+
   setToneBlockSelected(block: string, checked: boolean): void {
     this.toneSelectedBlocks.update((current) => ({ ...current, [block]: checked }));
   }
@@ -1598,14 +1608,6 @@ export class App implements OnInit, OnDestroy {
       }
       return merged;
     });
-  }
-
-  selectAllLiveEditorBlocks(): void {
-    this.setToneBlocksFromNames(this.toneBlockOptions(), true);
-  }
-
-  selectNoneLiveEditorBlocks(): void {
-    this.setToneBlocksFromNames([], true);
   }
 
   selectedToneBlocks(): string[] {
@@ -1683,11 +1685,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   liveEditorShowsBlock(block: string): boolean {
-    return this.isToneBlockSelected(block);
-  }
-
-  liveEditorShowsAnyBlocks(blocks: readonly string[]): boolean {
-    return blocks.some((block) => this.isToneBlockSelected(block));
+    return this.liveEditorSelectedBlock() === block;
   }
 
   setToneSaveName(value: string): void {
