@@ -2001,7 +2001,11 @@
     <div class="modal-body d-grid gap-3">
       <article class="border rounded p-3 bg-body-tertiary d-grid gap-2">
         <p class="mb-0">
-          The amp is now on <strong>{{ ampStateConflictCurrentSlotLabel() }}</strong> instead of <strong>{{ ampStateConflictPreviousSlotLabel() }}</strong>.
+          @if (ampStateConflictCurrentSlotLabel() === ampStateConflictPreviousSlotLabel()) {
+            The amp settings changed while <strong>{{ ampStateConflictCurrentSlotLabel() }}</strong> remained selected.
+          } @else {
+            The amp is now on <strong>{{ ampStateConflictCurrentSlotLabel() }}</strong> instead of <strong>{{ ampStateConflictPreviousSlotLabel() }}</strong>.
+          }
           Your current settings may no longer match the live amp state.
         </p>
         <p class="small text-secondary mb-0">

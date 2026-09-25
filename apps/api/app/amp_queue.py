@@ -315,7 +315,7 @@ class AmpJobQueue:
             timeout_seconds=settings.amidi_timeout_seconds,
             rq1_timeout_seconds=settings.amidi_rq1_timeout_seconds,
         )
-        synced_at = datetime.now().isoformat(timespec="seconds")
+        synced_at = datetime.now().isoformat(timespec="microseconds")
         try:
             applied_patch_result = None
             active_slot_result = None

@@ -884,6 +884,8 @@ export class App implements OnInit, OnDestroy {
   private slotRefreshRetryAt = 0;
   private preserveEditorDraftForSlotChange = false;
   private slotChangePreviousSlot: number | null = null;
+  private lastLivePatchConfirmedAt = '';
+  private lastLivePatchFingerprint = '';
   private readonly audioTakeService = inject(AudioTakeService);
   private takeTimer: ReturnType<typeof setInterval> | null = null;
   private takeStartedAt = 0;
@@ -1230,6 +1232,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   async syncLivePatch(): Promise<boolean> {
+    const generation = this.slotRefreshGeneration;
     this.setActionBusy('sync-live-patch', true);
     this.status.set('Syncing Live Patch from amp...');
     this.responseJson.set('');
@@ -1242,6 +1245,9 @@ export class App implements OnInit, OnDestroy {
       if (!response.ok || !('patch_json' in payload)) {
         this.status.set('Live Patch sync failed');
         this.responseJson.set(JSON.stringify(payload, null, 2));
+        return false;
+      }
+      if (generation !== this.slotRefreshGeneration || !this.isCurrentLivePatchStatus(payload as LivePatchResponse)) {
         return false;
       }
       this.observedSlot = (payload as LivePatchResponse).active_slot;
@@ -1368,6 +1374,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   async openLiveEditor(): Promise<void> {
+    const generation = this.slotRefreshGeneration;
     this.status.set('Loading current Live Patch from amp...');
     this.responseJson.set('');
     try {
@@ -1379,6 +1386,9 @@ export class App implements OnInit, OnDestroy {
       if (!response.ok || !('patch_json' in payload)) {
         this.status.set('Failed to load current Live Patch from amp.');
         this.responseJson.set(JSON.stringify(payload, null, 2));
+        return;
+      }
+      if (generation !== this.slotRefreshGeneration || !this.isCurrentLivePatchStatus(payload as LivePatchResponse)) {
         return;
       }
       const live = payload as LivePatchResponse;
@@ -1424,6 +1434,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   async refreshLivePatchStatus(): Promise<void> {
+    const generation = this.slotRefreshGeneration;
     try {
       const response = await fetch('/api/v1/live-patch', {
         method: 'GET',
@@ -1433,7 +1444,9 @@ export class App implements OnInit, OnDestroy {
       if (!response.ok || !('patch_json' in payload)) {
         return;
       }
-      if (this.observedSlot !== undefined && (payload as LivePatchResponse).active_slot !== this.observedSlot) {
+      if (generation !== this.slotRefreshGeneration || this.livePatchRefreshPending ||
+          this.observedSlot === undefined || (payload as LivePatchResponse).active_slot !== this.observedSlot ||
+          !this.isCurrentLivePatchStatus(payload as LivePatchResponse)) {
         return;
       }
       this.applyLivePatchStatus(payload as LivePatchResponse);
@@ -5973,8 +5986,9 @@ export class App implements OnInit, OnDestroy {
 
   private applyOperationalState(state: AmpOperationalState): void {
     this.notifyQueueTransitions(state.queue.jobs);
-    if (state.live_patch === null || this.livePatchRefreshPending ||
-        (this.observedSlot !== undefined && state.live_patch.active_slot !== this.observedSlot)) {
+    if (state.live_patch === null || this.livePatchRefreshPending || this.observedSlot === undefined ||
+        state.live_patch.active_slot !== this.observedSlot ||
+        !this.isCurrentLivePatchStatus(state.live_patch)) {
       return;
     }
     this.applyOperationalLivePatchStatus(state.live_patch);
@@ -5988,19 +6002,12 @@ export class App implements OnInit, OnDestroy {
       }
       return;
     }
-    if (this.observedSlot === undefined && slot === this.selectedAmpSlot() && this.livePatchSnapshot() !== null) {
-      this.observedSlot = slot;
-      return;
-    }
     const previousSlot = this.selectedAmpSlot();
     this.slotChangePreviousSlot = previousSlot;
     this.observedSlot = slot;
     this.livePatchRefreshPending = true;
     this.slotRefreshRetryAt = 0;
-    const draft = this.editorPatchDraft();
-    this.preserveEditorDraftForSlotChange = this.isAmpStateConflictModalOpen() ||
-      (draft !== null && (this.patchFingerprint(draft) !== this.editorLiveApplyLastAppliedFingerprint ||
-        this.editorLiveApplyInFlight));
+    this.preserveEditorDraftForSlotChange = this.hasUnsavedEditorDraft();
     const generation = ++this.slotRefreshGeneration;
     this.selectedAmpSlot.set(slot);
     this.selectedAmpSlotText.set(slot === null ? 'n/a' : this.setLabelForSlot(slot));
@@ -6027,6 +6034,15 @@ export class App implements OnInit, OnDestroy {
       if (!response.ok) {
         throw new Error(`Live Patch read failed (${response.status})`);
       }
+      const current = (await response.json()) as CurrentPatchResponse;
+      if (generation !== this.slotRefreshGeneration) {
+        return;
+      }
+      const currentSlot = this.readObject(current.patch, 'active_slot')?.['slot'];
+      if (currentSlot !== slot) {
+        this.onActiveSlotRead(typeof currentSlot === 'number' ? currentSlot : null);
+        return;
+      }
       const liveResponse = await fetch('/api/v1/live-patch', { cache: 'no-store' });
       if (!liveResponse.ok) {
         throw new Error(`Live Patch status failed (${liveResponse.status})`);
@@ -6035,23 +6051,18 @@ export class App implements OnInit, OnDestroy {
       if (generation !== this.slotRefreshGeneration) {
         return;
       }
-      if (live.active_slot !== slot) {
+      if (live.active_slot !== slot || this.patchFingerprint(live.patch_json) !== this.patchFingerprint(current.patch)) {
         this.slotRefreshRetryAt = Date.now() + 10000;
         return;
       }
       this.livePatchRefreshPending = false;
       this.applyOperationalLivePatchStatus(live);
-      const draft = this.editorPatchDraft();
-      const preserveDraft = this.preserveEditorDraftForSlotChange ||
-        (draft !== null && (this.patchFingerprint(draft) !== this.editorLiveApplyLastAppliedFingerprint ||
-          this.editorLiveApplyInFlight));
+      const preserveDraft = this.preserveEditorDraftForSlotChange || this.hasUnsavedEditorDraft();
       if (preserveDraft && !this.isAmpStateConflictModalOpen() && this.slotChangePreviousSlot !== null &&
           this.slotChangePreviousSlot !== slot) {
         this.openAmpStateConflictModal(this.slotChangePreviousSlot, slot);
       }
-      if (!preserveDraft && draft !== null) {
-        this.loadLivePatchIntoEditorState(live, false);
-      }
+      this.preserveEditorDraftForSlotChange = false;
     } catch (error) {
       if (generation === this.slotRefreshGeneration) {
         this.slotRefreshRetryAt = Date.now() + 10000;
@@ -6065,24 +6076,36 @@ export class App implements OnInit, OnDestroy {
   }
 
   private applyOperationalLivePatchStatus(payload: AmpOperationalLivePatch): void {
-    const previousSlot = this.selectedAmpSlot();
-    if (previousSlot !== null && payload.active_slot !== previousSlot) {
-      this.currentAmpPatchHash.set('');
-      this.currentAmpCommitState.set('unknown');
-      this.editorLiveApplyQueuedFingerprint = null;
-      if (!this.isAmpStateConflictModalOpen()) {
-        this.openAmpStateConflictModal(previousSlot, payload.active_slot);
-      } else {
-        this.ampStateConflictPreviousSlotLabel.set(this.setLabelForSlot(previousSlot));
-        this.ampStateConflictCurrentSlotLabel.set(payload.active_slot === null ? 'n/a' : this.setLabelForSlot(payload.active_slot));
-        this.ampStateConflictDetectedAt.set(new Date().toISOString());
-      }
+    const draft = this.editorPatchDraft();
+    const sameSlotAmpChangedUnderDraft = draft !== null && !this.editorLiveApplyInFlight &&
+      this.selectedAmpSlot() === payload.active_slot &&
+      this.patchFingerprint(draft) !== this.editorLiveApplyLastAppliedFingerprint &&
+      this.patchFingerprint(payload.patch_json) !== this.editorLiveApplyLastAppliedFingerprint;
+    if (sameSlotAmpChangedUnderDraft && !this.isAmpStateConflictModalOpen()) {
+      this.openAmpStateConflictModal(payload.active_slot, payload.active_slot);
     }
+    const reloadCleanDraft = draft !== null && !this.hasUnsavedEditorDraft() &&
+      (this.editorSlotNumber() !== payload.active_slot ||
+        this.patchFingerprint(draft) !== this.patchFingerprint(payload.patch_json));
     this.applyLivePatchStatus(payload);
     this.refreshCurrentCommitStateFromKnownState();
-    if (this.editorPatchDraft() === null) {
+    if (this.editorPatchDraft() === null || reloadCleanDraft) {
       this.loadLivePatchIntoEditorState(payload, false);
     }
+  }
+
+  private hasUnsavedEditorDraft(): boolean {
+    const draft = this.editorPatchDraft();
+    return this.isAmpStateConflictModalOpen() || this.editorLiveApplyInFlight ||
+      (draft !== null && this.patchFingerprint(draft) !== this.editorLiveApplyLastAppliedFingerprint);
+  }
+
+  private isCurrentLivePatchStatus(payload: AmpOperationalLivePatch): boolean {
+    if (payload.amp_confirmed_at < this.lastLivePatchConfirmedAt) {
+      return false;
+    }
+    return payload.amp_confirmed_at !== this.lastLivePatchConfirmedAt ||
+      this.patchFingerprint(payload.patch_json) === this.lastLivePatchFingerprint;
   }
 
   slotsForBank(bank: 'A' | 'B'): SlotCard[] {
@@ -7953,6 +7976,8 @@ export class App implements OnInit, OnDestroy {
   }
 
   private applyLivePatchStatus(payload: LivePatchResponse): void {
+    this.lastLivePatchConfirmedAt = payload.amp_confirmed_at;
+    this.lastLivePatchFingerprint = this.patchFingerprint(payload.patch_json);
     this.livePatchSnapshot.set(this.clonePatch(payload.patch_json));
     this.livePatchSourceType.set(payload.source_type || '');
     this.livePatchExactDbMatch.set(payload.exact_patch_object ?? null);
