@@ -96,7 +96,9 @@
                     [class.bg-success-subtle]="liveEditorShowsBlock(block)"
                     [class.border-success]="liveEditorShowsBlock(block)"
                     [attr.aria-pressed]="liveEditorShowsBlock(block)"
+                    [attr.aria-controls]="item.id === 'dly1' ? 'live-delay1-form' : item.id === 'dly2' ? 'live-delay2-form' : null"
                     [attr.aria-label]="(index + 1) + '. ' + item.label + (item.typeLabel ? ', ' + item.typeLabel : '') + '. ' + item.subtitle"
+                    [attr.data-pw]="'live-chain-' + item.id"
                     (click)="selectLiveEditorBlock(block)"
                   >
                     <div class="card-body py-2 px-3">
@@ -117,17 +119,9 @@
                     </div>
                   </button>
                   } @else {
-                    <div class="card bg-body-secondary live-chain-card" [attr.aria-label]="(index + 1) + '. ' + item.label + (item.typeLabel ? ', ' + item.typeLabel : '') + (item.id === 'dly2' ? ', ' + (editorDelay2On() ? 'On' : 'Off') : '') + '. ' + item.subtitle">
+                    <div class="card bg-body-secondary live-chain-card" [attr.aria-label]="(index + 1) + '. ' + item.label + '. ' + item.subtitle">
                       <div class="card-body py-2 px-3">
-                        <div class="d-flex justify-content-between gap-2 align-items-start">
-                          <div class="fw-semibold">{{ index + 1 }}. {{ item.label }}</div>
-                          @if (item.id === 'dly2') {
-                            <span class="badge rounded-pill" [class.text-bg-success]="editorDelay2On()" [class.text-bg-secondary]="!editorDelay2On()">{{ editorDelay2On() ? 'On' : 'Off' }}</span>
-                          }
-                        </div>
-                        @if (item.typeLabel) {
-                          <span class="badge rounded-pill text-bg-light border mt-1 live-chain-type">{{ item.typeLabel }}</span>
-                        }
+                        <div class="fw-semibold">{{ index + 1 }}. {{ item.label }}</div>
                         <div class="small text-secondary">{{ item.subtitle }}</div>
                       </div>
                     </div>
@@ -283,7 +277,7 @@
                   <div class="effects-card-wrap">
                   @for (stageName of ['booster', 'mod', 'fx', 'delay', 'reverb']; track stageName) {
                     @if (liveEditorShowsBlock($any(stageName))) {
-                    <article class="border rounded p-2 effect-card">
+                    <article class="border rounded p-2 effect-card" [attr.id]="stageName === 'delay' ? 'live-delay1-form' : null" [attr.data-pw]="stageName === 'delay' ? 'live-delay1-form' : null">
                       <div class="d-flex justify-content-between align-items-center mb-2">
                         <div class="d-flex align-items-center gap-2">
                           <h4 class="h6 mb-0 text-capitalize" [class.text-success]="editorStageOn($any(stageName))" [class.text-danger]="!editorStageOn($any(stageName))">{{ stageName === 'delay' ? 'Delay 1' : stageName }}</h4>
@@ -385,8 +379,8 @@
                     }
                   }
 
-                  @if (liveEditorShowsBlock('delay')) {
-                  <article class="border rounded p-2 effect-card">
+                  @if (liveEditorShowsBlock('delay2')) {
+                  <article id="live-delay2-form" data-pw="live-delay2-form" class="border rounded p-2 effect-card">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                       <div class="d-flex align-items-center gap-2">
                         <h4 class="h6 mb-0">Delay 2</h4>

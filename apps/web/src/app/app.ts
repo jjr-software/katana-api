@@ -387,7 +387,7 @@ const CHAIN_TONE_BLOCKS = new Set<ToneBlockKey>([...Object.values(CHAIN_BLOCK_TO
 
 interface LiveChainSelector {
   id: RoutingChainBlockId;
-  block: ToneBlockKey | null;
+  block: ToneBlockKey | 'delay2' | null;
   label: string;
   subtitle: string;
   typeLabel: string | null;
@@ -1488,8 +1488,8 @@ export class App implements OnInit, OnDestroy {
   liveChainSelectors(): readonly LiveChainSelector[] {
     return this.editorRoutingChainOrder().map((id) => {
       if (id === 'dly1' || id === 'dly2') {
-        const block = id === 'dly1' ? 'delay' : null;
-        return { id, block, label: routingChainBlockLabel(id), subtitle: block ? 'Delay settings' : 'Edit in Delay settings', typeLabel: this.liveChainTypeLabel(id) };
+        const block = id === 'dly1' ? 'delay' : 'delay2';
+        return { id, block, label: routingChainBlockLabel(id), subtitle: 'Delay settings', typeLabel: this.liveChainTypeLabel(id) };
       }
       if (id === 'fv') {
         return { id, block: null, label: 'Foot Volume', subtitle: 'Pedal volume stage', typeLabel: null };
@@ -1702,7 +1702,9 @@ export class App implements OnInit, OnDestroy {
   }
 
   editorBlockEnabledLabel(block: string): 'On' | 'Off' | null {
-    switch (block as ToneBlockKey) {
+    switch (block as ToneBlockKey | 'delay2') {
+      case 'delay2':
+        return this.editorDelay2On() ? 'On' : 'Off';
       case 'booster':
       case 'mod':
       case 'fx':
