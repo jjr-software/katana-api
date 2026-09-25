@@ -317,12 +317,11 @@
                             <label class="form-label small mb-1">Colour</label>
                             <select
                               class="form-select form-select-sm"
-                              [value]="editorStageColor($any(stageName))"
                               (change)="setEditorStageColor($any(stageName), $any($event.target).value)"
                             >
-                              <option [value]="0">Green</option>
-                              <option [value]="1">Red</option>
-                              <option [value]="2">Yellow</option>
+                              <option value="0" [selected]="editorStageColor($any(stageName)) === 0">Green</option>
+                              <option value="1" [selected]="editorStageColor($any(stageName)) === 1">Red</option>
+                              <option value="2" [selected]="editorStageColor($any(stageName)) === 2">Yellow</option>
                             </select>
                             <div class="small text-body-secondary mt-1">Switches to this stored effect variant.</div>
                           </div>
