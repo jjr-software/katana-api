@@ -940,6 +940,23 @@
         @if (takeError()) {
           <div class="alert alert-danger mb-0" role="alert">{{ takeError() }}</div>
         }
+        <div data-pw="recent-takes">
+          <h3 class="h6 mb-2">Recent takes</h3>
+          @if (recentTakesError()) {
+            <p class="small text-danger mb-2">{{ recentTakesError() }}</p>
+          }
+          @if (recentTakes().length === 0) {
+            <p class="small text-secondary mb-0">No saved takes yet.</p>
+          } @else {
+            <div class="d-flex gap-2 flex-wrap">
+              @for (saved of recentTakes(); track saved.id) {
+                <button type="button" class="btn btn-outline-secondary btn-sm" [disabled]="takeRecording() || openingTakeId() !== null" (click)="openTake(saved.id)" data-pw="open-take">
+                  {{ openingTakeId() === saved.id ? 'Opening…' : 'Open' }} {{ saved.created_at | date:'d MMM yyyy, HH:mm' }} · {{ takeTime(saved.duration_sec) }}
+                </button>
+              }
+            </div>
+          }
+        </div>
         @if (completedTake(); as take) {
           <div class="d-grid gap-3" data-pw="take-result">
             <div class="d-flex justify-content-between small text-secondary"><span>0 s</span><span>{{ takeTime(take.duration_sec) }}</span></div>
@@ -981,6 +998,24 @@
                 </div>
               }
             </div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <button type="button" class="btn btn-primary" (click)="compareTakeLevel()" [disabled]="takeCompareBusy() || !cleanRange() || !dirtyRange() || cleanRange()![1] <= cleanRange()![0] || dirtyRange()![1] <= dirtyRange()![0]" data-pw="compare-take-level">{{ takeCompareBusy() ? 'Comparing…' : 'Compare perceived level' }}</button>
+              <span class="small text-secondary">Estimate from the selected passages; replay both sections and check by ear.</span>
+            </div>
+            @if (takeCompareError()) {
+              <div class="alert alert-danger mb-0" role="alert">{{ takeCompareError() }}</div>
+            }
+            @if (takePerceivedComparison(); as perceived) {
+              <div class="alert alert-info mb-0" data-pw="take-perceived-comparison">
+                <strong>Estimated perceived level:</strong> clean {{ formatLufs(perceived.clean_lufs) }} · dirty {{ formatLufs(perceived.dirty_lufs) }}.
+                @if (perceived.dirty_minus_clean_lu !== null) {
+                  <span class="d-block fw-semibold">Dirty − clean: {{ perceived.dirty_minus_clean_lu >= 0 ? '+' : '' }}{{ perceived.dirty_minus_clean_lu.toFixed(2) }} LU</span>
+                } @else {
+                  <span class="d-block">LUFS comparison unavailable for a short or silent section. Select at least 0.4 s of audible playing in each section.</span>
+                }
+                <span class="d-block small mt-1">K-weighted integrated LUFS is an estimate for this take. Check the balance by ear using Play clean and Play dirty.</span>
+              </div>
+            }
             @if (takeComparison(); as comparison) {
               <div class="alert alert-secondary mb-0" data-pw="take-comparison">
                 <strong>Recorded level:</strong> clean {{ comparison.cleanDb.toFixed(1) }} dBFS · dirty {{ comparison.dirtyDb.toFixed(1) }} dBFS · dirty − clean {{ spectrumSignedDb(comparison.deltaDb) }}.

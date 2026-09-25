@@ -1,4 +1,5 @@
 import { Component, ElementRef, NgZone, OnDestroy, OnInit, TemplateRef, ViewChild, computed, effect, inject, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { NgbModal, NgbModalModule, NgbModalOptions, NgbModalRef } from '@ng-bootstrap/ng-bootstrap';
 import { PatchSummaryComponent } from './patch-summary.component';
 import { DashboardStickyPanelComponent, type DashboardStickyPanelViewModel } from './dashboard-sticky-panel.component';
@@ -12,7 +13,7 @@ import {
   type StageParamSchema,
 } from './pedal-schemas';
 import { buildRoutingChainOrder, routingChainBlockLabel, type RoutingChainBlockId } from './routing-chain';
-import { AudioTakeService, type AudioTake } from './audio-take.service';
+import { AudioTakeService, type AudioTake, type AudioTakeComparison, type AudioTakeSummary } from './audio-take.service';
 import {
   AmpOperationalStateService,
   type AmpOperationalLivePatch,
@@ -846,7 +847,7 @@ function defaultSlotCards(): SlotCard[] {
 
 @Component({
   selector: 'app-root',
-  imports: [DashboardStickyPanelComponent, PatchSummaryComponent, NgbModalModule],
+  imports: [DashboardStickyPanelComponent, PatchSummaryComponent, NgbModalModule, DatePipe],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
@@ -911,6 +912,12 @@ export class App implements OnInit, OnDestroy {
   takeRecording = signal(false);
   takeElapsedSec = signal(0);
   takeError = signal('');
+  takeCompareBusy = signal(false);
+  takePerceivedComparison = signal<AudioTakeComparison | null>(null);
+  takeCompareError = signal('');
+  recentTakes = signal<AudioTakeSummary[]>([]);
+  recentTakesError = signal('');
+  openingTakeId = signal<string | null>(null);
   completedTake = signal<AudioTake | null>(null);
   cleanRange = signal<[number, number] | null>(null);
   dirtyRange = signal<[number, number] | null>(null);
@@ -1108,6 +1115,7 @@ export class App implements OnInit, OnDestroy {
     window.addEventListener('popstate', this.onPopState);
     this.loadGlobalNormalizeTargetRms();
     void this.loadRecentAudioSamples();
+    void this.loadRecentTakes();
     void this.loadToneLabData();
     if (this.isLineOutPage()) {
     void this.loadLineOutState();
@@ -3437,6 +3445,8 @@ export class App implements OnInit, OnDestroy {
       this.takePlayer?.nativeElement.pause();
       this.playingTakeRange.set(null);
       this.completedTake.set(null);
+      this.takePerceivedComparison.set(null);
+      this.takeCompareError.set('');
       this.cleanRange.set(null);
       this.dirtyRange.set(null);
       this.takeStartedAt = Date.now();
@@ -3460,12 +3470,43 @@ export class App implements OnInit, OnDestroy {
       this.takeRecording.set(false);
       this.takeElapsedSec.set(take.duration_sec);
       this.completedTake.set(take);
+      this.takePerceivedComparison.set(null);
+      this.takeCompareError.set('');
       this.cleanRange.set([0, take.duration_sec / 2]);
       this.dirtyRange.set([take.duration_sec / 2, take.duration_sec]);
+      void this.loadRecentTakes();
     } catch (error) {
       this.takeError.set(error instanceof Error ? error.message : 'Could not stop the take. Try stopping again.');
     } finally {
       this.takeBusy.set(false);
+    }
+  }
+
+  async loadRecentTakes(): Promise<void> {
+    try {
+      this.recentTakes.set(await this.audioTakeService.recent());
+      this.recentTakesError.set('');
+    } catch (error) {
+      this.recentTakesError.set(error instanceof Error ? error.message : 'Could not load recent takes.');
+    }
+  }
+
+  async openTake(takeId: string): Promise<void> {
+    this.openingTakeId.set(takeId);
+    this.takeError.set('');
+    try {
+      const take = await this.audioTakeService.get(takeId);
+      this.takePlayer?.nativeElement.pause();
+      this.playingTakeRange.set(null);
+      this.completedTake.set(take);
+      this.cleanRange.set([0, take.duration_sec / 2]);
+      this.dirtyRange.set([take.duration_sec / 2, take.duration_sec]);
+      this.takePerceivedComparison.set(null);
+      this.takeCompareError.set('');
+    } catch (error) {
+      this.takeError.set(error instanceof Error ? error.message : 'Could not open the take.');
+    } finally {
+      this.openingTakeId.set(null);
     }
   }
 
@@ -3480,6 +3521,28 @@ export class App implements OnInit, OnDestroy {
       ? [Math.min(value, current[1]), current[1]]
       : [current[0], Math.max(value, current[0])];
     rangeSignal.set(next);
+    this.takePerceivedComparison.set(null);
+    this.takeCompareError.set('');
+  }
+
+  async compareTakeLevel(): Promise<void> {
+    const take = this.completedTake();
+    const clean = this.cleanRange();
+    const dirty = this.dirtyRange();
+    if (!take || !clean || !dirty || this.takeCompareBusy()) return;
+    this.takeCompareBusy.set(true);
+    this.takeCompareError.set('');
+    try {
+      const comparison = await this.audioTakeService.compare(take.id, clean, dirty);
+      if (this.completedTake()?.id === take.id && this.cleanRange() === clean && this.dirtyRange() === dirty) {
+        this.takePerceivedComparison.set(comparison);
+      }
+    } catch (error) {
+      this.takePerceivedComparison.set(null);
+      this.takeCompareError.set(error instanceof Error ? error.message : 'Could not compare the selected sections.');
+    } finally {
+      this.takeCompareBusy.set(false);
+    }
   }
 
   async playTakeRange(kind: 'clean' | 'dirty'): Promise<void> {

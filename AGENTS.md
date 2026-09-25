@@ -2231,3 +2231,8 @@
   - `docker compose up -d --build` completed; API/web are running and PostgreSQL is healthy. Existing Angular bundle-budget warnings remain non-fatal.
 - Current limitation:
   - the Katana audio source was absent during verification, so a physical disconnect/reconnect cycle could not be exercised. When it returns, the next bounded meter reconnect is the live hardware check to perform.
+
+## Session Update - 2026-09-25 (Saved Take Comparison and Reopen)
+- Added a selected-passage comparison from stored mono PCM WAV using the existing K-weighted integrated LUFS helper. The API returns clean and dirty LUFS, dirty-minus-clean LU, and exact PCM RMS dBFS. Passages shorter than 0.4 seconds or silent return unavailable LUFS.
+- Added recent-take metadata and waveform read endpoints so the Spectrum page can reopen a saved take after reload, replay selected passages, and request a fresh comparison.
+- Synthetic passage and reopen-contract tests pass in the API image; API and web image builds pass. Real-playing loudness acceptance and stack startup remain with the integrating session.

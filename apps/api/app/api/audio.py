@@ -21,6 +21,7 @@ from app.deps import get_db
 from app.db import SessionLocal
 from app.models import AudioSample, PatchConfig, PatchObject, SongTake
 from app.song_take import CompletedTake, song_take_recorder
+from app.song_take_compare import compare_passages
 
 router = APIRouter(prefix="/api/v1/audio", tags=["audio"])
 
@@ -39,6 +40,21 @@ class SongTakeStopResponse(BaseModel):
     duration_sec: float
     audio_url: str
     waveform: list[SongTakeWaveformPoint]
+
+
+class SongTakeSummary(BaseModel):
+    id: str
+    duration_sec: float
+    created_at: datetime
+
+
+def _song_take_response(row: SongTake) -> SongTakeStopResponse:
+    return SongTakeStopResponse(
+        id=row.id,
+        duration_sec=row.duration_sec,
+        audio_url=f"/api/v1/audio/take/{row.id}/wav",
+        waveform=[SongTakeWaveformPoint.model_validate(point) for point in row.waveform],
+    )
 
 
 @router.post("/take/start", response_model=SongTakeStartResponse)
@@ -83,6 +99,20 @@ async def stop_song_take() -> SongTakeStopResponse:
     return await asyncio.to_thread(_save_song_take, completed)
 
 
+@router.get("/takes/recent", response_model=list[SongTakeSummary])
+def recent_song_takes(db: Session = Depends(get_db)) -> list[SongTakeSummary]:
+    rows = db.scalars(select(SongTake).order_by(SongTake.created_at.desc(), SongTake.id.desc()).limit(10))
+    return [SongTakeSummary(id=row.id, duration_sec=row.duration_sec, created_at=row.created_at) for row in rows]
+
+
+@router.get("/take/{take_id}", response_model=SongTakeStopResponse)
+def get_song_take(take_id: str, db: Session = Depends(get_db)) -> SongTakeStopResponse:
+    row = db.get(SongTake, take_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail={"message": "Song take not found", "id": take_id})
+    return _song_take_response(row)
+
+
 @router.get("/take/{take_id}/wav")
 def get_song_take_wav(take_id: str, db: Session = Depends(get_db)) -> Response:
     row = db.get(SongTake, take_id)
@@ -92,6 +122,45 @@ def get_song_take_wav(take_id: str, db: Session = Depends(get_db)) -> Response:
         content=row.audio_wav,
         media_type="audio/wav",
         headers={"Content-Disposition": f'inline; filename="song-take-{take_id}.wav"'},
+    )
+
+
+class SongTakeCompareRequest(BaseModel):
+    clean_start_sec: float = Field(ge=0, allow_inf_nan=False)
+    clean_end_sec: float = Field(ge=0, allow_inf_nan=False)
+    dirty_start_sec: float = Field(ge=0, allow_inf_nan=False)
+    dirty_end_sec: float = Field(ge=0, allow_inf_nan=False)
+
+
+class SongTakeCompareResponse(BaseModel):
+    clean_lufs: float | None
+    dirty_lufs: float | None
+    dirty_minus_clean_lu: float | None
+    clean_rms_dbfs: float
+    dirty_rms_dbfs: float
+
+
+@router.post("/take/{take_id}/compare", response_model=SongTakeCompareResponse)
+def compare_song_take(
+    take_id: str, payload: SongTakeCompareRequest, db: Session = Depends(get_db)
+) -> SongTakeCompareResponse:
+    row = db.get(SongTake, take_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail={"message": "Song take not found", "id": take_id})
+    try:
+        clean, dirty, delta = compare_passages(
+            row.audio_wav,
+            (payload.clean_start_sec, payload.clean_end_sec),
+            (payload.dirty_start_sec, payload.dirty_end_sec),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return SongTakeCompareResponse(
+        clean_lufs=clean.lufs,
+        dirty_lufs=dirty.lufs,
+        dirty_minus_clean_lu=delta,
+        clean_rms_dbfs=clean.rms_dbfs,
+        dirty_rms_dbfs=dirty.rms_dbfs,
     )
 
 
