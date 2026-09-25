@@ -147,6 +147,7 @@ class ApplyPatchObjectRequest(BaseModel):
 class PatchLiveBlockRequest(BaseModel):
     patch_block: dict
     queue_key: str | None = None
+    expected_slot: int | None = None
 
 
 class StoreLivePatchToSlotRequest(BaseModel):
@@ -757,6 +758,7 @@ async def patch_live_patch_block(
     job = await amp_job_queue.enqueue_patch_edit(
         patch={block_name: payload.patch_block}, block_name=block_name,
         queue_key=payload.queue_key or f"live-patch:block:{block_name}",
+        expected_slot=payload.expected_slot,
     )
     settled = await _require_applied_job(job.job_id)
     return LivePatchStatusResponse(**settled.result_live_patch_status)

@@ -61,6 +61,7 @@ class AmpQueueJob:
     request_patch: dict | None = None
     request_block_name: str | None = None
     request_patch_name: str | None = None
+    request_expected_slot: int | None = None
     request_source_type: str = "manual_apply"
     request_line_out: dict | None = None
     result_applied_patch: dict | None = None
@@ -81,6 +82,7 @@ class AmpJobQueue:
         self._state_revision = 0
         # A persisted row alone cannot prove the live buffer after a process restart.
         self._live_baseline_valid = False
+        self._live_baseline_slot: int | None = None
 
     async def start(self) -> None:
         if self._worker_task is not None and not self._worker_task.done():
@@ -137,13 +139,13 @@ class AmpJobQueue:
     async def enqueue_patch_edit(
         self, *, patch: dict, block_name: str | None = None,
         patch_name: str | None = None, source_type: str = "manual_apply",
-        queue_key: str | None = None,
+        queue_key: str | None = None, expected_slot: int | None = None,
     ) -> AmpQueueJob:
         # Every accepted edit retains its own identity and executes in order.
         return await self._enqueue(
             "edit_current_patch", request_patch=patch, request_block_name=block_name,
             request_patch_name=patch_name, request_source_type=source_type,
-            queue_key=queue_key,
+            queue_key=queue_key, request_expected_slot=expected_slot,
         )
 
     async def _enqueue(
@@ -154,6 +156,7 @@ class AmpJobQueue:
         request_block_name: str | None = None,
         queue_key: str | None = None,
         request_patch_name: str | None = None,
+        request_expected_slot: int | None = None,
         request_source_type: str = "manual_apply",
         request_line_out: dict | None = None,
     ) -> AmpQueueJob:
@@ -164,6 +167,7 @@ class AmpJobQueue:
                 queue_key=queue_key, slot=slot, request_patch=request_patch,
                 request_block_name=request_block_name,
                 request_patch_name=request_patch_name,
+                request_expected_slot=request_expected_slot,
                 request_source_type=request_source_type,
                 request_line_out=request_line_out,
             )
@@ -238,6 +242,7 @@ class AmpJobQueue:
             source_type=source_type, confirmed_at=confirmed_at,
         )
         self._live_baseline_valid = True
+        self._live_baseline_slot = self._active_slot(patch)
         return status
 
     @staticmethod
@@ -345,6 +350,8 @@ class AmpJobQueue:
                 active_slot_result = await asyncio.wait_for(
                     client.read_active_slot(), timeout=max(5.0, settings.quick_sync_timeout_seconds),
                 )
+                if active_slot_result.slot != self._live_baseline_slot:
+                    self._live_baseline_valid = False
                 connection_result = None
                 current_patch_result = None
                 slot_result = None
@@ -412,6 +419,17 @@ class AmpJobQueue:
             elif job.operation == "edit_current_patch":
                 if job.request_patch is None:
                     raise RuntimeError("edit_current_patch operation missing patch edit")
+                if self._live_baseline_valid or job.request_expected_slot is not None:
+                    active = await asyncio.wait_for(
+                        client.read_active_slot(), timeout=max(5.0, settings.quick_sync_timeout_seconds),
+                    )
+                    if job.request_expected_slot is not None and active.slot != job.request_expected_slot:
+                        self._live_baseline_valid = False
+                        raise AmpClientError(
+                            f"Active slot changed before edit: expected {job.request_expected_slot}, found {active.slot}"
+                        )
+                    if active.slot != self._live_baseline_slot:
+                        self._live_baseline_valid = False
                 previous = await asyncio.to_thread(self._load_live_patch) if self._live_baseline_valid else None
                 if previous is None:
                     previous = (await asyncio.wait_for(

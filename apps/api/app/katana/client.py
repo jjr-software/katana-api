@@ -182,9 +182,12 @@ class AmpClient:
     async def read_current_patch(self) -> CurrentPatchSnapshot:
         async with self._port_lock():
             await self._send_only(EDITOR_MODE_ON)
+            initial_patch_number = self._decode_int2x7(await self._read_rq1(CURRENT_PATCH_NUMBER_ADDR, 2))
             payload = await self._read_selected_patch_payload()
             patch_number_raw = await self._read_rq1(CURRENT_PATCH_NUMBER_ADDR, 2)
             patch_number = self._decode_int2x7(patch_number_raw)
+            if patch_number != initial_patch_number:
+                raise AmpClientError("Active slot changed during current patch read; read again")
             slot = patch_number if 1 <= patch_number <= 8 else None
             payload["active_slot"] = {
                 "slot": slot,

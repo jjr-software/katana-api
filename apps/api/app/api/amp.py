@@ -78,6 +78,7 @@ class LineOutStateWriteRequest(BaseModel):
 class ApplyCurrentPatchRequest(BaseModel):
     patch: dict
     queue_key: str | None = None
+    expected_slot: int | None = None
 
 
 class ApplyCurrentPatchResponse(BaseModel):
@@ -308,7 +309,6 @@ async def current_patch() -> CurrentPatchResponse:
 
 @router.get("/current-slot", response_model=ActiveSlotResponse)
 async def current_slot() -> ActiveSlotResponse:
-    read_at = datetime.now().isoformat(timespec="seconds")
     job = await amp_job_queue.enqueue_active_slot()
     settled = await _await_terminal_job(job.job_id, timeout_seconds=60.0)
     if settled.status != "succeeded" or settled.result_active_slot is None:
@@ -322,7 +322,7 @@ async def current_slot() -> ActiveSlotResponse:
         slot=active.slot,
         slot_label=active.slot_label,
         patch_name=active.patch_name,
-        read_at=read_at,
+        read_at=settled.finished_at or datetime.now().isoformat(timespec="seconds"),
     )
 
 
@@ -357,6 +357,7 @@ async def apply_current_patch_live(
         patch=payload.patch,
         patch_name=requested_name if isinstance(requested_name, str) and requested_name.strip() else None,
         queue_key=payload.queue_key or "live-patch",
+        expected_slot=payload.expected_slot,
     )
     settled = await _await_terminal_job(job.job_id, timeout_seconds=120.0)
     if settled.status != "succeeded" or settled.result_applied_patch is None:
