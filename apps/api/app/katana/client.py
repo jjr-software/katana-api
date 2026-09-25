@@ -1102,7 +1102,7 @@ class AmpClient:
                     if isinstance(previous_variants2, list) and color_index < len(previous_variants2):
                         previous_delay2_raw = previous_variants2[color_index]
                 writes.extend(
-                    self._diff_raw(
+                    self._diff_delay_raw(
                         previous_delay_raw,
                         self._required_raw_from_object(current_stage, "raw", 17, "stages.delay.raw"),
                         addr_add(ADDR_PATCH_DELAY_1, 0x200 * color_index),
@@ -1110,7 +1110,7 @@ class AmpClient:
                 )
                 if isinstance(previous_stage.get("delay2_raw"), list) or isinstance(current_stage.get("delay2_raw"), list):
                     writes.extend(
-                        self._diff_raw(
+                        self._diff_delay_raw(
                             self._to_int_list(previous_delay2_raw, expected_size=17, field_name="previous.stages.delay.delay2_raw"),
                             self._required_raw_from_object(current_stage, "delay2_raw", 17, "stages.delay.delay2_raw"),
                             addr_add(ADDR_PATCH_DELAY_4, 0x200 * color_index),
@@ -1299,6 +1299,24 @@ class AmpClient:
             segment.append(new)
         if start is not None:
             writes.append((addr_add_7bit_data(base_addr, start), segment))
+        return writes
+
+    def _diff_delay_raw(
+        self,
+        previous_data: list[int],
+        current_data: list[int],
+        base_addr: tuple[int, int, int, int],
+    ) -> list[tuple[tuple[int, int, int, int], list[int]]]:
+        # Delay Time is one INTEGER4x4 parameter at offsets 1..4. Write
+        # the whole parameter even when only some of its nibbles change.
+        writes = self._diff_raw(previous_data[:1], current_data[:1], base_addr)
+        if previous_data[1:5] != current_data[1:5]:
+            writes.append((addr_add_7bit_data(base_addr, 1), current_data[1:5]))
+        writes.extend(
+            self._diff_raw(
+                previous_data[5:], current_data[5:], addr_add_7bit_data(base_addr, 5),
+            )
+        )
         return writes
 
     def _stage_switch_data(self, payload: dict[str, Any]) -> list[int]:
