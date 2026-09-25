@@ -7186,7 +7186,7 @@ export class App implements OnInit, OnDestroy {
             body: JSON.stringify({ patch_block: blockPayload, queue_key: queueKey }),
           });
           requestSettled = response.status !== 504;
-          let payload = (await response.json()) as LivePatchResponse | { detail?: unknown };
+          let payload = (await this.readEditorLiveApplyResponse(response)) as LivePatchResponse | { detail?: unknown };
           if (response.status === 504) {
             payload = await this.recoverTimedOutEditorLiveApply(payload, () => {
               requestSettled = true;
@@ -7239,7 +7239,7 @@ export class App implements OnInit, OnDestroy {
         body: JSON.stringify({ patch: draftSnapshot, queue_key: queueKey }),
       });
       requestSettled = response.status !== 504;
-      let payload = (await response.json()) as ApplyCurrentPatchResponse | { detail?: unknown };
+      let payload = (await this.readEditorLiveApplyResponse(response)) as ApplyCurrentPatchResponse | { detail?: unknown };
       if (response.status === 504) {
         const live = await this.recoverTimedOutEditorLiveApply(payload, () => {
           requestSettled = true;
@@ -7329,6 +7329,17 @@ export class App implements OnInit, OnDestroy {
         return live;
       }
       await new Promise<void>((resolve) => setTimeout(resolve, 500));
+    }
+  }
+
+  private async readEditorLiveApplyResponse(response: Response): Promise<unknown> {
+    const body = await response.text();
+    try {
+      return JSON.parse(body) as unknown;
+    } catch {
+      this.editorLiveApplyQueuedFingerprint = null;
+      const excerpt = body.trim() ? `: ${body.trim().slice(0, 240)}` : '';
+      throw new Error(`Amp live apply returned HTTP ${response.status} with a non-JSON response${excerpt}. Sync the live patch before editing again.`);
     }
   }
 
