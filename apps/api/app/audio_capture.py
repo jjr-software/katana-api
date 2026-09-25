@@ -241,6 +241,7 @@ def _pw_record_args(source: str, rate: int, channels: int) -> list[str]:
         raise RuntimeError("channels must be > 0")
     return [
         "pw-record",
+        "--raw",
         "--target",
         source,
         "--rate",

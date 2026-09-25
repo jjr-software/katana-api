@@ -77,8 +77,8 @@ class SongTakeRecorder:
             active = self._active
             if active is None:
                 raise RuntimeError("no song take is active")
-            active.stop_requested.set()
             if active.process.returncode is None:
+                active.stop_requested.set()
                 active.process.terminate()
             try:
                 try:
@@ -104,8 +104,8 @@ class SongTakeRecorder:
             active = self._active
             if active is None:
                 return
-            active.stop_requested.set()
             if active.process.returncode is None:
+                active.stop_requested.set()
                 active.process.terminate()
             try:
                 try:
@@ -139,7 +139,10 @@ class SongTakeRecorder:
                     remainder = data[usable:]
                     if not usable:
                         continue
-                    samples = np.frombuffer(data[:usable], dtype="<f4")
+                    samples = np.nan_to_num(
+                        np.frombuffer(data[:usable], dtype="<f4"),
+                        nan=0.0, posinf=1.0, neginf=-1.0,
+                    )
                     pcm = np.rint(np.clip(samples, -1.0, 1.0) * 32767).astype("<i2")
                     wav.writeframes(pcm.tobytes())
                     frame_count += len(samples)
@@ -156,7 +159,7 @@ class SongTakeRecorder:
                             window_frames = 0
             returncode = await process.wait()
             stderr = (await stderr_task).decode("utf-8", errors="replace").strip()
-            if returncode != 0 and not (returncode == -15 and stop_requested.is_set()):
+            if returncode != 0 and not (returncode in (-15, 1) and stop_requested.is_set()):
                 raise RuntimeError(f"pw-record failed (exit {returncode}): {stderr or 'unknown error'}")
             if frame_count == 0:
                 raise RuntimeError("no audio samples captured")

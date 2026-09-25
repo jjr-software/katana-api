@@ -39,7 +39,11 @@ class SongTakeRecorderTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(recorder._active)
 
     async def test_stop_terminates_active_capture_and_releases_session(self) -> None:
-        script = "import sys,time; sys.stdout.buffer.write(b'\\0' * 192000); sys.stdout.flush(); time.sleep(30)"
+        script = (
+            "import signal,sys,time; "
+            "signal.signal(signal.SIGTERM, lambda *_: sys.exit(1)); "
+            "sys.stdout.buffer.write(b'\\0' * 192000); sys.stdout.flush(); time.sleep(30)"
+        )
         recorder = SongTakeRecorder()
         with patch("app.song_take.resolve_katana_pipewire_source", new_callable=AsyncMock, return_value="KATANA"), \
              patch("app.song_take._pw_record_args", return_value=[sys.executable, "-c", script]):
