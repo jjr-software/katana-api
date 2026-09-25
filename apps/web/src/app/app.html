@@ -80,18 +80,23 @@
                 </div>
               }
               <div class="d-flex flex-wrap gap-2 align-items-center">
-                <span class="text-uppercase small text-secondary fw-semibold">Module</span>
+                <span class="text-uppercase small text-secondary fw-semibold">Live patch controls</span>
                 <button type="button" class="btn btn-sm btn-outline-secondary" [disabled]="liveEditorSelectedBlock() === null" (click)="clearLiveEditorBlock()">Clear selection</button>
               </div>
-              <div class="d-flex flex-wrap gap-2">
-                @for (block of toneBlockOptions(); track block) {
+              <div class="d-grid gap-2">
+                <div class="d-flex justify-content-between align-items-center small fw-semibold text-secondary">
+                  <span>Guitar</span><span>Signal flows left to right, then down</span>
+                </div>
+                <div class="live-chain-grid">
+                @for (item of liveChainSelectors(); track item.id; let index = $index) {
+                  @if (item.block; as block) {
                   <button
                     type="button"
-                    class="card shadow-sm"
-                    style="flex: 1 1 12rem; min-width: 12rem; text-align: left;"
+                    class="card shadow-sm live-chain-card"
                     [class.bg-success-subtle]="liveEditorShowsBlock(block)"
                     [class.border-success]="liveEditorShowsBlock(block)"
                     [attr.aria-pressed]="liveEditorShowsBlock(block)"
+                    [attr.aria-label]="(index + 1) + '. ' + item.label + (item.typeLabel ? ', ' + item.typeLabel : '') + '. ' + item.subtitle"
                     (click)="selectLiveEditorBlock(block)"
                   >
                     <div class="card-body py-2 px-3 d-flex align-items-start gap-2">
@@ -107,11 +112,53 @@
                       </span>
                       <div class="flex-grow-1">
                         <div class="d-flex justify-content-between gap-2 align-items-start">
-                          <div class="fw-semibold">{{ toneBlockDisplay(block).label }}</div>
+                          <div class="fw-semibold">{{ index + 1 }}. {{ item.label }}</div>
                           @if (editorBlockEnabledLabel(block); as enabledLabel) {
                             <span class="badge rounded-pill" [class.text-bg-success]="enabledLabel === 'On'" [class.text-bg-secondary]="enabledLabel === 'Off'">
                               {{ enabledLabel }}
                             </span>
+                          }
+                        </div>
+                        @if (item.typeLabel) {
+                          <span class="badge rounded-pill text-bg-light border mt-1 live-chain-type">{{ item.typeLabel }}</span>
+                        }
+                        <div class="small text-secondary">{{ item.subtitle }}</div>
+                      </div>
+                    </div>
+                  </button>
+                  } @else {
+                    <div class="card bg-body-secondary live-chain-card" [attr.aria-label]="(index + 1) + '. ' + item.label + '. ' + item.subtitle">
+                      <div class="card-body py-2 px-3">
+                        <div class="fw-semibold">{{ index + 1 }}. {{ item.label }}</div>
+                        <div class="small text-secondary">{{ item.subtitle }}</div>
+                      </div>
+                    </div>
+                  }
+                }
+                </div>
+                <div class="small fw-semibold text-secondary text-end">Speaker</div>
+              </div>
+              <div class="border-top pt-2">
+                <div class="small text-uppercase text-secondary fw-semibold mb-2">Other patch controls</div>
+                <div class="live-other-grid">
+                @for (block of liveOtherBlockOptions(); track block) {
+                  <button type="button" class="card shadow-sm live-chain-card"
+                    [class.bg-success-subtle]="liveEditorShowsBlock(block)"
+                    [class.border-success]="liveEditorShowsBlock(block)"
+                    [attr.aria-pressed]="liveEditorShowsBlock(block)"
+                    (click)="selectLiveEditorBlock(block)">
+                    <div class="card-body py-2 px-3 d-flex align-items-start gap-2">
+                      <span class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0"
+                        style="width: 2.5rem; height: 2.5rem; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em;"
+                        [class.bg-success]="liveEditorShowsBlock(block)"
+                        [class.text-white]="liveEditorShowsBlock(block)"
+                        [class.bg-body-tertiary]="!liveEditorShowsBlock(block)"
+                        [class.text-secondary]="!liveEditorShowsBlock(block)">{{ toneBlockDisplay(block).glyph }}</span>
+                      <div class="flex-grow-1">
+                        <div class="d-flex justify-content-between gap-2 align-items-start">
+                          <div class="fw-semibold">{{ toneBlockDisplay(block).label }}</div>
+                          @if (editorBlockEnabledLabel(block); as enabledLabel) {
+                            <span class="badge rounded-pill" [class.text-bg-success]="enabledLabel === 'On'" [class.text-bg-secondary]="enabledLabel === 'Off'">{{ enabledLabel }}</span>
                           }
                         </div>
                         <div class="small text-secondary">{{ toneBlockDisplay(block).subtitle }}</div>
@@ -119,6 +166,7 @@
                     </div>
                   </button>
                 }
+                </div>
               </div>
             </div>
             @if (editorModalOpen()) {

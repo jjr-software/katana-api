@@ -20,6 +20,31 @@ code {
   max-width: 1680px;
 }
 
+.app-shell .live-chain-grid,
+.app-shell .live-other-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: 0.5rem;
+}
+
+.app-shell .live-chain-card {
+  min-width: 0;
+  text-align: left;
+}
+
+.app-shell .live-chain-type {
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+}
+
+@media (max-width: 575.98px) {
+  .app-shell .live-chain-grid,
+  .app-shell .live-other-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .spectrum-page .take-waveform { position: relative; height: 8rem; overflow: hidden; border: 1px solid #ced4da; border-radius: .375rem; background: #f8f9fa; cursor: crosshair; touch-action: none; user-select: none; }
 .spectrum-page .take-waveform-select-clean { border-color: #0d6efd; }
 .spectrum-page .take-waveform-select-dirty { border-color: #dc3545; }

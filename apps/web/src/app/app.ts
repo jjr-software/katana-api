@@ -379,6 +379,19 @@ const AUTO_LEVEL_MAX_STEP = 8;
 const GLOBAL_NORMALIZE_TARGET_STORAGE_KEY = 'katana.globalNormalizeTargetRms';
 const TONE_BLOCK_OPTIONS = ['routing', 'amp', 'booster', 'mod', 'fx', 'delay', 'reverb', 'eq1', 'eq2', 'ns', 'send_return', 'solo', 'pedalfx', 'exp_pedal', 'gafc_exp1'] as const;
 type ToneBlockKey = (typeof TONE_BLOCK_OPTIONS)[number];
+const CHAIN_BLOCK_TO_TONE_BLOCK: Partial<Record<RoutingChainBlockId, ToneBlockKey>> = {
+  pdl: 'pedalfx', bst: 'booster', amp: 'amp', mod: 'mod', fx: 'fx',
+  sr: 'send_return', rev: 'reverb', eq: 'eq1', eq2: 'eq2',
+};
+const CHAIN_TONE_BLOCKS = new Set<ToneBlockKey>([...Object.values(CHAIN_BLOCK_TO_TONE_BLOCK), 'delay'] as ToneBlockKey[]);
+
+interface LiveChainSelector {
+  id: RoutingChainBlockId;
+  block: ToneBlockKey | null;
+  label: string;
+  subtitle: string;
+  typeLabel: string | null;
+}
 
 interface ToneBlockDisplay {
   label: string;
@@ -1472,6 +1485,36 @@ export class App implements OnInit, OnDestroy {
 
   toneBlockOptions(): readonly string[] {
     return TONE_BLOCK_OPTIONS;
+  }
+
+  liveChainSelectors(): readonly LiveChainSelector[] {
+    let delaySelectorShown = false;
+    return this.editorRoutingChainOrder().map((id) => {
+      if (id === 'dly1' || id === 'dly2') {
+        const block = delaySelectorShown ? null : 'delay';
+        delaySelectorShown = true;
+        return { id, block, label: routingChainBlockLabel(id), subtitle: block ? 'Delay settings' : 'Edit in Delay', typeLabel: block ? this.liveChainTypeLabel(id) : null };
+      }
+      if (id === 'fv') {
+        return { id, block: null, label: 'Foot Volume', subtitle: 'Pedal volume stage', typeLabel: null };
+      }
+      const block = CHAIN_BLOCK_TO_TONE_BLOCK[id] ?? null;
+      return { id, block, label: block ? this.toneBlockDisplay(block).label : routingChainBlockLabel(id), subtitle: block ? this.toneBlockDisplay(block).subtitle : '', typeLabel: block ? this.liveChainTypeLabel(id) : null };
+    });
+  }
+
+  private liveChainTypeLabel(id: RoutingChainBlockId): string | null {
+    const label = this.routingChainBlockRealLabel(id);
+    const separator = label.indexOf(': ');
+    if (separator < 0) {
+      return null;
+    }
+    const type = label.slice(separator + 2);
+    return type === 'Unknown' || type === 'n/a' ? null : type;
+  }
+
+  liveOtherBlockOptions(): readonly ToneBlockKey[] {
+    return TONE_BLOCK_OPTIONS.filter((block) => !CHAIN_TONE_BLOCKS.has(block));
   }
 
   toneBlockDisplay(block: string): ToneBlockDisplay {
