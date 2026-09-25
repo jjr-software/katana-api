@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+from contextlib import suppress
 
 from .sysex import build_dt1, build_rq1, extract_sysex_frames, parse_dt1
 
@@ -19,13 +20,24 @@ class AmidiTransport:
         self.timeout_sec = float(timeout_sec)
         self._resolved_port: str | None = None
 
-    async def _run(self, *args: str) -> tuple[int, str, str]:
+    async def _run(self, *args: str, timeout_sec: float | None = None) -> tuple[int, str, str]:
         proc = await asyncio.create_subprocess_exec(
             *args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        out, err = await proc.communicate()
+        try:
+            out, err = await asyncio.wait_for(
+                proc.communicate(),
+                timeout=max(5.0, (self.timeout_sec if timeout_sec is None else timeout_sec) + 2.0),
+            )
+        except (asyncio.TimeoutError, asyncio.CancelledError) as exc:
+            with suppress(ProcessLookupError):
+                proc.kill()
+            await proc.wait()
+            if isinstance(exc, asyncio.TimeoutError):
+                raise RuntimeError(f"amidi command timed out: {' '.join(args[:2])}") from exc
+            raise
         return proc.returncode, out.decode("utf-8", errors="replace"), err.decode("utf-8", errors="replace")
 
     async def send_hex(self, sysex_hex: str) -> None:
@@ -37,7 +49,9 @@ class AmidiTransport:
     async def query_hex(self, sysex_hex: str, timeout_sec: float | None = None) -> str:
         timeout = self.timeout_sec if timeout_sec is None else timeout_sec
         port = await self.resolve_port()
-        rc, out, err = await self._run("amidi", "-p", port, "-d", "-t", f"{timeout:g}", "-S", sysex_hex)
+        rc, out, err = await self._run(
+            "amidi", "-p", port, "-d", "-t", f"{timeout:g}", "-S", sysex_hex, timeout_sec=timeout
+        )
         if rc != 0:
             raise RuntimeError(f"amidi query failed rc={rc}: {err.strip()}")
         return out
@@ -136,7 +150,7 @@ class AmidiTransport:
 
     @staticmethod
     def _addr_to_int(addr: tuple[int, int, int, int]) -> int:
-        return (int(addr[0]) << 24) | (int(addr[1]) << 16) | (int(addr[2]) << 8) | int(addr[3])
+        return (int(addr[0]) << 21) | (int(addr[1]) << 14) | (int(addr[2]) << 7) | int(addr[3])
 
     @staticmethod
     def _addr_add_7bit(addr: tuple[int, int, int, int], offset: int) -> tuple[int, int, int, int]:

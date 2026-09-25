@@ -1,9 +1,10 @@
 import asyncio
+import logging
 import re
 import time
 from contextlib import suppress
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from app.hashing import canonical_blob, snapshot_hash
 from app.katana.protocol import (
@@ -144,6 +145,7 @@ class AmpDeviceStatus:
 
 
 _PORT_LOCKS: dict[str, asyncio.Lock] = {}
+_LOGGER = logging.getLogger(__name__)
 
 
 class AmpClient:
@@ -607,6 +609,17 @@ class AmpClient:
         return payload
 
     async def _apply_selected_patch_payload(self, payload: dict[str, Any]) -> None:
+        stages_obj = payload.get("stages")
+        sw_data: list[int] | None = None
+        color_data: list[int] | None = None
+        if isinstance(stages_obj, dict) and any(
+            isinstance(stages_obj.get(name), dict)
+            for name in ("booster", "mod", "fx", "delay", "reverb")
+        ):
+            # Preserve the existing switches and colours before any patch write.
+            sw_data = await self._read_rq1(ADDR_PATCH_SW, 6)
+            color_data = await self._read_rq1(ADDR_PATCH_COLOR, 5)
+
         patch_name = self._normalize_patch_name(str(payload.get("patch_name", "")))
         await self._send_only(build_dt1(ADDR_PATCH_COM, patch_name))
 
@@ -626,19 +639,11 @@ class AmpClient:
             amp_data = self._to_int_list(amp_raw, expected_size=10, field_name="amp.raw")
             await self._send_only(build_dt1(ADDR_PATCH_AMP, amp_data))
 
-        stages_obj = payload.get("stages")
         if not isinstance(stages_obj, dict):
             return
 
-        sw_data: list[int] | None = None
-        color_data: list[int] | None = None
-
         async def ensure_stage_state() -> tuple[list[int], list[int]]:
-            nonlocal sw_data, color_data
-            if sw_data is None or color_data is None:
-                sw_data = await self._read_rq1(ADDR_PATCH_SW, 6)
-                color_data = await self._read_rq1(ADDR_PATCH_COLOR, 5)
-            return sw_data, color_data
+            return cast(list[int], sw_data), cast(list[int], color_data)
 
         async def apply_color_stage(
             sw_index: int,
@@ -1591,34 +1596,39 @@ class AmpClient:
         return out
 
     async def _read_rq1_chunk(self, addr: tuple[int, int, int, int], size: int) -> list[int]:
-        output = await self._send_and_read(
-            build_rq1(addr, size),
-            timeout_seconds=self._rq1_timeout_seconds,
-        )
-        frames = extract_sysex_frames(output)
-        start_addr = self._addr_to_int(addr)
-        assembled = [0] * size
-        seen = [False] * size
-        for frame in frames:
-            parsed = parse_dt1(frame)
-            if parsed is None:
-                continue
-            dt1_addr, data = parsed
-            offset = self._addr_to_int(dt1_addr) - start_addr
-            if offset < 0 or offset >= size:
-                continue
-            end = min(size, offset + len(data))
-            if end <= offset:
-                continue
-            for idx, value in enumerate(data[: end - offset], start=offset):
-                assembled[idx] = int(value)
-                seen[idx] = True
-        if all(seen):
-            return assembled
-        received = sum(1 for flag in seen if flag)
-        if received == 0:
-            raise AmpClientError(f"No DT1 response for address {addr}")
-        raise AmpClientError(f"Incomplete DT1 response for address {addr}: {received}/{size} bytes")
+        started = time.monotonic()
+        for attempt in range(1, 4):
+            output = await self._send_and_read(
+                build_rq1(addr, size),
+                timeout_seconds=self._rq1_timeout_seconds,
+            )
+            frames = extract_sysex_frames(output)
+            start_addr = self._addr_to_int(addr)
+            assembled = [0] * size
+            seen = [False] * size
+            for frame in frames:
+                parsed = parse_dt1(frame)
+                if parsed is None:
+                    continue
+                dt1_addr, data = parsed
+                offset = self._addr_to_int(dt1_addr) - start_addr
+                if offset < 0 or offset >= size:
+                    continue
+                end = min(size, offset + len(data))
+                for idx, value in enumerate(data[: end - offset], start=offset):
+                    assembled[idx] = int(value)
+                    seen[idx] = True
+            if all(seen):
+                return assembled
+            received = sum(seen)
+            detail = (
+                f"RQ1 address {addr}: expected {size} bytes, received {received}; "
+                f"attempt {attempt}/3, elapsed {time.monotonic() - started:.3f}s"
+            )
+            _LOGGER.warning(detail)
+            if attempt == 3:
+                raise AmpClientError(detail)
+            await asyncio.sleep(0.1)
 
     @staticmethod
     def _decode_int2x7(raw: list[int]) -> int:
@@ -1697,7 +1707,7 @@ class AmpClient:
 
     @staticmethod
     def _addr_to_int(addr: tuple[int, int, int, int]) -> int:
-        return (int(addr[0]) << 24) | (int(addr[1]) << 16) | (int(addr[2]) << 8) | int(addr[3])
+        return (int(addr[0]) << 21) | (int(addr[1]) << 14) | (int(addr[2]) << 7) | int(addr[3])
 
     @staticmethod
     def _config_hash(payload: dict[str, Any]) -> str:
