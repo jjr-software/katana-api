@@ -152,7 +152,20 @@
                 </div>
               </div>
             </div>
-            @if (editorModalOpen()) {
+            @if (livePatchRefreshPending) {
+              <article class="border rounded p-3 bg-body-tertiary" role="status" aria-live="polite">
+                @if (!livePatchReadError) {
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="spinner-border spinner-border-sm text-primary" aria-hidden="true"></span>
+                    <strong>Reading current Live Patch from amp...</strong>
+                  </div>
+                  <p class="small text-secondary mt-2 mb-0">This can take several seconds.</p>
+                } @else {
+                  <p class="small text-danger mt-2 mb-0">{{ livePatchReadError }}</p>
+                  <button type="button" class="btn btn-sm btn-outline-primary mt-2" (click)="openLiveEditor()">Try again</button>
+                }
+              </article>
+            } @else if (editorModalOpen()) {
               @if (editorPatchDraft(); as draft) {
                 <div class="d-grid gap-3">
                   @if (editorLiveApplyError()) {

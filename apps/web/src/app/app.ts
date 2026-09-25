@@ -879,7 +879,8 @@ export class App implements OnInit, OnDestroy {
   private readonly ampOperationalState = inject(AmpOperationalStateService);
   private observedSlot: number | null | undefined;
   private slotRefreshGeneration = 0;
-  private livePatchRefreshPending = false;
+  livePatchRefreshPending = true;
+  livePatchReadError = '';
   private refreshingSlotGeneration: number | null = null;
   private slotRefreshRetryAt = 0;
   private preserveEditorDraftForSlotChange = false;
@@ -1375,6 +1376,8 @@ export class App implements OnInit, OnDestroy {
 
   async openLiveEditor(): Promise<void> {
     const generation = this.slotRefreshGeneration;
+    this.livePatchRefreshPending = true;
+    this.livePatchReadError = '';
     this.status.set('Loading current Live Patch from amp...');
     this.responseJson.set('');
     try {
@@ -1385,6 +1388,7 @@ export class App implements OnInit, OnDestroy {
       const payload = (await response.json()) as LivePatchResponse | { detail?: unknown };
       if (!response.ok || !('patch_json' in payload)) {
         this.status.set('Failed to load current Live Patch from amp.');
+        this.livePatchReadError = 'Could not read the amp. Try again.';
         this.responseJson.set(JSON.stringify(payload, null, 2));
         return;
       }
@@ -1392,12 +1396,16 @@ export class App implements OnInit, OnDestroy {
         return;
       }
       const live = payload as LivePatchResponse;
+      this.observedSlot = live.active_slot;
+      this.livePatchRefreshPending = false;
+      this.livePatchReadError = '';
       this.applyLivePatchStatus(live);
       this.loadLivePatchIntoEditorState(live, false, true);
       this.recordRecentLoadedPatch(this.readString(live.patch_json, 'patch_name')?.trim() || 'Live Patch', 'AMP');
       this.status.set('Loaded current Live Patch from amp');
     } catch (error: unknown) {
       this.status.set('Failed to load current Live Patch from amp.');
+      this.livePatchReadError = 'Could not read the amp. Try again.';
       this.responseJson.set(JSON.stringify({ message: 'Browser request failed', error: String(error) }, null, 2));
     }
   }
@@ -6008,6 +6016,7 @@ export class App implements OnInit, OnDestroy {
     this.slotChangePreviousSlot = previousSlot;
     this.observedSlot = slot;
     this.livePatchRefreshPending = true;
+    this.livePatchReadError = '';
     this.slotRefreshRetryAt = 0;
     this.preserveEditorDraftForSlotChange = this.hasUnsavedEditorDraft();
     const generation = ++this.slotRefreshGeneration;
@@ -6055,9 +6064,11 @@ export class App implements OnInit, OnDestroy {
       }
       if (live.active_slot !== slot || this.patchFingerprint(live.patch_json) !== this.patchFingerprint(current.patch)) {
         this.slotRefreshRetryAt = Date.now() + 10000;
+        this.livePatchReadError = 'The amp changed during the read. Retrying...';
         return;
       }
       this.livePatchRefreshPending = false;
+      this.livePatchReadError = '';
       this.applyOperationalLivePatchStatus(live);
       const preserveDraft = this.preserveEditorDraftForSlotChange || this.hasUnsavedEditorDraft();
       if (preserveDraft && !this.isAmpStateConflictModalOpen() && this.slotChangePreviousSlot !== null &&
@@ -6068,6 +6079,7 @@ export class App implements OnInit, OnDestroy {
     } catch (error) {
       if (generation === this.slotRefreshGeneration) {
         this.slotRefreshRetryAt = Date.now() + 10000;
+        this.livePatchReadError = 'Could not read the amp. Retrying...';
         this.pushToast(`Live Patch refresh failed: ${String(error)}`, 'danger');
       }
     } finally {
