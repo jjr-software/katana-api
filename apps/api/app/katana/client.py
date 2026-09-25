@@ -729,7 +729,9 @@ class AmpClient:
             delay2_on_value = delay_obj.get("delay2_on")
             if isinstance(delay2_on_value, bool):
                 sw[4] = 1 if delay2_on_value else 0
-            stage_color = delay_obj.get("color_index")
+            payload_colors = payload.get("colors")
+            delay_color = payload_colors.get("delay") if isinstance(payload_colors, dict) else None
+            stage_color = delay_color.get("index") if isinstance(delay_color, dict) else delay_obj.get("color_index")
             if isinstance(stage_color, (int, float)):
                 colors[3] = max(0, min(2, int(stage_color)))
             await self._write_stage_variant(
@@ -1087,9 +1089,21 @@ class AmpClient:
                     )
                 )
             elif block_name == "delay":
+                previous_color_index = previous_colors[color_data_index]
+                previous_delay_raw = self._required_raw_from_object(previous_stage, "raw", 17, "previous.stages.delay.raw")
+                previous_delay2_raw = previous_stage.get("delay2_raw")
+                if color_index != previous_color_index:
+                    previous_variants = previous_stage.get("variants_raw")
+                    if isinstance(previous_variants, list) and color_index < len(previous_variants):
+                        previous_delay_raw = self._to_int_list(
+                            previous_variants[color_index], expected_size=17, field_name="previous.stages.delay.variants_raw"
+                        )
+                    previous_variants2 = previous_stage.get("variants2_raw")
+                    if isinstance(previous_variants2, list) and color_index < len(previous_variants2):
+                        previous_delay2_raw = previous_variants2[color_index]
                 writes.extend(
                     self._diff_raw(
-                        self._required_raw_from_object(previous_stage, "raw", 17, "previous.stages.delay.raw"),
+                        previous_delay_raw,
                         self._required_raw_from_object(current_stage, "raw", 17, "stages.delay.raw"),
                         addr_add(ADDR_PATCH_DELAY_1, 0x200 * color_index),
                     )
@@ -1097,7 +1111,7 @@ class AmpClient:
                 if isinstance(previous_stage.get("delay2_raw"), list) or isinstance(current_stage.get("delay2_raw"), list):
                     writes.extend(
                         self._diff_raw(
-                            self._required_raw_from_object(previous_stage, "delay2_raw", 17, "previous.stages.delay.delay2_raw"),
+                            self._to_int_list(previous_delay2_raw, expected_size=17, field_name="previous.stages.delay.delay2_raw"),
                             self._required_raw_from_object(current_stage, "delay2_raw", 17, "stages.delay.delay2_raw"),
                             addr_add(ADDR_PATCH_DELAY_4, 0x200 * color_index),
                         )
