@@ -99,17 +99,7 @@
                     [attr.aria-label]="(index + 1) + '. ' + item.label + (item.typeLabel ? ', ' + item.typeLabel : '') + '. ' + item.subtitle"
                     (click)="selectLiveEditorBlock(block)"
                   >
-                    <div class="card-body py-2 px-3 d-flex align-items-start gap-2">
-                      <span
-                        class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0"
-                        style="width: 2.5rem; height: 2.5rem; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em;"
-                        [class.bg-success]="liveEditorShowsBlock(block)"
-                        [class.text-white]="liveEditorShowsBlock(block)"
-                        [class.bg-body-tertiary]="!liveEditorShowsBlock(block)"
-                        [class.text-secondary]="!liveEditorShowsBlock(block)"
-                      >
-                        {{ toneBlockDisplay(block).glyph }}
-                      </span>
+                    <div class="card-body py-2 px-3">
                       <div class="flex-grow-1">
                         <div class="d-flex justify-content-between gap-2 align-items-start">
                           <div class="fw-semibold">{{ index + 1 }}. {{ item.label }}</div>
@@ -147,13 +137,7 @@
                     [class.border-success]="liveEditorShowsBlock(block)"
                     [attr.aria-pressed]="liveEditorShowsBlock(block)"
                     (click)="selectLiveEditorBlock(block)">
-                    <div class="card-body py-2 px-3 d-flex align-items-start gap-2">
-                      <span class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0"
-                        style="width: 2.5rem; height: 2.5rem; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em;"
-                        [class.bg-success]="liveEditorShowsBlock(block)"
-                        [class.text-white]="liveEditorShowsBlock(block)"
-                        [class.bg-body-tertiary]="!liveEditorShowsBlock(block)"
-                        [class.text-secondary]="!liveEditorShowsBlock(block)">{{ toneBlockDisplay(block).glyph }}</span>
+                    <div class="card-body py-2 px-3">
                       <div class="flex-grow-1">
                         <div class="d-flex justify-content-between gap-2 align-items-start">
                           <div class="fw-semibold">{{ toneBlockDisplay(block).label }}</div>
