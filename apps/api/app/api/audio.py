@@ -18,9 +18,81 @@ from app.audio_capture import (
     capture_audio_sample,
 )
 from app.deps import get_db
-from app.models import AudioSample, PatchConfig, PatchObject
+from app.db import SessionLocal
+from app.models import AudioSample, PatchConfig, PatchObject, SongTake
+from app.song_take import CompletedTake, song_take_recorder
 
 router = APIRouter(prefix="/api/v1/audio", tags=["audio"])
+
+
+class SongTakeStartResponse(BaseModel):
+    session_id: str
+
+
+class SongTakeWaveformPoint(BaseModel):
+    time_sec: float
+    rms_dbfs: float
+
+
+class SongTakeStopResponse(BaseModel):
+    id: str
+    duration_sec: float
+    audio_url: str
+    waveform: list[SongTakeWaveformPoint]
+
+
+@router.post("/take/start", response_model=SongTakeStartResponse)
+async def start_song_take() -> SongTakeStartResponse:
+    try:
+        session_id = await song_take_recorder.start()
+    except RuntimeError as exc:
+        if str(exc) == "a song take is already active":
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise
+    return SongTakeStartResponse(session_id=session_id)
+
+
+def _save_song_take(completed: CompletedTake) -> SongTakeStopResponse:
+    waveform = [SongTakeWaveformPoint(time_sec=point.time_sec, rms_dbfs=point.rms_dbfs) for point in completed.waveform]
+    with SessionLocal() as db:
+        row = SongTake(
+            id=completed.id,
+            source=completed.source,
+            duration_sec=completed.duration_sec,
+            waveform=[point.model_dump() for point in waveform],
+            audio_wav=completed.wav_bytes,
+        )
+        db.add(row)
+        db.commit()
+        return SongTakeStopResponse(
+            id=completed.id,
+            duration_sec=completed.duration_sec,
+            audio_url=f"/api/v1/audio/take/{completed.id}/wav",
+            waveform=waveform,
+        )
+
+
+@router.post("/take/stop", response_model=SongTakeStopResponse)
+async def stop_song_take() -> SongTakeStopResponse:
+    try:
+        completed = await song_take_recorder.stop()
+    except RuntimeError as exc:
+        if str(exc) == "no song take is active":
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise
+    return await asyncio.to_thread(_save_song_take, completed)
+
+
+@router.get("/take/{take_id}/wav")
+def get_song_take_wav(take_id: str, db: Session = Depends(get_db)) -> Response:
+    row = db.get(SongTake, take_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail={"message": "Song take not found", "id": take_id})
+    return Response(
+        content=row.audio_wav,
+        media_type="audio/wav",
+        headers={"Content-Disposition": f'inline; filename="song-take-{take_id}.wav"'},
+    )
 
 
 class AudioSampleCreateRequest(BaseModel):

@@ -86,6 +86,17 @@ class AudioSample(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
 
+class SongTake(Base):
+    __tablename__ = "song_takes"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    source: Mapped[str] = mapped_column(String(255), nullable=False)
+    duration_sec: Mapped[float] = mapped_column(Float, nullable=False)
+    waveform: Mapped[list[dict]] = mapped_column(JSONB, nullable=False)
+    audio_wav: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class PatchObject(Base):
     __tablename__ = "patch_objects"
 

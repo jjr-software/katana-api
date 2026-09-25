@@ -10,6 +10,7 @@ from app.api.tone import router as tone_router
 from app.health import run_startup_checks
 from app.db import SessionLocal
 from app.rom_patches import seed_rom_patch_objects
+from app.song_take import song_take_recorder
 
 app = FastAPI(title="Katana API", version="0.1.0")
 app.include_router(patches_router)
@@ -31,7 +32,10 @@ async def startup() -> None:
 
 @app.on_event("shutdown")
 async def shutdown() -> None:
-    await amp_job_queue.stop()
+    try:
+        await song_take_recorder.close()
+    finally:
+        await amp_job_queue.stop()
 
 
 @app.get("/api/healthz")
