@@ -114,7 +114,6 @@
                         @if (item.typeLabel) {
                           <span class="badge rounded-1 text-bg-light border mt-1 live-chain-type">{{ item.typeLabel }}</span>
                         }
-                        <div class="small text-secondary">{{ item.subtitle }}</div>
                       </div>
                     </div>
                   </button>
@@ -122,7 +121,6 @@
                     <div class="card bg-body-secondary live-chain-card" [attr.aria-label]="(index + 1) + '. ' + item.label + '. ' + item.subtitle">
                       <div class="card-body p-2">
                         <div class="fw-semibold">{{ index + 1 }}. {{ item.label }}</div>
-                        <div class="small text-secondary">{{ item.subtitle }}</div>
                       </div>
                     </div>
                   }
@@ -139,15 +137,14 @@
                     [class.border-success]="liveEditorShowsBlock(block)"
                     [attr.aria-pressed]="liveEditorShowsBlock(block)"
                     (click)="selectLiveEditorBlock(block)">
-                    <div class="card-body py-2 px-3">
+                    <div class="card-body p-2">
                       <div class="flex-grow-1">
                         <div class="d-flex justify-content-between gap-2 align-items-start">
                           <div class="fw-semibold">{{ toneBlockDisplay(block).label }}</div>
                           @if (editorBlockEnabledLabel(block); as enabledLabel) {
-                            <span class="badge rounded-pill" [class.text-bg-success]="enabledLabel === 'On'" [class.text-bg-secondary]="enabledLabel === 'Off'">{{ enabledLabel }}</span>
+                            <span class="badge rounded-1" [class.text-bg-success]="enabledLabel === 'On'" [class.text-bg-secondary]="enabledLabel === 'Off'">{{ enabledLabel }}</span>
                           }
                         </div>
-                        <div class="small text-secondary">{{ toneBlockDisplay(block).subtitle }}</div>
                       </div>
                     </div>
                   </button>
