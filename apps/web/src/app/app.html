@@ -117,9 +117,17 @@
                     </div>
                   </button>
                   } @else {
-                    <div class="card bg-body-secondary live-chain-card" [attr.aria-label]="(index + 1) + '. ' + item.label + '. ' + item.subtitle">
+                    <div class="card bg-body-secondary live-chain-card" [attr.aria-label]="(index + 1) + '. ' + item.label + (item.typeLabel ? ', ' + item.typeLabel : '') + (item.id === 'dly2' ? ', ' + (editorDelay2On() ? 'On' : 'Off') : '') + '. ' + item.subtitle">
                       <div class="card-body py-2 px-3">
-                        <div class="fw-semibold">{{ index + 1 }}. {{ item.label }}</div>
+                        <div class="d-flex justify-content-between gap-2 align-items-start">
+                          <div class="fw-semibold">{{ index + 1 }}. {{ item.label }}</div>
+                          @if (item.id === 'dly2') {
+                            <span class="badge rounded-pill" [class.text-bg-success]="editorDelay2On()" [class.text-bg-secondary]="!editorDelay2On()">{{ editorDelay2On() ? 'On' : 'Off' }}</span>
+                          }
+                        </div>
+                        @if (item.typeLabel) {
+                          <span class="badge rounded-pill text-bg-light border mt-1 live-chain-type">{{ item.typeLabel }}</span>
+                        }
                         <div class="small text-secondary">{{ item.subtitle }}</div>
                       </div>
                     </div>
@@ -273,56 +281,12 @@
                   }
 
                   <div class="effects-card-wrap">
-                  @if (liveEditorShowsBlock('delay')) {
-                  <article class="border rounded p-2 effect-card">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                      <div class="d-flex align-items-center gap-2">
-                        <h4 class="h6 mb-0">Delay 2</h4>
-                      </div>
-                      <label class="form-check-label small d-flex align-items-center gap-1">
-                        <input class="form-check-input m-0" type="checkbox" [checked]="editorDelay2On()" (change)="setEditorDelay2On($any($event.target).checked)" />
-                        <span>Delay 2 Enabled</span>
-                      </label>
-                    </div>
-                    <div class="row g-2">
-                      <div class="col-12 col-md-6">
-                        <label class="form-label small mb-1">Type</label>
-                        <select class="form-select form-select-sm" (change)="setEditorDelay2Type($any($event.target).value)">
-                          @for (opt of stageTypeOptions('delay'); track opt.value) {
-                            <option [value]="opt.value" [selected]="editorDelay2Type() === opt.value">{{ opt.label }}</option>
-                          }
-                        </select>
-                        <div class="small text-body-secondary mt-1">Selected: {{ editorDelay2TypeLabel() }}</div>
-                      </div>
-                    </div>
-                    <div class="row g-2 mt-1">
-                      @for (param of editorDelay2Params(); track param.id) {
-                        <div class="col-12 col-md-6">
-                          @if (stageParamIsToggle(param)) {
-                            <label class="form-label small mb-1">{{ param.label }}</label>
-                            <div class="form-check form-switch editor-toggle-field">
-                              <input class="form-check-input" type="checkbox" [checked]="param.value === param.max" (change)="setEditorDelay2Param(param.key, $any($event.target).checked ? param.max : param.min)" />
-                              <span class="small text-secondary">{{ stageParamToggleLabel(param) }}</span>
-                            </div>
-                          } @else {
-                            <label class="form-label small mb-1">{{ param.label }} <span class="text-secondary">[{{ param.min }}..{{ param.max }}]</span></label>
-                            <div class="editor-range-field">
-                              <input type="range" [min]="param.min" [max]="param.max" class="form-range editor-range-slider" [value]="param.value" (input)="setEditorDelay2Param(param.key, $any($event.target).value)" />
-                              <input type="number" [min]="param.min" [max]="param.max" class="form-control form-control-sm editor-range-value" [value]="param.value" (input)="setEditorDelay2Param(param.key, $any($event.target).value)" />
-                            </div>
-                          }
-                        </div>
-                      }
-                    </div>
-                  </article>
-                  }
-
                   @for (stageName of ['booster', 'mod', 'fx', 'delay', 'reverb']; track stageName) {
                     @if (liveEditorShowsBlock($any(stageName))) {
                     <article class="border rounded p-2 effect-card">
                       <div class="d-flex justify-content-between align-items-center mb-2">
                         <div class="d-flex align-items-center gap-2">
-                          <h4 class="h6 mb-0 text-capitalize" [class.text-success]="editorStageOn($any(stageName))" [class.text-danger]="!editorStageOn($any(stageName))">{{ stageName }}</h4>
+                          <h4 class="h6 mb-0 text-capitalize" [class.text-success]="editorStageOn($any(stageName))" [class.text-danger]="!editorStageOn($any(stageName))">{{ stageName === 'delay' ? 'Delay 1' : stageName }}</h4>
                           <span class="badge rounded-pill" [class.text-bg-success]="editorStageOn($any(stageName))" [class.text-bg-secondary]="!editorStageOn($any(stageName))">
                             {{ editorStageOn($any(stageName)) ? 'On' : 'Off' }}
                           </span>
@@ -419,6 +383,50 @@
                       </div>
                     </article>
                     }
+                  }
+
+                  @if (liveEditorShowsBlock('delay')) {
+                  <article class="border rounded p-2 effect-card">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <div class="d-flex align-items-center gap-2">
+                        <h4 class="h6 mb-0">Delay 2</h4>
+                      </div>
+                      <label class="form-check-label small d-flex align-items-center gap-1">
+                        <input class="form-check-input m-0" type="checkbox" [checked]="editorDelay2On()" (change)="setEditorDelay2On($any($event.target).checked)" />
+                        <span>Delay 2 Enabled</span>
+                      </label>
+                    </div>
+                    <div class="row g-2">
+                      <div class="col-12 col-md-6">
+                        <label class="form-label small mb-1">Type</label>
+                        <select class="form-select form-select-sm" (change)="setEditorDelay2Type($any($event.target).value)">
+                          @for (opt of stageTypeOptions('delay'); track opt.value) {
+                            <option [value]="opt.value" [selected]="editorDelay2Type() === opt.value">{{ opt.label }}</option>
+                          }
+                        </select>
+                        <div class="small text-body-secondary mt-1">Selected: {{ editorDelay2TypeLabel() }}</div>
+                      </div>
+                    </div>
+                    <div class="row g-2 mt-1">
+                      @for (param of editorDelay2Params(); track param.id) {
+                        <div class="col-12 col-md-6">
+                          @if (stageParamIsToggle(param)) {
+                            <label class="form-label small mb-1">{{ param.label }}</label>
+                            <div class="form-check form-switch editor-toggle-field">
+                              <input class="form-check-input" type="checkbox" [checked]="param.value === param.max" (change)="setEditorDelay2Param(param.key, $any($event.target).checked ? param.max : param.min)" />
+                              <span class="small text-secondary">{{ stageParamToggleLabel(param) }}</span>
+                            </div>
+                          } @else {
+                            <label class="form-label small mb-1">{{ param.label }} <span class="text-secondary">[{{ param.min }}..{{ param.max }}]</span></label>
+                            <div class="editor-range-field">
+                              <input type="range" [min]="param.min" [max]="param.max" class="form-range editor-range-slider" [value]="param.value" (input)="setEditorDelay2Param(param.key, $any($event.target).value)" />
+                              <input type="number" [min]="param.min" [max]="param.max" class="form-control form-control-sm editor-range-value" [value]="param.value" (input)="setEditorDelay2Param(param.key, $any($event.target).value)" />
+                            </div>
+                          }
+                        </div>
+                      }
+                    </div>
+                  </article>
                   }
 
                   @for (eqName of ['eq1', 'eq2']; track eqName) {

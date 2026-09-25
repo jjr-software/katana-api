@@ -1486,12 +1486,10 @@ export class App implements OnInit, OnDestroy {
   }
 
   liveChainSelectors(): readonly LiveChainSelector[] {
-    let delaySelectorShown = false;
     return this.editorRoutingChainOrder().map((id) => {
       if (id === 'dly1' || id === 'dly2') {
-        const block = delaySelectorShown ? null : 'delay';
-        delaySelectorShown = true;
-        return { id, block, label: routingChainBlockLabel(id), subtitle: block ? 'Delay settings' : 'Edit in Delay', typeLabel: block ? this.liveChainTypeLabel(id) : null };
+        const block = id === 'dly1' ? 'delay' : null;
+        return { id, block, label: routingChainBlockLabel(id), subtitle: block ? 'Delay settings' : 'Edit in Delay settings', typeLabel: this.liveChainTypeLabel(id) };
       }
       if (id === 'fv') {
         return { id, block: null, label: 'Foot Volume', subtitle: 'Pedal volume stage', typeLabel: null };
@@ -4585,7 +4583,7 @@ export class App implements OnInit, OnDestroy {
       case 'dly1':
         return this.stageTypeChainLabel('delay', 'Delay 1');
       case 'dly2':
-        return this.stageTypeChainLabel('delay', 'Delay 2');
+        return this.editorDelay2TypeLabel() === 'n/a' ? 'Delay 2' : `Delay 2: ${this.editorDelay2TypeLabel()}`;
       case 'rev':
         return this.stageTypeChainLabel('reverb', 'Reverb');
       case 'eq':
