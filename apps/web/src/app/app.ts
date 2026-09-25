@@ -6078,7 +6078,7 @@ export class App implements OnInit, OnDestroy {
   private applyOperationalLivePatchStatus(payload: AmpOperationalLivePatch): void {
     const draft = this.editorPatchDraft();
     const sameSlotAmpChangedUnderDraft = draft !== null && !this.editorLiveApplyInFlight &&
-      this.selectedAmpSlot() === payload.active_slot &&
+      this.editorSlotNumber() === payload.active_slot &&
       this.patchFingerprint(draft) !== this.editorLiveApplyLastAppliedFingerprint &&
       this.patchFingerprint(payload.patch_json) !== this.editorLiveApplyLastAppliedFingerprint;
     if (sameSlotAmpChangedUnderDraft && !this.isAmpStateConflictModalOpen()) {
