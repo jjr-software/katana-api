@@ -4,6 +4,7 @@ import re
 import time
 from contextlib import suppress
 from dataclasses import dataclass
+from hashlib import sha256
 from typing import Any, cast
 
 from app.hashing import canonical_blob, snapshot_hash
@@ -12,6 +13,8 @@ from app.katana.protocol import (
     ADDR_PATCH_BOOSTER_1,
     ADDR_PATCH_COLOR,
     ADDR_PATCH_COM,
+    ADDR_PATCH_CONTOUR_COM,
+    ADDR_PATCH_CONTOUR_1,
     CURRENT_PATCH_NUMBER_ADDR,
     ADDR_PATCH_DELAY_1,
     ADDR_PATCH_DELAY_4,
@@ -439,6 +442,8 @@ class AmpClient:
         reverb_variants = [await self._read_rq1(addr_add(ADDR_PATCH_REVERB_1, 0x200 * i), 13) for i in range(3)]
 
         solo_com = await self._read_rq1(ADDR_PATCH_SOLO_COM, 2)
+        contour_com = await self._read_rq1(ADDR_PATCH_CONTOUR_COM, 1)
+        contour_variants = [await self._read_rq1(addr_add(ADDR_PATCH_CONTOUR_1, 0x200 * i), 2) for i in range(3)]
         pedalfx_com = await self._read_rq1(ADDR_PATCH_PEDALFX_COM, 3)
         pedalfx = await self._read_rq1(ADDR_PATCH_PEDALFX, 15)
         exp_pedal_func = await self._read_rq1(ADDR_PATCH_EXPPDL_FUNC, 1)
@@ -584,6 +589,10 @@ class AmpClient:
                     "on": self._bool_flag(solo_com[0]) if len(solo_com) >= 1 else False,
                     "effect_level": solo_com[1] if len(solo_com) >= 2 else None,
                     "raw": solo_com,
+                },
+                "contour": {
+                    "raw": contour_com,
+                    "variants_raw": contour_variants,
                 },
                 "pedalfx": {
                     "position": pedalfx_com[0] if len(pedalfx_com) >= 1 else None,
@@ -745,7 +754,16 @@ class AmpClient:
                 field_name="stages.delay.raw",
             )
             delay2_data = delay_obj.get("delay2_raw")
-            if isinstance(delay2_data, list):
+            delay2_variants = delay_obj.get("variants2_raw")
+            if isinstance(delay2_variants, list):
+                for i, variant in enumerate(delay2_variants):
+                    if i == colors[3] and isinstance(delay2_data, list):
+                        variant = delay2_data
+                    await self._send_only(build_dt1(
+                        addr_add(ADDR_PATCH_DELAY_4, 0x200 * i),
+                        self._to_int_list(variant, expected_size=17, field_name="stages.delay.variants2_raw"),
+                    ))
+            elif isinstance(delay2_data, list):
                 await self._send_only(
                     build_dt1(
                         addr_add(ADDR_PATCH_DELAY_4, 0x200 * colors[3]),
@@ -879,6 +897,19 @@ class AmpClient:
                     ),
                 )
             )
+        contour_obj = stages_obj.get("contour")
+        if isinstance(contour_obj, dict):
+            for i, variant in enumerate(contour_obj.get("variants_raw", [])):
+                await self._send_only(build_dt1(
+                    addr_add(ADDR_PATCH_CONTOUR_1, 0x200 * i),
+                    self._to_int_list(variant, expected_size=2, field_name="stages.contour.variants_raw"),
+                ))
+            if isinstance(contour_obj.get("raw"), list):
+                await self._send_only(build_dt1(
+                    ADDR_PATCH_CONTOUR_COM,
+                    self._to_int_list(contour_obj["raw"], expected_size=1, field_name="stages.contour.raw"),
+                ))
+
         pedalfx_obj = stages_obj.get("pedalfx")
         if isinstance(pedalfx_obj, dict):
             await self._send_only(
@@ -1412,6 +1443,14 @@ class AmpClient:
     ) -> None:
         if not isinstance(stage_obj, dict):
             return
+        variants = stage_obj.get("variants_raw")
+        if isinstance(variants, list):
+            for i, variant in enumerate(variants):
+                if i == color_index and isinstance(stage_obj.get("raw"), list):
+                    variant = stage_obj["raw"]
+                data = self._to_int_list(variant, expected_size=size, field_name=field_name)
+                await self._send_only(build_dt1(addr_add(base_addr, 0x200 * i), data))
+            return
         raw = stage_obj.get("raw")
         if not isinstance(raw, list):
             return
@@ -1440,6 +1479,15 @@ class AmpClient:
         field_name: str,
     ) -> None:
         if not isinstance(stage_obj, dict):
+            return
+        variants = stage_obj.get("variants_raw")
+        if isinstance(variants, list):
+            for i, variant in enumerate(variants):
+                if i == color_index and isinstance(stage_obj.get("raw"), list):
+                    variant = stage_obj["raw"]
+                await self._write_fx_stage_variant(
+                    {"raw": variant}, i, type_base_addr, detail_base_addr, field_name,
+                )
             return
         raw = stage_obj.get("raw")
         if not isinstance(raw, list):

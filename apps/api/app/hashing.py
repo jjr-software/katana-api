@@ -107,6 +107,14 @@ def canonicalize_snapshot_for_hash(snapshot: dict[str, Any]) -> dict[str, Any]:
             if out:
                 stages_out["reverb"] = out
 
+        contour = stages.get("contour")
+        if isinstance(contour, dict):
+            stages_out["contour"] = {
+                key: contour[key]
+                for key in ("raw", "variants_raw")
+                if isinstance(contour.get(key), list)
+            }
+
         for eq_name in ("eq1", "eq2"):
             eq = stages.get(eq_name)
             if isinstance(eq, dict):

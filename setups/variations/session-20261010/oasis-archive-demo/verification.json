@@ -1,0 +1,9 @@
+{
+  "slot": "B:4",
+  "patch_name": "Oasis Demo",
+  "source": "imports/windows-bts-sda2/gen3/8 / 20251026 / Oasis",
+  "persisted_after_reselect": true,
+  "matches_requested_fields": true,
+  "differences": [],
+  "hash": "93376f25d1a37c8e45490e226a649775160a56d263ef86e1fc8f46f1c0465ab2"
+}
